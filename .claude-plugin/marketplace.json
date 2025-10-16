@@ -3,12 +3,12 @@
   "owner": {
     "name": "Nick Huang"
   },
-  "description": "Nick's personal Claude Code plugin marketplace for Agent-First workflow and other productivity tools",
+  "description": "Nick's personal Claude Code plugin marketplace featuring OMT and other productivity tools",
   "plugins": [
     {
-      "name": "agent-first",
-      "source": "./agent-first",
-      "description": "Complete Agent-First workflow system with autonomous agents, task management, and intelligent code review"
+      "name": "omt",
+      "source": "./omt",
+      "description": "OMT - One Man Team: Your personal development squad powered by Agent-First workflow with 9 autonomous agents"
     }
   ]
 }

@@ -1,10 +1,10 @@
-# Agent-First Workflow Plugin
+# OMT - One Man Team Plugin
 
-A comprehensive Agent-First development workflow system for Claude Code, featuring autonomous agents, intelligent task management, and automated quality assurance.
+A comprehensive Agent-First development workflow system for Claude Code, featuring 9 autonomous agents, intelligent task management, and automated quality assurance. Your personal development squad that makes one person feel like a team.
 
 ## Overview
 
-This plugin transforms your development workflow by introducing an **Agent-First** approach where:
+**OMT (One Man Team)** transforms your development workflow by introducing an **Agent-First** approach where:
 - **Agents handle complex automation** - Autonomous execution of multi-step tasks
 - **Commands are for critical decisions** - Human input only at key decision points
 - **Quality is built-in** - Automated code review, testing, and git commit workflows
@@ -65,13 +65,13 @@ This plugin transforms your development workflow by introducing an **Agent-First
 ### 1. Add Marketplace
 
 ```bash
-/plugin marketplace add nickhuang/cc-plugins
+/plugin marketplace add musingfox/cc-plugins
 ```
 
 ### 2. Install Plugin
 
 ```bash
-/plugin install agent-first
+/plugin install omt
 ```
 
 ### 3. Initialize Workspace
@@ -312,7 +312,7 @@ MIT License
 ## Support
 
 For issues and feedback:
-- GitHub Issues: https://github.com/nickhuang/cc-plugins/issues
+- GitHub Issues: https://github.com/musingfox/cc-plugins/issues
 - Documentation: Plugin installation includes complete docs
 
 ---

@@ -7,14 +7,14 @@ Personal marketplace for Claude Code plugins focused on developer productivity a
 Add this marketplace to your Claude Code:
 
 ```bash
-/plugin marketplace add nickhuang/cc-plugins
+/plugin marketplace add musingfox/cc-plugins
 ```
 
 ## Available Plugins
 
-### Agent-First Workflow
+### OMT - One Man Team
 
-Complete Agent-First development system featuring:
+Your personal development squad powered by Agent-First workflow:
 - **Autonomous Agents**: 9 specialized agents for planning, coding, reviewing, debugging, and optimization
 - **Task Management**: Integrated with Linear, GitHub Issues, Jira, or local files
 - **Quality Assurance**: Automated code review and git commit workflows
@@ -23,7 +23,7 @@ Complete Agent-First development system featuring:
 
 **Installation:**
 ```bash
-/plugin install agent-first
+/plugin install omt
 ```
 
 ## Plugin Development
@@ -36,7 +36,7 @@ This repository serves as both a marketplace and a development workspace for cus
 cc-plugins/
 ├── .claude-plugin/
 │   └── marketplace.json          # Marketplace configuration
-├── agent-first/                   # Agent-First workflow plugin
+├── omt/                          # OMT - One Man Team plugin
 │   ├── .claude-plugin/
 │   │   └── plugin.json
 │   ├── commands/
