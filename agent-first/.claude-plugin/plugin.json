@@ -1,0 +1,21 @@
+{
+  "name": "agent-first",
+  "description": "Complete Agent-First workflow system with autonomous agents, task management, and intelligent code review",
+  "version": "1.0.0",
+  "author": {
+    "name": "Nick Huang",
+    "email": "nick@example.com"
+  },
+  "keywords": [
+    "agent",
+    "workflow",
+    "automation",
+    "tdd",
+    "code-review",
+    "task-management",
+    "linear",
+    "retrospective"
+  ],
+  "homepage": "https://github.com/nickhuang/cc-plugins/tree/main/agent-first",
+  "license": "MIT"
+}
