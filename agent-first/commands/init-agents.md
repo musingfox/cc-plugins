@@ -1,3 +1,9 @@
+---
+name: init-agents
+description: Initialize Agent-First workflow structure in the current project. Sets up agent workspace, task management, and configuration.
+model: haiku
+---
+
 # Init Agents Workspace
 
 Initialize Agent-First workflow structure in the current project.

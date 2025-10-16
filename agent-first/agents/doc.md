@@ -1,6 +1,7 @@
 ---
 name: doc
 description: Autonomous documentation generation and maintenance specialist that ensures all implementations have complete and accurate documentation
+model: haiku
 tools: Bash, Glob, Grep, Read, Edit, MultiEdit, Write, TodoWrite, BashOutput, KillBash
 ---
 

@@ -1,6 +1,7 @@
 ---
 name: optimizer
 description: Performance optimization and code architecture improvement specialist focused on technical debt reduction, scalability enhancement, and maintainability improvement without changing external behavior.
+model: sonnet
 tools: Bash, Glob, Grep, Read, Edit, MultiEdit, Write, TodoWrite, BashOutput, KillBash
 ---
 

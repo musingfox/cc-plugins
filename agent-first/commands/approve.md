@@ -1,3 +1,9 @@
+---
+name: approve
+description: Review and approve important code changes (API, schema, security) before automatic commit. Critical decision point for quality assurance.
+model: opus
+---
+
 # Approve Command
 
 **Command Type**: Critical Decision Point

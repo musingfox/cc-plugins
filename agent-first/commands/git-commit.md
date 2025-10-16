@@ -1,3 +1,9 @@
+---
+name: git-commit
+description: Manual git commit creation for emergency situations. Creates conventional commit messages with proper attribution.
+model: haiku
+---
+
 # Git Commit Mode
 
 Switch to Git Commit mode for automated git commit creation with conventional commit message format.

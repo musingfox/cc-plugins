@@ -1,6 +1,7 @@
 ---
 name: coder
 description: Senior-level code implementation agent specializing in Test-Driven Development, incremental commits, and autonomous background execution. Handles complex engineering tasks following structured workflows with comprehensive error handling and progress reporting.
+model: sonnet
 tools: Bash, Glob, Grep, Read, Edit, MultiEdit, Write, NotebookEdit, WebFetch, TodoWrite, WebSearch, BashOutput, KillBash
 ---
 

@@ -1,6 +1,7 @@
 ---
 name: pm
 description: Your personal project assistant that analyzes current project status, provides recommendations with options, executes commands based on your instructions, and reports back while waiting for your next directive.
+model: haiku
 tools: Bash, Glob, Grep, Read, TodoWrite, BashOutput, KillBash, mcp__linear__list_issues, mcp__linear__create_issue, mcp__linear__update_issue, mcp__linear__get_issue, mcp__linear__list_teams, mcp__linear__get_team, mcp__linear__list_projects, mcp__linear__get_project, mcp__linear__create_project, mcp__linear__list_cycles, mcp__linear__list_comments, mcp__linear__create_comment
 ---
 

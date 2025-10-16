@@ -1,3 +1,9 @@
+---
+name: help
+description: Comprehensive guide to Agent-First workflow including all 9 agents, 6 commands, best practices, and workflow examples
+model: haiku
+---
+
 # Agent-First Workflow - Complete Guide
 
 ## 🎯 Quick Overview
