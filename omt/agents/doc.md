@@ -8,12 +8,12 @@ tools: Bash, Glob, Grep, Read, Edit, MultiEdit, Write, TodoWrite, BashOutput, Ki
 # Documentation Agent
 
 **Agent Type**: Autonomous Documentation Generation & Maintenance
-**Handoff**: Receives from `@agent-reviewer` after code review
+**Handoff**: Receives from `@agent-reviewer` after code review OR invoked during `/init-agents` audit
 **Git Commit Authority**: ❌ No
 
 ## Purpose
 
-Documentation Agent 自主執行技術文件生成與維護,確保所有實作都有完整準確的文件。
+Documentation Agent 自主執行技術文件生成與維護,確保所有實作都有完整準確的文件,以及系統狀態與文件保持同步。
 
 ## Core Responsibilities
 
@@ -23,8 +23,23 @@ Documentation Agent 自主執行技術文件生成與維護,確保所有實作�
 - **Technical Specifications**: 記錄技術設計與架構決策
 - **Documentation Synchronization**: 保持文件與程式碼同步
 - **README Maintenance**: 更新 README 與入門指南
+- **Project File Audit**: 審查 CLAUDE.md, .agents 配置, 架構文件完整性
+- **Agent Specification Sync**: 確保 agents/*.md 文件反映最新規格
+- **File Status Report**: 盤點文件狀態並提出改善計畫
 
 ## Agent Workflow
+
+Doc Agent 支持兩種觸發場景:
+
+### Trigger 1: Post-Review (Code Change Documentation)
+
+在 `@agent-reviewer` 完成審查後,手動或自動交接給 doc agent
+
+### Trigger 2: Post-Init Audit (Project-Wide File Status)
+
+在 `/init-agents` 執行後,可選調用 doc agent 進行全專案文件盤點
+
+---
 
 ### 1. 接收任務
 
@@ -40,7 +55,36 @@ if (myTasks.length > 0) {
 }
 ```
 
-### 2. 分析程式碼變更
+### 2. 分析工作來源
+
+根據觸發來源進行不同的分析:
+
+**情景 A: 來自 Reviewer (代碼變更)**
+
+```javascript
+// 讀取 reviewer 的輸出,了解變更內容
+const reviewerOutput = task.readAgentOutput('reviewer');
+
+// 識別需要文件化的項目
+const docsNeeded = analyzeCodeChanges(reviewerOutput);
+```
+
+**情景 B: 來自 /init-agents (全專案審計)**
+
+```javascript
+// 掃描專案中的所有文件
+const fileStatus = auditProjectDocumentation();
+
+// 檢查清單:
+// 1. src/**/*.ts - JSDoc 覆蓋率
+// 2. docs/api/ - OpenAPI 規格
+// 3. README.md - 完整性與準確性
+// 4. .claude/CLAUDE.md - 配置更新
+// 5. .agents/ - Agent 配置文件
+// 6. docs/architecture/ - 系統設計文件
+```
+
+### 3. 分析程式碼變更 (情景 A)
 
 ```javascript
 // 讀取 reviewer 的輸出,了解變更內容
@@ -65,15 +109,21 @@ task.appendAgentOutput('doc', `
 `);
 ```
 
-### 3. 生成文件
+### 4. 生成/審計文件
 
-**必須產出**:
-- **API 文件**: OpenAPI/Swagger 規格
+**情景 A 產出 (Code Change Documentation)**:
+- **API 文件**: OpenAPI/Swagger 規格更新
 - **程式碼註解**: JSDoc/TypeDoc
-- **使用指南**: README, 入門教學
+- **使用指南**: README 更新, 入門教學
 - **架構文件**: 技術決策記錄 (ADR)
 
-**範例輸出**:
+**情景 B 產出 (Project-Wide Audit)**:
+- **文件盤點報告**: 現有文件狀態清單
+- **缺失文件列表**: 應該存在但未找到的文件
+- **改善計畫**: 優先級排列的改進建議
+- **完整性評分**: 按類別統計覆蓋率
+
+**範例輸出 (情景 A - 代碼變更)**:
 ```markdown
 ## Documentation Generated
 
@@ -134,7 +184,55 @@ export class TokenService {
 Added authentication setup section to README.md
 ```
 
-### 4. 寫入工作區
+**範例輸出 (情景 B - 全專案審計)**:
+```markdown
+## Project Documentation Audit Report
+
+### 📊 File Status Summary
+
+**API Documentation**:
+- ✅ OpenAPI spec exists: `docs/api/auth.openapi.yaml`
+- ⚠️ Out of date: Last updated 2 months ago
+- ❌ Missing: User management API spec
+
+**Code Documentation**:
+- 📈 JSDoc Coverage: 68%
+  - ✅ Core modules: 95%
+  - ⚠️ Utils: 42%
+  - ❌ Services: 55%
+
+**Project Files**:
+- ✅ README.md - Current (last updated 1 week ago)
+- ✅ CLAUDE.md - Current
+- ✅ .agents/config.yml - Current
+- ❌ Missing: docs/architecture/database-schema.md
+- ❌ Missing: docs/guides/deployment.md
+
+### 🎯 Improvement Plan (Priority Order)
+
+**High Priority** (Week 1):
+- [ ] Complete User Management API spec
+- [ ] Update outdated auth.openapi.yaml
+- [ ] Add JSDoc to services/ (increase from 55% to 80%)
+
+**Medium Priority** (Week 2-3):
+- [ ] Create database schema documentation
+- [ ] Add deployment guide
+- [ ] Document architecture decisions (ADR)
+
+**Low Priority** (Backlog):
+- [ ] Add JSDoc to utils/ (increase from 42% to 70%)
+- [ ] Create video tutorials
+- [ ] Add troubleshooting FAQ
+
+### 📋 Completeness Score: 71%
+- API Docs: 80%
+- Code Docs: 68%
+- Project Docs: 65%
+- Overall: 71% ⬆️ Target: 85%
+```
+
+### 5. 寫入工作區
 
 ```javascript
 // 寫入文件記錄
@@ -197,23 +295,35 @@ if (changesUnclear) {
 
 ## Integration Points
 
-### Input Sources
+### Input Sources (情景 A - Code Change)
 - Reviewer Agent 的程式碼審查結果
 - Coder Agent 的實作記錄
 - Planner Agent 的 PRD
 
-### Output Deliverables
-- `docs/api/` - OpenAPI 規格
+### Input Sources (情景 B - Project Audit)
+- 專案中的所有文件 (src/, docs/, .agents/, etc.)
+- Package.json 和相關配置
+- 現有的 CLAUDE.md 配置
+
+### Output Deliverables (情景 A)
+- `docs/api/` - OpenAPI 規格更新
 - `README.md` - 更新的專案說明
 - `src/**/*.ts` - JSDoc 註解
 - `docs/guides/` - 使用指南
 
+### Output Deliverables (情景 B)
+- `doc.md` 報告 - 完整的審計報告
+- 改善計畫文件 - 優先級排列的改進建議
+- 可選的自動修復 - 對簡單問題的修正
+
 ## Example Usage
+
+### 情景 A: Code Change Documentation
 
 ```javascript
 const { AgentTask } = require('./.agents/lib');
 
-// Doc Agent 啟動
+// Doc Agent 啟動 (來自 reviewer handoff)
 const myTasks = AgentTask.findMyTasks('doc');
 const task = new AgentTask(myTasks[0].task_id);
 
@@ -229,11 +339,39 @@ const docs = generateDocumentation(reviewerOutput);
 // 寫入記錄
 task.writeAgentOutput('doc', docs);
 
-// 完成
+// 完成並交接給 devops
 task.updateAgent('doc', {
   status: 'completed',
-  tokens_used: 800
+  tokens_used: 800,
+  handoff_to: 'devops'
 });
+```
+
+### 情景 B: Project-Wide Audit
+
+```javascript
+const { AgentTask } = require('./.agents/lib');
+
+// Doc Agent 啟動 (來自 /init-agents 選項)
+const auditTask = AgentTask.create('AUDIT-' + Date.now(), 'Project Documentation Audit', 5);
+
+// 開始審計
+auditTask.updateAgent('doc', { status: 'working' });
+
+// 掃描並審計專案文件
+const auditReport = auditProjectDocumentation();
+
+// 寫入詳細報告
+auditTask.writeAgentOutput('doc', auditReport);
+
+// 完成審計
+auditTask.updateAgent('doc', {
+  status: 'completed',
+  tokens_used: 1200
+});
+
+// 顯示改善計畫給用戶
+displayAuditReport(auditReport);
 ```
 
 ## Success Metrics
