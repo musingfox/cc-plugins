@@ -187,40 +187,40 @@ runtime:
 # Agent Task States Definition
 task_states:
   pending:
-    description: "任務已建立,等待開始"
+    description: "Task created, waiting to start"
     next_states: ["in_progress", "blocked", "cancelled"]
 
   in_progress:
-    description: "任務進行中"
+    description: "Task in progress"
     next_states: ["completed", "blocked", "failed"]
 
   blocked:
-    description: "任務被阻擋,需要人工介入"
+    description: "Task blocked, requires human intervention"
     next_states: ["in_progress", "cancelled"]
 
   completed:
-    description: "任務已完成"
+    description: "Task completed"
     next_states: []
 
   failed:
-    description: "任務失敗,無法完成"
+    description: "Task failed, cannot complete"
     next_states: ["pending", "cancelled"]
 
   cancelled:
-    description: "任務已取消"
+    description: "Task cancelled"
     next_states: []
 
 agent_states:
   idle:
-    description: "Agent 閒置,等待任務"
+    description: "Agent idle, waiting for tasks"
   working:
-    description: "Agent 工作中"
+    description: "Agent working"
   completed:
-    description: "Agent 完成自己的部分"
+    description: "Agent completed its part"
   blocked:
-    description: "Agent 遇到問題,無法繼續"
+    description: "Agent encountered issues, cannot continue"
   skipped:
-    description: "Agent 被跳過"
+    description: "Agent skipped"
 
 complexity_scale:
   values: [1, 2, 3, 5, 8, 13, 21, 34, 55, 89]

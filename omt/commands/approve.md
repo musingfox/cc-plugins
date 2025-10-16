@@ -11,103 +11,103 @@ model: opus
 
 ## Purpose
 
-`/approve` 命令用於人工審查重要變更,特別是 API 變更、Schema 變更、重大重構等需要明確批准的修改。
+The `/approve` command is used for manual review of important changes, especially API changes, schema modifications, major refactoring, and other changes requiring explicit approval.
 
 ## When to Use
 
-### 必須使用 /approve 的情況:
+### Required Use Cases for /approve:
 
-1. **API 變更**
-   - 新增/修改 public API endpoint
-   - 變更 API request/response schema
-   - API 版本升級
+1. **API Changes**
+   - Add/modify public API endpoints
+   - Change API request/response schemas
+   - API version upgrades
 
-2. **Database Schema 變更**
-   - 新增/修改 table schema
-   - 資料庫遷移腳本
-   - 索引變更
+2. **Database Schema Changes**
+   - Add/modify table schemas
+   - Database migration scripts
+   - Index changes
 
-3. **重大重構**
-   - 架構模式變更
-   - 核心模組重寫
-   - 依賴版本主要升級
+3. **Major Refactoring**
+   - Architecture pattern changes
+   - Core module rewrites
+   - Major dependency version upgrades
 
-4. **安全性變更**
-   - 認證/授權機制修改
-   - 密碼處理邏輯變更
-   - 安全性配置調整
+4. **Security Changes**
+   - Authentication/authorization mechanism modifications
+   - Password handling logic changes
+   - Security configuration adjustments
 
-5. **效能關鍵變更**
-   - 快取策略變更
-   - 資料庫查詢優化
-   - 負載平衡配置
+5. **Performance-Critical Changes**
+   - Cache strategy changes
+   - Database query optimizations
+   - Load balancing configuration
 
-### 不需要使用 /approve 的情況:
+### Cases Where /approve is NOT Required:
 
-- 小型 bug 修復
-- 程式碼註解更新
-- 單元測試新增
-- 文件更新
-- 樣式調整
+- Minor bug fixes
+- Code comment updates
+- Unit test additions
+- Documentation updates
+- Style adjustments
 
 ## Usage
 
 ```bash
-# 基本使用
+# Basic usage
 /approve
 
-# 系統會顯示待審查的變更
-# 你需要:
-# 1. 檢視變更內容
-# 2. 決定批准或退回
-# 3. (可選) 提供審查意見
+# System will display changes awaiting review
+# You need to:
+# 1. Review change details
+# 2. Decide to approve or reject
+# 3. (Optional) Provide review comments
 ```
 
 ## Workflow Integration
 
-### 觸發時機
+### Trigger Point
 
-`@agent-reviewer` 在偵測到重要變更時會自動提示需要人工審查:
+`@agent-reviewer` automatically prompts for manual review when important changes are detected:
 
 ```markdown
-🔍 重要變更偵測
+🔍 Important Change Detected
 
-**變更類型**: API Schema 修改
-**影響範圍**: POST /auth/login
+**Change Type**: API Schema Modification
+**Impact Scope**: POST /auth/login
 
-需要人工審查,請執行: /approve
+Manual review required, please run: /approve
 ```
 
-### 審查流程
+### Review Process
 
 ```mermaid
 graph LR
-    A[@agent-coder<br/>完成實作] --> B[@agent-reviewer<br/>自動審查]
-    B --> C{偵測到<br/>重要變更?}
+    A[@agent-coder<br/>Complete Implementation] --> B[@agent-reviewer<br/>Automatic Review]
+    B --> C{Important<br/>Change<br/>Detected?}
 
-    C -->|是| D[🛑 暫停]
-    C -->|否| F[✅ 自動 commit]
+    C -->|Yes| D[🛑 Pause]
+    C -->|No| F[✅ Auto Commit]
 
-    D --> E[/approve<br/>人工審查]
-    E --> G{批准?}
+    D --> E[/approve<br/>Manual Review]
+    E --> G{Approved?}
 
-    G -->|批准| H[@agent-reviewer<br/>完成 commit]
-    G -->|退回| I[@agent-coder<br/>修改]
+    G -->|Approved| H[@agent-reviewer<br/>Complete Commit]
+    G -->|Rejected| I[@agent-coder<br/>Modify]
 
     I --> B
 ```
 
-### 審查選項
+### Review Options
 
-執行 `/approve` 後會看到:
+After running `/approve`, you'll see:
 
 ```markdown
-## 待審查變更
+## Changes Awaiting Review
 
-**任務**: LIN-123 - User Authentication API
-**變更類型**: API Schema 修改
+**Task**: LIN-123 - User Authentication API
+**Change Type**: API Schema Modification
 
-### 變更摘要
+### Change Summary
 
 **Modified Files**:
 - src/routes/auth.routes.ts
@@ -124,33 +124,33 @@ POST /auth/login
 + Response: { accessToken, refreshToken, sessionId }
 ```
 
-**影響分析**:
-- 破壞性變更: ❌ 否 (向後相容)
-- 需要前端調整: ✅ 是 (新增 deviceId 欄位)
-- 需要文件更新: ✅ 是 (已完成)
+**Impact Analysis**:
+- Breaking Change: ❌ No (backward compatible)
+- Frontend Adjustment Needed: ✅ Yes (add deviceId field)
+- Documentation Update Needed: ✅ Yes (completed)
 
 ---
 
-**選項**:
-A) ✅ 批准並 commit
-B) ❌ 退回修改 (附帶意見)
-C) 🔍 查看詳細 diff
-D) 📝 新增審查註記後批准
+**Options**:
+A) ✅ Approve and commit
+B) ❌ Reject with feedback
+C) 🔍 View detailed diff
+D) 📝 Add review notes and approve
 
-請選擇 (A/B/C/D):
+Please select (A/B/C/D):
 ```
 
 ## Response Examples
 
-### 選項 A: 批准並 commit
+### Option A: Approve and Commit
 
 ```markdown
-✅ 變更已批准
+✅ Changes Approved
 
-@agent-reviewer 將執行以下操作:
-1. 標記審查通過
-2. 建立 git commit
-3. 更新任務狀態
+@agent-reviewer will execute the following operations:
+1. Mark review as passed
+2. Create git commit
+3. Update task status
 
 Commit message:
 feat(LIN-123): add device tracking to auth API
@@ -165,14 +165,14 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 Reviewed-By: [Your Name]
 ```
 
-### 選項 B: 退回修改
+### Option B: Reject with Feedback
 
 ```markdown
-❌ 變更已退回
+❌ Changes Rejected
 
-**審查意見**:
-deviceId 欄位應該是可選的,不應強制要求。
-建議調整 schema 為:
+**Review Feedback**:
+The deviceId field should be optional, not mandatory.
+Suggested schema adjustment:
 ```typescript
 {
   email: string;
@@ -181,34 +181,34 @@ deviceId 欄位應該是可選的,不應強制要求。
 }
 ```
 
-任務已標記為需要修改,@agent-coder 將收到通知。
+Task has been marked for modification, @agent-coder will be notified.
 ```
 
-### 選項 C: 查看詳細 diff
+### Option C: View Detailed Diff
 
-顯示完整的 git diff 輸出
+Displays complete git diff output
 
-### 選項 D: 新增審查註記後批准
+### Option D: Add Review Notes and Approve
 
 ```markdown
-**審查註記**:
-API 變更已確認,但需注意:
-1. 前端團隊需要同步更新
-2. 舊版 mobile app 可能需要處理向後相容
-3. 建議在下個 sprint 通知使用者升級
+**Review Notes**:
+API changes confirmed, but note:
+1. Frontend team needs to synchronize updates
+2. Legacy mobile app may need backward compatibility handling
+3. Recommend notifying users to upgrade in next sprint
 
-請輸入額外的審查註記 (按 Enter 完成):
+Please enter additional review notes (press Enter to complete):
 > [Your notes here]
 
-✅ 已批准並記錄審查註記
+✅ Approved with review notes recorded
 ```
 
 ## Integration with Agent Workspace
 
-審查記錄會寫入 agent workspace:
+Review records are written to the agent workspace:
 
 ```javascript
-// 批准記錄寫入 .agents/tasks/LIN-123/approve.md
+// Approval record written to .agents/tasks/LIN-123/approve.md
 const approvalRecord = {
   approved_at: new Date().toISOString(),
   approved_by: 'human',
@@ -222,18 +222,18 @@ task.writeAgentOutput('approve', JSON.stringify(approvalRecord, null, 2));
 
 ## Best Practices
 
-1. **仔細檢視影響分析**: 確認是否為破壞性變更
-2. **確認測試覆蓋**: 重要變更必須有完整測試
-3. **檢查文件同步**: API 變更必須更新文件
-4. **考慮向後相容性**: 評估對現有客戶端的影響
-5. **記錄審查意見**: 為未來參考留下審查記錄
+1. **Carefully Review Impact Analysis**: Confirm if breaking changes exist
+2. **Verify Test Coverage**: Important changes must have comprehensive tests
+3. **Check Documentation Sync**: API changes must update documentation
+4. **Consider Backward Compatibility**: Assess impact on existing clients
+5. **Document Review Feedback**: Leave review records for future reference
 
 ## Key Constraints
 
-- **Only Human**: 此命令僅供人工使用,agents 無法執行
-- **Blocking**: 任務會暫停直到審查完成
-- **Required for Critical Changes**: 重要變更必須經過此流程
-- **Audit Trail**: 所有審查記錄都會保存
+- **Only Human**: This command is for human use only, agents cannot execute it
+- **Blocking**: Task will pause until review is complete
+- **Required for Critical Changes**: Important changes must go through this process
+- **Audit Trail**: All review records are preserved
 
 ## References
 

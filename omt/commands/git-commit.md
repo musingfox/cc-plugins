@@ -49,34 +49,34 @@ In Git Commit mode, I function as an automated git commit manager that analyzes 
 
 ## Git Commit Process
 
-### 1. 變更分析階段
+### 1. Change Analysis Phase
 ```bash
-# 檢查當前 git 狀態
+# Check current git status
 git status
-# 查看差異內容
+# View diff content
 git diff
 git diff --staged
-# 檢視近期 commit 歷史以了解專案的 commit 風格
+# Review recent commit history to understand project commit style
 git log --oneline -10
 ```
 
-### 2. 預處理階段
-- [ ] 識別所有未追蹤的檔案
-- [ ] 分析已修改但未暫存的變更
-- [ ] 檢查已暫存的變更
-- [ ] 確認是否有敏感資訊不應 commit
+### 2. Pre-processing Phase
+- [ ] Identify all untracked files
+- [ ] Analyze modified but unstaged changes
+- [ ] Check staged changes
+- [ ] Confirm no sensitive information should be committed
 
-### 3. 訊息生成階段
-- [ ] 根據變更類型選擇適當的 conventional commit type
-- [ ] 分析變更範圍決定 optional scope
-- [ ] 撰寫簡潔明確的 description
-- [ ] 確保訊息符合專案 commit 風格
+### 3. Message Generation Phase
+- [ ] Select appropriate conventional commit type based on change type
+- [ ] Determine optional scope based on change range
+- [ ] Write concise and clear description
+- [ ] Ensure message follows project commit style
 
-### 4. 提交執行階段
+### 4. Commit Execution Phase
 ```bash
-# 暫存相關檔案
+# Stage relevant files
 git add [files]
-# 建立 commit（使用 HEREDOC 確保格式正確）
+# Create commit (using HEREDOC to ensure proper formatting)
 git commit -m "$(cat <<'EOF'
 <type>[optional scope]: <description>
 
@@ -85,14 +85,14 @@ git commit -m "$(cat <<'EOF'
 Co-Authored-By: Claude <noreply@anthropic.com>
 EOF
 )"
-# 檢查提交狀態
+# Check commit status
 git status
 ```
 
-### 5. Pre-commit 處理
-- [ ] 如果 pre-commit hook 失敗，分析失敗原因
-- [ ] 如果是格式化或自動修正，重新 commit 包含這些變更
-- [ ] 最多重試一次，如果仍失敗則回報給使用者
+### 5. Pre-commit Handling
+- [ ] If pre-commit hook fails, analyze failure reason
+- [ ] If formatting or auto-correction, re-commit including these changes
+- [ ] Retry at most once, report to user if still failing
 
 ## Example Usage
 
@@ -105,43 +105,43 @@ User: Please create a commit for the current changes.
 
 **Response:**
 ```
-當前模式: Git Commit (自動化 Git 提交管理)
+Current Mode: Git Commit (Automated Git Commit Management)
 
-## 分析當前變更狀態
+## Analyzing Current Change Status
 
-檢查 git 狀態和變更內容...
+Checking git status and change content...
 
-**Git 狀態摘要：**
-- 3 個檔案已修改：src/auth/token.service.ts, tests/auth/token.test.ts, README.md
-- 1 個新檔案：src/auth/types.ts
-- 0 個檔案已暫存
+**Git Status Summary:**
+- 3 files modified: src/auth/token.service.ts, tests/auth/token.test.ts, README.md
+- 1 new file: src/auth/types.ts
+- 0 files staged
 
-**變更分析：**
-1. `src/auth/token.service.ts`: 新增 JWT token 生成和驗證功能
-2. `tests/auth/token.test.ts`: 新增 token 服務的單元測試
-3. `src/auth/types.ts`: 新增認證相關的型別定義
-4. `README.md`: 更新專案說明，新增認證模組文件
+**Change Analysis:**
+1. `src/auth/token.service.ts`: Add JWT token generation and validation functionality
+2. `tests/auth/token.test.ts`: Add unit tests for token service
+3. `src/auth/types.ts`: Add authentication-related type definitions
+4. `README.md`: Update project description, add authentication module documentation
 
-**近期 Commit 風格：**
+**Recent Commit Style:**
 - `feat(auth): implement user login endpoint`
 - `fix(db): resolve connection timeout issue`
 - `docs: update API documentation`
 
-## 生成 Conventional Commit 訊息
+## Generate Conventional Commit Message
 
-**建議的 commit 類型：** `feat`
-**建議的 scope：** `auth`
-**建議的 description：** `implement JWT token service with validation`
+**Suggested commit type:** `feat`
+**Suggested scope:** `auth`
+**Suggested description:** `implement JWT token service with validation`
 
-## 執行 Git Commit
+## Execute Git Commit
 
-暫存相關檔案並建立 commit...
+Staging relevant files and creating commit...
 
 ```bash
 git add src/auth/token.service.ts src/auth/types.ts tests/auth/token.test.ts README.md
 ```
 
-建立 commit...
+Creating commit...
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -154,42 +154,42 @@ EOF
 )"
 ```
 
-## Pre-commit Hook 檢查
+## Pre-commit Hook Check
 
-✅ Pre-commit hooks 執行成功
-✅ 程式碼格式化檢查通過
-✅ 測試執行通過
-✅ Linting 檢查通過
+✅ Pre-commit hooks executed successfully
+✅ Code formatting check passed
+✅ Tests executed successfully
+✅ Linting check passed
 
-## 提交結果
+## Commit Result
 
-✅ Commit 成功建立: `feat(auth): implement JWT token service with validation`
-✅ 檔案變更已記錄：4 個檔案
-✅ 工作目錄狀態：乾淨
+✅ Commit created successfully: `feat(auth): implement JWT token service with validation`
+✅ File changes recorded: 4 files
+✅ Working directory status: clean
 
-提交完成！目前分支已更新。
+Commit complete! Current branch updated.
 ```
 
 **Pre-commit Hook Failure Example:**
 ```
-⚠️ Pre-commit Hook 失敗
+⚠️ Pre-commit Hook Failed
 
-檢測到 pre-commit hook 對檔案進行了自動修正：
-- src/auth/token.service.ts: 程式碼格式化調整
-- tests/auth/token.test.ts: import 排序調整
+Detected that pre-commit hook made automatic corrections to files:
+- src/auth/token.service.ts: Code formatting adjustments
+- tests/auth/token.test.ts: Import ordering adjustments
 
-重新建立 commit 以包含這些自動修正...
+Recreating commit to include these automatic corrections...
 
-✅ 重試提交成功: `feat(auth): implement JWT token service with validation`
+✅ Retry commit successful: `feat(auth): implement JWT token service with validation`
 
-所有 pre-commit 檢查現在都已通過。
+All pre-commit checks now passed.
 ```
 
 ## Error Handling
 
-如果遇到以下情況，會回報給使用者：
-- Git repository 不存在
-- 沒有變更需要 commit
-- Pre-commit hook 連續失敗
-- 敏感資訊檢測警告
-- Git 操作權限問題
+If any of the following situations occur, user will be notified:
+- Git repository does not exist
+- No changes to commit
+- Pre-commit hook consecutive failures
+- Sensitive information detection warning
+- Git operation permission issues

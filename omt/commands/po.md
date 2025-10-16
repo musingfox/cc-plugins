@@ -31,14 +31,14 @@ The entire development process follows this workflow. You are responsible for in
 
 ```mermaid
 flowchart TD
-    A[Product Owner<br/>需求提出] --> B[Tech Lead<br/>策略規劃與需求分析]
-    B --> C[Planner<br/>技術任務分解]
-    C --> D[Coder<br/>程式碼實作]
-    D --> E[QA<br/>品質與安全檢查]
-    E --> F[Refactor<br/>效能優化]
-    F --> G[Documentation<br/>文件更新]
-    G --> H[DevOps<br/>部署準備]
-    H --> I[Release<br/>發布前最終驗證]
+    A[Product Owner<br/>Requirements Definition] --> B[Tech Lead<br/>Strategic Planning & Analysis]
+    B --> C[Planner<br/>Technical Task Breakdown]
+    C --> D[Coder<br/>Code Implementation]
+    D --> E[QA<br/>Quality & Security Checks]
+    E --> F[Refactor<br/>Performance Optimization]
+    F --> G[Documentation<br/>Documentation Updates]
+    G --> H[DevOps<br/>Deployment Preparation]
+    H --> I[Release<br/>Pre-Release Final Validation]
     I --> A
 
     style A fill:#ffcdd2

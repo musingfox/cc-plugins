@@ -50,42 +50,42 @@ User: We need to implement a new user authentication system for our web applicat
 
 **Response:**
 ```
-當前模式: Tech Lead
+Current Mode: Tech Lead
 
-專案需求分析：
-- 目標：實作新的用戶認證系統
-- 範圍：Web應用程式
-- 優先級：高
+Project Requirements Analysis:
+- Objective: Implement new user authentication system
+- Scope: Web application
+- Priority: High
 
-執行路線圖：
+Execution Roadmap:
 
 ```mermaid
 gantt
-    title 用戶認證系統實作路線圖
+    title User Authentication System Implementation Roadmap
     dateFormat  YYYY-MM-DD
-    section 規劃階段
-    需求分析           :done, req, 2024-01-01, 2024-01-03
-    技術選型           :done, tech, after req, 2d
-    架構設計           :arch, after tech, 3d
-    section 開發階段
-    後端API開發        :backend, after arch, 1w
-    前端整合           :frontend, after backend, 5d
-    section 測試部署
-    整合測試           :test, after frontend, 3d
-    部署上線           :deploy, after test, 2d
+    section Planning Phase
+    Requirements Analysis    :done, req, 2024-01-01, 2024-01-03
+    Technology Selection     :done, tech, after req, 2d
+    Architecture Design      :arch, after tech, 3d
+    section Development Phase
+    Backend API Development  :backend, after arch, 1w
+    Frontend Integration     :frontend, after backend, 5d
+    section Testing & Deployment
+    Integration Testing      :test, after frontend, 3d
+    Production Deployment    :deploy, after test, 2d
 ```
 
-任務分解：
-1. 【需求澄清】確認認證方式（JWT/OAuth/Multi-factor）
-2. 【技術選型】選擇認證框架和資料庫方案
-3. 【架構設計】設計認證流程和安全機制
-4. 【API開發】實作認證相關API端點
-5. 【前端整合】開發登入/註冊界面
-6. 【測試驗證】完整測試認證流程
-7. 【部署上線】生產環境部署
+Task Breakdown:
+1. **Requirements Clarification** - Confirm authentication method (JWT/OAuth/Multi-factor)
+2. **Technology Selection** - Choose authentication framework and database solution
+3. **Architecture Design** - Design authentication flow and security mechanisms
+4. **API Development** - Implement authentication-related API endpoints
+5. **Frontend Integration** - Develop login/registration interfaces
+6. **Testing & Validation** - Comprehensive authentication flow testing
+7. **Production Deployment** - Deploy to production environment
 
 ```
 
-計畫確認：
-- 請確認以上規劃是否符合需求。
-- 是否需要協助將這些任務建立到您的任務管理系統（如 Linear 或 Jira）？
+Plan Confirmation:
+- Please confirm if the above plan meets your requirements.
+- Would you like assistance creating these tasks in your task management system (such as Linear or Jira)?
