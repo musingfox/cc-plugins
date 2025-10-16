@@ -1,72 +1,72 @@
-# Agent 本地工作區指南
+# Agent Local Workspace Guide
 
-## 概述
+## Overview
 
-為實現 Agent-First 工作流程,每個 repo 都需要建立本地 Agent 工作區。這個工作區提供:
-- **Agent 間通訊機制**
-- **狀態管理與同步**
-- **任務交接協議**
-- **交付物暫存**
-- **日誌與監控**
+To implement the Agent-First workflow, each repo needs to establish a local Agent workspace. This workspace provides:
+- **Inter-agent communication mechanism**
+- **State management and synchronization**
+- **Task handoff protocol**
+- **Deliverable staging**
+- **Logging and monitoring**
 
-**重要**: 所有 Agent 工作區資料都是**本地的**,不會進入 git 版控。
+**Important**: All Agent workspace data is **local** and will not enter git version control.
 
-## 目錄結構
+## Directory Structure
 
 ```
 project-root/
-├── .claude/                    # Claude 配置 (在 git 中)
-│   ├── agents/                # Agent 定義
-│   ├── commands/              # Commands 定義
-│   └── agent-config.yml       # Agent 行為配置
+├── .claude/                    # Claude configuration (in git)
+│   ├── agents/                # Agent definitions
+│   ├── commands/              # Commands definitions
+│   └── agent-config.yml       # Agent behavior configuration
 │
-├── .agents/                   # ⭐ Agent 工作區 (不進 git)
-│   ├── workspace/            # 各 Agent 工作空間
-│   │   ├── planner/         # Planner 專屬區域
-│   │   ├── coder/           # Coder 專屬區域
-│   │   ├── reviewer/        # Reviewer 專屬區域
+├── .agents/                   # ⭐ Agent workspace (not in git)
+│   ├── workspace/            # Each Agent's workspace
+│   │   ├── planner/         # Planner dedicated area
+│   │   ├── coder/           # Coder dedicated area
+│   │   ├── reviewer/        # Reviewer dedicated area
 │   │   └── ...
 │   │
-│   ├── communication/        # Agent 間通訊
-│   │   ├── messages/        # 訊息佇列
-│   │   ├── handoffs/        # 任務交接
-│   │   └── broadcasts/      # 廣播通知
+│   ├── communication/        # Inter-agent communication
+│   │   ├── messages/        # Message queue
+│   │   ├── handoffs/        # Task handoffs
+│   │   └── broadcasts/      # Broadcast notifications
 │   │
-│   ├── state/               # 狀態管理
+│   ├── state/               # State management
 │   │   ├── active-agents.json
 │   │   ├── task-registry.json
 │   │   └── checkpoints/
 │   │
-│   ├── logs/                # 日誌系統
-│   ├── deliverables/        # 交付物暫存
-│   ├── metrics/             # 指標數據
-│   └── cache/               # 快取
+│   ├── logs/                # Logging system
+│   ├── deliverables/        # Deliverable staging
+│   ├── metrics/             # Metrics data
+│   └── cache/               # Cache
 │
-└── .gitignore              # 已排除 .agents/
+└── .gitignore              # Excludes .agents/
 ```
 
-## 快速開始
+## Quick Start
 
-### 1. 初始化 Agent 工作區
+### 1. Initialize Agent Workspace
 
-在新專案中執行:
+Execute in new project:
 
 ```bash
-# 方式 1: 使用初始化腳本
+# Method 1: Using initialization script
 bash ~/.claude/templates/init-agent-workspace.sh
 
-# 方式 2: 手動建立
+# Method 2: Manual creation
 mkdir -p .agents/{workspace,communication,state,logs,deliverables,metrics,cache}
 ```
 
-### 2. 配置 Git 排除規則
+### 2. Configure Git Exclusion Rules
 
 ```bash
-# 自動添加 .gitignore 規則
+# Auto-add .gitignore rules
 cat ~/.claude/templates/agents-gitignore.txt >> .gitignore
 ```
 
-### 3. 初始化各個 Agent
+### 3. Initialize Each Agent
 
 ```bash
 ./.agents/scripts/init-agent.sh planner
@@ -77,16 +77,16 @@ cat ~/.claude/templates/agents-gitignore.txt >> .gitignore
 ./.agents/scripts/init-agent.sh pm
 ```
 
-## 任務資料格式
+## Task Data Format
 
-### Task JSON (輕量狀態)
+### Task JSON (Lightweight State)
 
-**範例: `.agents/tasks/LIN-123.json`**
+**Example: `.agents/tasks/LIN-123.json`**
 
 ```json
 {
   "task_id": "LIN-123",
-  "title": "實作用戶認證 API",
+  "title": "Implement user authentication API",
   "status": "in_progress",
   "current_agent": "coder",
 
@@ -122,9 +122,9 @@ cat ~/.claude/templates/agents-gitignore.txt >> .gitignore
 }
 ```
 
-### Agent Markdown (詳細內容)
+### Agent Markdown (Detailed Content)
 
-**範例: `.agents/tasks/LIN-123/planner.md`**
+**Example: `.agents/tasks/LIN-123/planner.md`**
 
 ```markdown
 # Planner Output - LIN-123
@@ -148,55 +148,55 @@ Files to create: src/auth/token.service.ts, src/auth/auth.middleware.ts
 Dependencies: jsonwebtoken, express-rate-limit
 ```
 
-## Agent 通訊協議
+## Agent Communication Protocol
 
-### Handoff Protocol (任務交接)
+### Handoff Protocol (Task Handoff)
 
-Agent 完成工作後,透過更新 JSON 中的 `handoff_to` 欄位交接給下一個 Agent:
+After an Agent completes work, it hands off to the next Agent by updating the `handoff_to` field in the JSON:
 
 ```javascript
-// Planner 完成並交接給 Coder
+// Planner completes and hands off to Coder
 task.updateAgent('planner', {
   status: 'completed',
   tokens_used: 1200,
-  handoff_to: 'coder'  // 自動設定 current_agent
+  handoff_to: 'coder'  // Auto-set current_agent
 });
 
-// Coder 查找分配給自己的任務
+// Coder finds tasks assigned to itself
 const myTasks = AgentTask.findMyTasks('coder');
-// 返回所有 current_agent === 'coder' 且 status === 'in_progress' 的任務
+// Returns all tasks where current_agent === 'coder' and status === 'in_progress'
 ```
 
-**簡化設計**:
-- 無需複雜的訊息佇列或交接檔案
-- 透過 JSON 的 `current_agent` 和 `handoff_to` 實現交接
-- Agent 定期檢查自己的任務 (`findMyTasks`)
+**Simplified Design**:
+- No need for complex message queues or handoff files
+- Handoff via JSON's `current_agent` and `handoff_to`
+- Agents periodically check their own tasks (`findMyTasks`)
 
-## 狀態管理
+## State Management
 
-### 狀態定義 (Single Source of Truth)
+### State Definitions (Single Source of Truth)
 
-所有狀態定義在 `.agents/states.yml`:
+All states defined in `.agents/states.yml`:
 
 ```yaml
-# 任務狀態
+# Task states
 task_states:
-  pending: "等待開始"
-  in_progress: "進行中"
-  blocked: "被阻擋,需要人工介入"
-  completed: "已完成"
-  failed: "失敗"
-  cancelled: "已取消"
+  pending: "Waiting to start"
+  in_progress: "In progress"
+  blocked: "Blocked, requires human intervention"
+  completed: "Completed"
+  failed: "Failed"
+  cancelled: "Cancelled"
 
-# Agent 狀態
+# Agent states
 agent_states:
-  idle: "閒置"
-  working: "工作中"
-  completed: "完成"
-  blocked: "遇到問題"
-  skipped: "被跳過"
+  idle: "Idle"
+  working: "Working"
+  completed: "Completed"
+  blocked: "Encountered issues"
+  skipped: "Skipped"
 
-# 複雜度 (費氏數列)
+# Complexity (Fibonacci)
 complexity_scale:
   values: [1, 2, 3, 5, 8, 13, 21, 34, 55, 89]
   token_estimates:
@@ -212,49 +212,49 @@ complexity_scale:
     89: 89000
 ```
 
-### 狀態存儲位置
+### State Storage Location
 
-- **任務狀態**: `.agents/tasks/{task-id}.json` 中的 `status` 欄位
-- **Agent 狀態**: `.agents/tasks/{task-id}.json` 中的 `agents.{agent-name}.status` 欄位
-- **無需額外的狀態檔案**: 所有狀態都在任務 JSON 中
+- **Task state**: `status` field in `.agents/tasks/{task-id}.json`
+- **Agent state**: `agents.{agent-name}.status` field in `.agents/tasks/{task-id}.json`
+- **No additional state files needed**: All states in task JSON
 
-## 資料生命週期
+## Data Lifecycle
 
-### 自動清理機制 (基於檔案 mtime)
+### Auto Cleanup Mechanism (File mtime-based)
 
 ```javascript
 const { AgentTask } = require('./.agents/lib');
 
-// 清理 90 天前完成的任務
+// Cleanup tasks completed 90 days ago
 const cleaned = AgentTask.cleanup(90);
 console.log(`Cleaned ${cleaned} old tasks`);
 ```
 
-**清理規則**:
-- ✅ 只清理 `completed` 或 `cancelled` 狀態
-- ✅ 基於檔案 `mtime` (修改時間) 判斷年齡
-- ✅ 同時刪除 `.json` 檔案和對應的資料夾
-- ✅ 無需 archive 資料夾
+**Cleanup Rules**:
+- ✅ Only cleanup `completed` or `cancelled` status
+- ✅ Determine age based on file `mtime` (modification time)
+- ✅ Delete both `.json` file and corresponding folder
+- ✅ No archive folder needed
 
-### 定期維護 (可選)
+### Periodic Maintenance (Optional)
 
 ```bash
-# 設定 cron job
-# 每天凌晨 2 點清理 90 天前的任務
+# Set up cron job
+# Cleanup tasks 90 days old at 2 AM daily
 0 2 * * * cd /path/to/project && node -e "require('./.agents/lib').AgentTask.cleanup(90)"
 ```
 
-## Agent 工作流程範例
+## Agent Workflow Examples
 
-### 範例 1: Planner → Coder Handoff
+### Example 1: Planner → Coder Handoff
 
 ```javascript
 const { AgentTask } = require('./.agents/lib');
 
-// 1. Planner 建立任務
+// 1. Planner creates task
 const task = AgentTask.create('LIN-123', 'User Authentication API', 8);
 
-// 2. Planner 寫入 PRD
+// 2. Planner writes PRD
 task.writeAgentOutput('planner', `
 # PRD: User Authentication API
 
@@ -267,41 +267,41 @@ task.writeAgentOutput('planner', `
 ...
 `);
 
-// 3. Planner 完成並交接
+// 3. Planner completes and hands off
 task.updateAgent('planner', {
   status: 'completed',
   tokens_used: 1200,
-  handoff_to: 'coder'  // 自動設定 current_agent = 'coder'
+  handoff_to: 'coder'  // Auto-set current_agent = 'coder'
 });
 
-// 4. Coder 查找自己的任務
+// 4. Coder finds its tasks
 const myTasks = AgentTask.findMyTasks('coder');
 console.log(`Found ${myTasks.length} tasks for coder`);
 
-// 5. Coder 開始工作
+// 5. Coder starts work
 task.updateAgent('coder', {
   status: 'working',
   checkpoint: 'stash@{0}'
 });
 ```
 
-### 範例 2: 錯誤升級 (失敗保護)
+### Example 2: Error Escalation (Failure Protection)
 
 ```javascript
 const { AgentTask } = require('./.agents/lib');
 
-// Coder 執行任務
+// Coder executes task
 const task = new AgentTask('LIN-123').load();
 let retryCount = task.agents.coder?.retry_count || 0;
 
 try {
-  // 執行測試
+  // Execute tests
   await runTests();
 } catch (error) {
   retryCount++;
 
   if (retryCount >= 3) {
-    // 達到重試上限,升級人工
+    // Reached retry limit, escalate to human
     task.updateAgent('coder', {
       status: 'blocked',
       retry_count: retryCount,
@@ -309,105 +309,105 @@ try {
       error_message: error.message
     });
 
-    // 寫入診斷報告
+    // Write diagnostic report
     task.appendAgentOutput('coder', `
-## 🚨 需要人工協助
+## 🚨 Human Assistance Needed
 
-**錯誤**: ${error.message}
-**重試次數**: ${retryCount}
+**Error**: ${error.message}
+**Retry count**: ${retryCount}
 **Checkpoint**: stash@{0}
 
-請檢查並修復問題後重新啟動任務。
+Please check and fix the issue then restart the task.
     `);
 
-    // 任務標記為 blocked
+    // Mark task as blocked
     const taskData = task.load();
     taskData.status = 'blocked';
     task.save(taskData);
 
   } else {
-    // 更新重試次數
+    // Update retry count
     task.updateAgent('coder', { retry_count: retryCount });
   }
 }
 ```
 
-## 監控與除錯
+## Monitoring and Debugging
 
-### 查看任務狀態
+### View Task Status
 
 ```bash
-# 查看特定任務
+# View specific task
 cat .agents/tasks/LIN-123.json | jq
 
-# 查看任務列表
+# View task list
 ls .agents/tasks/*.json
 
-# 查看進行中的任務
+# View in-progress tasks
 jq -r 'select(.status == "in_progress") | .task_id' .agents/tasks/*.json
 
-# 查看被阻擋的任務
+# View blocked tasks
 jq -r 'select(.status == "blocked") | .task_id' .agents/tasks/*.json
 ```
 
-### 查看 Agent 輸出
+### View Agent Output
 
 ```bash
-# 查看 Planner 輸出
+# View Planner output
 cat .agents/tasks/LIN-123/planner.md
 
-# 查看 Coder 工作記錄
+# View Coder work log
 cat .agents/tasks/LIN-123/coder.md
 
-# 查看 Reviewer 檢查結果
+# View Reviewer check results
 cat .agents/tasks/LIN-123/reviewer.md
 ```
 
-### 查看回顧分析
+### View Retrospective Analysis
 
 ```bash
-# 查看 Retro Agent 分析
+# View Retro Agent analysis
 ls .agents/retro/
 cat .agents/retro/2025-10-sprint-1.md
 ```
 
-## 最佳實踐
+## Best Practices
 
-### 1. Agent 啟動時
+### 1. Agent Startup
 
 ```javascript
 const { AgentTask } = require('./.agents/lib');
 
-// 查找分配給我的任務
+// Find tasks assigned to me
 const myTasks = AgentTask.findMyTasks('coder');
 console.log(`Found ${myTasks.length} tasks`);
 
-// 開始第一個任務
+// Start first task
 if (myTasks.length > 0) {
   const task = new AgentTask(myTasks[0].task_id);
   task.updateAgent('coder', { status: 'working' });
 }
 ```
 
-### 2. 執行任務時
+### 2. During Task Execution
 
 ```javascript
 const task = new AgentTask('LIN-123');
 
-// 開始工作
+// Start work
 task.updateAgent('coder', {
   status: 'working',
   checkpoint: 'stash@{0}'
 });
 
-// 記錄進度
+// Record progress
 task.appendAgentOutput('coder', `
 ### Progress Update
 - Implemented token service
 - Tokens used: 2500
 `);
 
-// 完成工作
+// Complete work
 task.updateAgent('coder', {
   status: 'completed',
   tokens_used: 5000,
@@ -415,21 +415,21 @@ task.updateAgent('coder', {
 });
 ```
 
-### 3. 任務交接時
+### 3. During Task Handoff
 
 ```javascript
-// 簡化的交接流程
+// Simplified handoff flow
 task.updateAgent('planner', {
   status: 'completed',
   tokens_used: 1200,
-  handoff_to: 'coder'  // 自動設定 current_agent
+  handoff_to: 'coder'  // Auto-set current_agent
 });
 
-// 下一個 Agent 自動發現
+// Next Agent auto-discovers
 const myTasks = AgentTask.findMyTasks('coder');
 ```
 
-### 4. 錯誤處理時
+### 4. During Error Handling
 
 ```javascript
 let retryCount = task.agents.coder?.retry_count || 0;
@@ -440,7 +440,7 @@ try {
   retryCount++;
 
   if (retryCount >= 3) {
-    // 升級人工
+    // Escalate to human
     task.updateAgent('coder', {
       status: 'blocked',
       retry_count: retryCount,
@@ -456,51 +456,51 @@ try {
 }
 ```
 
-## 疑難排解
+## Troubleshooting
 
-### 問題 1: 任務找不到
+### Issue 1: Task Not Found
 
 ```bash
-# 檢查任務是否存在
+# Check if task exists
 ls .agents/tasks/LIN-123.json
 
-# 檢查任務內容
+# Check task content
 cat .agents/tasks/LIN-123.json | jq
 ```
 
-### 問題 2: Agent 找不到自己的任務
+### Issue 2: Agent Can't Find Its Tasks
 
 ```javascript
-// 檢查 current_agent 欄位
+// Check current_agent field
 const task = new AgentTask('LIN-123').load();
-console.log(task.current_agent);  // 應該是 'coder'
+console.log(task.current_agent);  // Should be 'coder'
 
-// 檢查任務狀態
-console.log(task.status);  // 應該是 'in_progress'
+// Check task status
+console.log(task.status);  // Should be 'in_progress'
 ```
 
-### 問題 3: 磁碟空間不足
+### Issue 3: Disk Space Insufficient
 
 ```bash
-# 檢查工作區大小
+# Check workspace size
 du -sh .agents/
 
-# 手動清理舊任務
-node -e "require('./.agents/lib').AgentTask.cleanup(30)"  # 30 天
+# Manually cleanup old tasks
+node -e "require('./.agents/lib').AgentTask.cleanup(30)"  # 30 days
 
-# 查看清理了多少任務
+# See how many tasks cleaned
 const cleaned = require('./.agents/lib').AgentTask.cleanup(90);
 console.log(`Cleaned ${cleaned} tasks`);
 ```
 
-## 參考資料
+## References
 
-- @~/.claude/workflow.md - 完整工作流程說明
-- @~/.claude/workflow.md#agent-first-workflow - Agent 優先設計
-- @~/.claude/workflow.md#agent-失敗保護機制 - 失敗保護機制
+- @~/.claude/workflow.md - Complete workflow documentation
+- @~/.claude/workflow.md#agent-first-workflow - Agent-First design
+- @~/.claude/workflow.md#agent-failure-protection - Failure protection mechanism
 
 ---
 
-**版本**: 1.0
-**最後更新**: 2025-10-02
-**狀態**: Active
+**Version**: 1.0
+**Last Updated**: 2025-10-02
+**Status**: Active

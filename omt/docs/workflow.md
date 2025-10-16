@@ -164,26 +164,26 @@ See: commands/init-agents.md
 ```javascript
 const { AgentTask } = require('./.agents/lib');
 
-// Planner: 建立任務
+// Planner: Create task
 const task = AgentTask.create('LIN-123', 'Implement auth API', 8);
 task.writeAgentOutput('planner', '# PRD...');
 task.updateAgent('planner', { status: 'completed', handoff_to: 'coder' });
 
-// Coder: 接手任務
+// Coder: Take over task
 const myTasks = AgentTask.findMyTasks('coder');
 task.updateAgent('coder', { status: 'working' });
 
-// Reviewer: 審查並 commit
+// Reviewer: Review and commit
 task.updateAgent('reviewer', { status: 'completed', handoff_to: 'pm' });
 
-// PM: 任務完成流程
-// 1. 觸發 retro
-// 2. 生成報告
-// 3. 更新 Linear
-// 4. 回報用戶
+// PM: Task completion workflow
+// 1. Trigger retro
+// 2. Generate report
+// 3. Update Linear
+// 4. Report to user
 
-// Reviewer: 完成任務
-task.complete();  // 自動計算實際複雜度
+// Reviewer: Complete task
+task.complete();  // Auto calculate actual complexity
 ```
 
 **Complete API Documentation**: See [agent-workspace-guide.md](./agent-workspace-guide.md#agent-工作流程範例)
@@ -194,10 +194,10 @@ task.complete();  // 自動計算實際複雜度
 
 ```bash
 # Step 1: Define requirements (human)
-/po "實作用戶認證系統"
+/po "Implement user authentication system"
 
 # Step 2: Architecture decisions (human)
-/techlead [選擇 JWT + PostgreSQL]
+/techlead [Choose JWT + PostgreSQL]
 
 # Step 3-N: Fully automated
 # @agent-planner breaks down tasks (LIN-123) →
@@ -214,10 +214,10 @@ task.complete();  // 自動計算實際複雜度
 
 ```bash
 # Agents execute automatically
-@agent-coder "修改 User API schema"
+@agent-coder "Modify User API schema"
 
 # System prompt: Important changes need review
-/approve [檢視變更]
+/approve [Review changes]
 
 # Auto commit after approval
 ```
@@ -226,7 +226,7 @@ task.complete();  // 自動計算實際複雜度
 
 ```bash
 # Fully automated
-@agent-debugger "修復登入 500 錯誤"
+@agent-debugger "Fix login 500 error"
 # → @agent-coder auto fixes
 # → @agent-reviewer reviews + commits
 ```
@@ -287,31 +287,31 @@ graph TB
 
 ### Escalation Triggers
 
-- ❌ 同一錯誤重試 ≥ 3 次
-- ⏱️ 執行時間超過預期 3 倍
-- 💾 資源使用異常 (Memory >80%, CPU >90%)
-- 🚨 架構/安全問題立即升級
+- ❌ Same error retried ≥ 3 times
+- ⏱️ Execution time exceeds expected by 3x
+- 💾 Resource usage anomaly (Memory >80%, CPU >90%)
+- 🚨 Architecture/security issues escalate immediately
 
 ### Escalation Notification Format
 
 ```markdown
-🚨 **Agent 需要人工協助**
+🚨 **Agent Needs Human Assistance**
 
 **Agent**: @agent-coder
-**任務**: LIN-123
-**狀態**: ⏸️ 暫停
+**Task**: LIN-123
+**Status**: ⏸️ Paused
 
-**問題**: 測試失敗已重試 3 次
+**Issue**: Test failures after 3 retries
 
-**當前狀態**:
-- ✅ 已保存: stash@{0}
-- ✅ 診斷: .agents/tasks/LIN-123/coder.md
-- ✅ 任務標記: BLOCKED
+**Current State**:
+- ✅ Saved: stash@{0}
+- ✅ Diagnosis: .agents/tasks/LIN-123/coder.md
+- ✅ Task marked: BLOCKED
 
-**選項**:
-A) 查看失敗原因
-B) 直接接手修復
-C) 調整需求
+**Options**:
+A) View failure reasons
+B) Take over and fix directly
+C) Adjust requirements
 ```
 
 ## Data Cleanup Mechanism
@@ -319,35 +319,35 @@ C) 調整需求
 ### Auto Cleanup (File mtime-based)
 
 ```javascript
-// 清理 90 天前完成的任務
+// Cleanup tasks completed 90 days ago
 const { AgentTask } = require('./.agents/lib');
 
 const cleaned = AgentTask.cleanup(90);
 console.log(`Cleaned ${cleaned} old tasks`);
 
-// 定期執行 (cron)
+// Periodic execution (cron)
 // 0 2 * * * cd /path/to/project && node -e "require('./.agents/lib').AgentTask.cleanup(90)"
 ```
 
 ### Cleanup Rules
 
-- ✅ 只清理 `completed` 或 `cancelled` 狀態
-- ✅ 基於檔案 `mtime` 判斷年齡
-- ✅ 同時刪除 JSON 和對應資料夾
-- ✅ 無需 archive 資料夾
+- ✅ Only cleanup `completed` or `cancelled` status
+- ✅ Determine age based on file `mtime`
+- ✅ Delete both JSON and corresponding folders
+- ✅ No archive folder needed
 
 ## Git Version Control
 
 ### Commit Authority Control
 
-**✅ 有 Commit 權限**:
-1. `@agent-reviewer` - 審查通過後自動 commit
-2. `/git-commit` - Human 手動 commit
+**✅ Has Commit Authority**:
+1. `@agent-reviewer` - Auto commit after review passes
+2. `/git-commit` - Human manual commit
 
-**❌ 無 Commit 權限**:
+**❌ No Commit Authority**:
 - `@agent-coder`
 - `@agent-planner`
-- 其他所有 agents
+- All other agents
 
 ### Commit Format
 
@@ -355,12 +355,12 @@ console.log(`Cleaned ${cleaned} old tasks`);
 # Conventional Commits
 <type>[optional scope]: <description>
 
-# 範例
+# Examples
 feat(LIN-123): implement JWT token service
 fix(LIN-124): resolve login timeout issue
 docs: update API documentation
 
-# 自動添加
+# Auto-added
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
 Co-Authored-By: Claude <noreply@anthropic.com>
@@ -370,39 +370,39 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 
 ### 1. Agent-First Priority
 
-- ✅ 複雜任務 → 使用 Agents
-- ✅ 自動化工作 → 使用 Agents
-- ⚠️ 關鍵決策 → 使用 Commands
+- ✅ Complex tasks → Use Agents
+- ✅ Automation work → Use Agents
+- ⚠️ Critical decisions → Use Commands
 
 ### 2. Task Complexity Estimation
 
-- 基於 token 消耗,非人類工時
-- 使用費氏數列: 1, 2, 3, 5, 8, 13...
-- 由 `@agent-retro` 持續優化
+- Based on token consumption, not human hours
+- Use Fibonacci sequence: 1, 2, 3, 5, 8, 13...
+- Continuously optimized by `@agent-retro`
 
 ### 3. Keep Workspace Clean
 
 ```bash
-# 定期清理
+# Periodic cleanup
 AgentTask.cleanup(90);
 
-# 檢查工作區大小
+# Check workspace size
 du -sh .agents/
 
-# 查看活躍任務
+# View active tasks
 ls .agents/tasks/*.json | wc -l
 ```
 
 ### 4. Monitor Agent Status
 
 ```bash
-# 查看任務狀態
+# View task status
 cat .agents/tasks/LIN-123.json | jq
 
-# 查看 Agent 輸出
+# View Agent output
 cat .agents/tasks/LIN-123/coder.md
 
-# 查看回顧分析
+# View retro analysis
 cat .agents/retro/*.md
 ```
 
@@ -410,34 +410,34 @@ cat .agents/retro/*.md
 
 ### ✅ Completed
 
-- [x] 簡化為 4 個關鍵 Commands
-- [x] Agent 處理所有複雜工作
-- [x] 極簡本地工作區架構
-- [x] 費氏複雜度估算機制
-- [x] Retro Agent 回顧分析
-- [x] 基於檔案時間的自動清理
-- [x] 狀態定義檔 (states.yml)
-- [x] Agent 輔助函式庫 (lib.js)
-- [x] `/init-agents` 初始化 command
+- [x] Simplified to 4 key Commands
+- [x] Agents handle all complex work
+- [x] Minimalist local workspace architecture
+- [x] Fibonacci complexity estimation mechanism
+- [x] Retro Agent retrospective analysis
+- [x] File time-based automatic cleanup
+- [x] State definition file (states.yml)
+- [x] Agent helper library (lib.js)
+- [x] `/init-agents` initialization command
 
 ### 📋 To Implement
 
-- [ ] 實作 `@agent-planner`
-- [ ] 實作 `@agent-doc`
-- [ ] 實作 `@agent-devops`
-- [ ] 實作 `@agent-retro`
-- [ ] 實作 `/approve` command
-- [ ] 更新所有 Agent 使用新工作區
-- [ ] 建立使用範例專案
-- [ ] 收集使用反饋並優化
+- [ ] Implement `@agent-planner`
+- [ ] Implement `@agent-doc`
+- [ ] Implement `@agent-devops`
+- [ ] Implement `@agent-retro`
+- [ ] Implement `/approve` command
+- [ ] Update all Agents to use new workspace
+- [ ] Create usage example project
+- [ ] Collect usage feedback and optimize
 
 ## References
 
-- @~/.claude/CLAUDE.md - 全局配置
-- @~/.claude/commands/ - Commands 定義
-- @~/.claude/agents/ - Agents 規格
-- @~/.claude/agent-workspace-guide.md - 工作區詳細指南
-- @~/.claude/commands/init-agents.md - 初始化指令
+- @~/.claude/CLAUDE.md - Global configuration
+- @~/.claude/commands/ - Commands definitions
+- @~/.claude/agents/ - Agents specifications
+- @~/.claude/agent-workspace-guide.md - Workspace detailed guide
+- @~/.claude/commands/init-agents.md - Initialization command
 
 ---
 

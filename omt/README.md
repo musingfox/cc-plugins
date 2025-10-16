@@ -94,7 +94,7 @@ This will:
 
 ```bash
 # 1. Define requirements
-/po "實作用戶認證系統"
+/po "Implement user authentication system"
 
 # 2. Make architecture decisions
 /techlead
@@ -110,7 +110,7 @@ This will:
 
 ```bash
 # Fully automated
-@agent-debugger "修復登入 500 錯誤"
+@agent-debugger "Fix login 500 error"
 # → Diagnoses issue
 # → Hands off to @agent-coder
 # → @agent-reviewer reviews and commits
@@ -119,7 +119,7 @@ This will:
 ### Example: Performance Optimization
 
 ```bash
-@agent-optimizer "優化 API 回應時間"
+@agent-optimizer "Optimize API response time"
 # → Analyzes bottlenecks
 # → Implements optimizations
 # → @agent-reviewer validates and commits
