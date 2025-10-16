@@ -18,8 +18,8 @@ A comprehensive Agent-First development workflow system for Claude Code, featuri
 - **@agent-reviewer**: Code quality review + automatic git commits
 - **@agent-debugger**: Systematic error diagnosis and fixes
 - **@agent-optimizer**: Performance optimization and refactoring
-- **@agent-doc**: Documentation generation and maintenance
-- **@agent-devops**: Deployment configuration and infrastructure
+- **@agent-doc**: Documentation generation and maintenance (see `agents/doc.md` for dual-trigger details)
+- **@agent-devops**: Deployment configuration and infrastructure (see `agents/devops.md` for triple-trigger details)
 - **@agent-pm**: Project management and status tracking
 - **@agent-retro**: Retrospective analysis and estimation improvement
 
@@ -36,7 +36,7 @@ A comprehensive Agent-First development workflow system for Claude Code, featuri
 - `/techlead`: Make architectural decisions
 - `/approve`: Review important changes (API, schema, security)
 - `/git-commit`: Manual git commits (emergency only)
-- `/init-agents`: Initialize agent workspace
+- `/init-agents`: Initialize agent workspace (see `docs/workflow.md` for initialization workflow details)
 
 ### 🔄 Automated Workflow
 

@@ -1,5 +1,7 @@
 # Agent Local Workspace Guide
 
+> **For workflow overview and agent trigger mechanisms, see `docs/workflow.md`**
+
 ## Overview
 
 To implement the Agent-First workflow, each repo needs to establish a local Agent workspace. This workspace provides:
@@ -149,6 +151,8 @@ Dependencies: jsonwebtoken, express-rate-limit
 ```
 
 ## Agent Communication Protocol
+
+> **For agent trigger mechanisms and workflow integration, see `agents/*.md` specifications**
 
 ### Handoff Protocol (Task Handoff)
 

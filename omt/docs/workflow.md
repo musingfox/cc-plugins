@@ -86,6 +86,48 @@ graph TB
     class TaskMgmt,GitRepo,AgentWorkspace systemClass
 ```
 
+### Initialization Workflow
+
+The `/init-agents` command sets up the agent workspace and optionally performs project audits:
+
+```mermaid
+graph TB
+    Start([/init-agents Command])
+
+    Start --> CreateStructure[Create .agents/ Structure]
+    CreateStructure --> ConfigPkgMgr[Configure Package Manager<br/>npm/pnpm/bun]
+    ConfigPkgMgr --> ConfigTask[Configure Task Management<br/>Linear/GitHub/Jira/Local]
+
+    ConfigTask --> AskDoc{Ask: Run @agent-doc<br/>documentation audit?}
+    AskDoc -->|Yes| DocAudit[@agent-doc<br/>Audit Project Documentation]
+    AskDoc -->|No| AskDevOps
+    DocAudit --> DocReport[Generate:<br/>- Documentation inventory<br/>- Missing docs list<br/>- Improvement plan<br/>- Completeness score]
+
+    DocReport --> AskDevOps{Ask: Run @agent-devops<br/>infrastructure audit?}
+    AskDevOps -->|Yes| DevOpsAudit[@agent-devops<br/>Audit Infrastructure/Environment]
+    AskDevOps -->|No| Complete
+
+    DevOpsAudit --> DevOpsReport[Generate:<br/>- Infrastructure inventory<br/>- Missing configs list<br/>- Improvement plan<br/>- Readiness score]
+
+    DevOpsReport --> Complete[Initialization Complete<br/>Workspace Ready]
+
+    classDef commandClass fill:#E1F5FE,stroke:#0288D1,stroke-width:2px
+    classDef agentClass fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px
+    classDef decisionClass fill:#FFF9C4,stroke:#F57C00,stroke-width:2px
+    classDef outputClass fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px
+
+    class Start commandClass
+    class DocAudit,DevOpsAudit agentClass
+    class AskDoc,AskDevOps decisionClass
+    class DocReport,DevOpsReport,CreateStructure,ConfigPkgMgr,ConfigTask,Complete outputClass
+```
+
+**Key Points:**
+- Audits are **optional** during initialization
+- Documentation audit checks project-wide doc status (Trigger 2 for @agent-doc)
+- Infrastructure audit checks environment and deployment readiness (Trigger 3 for @agent-devops)
+- See `commands/init-agents.md` for detailed initialization steps
+
 ## Agent Local Workspace
 
 ### Quick Start
@@ -156,8 +198,58 @@ See: commands/init-agents.md
 | `@agent-retro` | Retrospective analysis | Completed task | Estimation insights | @agent-pm |
 | `@agent-debugger` | Error diagnosis & fix | Error info | debugger.md | @agent-coder |
 | `@agent-optimizer` | Performance optimization | Code | optimizer.md | @agent-reviewer |
-| `@agent-doc` | Documentation generation | Code | Documentation | @agent-reviewer |
-| `@agent-devops` | Deployment configuration | Application | Deploy config | User |
+| `@agent-doc` | Documentation generation | Code | Documentation | @agent-devops (optional) |
+| `@agent-devops` | Deployment configuration | Application | Deploy config | @agent-reviewer (optional) |
+
+**Note on Standard Review Completion:**
+- After code changes: `@agent-reviewer` → `@agent-doc` (mandatory for code changes)
+- After documentation: `@agent-doc` → `@agent-devops` (optional if infrastructure changes)
+- After infrastructure: `@agent-devops` → `@agent-reviewer` (optional if config changes)
+- Doc and DevOps agents are part of standard review completion workflow, not separate branches
+
+### Agent Trigger Mechanisms
+
+#### @agent-doc Trigger Modes
+
+The documentation agent supports two distinct triggering scenarios:
+
+**Trigger 1: Post-Review (Code Change Documentation)**
+- **When**: After `@agent-reviewer` completes code review
+- **Purpose**: Generate documentation for new or modified code
+- **Handoff**: Manually or automatically invoked from reviewer
+- **Outputs**: API docs, code comments, README updates, architecture docs
+
+**Trigger 2: Post-Init Audit (Project-Wide Documentation Inventory)**
+- **When**: After `/init-agents` execution, optionally invoked
+- **Purpose**: Comprehensive documentation status audit across entire project
+- **Invocation**: User chooses to run documentation audit during initialization
+- **Outputs**: Documentation inventory report, missing docs list, improvement plan, completeness score
+
+For complete details on dual-trigger mechanism, see `agents/doc.md`.
+
+#### @agent-devops Trigger Modes
+
+The DevOps agent supports three distinct triggering scenarios:
+
+**Trigger 1: Post-Doc (Optional Infrastructure Support)**
+- **When**: After `@agent-doc` completes, if infrastructure changes needed
+- **Purpose**: Create/update deployment and infrastructure configuration
+- **Handoff**: Optional handoff from doc agent
+- **Outputs**: CI/CD pipelines, IaC configs, container configs, monitoring setup
+
+**Trigger 2: Infrastructure-Focused Task**
+- **When**: Task itself relates to infrastructure (not product development)
+- **Purpose**: Direct infrastructure work (e.g., "Setup staging environment")
+- **Invocation**: Directly assigned without prior agent handoff
+- **Outputs**: Environment setup, pipeline improvements, infrastructure automation
+
+**Trigger 3: Post-Init Audit (Infrastructure Inventory)**
+- **When**: After `/init-agents` execution, optionally invoked
+- **Purpose**: Comprehensive infrastructure and environment status audit
+- **Invocation**: User chooses to run infrastructure audit during initialization
+- **Outputs**: Infrastructure inventory report, missing configs list, improvement plan, readiness score
+
+For complete details on triple-trigger mechanism, see `agents/devops.md`.
 
 ### Agent Operation Example
 
