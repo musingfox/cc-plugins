@@ -1,7 +1,7 @@
 ---
 name: help
 description: Comprehensive guide to Agent-First workflow including all 9 agents, 6 commands, best practices, and workflow examples
-model: haiku
+model: claude-haiku-4-5
 ---
 
 # Agent-First Workflow - Complete Guide

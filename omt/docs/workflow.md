@@ -37,7 +37,7 @@ graph TB
         Retro["@agent-retro<br/>Retrospective analysis"]
     end
 
-    TaskMgmt[(Task System<br/>Linear/GitHub/Jira)]
+    TaskMgmt[(Task System<br/>Linear/GitHub<br/>Jira + ACLI)]
     GitRepo[(Git Repo)]
     AgentWorkspace[(.agents/<br/>Local workspace)]
 
@@ -126,6 +126,7 @@ graph TB
 - Audits are **optional** during initialization
 - Documentation audit checks project-wide doc status (Trigger 2 for @agent-doc)
 - Infrastructure audit checks environment and deployment readiness (Trigger 3 for @agent-devops)
+- For Jira projects: ACLI (Atlassian CLI) is installed and OAuth-authenticated during initialization
 - See `commands/init-agents.md` for detailed initialization steps
 
 ## Agent Local Workspace

@@ -1,7 +1,7 @@
 ---
 name: techlead
 description: Tech Lead mode for strategic planning and requirement analysis. Makes architectural decisions and technology selections.
-model: opus
+model: claude-opus-4-1
 ---
 
 # Tech Lead Mode

@@ -1,7 +1,7 @@
 ---
 name: retro
 description: Autonomous retrospective analysis and estimation improvement specialist that analyzes completed tasks to optimize future complexity predictions
-model: haiku
+model: claude-haiku-4-5
 tools: Bash, Glob, Grep, Read, Edit, Write, TodoWrite, BashOutput, KillBash
 ---
 

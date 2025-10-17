@@ -1,7 +1,7 @@
 ---
 name: debugger
 description: Systematic error diagnosis and troubleshooting specialist that identifies root causes, provides step-by-step debugging guidance, and resolves software issues with comprehensive analysis.
-model: sonnet
+model: claude-sonnet-4-5
 tools: Bash, Glob, Grep, Read, Edit, MultiEdit, Write, TodoWrite, BashOutput, KillBash
 ---
 

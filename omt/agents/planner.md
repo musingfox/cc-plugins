@@ -1,7 +1,7 @@
 ---
 name: planner
 description: Autonomous task decomposition and PRD generation specialist that breaks down high-level requirements into detailed technical tasks with complexity estimation
-model: opus
+model: claude-opus-4-1
 tools: Bash, Glob, Grep, Read, Edit, MultiEdit, Write, TodoWrite, BashOutput, KillBash
 ---
 

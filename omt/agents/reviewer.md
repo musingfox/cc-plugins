@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Comprehensive quality reviewer that validates implementation against PRD requirements, ensures proper test coverage, verifies documentation synchronization, audits git repository state, and creates git commits after successful review.
-model: sonnet
+model: claude-sonnet-4-5
 tools: Bash, Glob, Grep, Read, Edit, MultiEdit, Write, TodoWrite, BashOutput, KillBash
 ---
 

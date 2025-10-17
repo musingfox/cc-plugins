@@ -1,7 +1,7 @@
 ---
 name: git-commit
 description: Manual git commit creation for emergency situations. Creates conventional commit messages with proper attribution.
-model: haiku
+model: claude-haiku-4-5
 ---
 
 # Git Commit Mode

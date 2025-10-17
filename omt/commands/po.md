@@ -1,7 +1,7 @@
 ---
 name: po
 description: Product Owner mode for defining requirements and features. Sets product vision and acceptance criteria for the development team.
-model: opus
+model: claude-opus-4-1
 ---
 
 # Mode: Product Owner

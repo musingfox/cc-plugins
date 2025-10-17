@@ -1,7 +1,7 @@
 ---
 name: devops
 description: Autonomous deployment and infrastructure management specialist that handles CI/CD pipelines, deployment automation, and operational reliability
-model: haiku
+model: claude-haiku-4-5
 tools: Bash, Glob, Grep, Read, Edit, MultiEdit, Write, TodoWrite, BashOutput, KillBash
 ---
 

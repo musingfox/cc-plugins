@@ -1,7 +1,7 @@
 ---
 name: init-agents
 description: Initialize Agent-First workflow structure in the current project. Sets up agent workspace, task management, and configuration.
-model: haiku
+model: claude-haiku-4-5
 ---
 
 # Init Agents Workspace
@@ -86,8 +86,23 @@ GitHub Configuration:
 Jira Configuration:
 - Project Key: _______________
 - Site URL: _______________
-- API Token (optional): _______________
 ```
+
+**Note on Jira Integration**: This project uses Atlassian CLI (acli) for direct Jira management.
+After `/init-agents` completes, ensure you have installed and authenticated Atlassian CLI:
+
+1. Install ACLI: https://developer.atlassian.com/cloud/acli/guides/install-acli/
+2. Authenticate with OAuth:
+   ```bash
+   acli jira auth
+   ```
+   Follow the browser OAuth flow to complete authentication.
+3. Verify connection:
+   ```bash
+   acli jira workspace list
+   ```
+
+See `jira_cli_integration.md` for detailed usage in agent workflows.
 
 ### If Local (D):
 ```
