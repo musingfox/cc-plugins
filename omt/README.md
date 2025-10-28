@@ -23,6 +23,17 @@ A comprehensive Agent-First development workflow system for Claude Code, featuri
 - **@agent-pm**: Project management and status tracking
 - **@agent-retro**: Retrospective analysis and estimation improvement
 
+### 🎯 MAGI Multi-Perspective Review System
+
+- **@agent-magi**: Universal multi-perspective analysis coordinator
+  - **MELCHIOR** (Rational): Technical, data-driven, systematic analysis
+  - **BALTHASAR** (Empathic): User-focused, stakeholder-centric evaluation
+  - **CASPER** (Pragmatic): Sustainable, maintainable, realistic assessment
+
+**When to use MAGI**: Automatically invoked when any agent encounters decisions crossing 3+ dimensions (technical, user impact, team, maintenance, risk, cost).
+
+See `CLAUDE.md` for dimension recognition guidelines and `docs/magi-review-system.md` for complete documentation.
+
 ### 📋 Task Management Integration
 
 - **Linear**: Full MCP integration with workflow automation
