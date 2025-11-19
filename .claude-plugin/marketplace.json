@@ -13,7 +13,7 @@
     {
       "name": "voice-summary",
       "source": "./voice-summary",
-      "description": "Voice Summary Hook: Audio summaries after task completion with AI-powered summarization (OpenAI/Anthropic/Ollama) and TTS (ElevenLabs/macOS)"
+      "description": "Voice Summary Hook: Audio feedback after tasks. Simple mode (zero setup) or Gemini mode (AI + voice in one call). 30-second setup."
     }
   ]
 }

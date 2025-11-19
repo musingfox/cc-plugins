@@ -1,7 +1,7 @@
 {
   "name": "voice-summary",
-  "description": "Voice Summary Hook: Provides audio summaries after task completion with AI-powered summarization and multi-language support. Supports OpenAI, Anthropic, Ollama for summarization and ElevenLabs, macOS say for TTS.",
-  "version": "1.0.0",
+  "description": "Voice Summary Hook: Audio feedback after task completion. Simple mode (zero setup) or Gemini mode (AI + voice in one call). 30-second setup, works immediately on macOS.",
+  "version": "2.0.0",
   "author": {
     "name": "Nick Huang",
     "email": "nick12703990@gmail.com"
@@ -14,6 +14,8 @@
     "audio",
     "accessibility",
     "ai",
+    "gemini",
+    "native-audio",
     "ollama",
     "openai",
     "anthropic"

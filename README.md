@@ -28,25 +28,20 @@ Your personal development squad powered by Agent-First workflow:
 
 ### Voice Summary Hook
 
-Audio feedback after Claude Code completes tasks:
-- **AI Summarization**: Optional summaries using OpenAI, Anthropic, or Ollama
-- **Voice Output**: Text-to-speech via ElevenLabs (cloud) or macOS say (local)
-- **Multi-language**: Support for English and Chinese
-- **Zero Dependencies**: Works with just Python 3 in basic mode
-- **Highly Configurable**: Environment variables for all settings
+Get audio feedback when Claude Code finishes tasks. **30-second setup**, works immediately on macOS.
 
-**Installation:**
-```bash
-/plugin install voice-summary
-```
+**3 Modes:**
+- **Simple** (default): Just says "Done" - zero setup, no API needed
+- **Gemini** (recommended): AI summary + voice in one API call - best quality
+- **Custom**: Mix your own AI + TTS providers - maximum flexibility
 
 **Quick Start:**
 ```bash
-# Copy hook to your project
+# 1. Copy hook
 mkdir -p .claude/hooks
 cp voice-summary/hooks/voice_summary.py .claude/hooks/
 
-# Configure in .claude/settings.json
+# 2. Configure .claude/settings.json
 {
   "hooks": {
     "Stop": [{
@@ -55,7 +50,20 @@ cp voice-summary/hooks/voice_summary.py .claude/hooks/
     }]
   }
 }
+
+# 3. Done! Works immediately on macOS
+
+# Optional: Enable Gemini mode for AI summaries
+export GOOGLE_API_KEY=your_key
+export VOICE_MODE=gemini
+pip install google-generativeai
 ```
+
+**Features:**
+- Gemini 2.0 native audio support (AI + voice in one call!)
+- Multi-language (English, Chinese)
+- Zero dependencies in simple mode
+- Fallback support: OpenAI, Anthropic, Ollama, ElevenLabs
 
 ## Plugin Development
 
