@@ -1,0 +1,36 @@
+# Voice Summary Hook - Python Dependencies
+# Install only the packages you need based on your configuration
+
+# ===== Core (No dependencies needed for basic usage) =====
+# The hook works with just Python 3 standard library if:
+# - VOICE_SUMMARY_AI_PROVIDER=none
+# - VOICE_SUMMARY_TTS_PROVIDER=macos
+
+# ===== AI Summarization Providers =====
+# For OpenAI (GPT-4)
+openai>=1.0.0
+
+# For Anthropic (Claude)
+anthropic>=0.18.0
+
+# For Ollama or ElevenLabs (HTTP requests)
+requests>=2.31.0
+
+# ===== Quick Install Commands =====
+# Minimal (no AI, macOS say only):
+#   No installation needed!
+
+# OpenAI + macOS:
+#   pip install openai
+
+# Anthropic + macOS:
+#   pip install anthropic
+
+# Ollama + macOS:
+#   pip install requests
+
+# ElevenLabs TTS:
+#   pip install requests
+
+# Full installation (all providers):
+#   pip install -r requirements.txt

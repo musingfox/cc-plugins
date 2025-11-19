@@ -26,6 +26,37 @@ Your personal development squad powered by Agent-First workflow:
 /plugin install omt
 ```
 
+### Voice Summary Hook
+
+Audio feedback after Claude Code completes tasks:
+- **AI Summarization**: Optional summaries using OpenAI, Anthropic, or Ollama
+- **Voice Output**: Text-to-speech via ElevenLabs (cloud) or macOS say (local)
+- **Multi-language**: Support for English and Chinese
+- **Zero Dependencies**: Works with just Python 3 in basic mode
+- **Highly Configurable**: Environment variables for all settings
+
+**Installation:**
+```bash
+/plugin install voice-summary
+```
+
+**Quick Start:**
+```bash
+# Copy hook to your project
+mkdir -p .claude/hooks
+cp voice-summary/hooks/voice_summary.py .claude/hooks/
+
+# Configure in .claude/settings.json
+{
+  "hooks": {
+    "Stop": [{
+      "type": "command",
+      "command": "python3 .claude/hooks/voice_summary.py"
+    }]
+  }
+}
+```
+
 ## Plugin Development
 
 This repository serves as both a marketplace and a development workspace for custom Claude Code plugins.
@@ -42,6 +73,15 @@ cc-plugins/
 │   ├── commands/
 │   ├── agents/
 │   └── templates/
+├── voice-summary/                # Voice Summary Hook plugin
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   ├── hooks/
+│   │   └── voice_summary.py
+│   ├── .env.example
+│   ├── requirements.txt
+│   ├── settings.json.example
+│   └── README.md
 └── README.md
 ```
 

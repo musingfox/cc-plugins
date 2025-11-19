@@ -9,6 +9,11 @@
       "name": "omt",
       "source": "./omt",
       "description": "OMT - One Man Team: Your personal development squad powered by Agent-First workflow with 9 autonomous agents"
+    },
+    {
+      "name": "voice-summary",
+      "source": "./voice-summary",
+      "description": "Voice Summary Hook: Audio summaries after task completion with AI-powered summarization (OpenAI/Anthropic/Ollama) and TTS (ElevenLabs/macOS)"
     }
   ]
 }
