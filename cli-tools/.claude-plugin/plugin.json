@@ -1,0 +1,24 @@
+{
+  "name": "cli-tools",
+  "description": "Modern CLI Tools Expert: Master powerful command-line tools for lightning-fast file finding (fd), text searching (ripgrep), AST pattern matching (ast-grep), fuzzy selection (fzf), and data processing (jq/yq).",
+  "version": "1.0.0",
+  "author": {
+    "name": "Nick Huang",
+    "email": "nick12703990@gmail.com"
+  },
+  "keywords": [
+    "cli",
+    "tools",
+    "fd",
+    "ripgrep",
+    "ast-grep",
+    "fzf",
+    "jq",
+    "yq",
+    "search",
+    "productivity",
+    "devtools"
+  ],
+  "homepage": "https://github.com/musingfox/cc-plugins/tree/main/cli-tools",
+  "license": "MIT"
+}

@@ -26,6 +26,21 @@ Your personal development squad powered by Agent-First workflow:
 /plugin install omt
 ```
 
+### CLI Tools - Modern Command-Line Productivity
+
+Master powerful CLI tools for lightning-fast development workflows:
+- **fd**: Fast file finder (3-10x faster than `find`)
+- **ripgrep (rg)**: Blazing fast text search
+- **ast-grep**: Structural code search by AST patterns
+- **fzf**: Interactive fuzzy finder for selection workflows
+- **jq**: JSON processing and transformation
+- **yq**: YAML/XML processing for configs
+
+**Installation:**
+```bash
+/plugin install cli-tools
+```
+
 ## Plugin Development
 
 This repository serves as both a marketplace and a development workspace for custom Claude Code plugins.
