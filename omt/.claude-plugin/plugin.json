@@ -19,6 +19,30 @@
   ],
   "homepage": "https://github.com/musingfox/cc-plugins/tree/main/omt",
   "license": "MIT",
+  "commands": [
+    {
+      "name": "analyze-observations",
+      "description": "Analyze observation data to identify automation opportunities",
+      "path": "commands/analyze-observations.md"
+    }
+  ],
+  "agents": [
+    {
+      "name": "arch",
+      "description": "Technical architecture design using API-First methodology",
+      "path": "agents/arch.md"
+    },
+    {
+      "name": "tdd",
+      "description": "Test-Driven Development implementation with Red-Green-Refactor cycle",
+      "path": "agents/tdd.md"
+    },
+    {
+      "name": "coord-exec",
+      "description": "Execution phase coordinator with human decision points",
+      "path": "agents/coord-exec.md"
+    }
+  ],
   "skills": [
     {
       "name": "contract-validation",
