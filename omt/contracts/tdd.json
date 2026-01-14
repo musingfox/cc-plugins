@@ -1,0 +1,103 @@
+{
+  "agent": "tdd",
+  "description": "Test-Driven Development implementation agent",
+  "method": {
+    "name": "Test-Driven Development",
+    "description": "Red → Green → Refactor cycle for robust code",
+    "steps": [
+      "Write failing tests (Red)",
+      "Implement minimal code to pass (Green)",
+      "Refactor for quality",
+      "Repeat"
+    ]
+  },
+  "input_contract": {
+    "required": [
+      {
+        "field_name": "requirements",
+        "description": "Requirements document from PM",
+        "type": "string",
+        "validation": ["minLength:10"]
+      },
+      {
+        "field_name": "architecture",
+        "description": "API contracts and architecture design",
+        "type": "string",
+        "validation": ["minLength:10"]
+      },
+      {
+        "field_name": "files_to_modify",
+        "description": "List of files to implement",
+        "type": "array",
+        "validation": ["minItems:1"]
+      }
+    ],
+    "optional": [
+      {
+        "field_name": "existing_tests",
+        "description": "Existing test files to build upon",
+        "type": "array"
+      }
+    ],
+    "source": [
+      {
+        "location": "outputs/pm.md",
+        "description": "Requirements from PM agent"
+      },
+      {
+        "location": "outputs/arch.md",
+        "description": "Architecture from Architect agent"
+      },
+      {
+        "location": "state.json:planning.architecture.files_to_modify",
+        "description": "Files list from state"
+      }
+    ]
+  },
+  "output_contract": {
+    "required": [
+      {
+        "field_name": "test_files",
+        "description": "Test files created or modified",
+        "type": "array",
+        "validation": ["minItems:1"]
+      },
+      {
+        "field_name": "implementation_files",
+        "description": "Implementation files modified",
+        "type": "array",
+        "validation": ["minItems:1"]
+      },
+      {
+        "field_name": "tests_status",
+        "description": "Test execution result (format: X/Y passed)",
+        "type": "string",
+        "validation": ["pattern:^\\d+/\\d+ passed$"]
+      },
+      {
+        "field_name": "complexity_actual",
+        "description": "Actual complexity score",
+        "type": "number"
+      }
+    ],
+    "optional": [
+      {
+        "field_name": "coverage",
+        "description": "Test coverage percentage",
+        "type": "number"
+      }
+    ],
+    "destination": [
+      "tests/",
+      "src/",
+      "outputs/tdd.md",
+      "state.json:execution.tdd_result"
+    ]
+  },
+  "validation": [
+    "all tests must pass",
+    "test coverage >= 80%",
+    "complexity_actual should match estimate ±30%"
+  ],
+  "complexity_range": [8, 21]
+}

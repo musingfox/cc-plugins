@@ -1,0 +1,92 @@
+{
+  "agent": "arch",
+  "description": "Technical architecture design agent",
+  "method": {
+    "name": "API-First Design",
+    "description": "Define interfaces and types before implementation",
+    "steps": [
+      "Analyze requirements and project structure",
+      "Define API interfaces and types",
+      "Create architecture diagram",
+      "Document technical decisions",
+      "List files to create/modify"
+    ]
+  },
+  "input_contract": {
+    "required": [
+      {
+        "field_name": "requirements",
+        "description": "Requirements from PM or task description",
+        "type": "string",
+        "validation": ["minLength:10"]
+      },
+      {
+        "field_name": "project_structure",
+        "description": "Current project file structure",
+        "type": "array"
+      }
+    ],
+    "optional": [
+      {
+        "field_name": "existing_architecture",
+        "description": "Existing architecture documentation",
+        "type": "string"
+      }
+    ],
+    "source": [
+      {
+        "location": "outputs/pm.md",
+        "description": "Requirements from PM (if available)"
+      },
+      {
+        "location": "state.json:task.description",
+        "description": "Direct task description"
+      },
+      {
+        "location": "CLAUDE.md",
+        "description": "Project standards and preferences"
+      }
+    ]
+  },
+  "output_contract": {
+    "required": [
+      {
+        "field_name": "api_contracts",
+        "description": "API interfaces and type definitions",
+        "type": "string",
+        "validation": ["minLength:20"]
+      },
+      {
+        "field_name": "architecture_diagram",
+        "description": "Architecture visualization (Mermaid format)",
+        "type": "string",
+        "validation": ["pattern:^```mermaid"]
+      },
+      {
+        "field_name": "tech_decisions",
+        "description": "Technical decisions and rationale",
+        "type": "string",
+        "validation": ["minLength:20"]
+      },
+      {
+        "field_name": "files_to_create",
+        "description": "New files to create",
+        "type": "array"
+      },
+      {
+        "field_name": "files_to_modify",
+        "description": "Existing files to modify",
+        "type": "array"
+      }
+    ],
+    "destination": [
+      "outputs/arch.md",
+      "state.json:planning.architecture"
+    ]
+  },
+  "validation": [
+    "all APIs must have interface definitions",
+    "files_to_create + files_to_modify <= 15 (otherwise split task)"
+  ],
+  "complexity_range": [5, 13]
+}

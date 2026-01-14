@@ -1,6 +1,6 @@
 {
   "name": "omt",
-  "description": "OMT - One Man Team: Your personal development squad powered by Agent-First workflow. 9 autonomous agents handle planning, coding, review, optimization, and documentation.",
+  "description": "OMT - One Man Team: Your personal development squad powered by Agent-First workflow. Contract-First design with autonomous agents for planning, execution, and review.",
   "version": "1.0.0",
   "author": {
     "name": "Nick Huang",
@@ -10,6 +10,7 @@
     "agent",
     "workflow",
     "automation",
+    "contract-first",
     "tdd",
     "code-review",
     "task-management",
@@ -17,5 +18,20 @@
     "retrospective"
   ],
   "homepage": "https://github.com/musingfox/cc-plugins/tree/main/omt",
-  "license": "MIT"
+  "license": "MIT",
+  "skills": [
+    {
+      "name": "contract-validation",
+      "description": "Validate agent input/output contracts",
+      "path": "skills/contract-validation.md"
+    }
+  ],
+  "hooks": [
+    {
+      "name": "state-sync",
+      "description": "Automatically sync agent outputs to state.json and jj",
+      "path": "hooks/state-sync.sh",
+      "event": "PostToolUse"
+    }
+  ]
 }

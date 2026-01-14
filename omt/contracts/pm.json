@@ -1,0 +1,79 @@
+{
+  "agent": "pm",
+  "description": "Product management and requirements definition agent",
+  "method": {
+    "name": "User Story Driven",
+    "description": "Define requirements through user stories and acceptance criteria",
+    "steps": [
+      "Analyze task description",
+      "Create user stories",
+      "Define acceptance criteria",
+      "Specify scope boundaries"
+    ]
+  },
+  "input_contract": {
+    "required": [
+      {
+        "field_name": "task_description",
+        "description": "Human-provided task description",
+        "type": "string",
+        "validation": ["minLength:5"]
+      }
+    ],
+    "optional": [
+      {
+        "field_name": "existing_prd",
+        "description": "Existing product requirements document",
+        "type": "string"
+      }
+    ],
+    "source": [
+      {
+        "location": "state.json:task.title",
+        "description": "Task title from state"
+      },
+      {
+        "location": "docs/PRD/*.md",
+        "description": "Existing PRD documents (if any)"
+      }
+    ]
+  },
+  "output_contract": {
+    "required": [
+      {
+        "field_name": "user_stories",
+        "description": "User stories in standard format",
+        "type": "array",
+        "validation": ["minItems:1"]
+      },
+      {
+        "field_name": "acceptance_criteria",
+        "description": "Testable acceptance criteria",
+        "type": "array",
+        "validation": ["minItems:1"]
+      },
+      {
+        "field_name": "scope",
+        "description": "Feature scope definition",
+        "type": "string",
+        "validation": ["minLength:10"]
+      }
+    ],
+    "optional": [
+      {
+        "field_name": "out_of_scope",
+        "description": "Explicitly excluded items",
+        "type": "array"
+      }
+    ],
+    "destination": [
+      "outputs/pm.md",
+      "state.json:planning.requirements"
+    ]
+  },
+  "validation": [
+    "user_stories must follow 'As a... I want... So that...' format",
+    "acceptance_criteria must be testable"
+  ],
+  "complexity_range": [3, 8]
+}
