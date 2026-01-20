@@ -1,0 +1,27 @@
+{
+  "name": "readability-formatting",
+  "description": "Enhances AI-generated text readability through proper alignment and formatting of markdown tables, ASCII art, and text-based diagrams",
+  "version": "1.0.0",
+  "author": {
+    "name": "Nick Huang",
+    "email": "nick12703990@gmail.com"
+  },
+  "keywords": [
+    "formatting",
+    "readability",
+    "markdown",
+    "ascii-art",
+    "alignment",
+    "tables",
+    "text-diagrams"
+  ],
+  "homepage": "https://github.com/musingfox/cc-plugins",
+  "license": "MIT",
+  "skills": [
+    {
+      "name": "readable-text-formatting",
+      "description": "Generate human-readable formatted text including aligned markdown tables and ASCII diagrams",
+      "path": "skills/readable-text-formatting.md"
+    }
+  ]
+}

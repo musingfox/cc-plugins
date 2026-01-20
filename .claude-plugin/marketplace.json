@@ -9,6 +9,11 @@
       "name": "omt",
       "source": "./omt",
       "description": "OMT - One Man Team: Your personal development squad powered by Agent-First workflow with 9 autonomous agents"
+    },
+    {
+      "name": "readability-formatting",
+      "source": "./readability-formatting",
+      "description": "Readability Formatting: Enhances AI-generated text readability through proper alignment and formatting of markdown tables, ASCII art, and text-based diagrams"
     }
   ]
 }
