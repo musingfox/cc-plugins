@@ -26,6 +26,30 @@ Your personal development squad powered by Agent-First workflow:
 /plugin install omt
 ```
 
+### Thinking
+
+Thinking frameworks for better decision-making:
+- **Scenario-Driven Design**: Always start with future usage scenarios before proposing solutions
+- **Dimensional Analysis**: Evaluate performance, maintainability, scalability, cost, and more
+- **Explicit Trade-offs**: Clearly communicate what each solution optimizes and sacrifices
+
+**Installation:**
+```bash
+/plugin install thinking
+```
+
+### Readability
+
+Enhances AI-generated text readability:
+- **Markdown Tables**: Properly aligned columns for terminal display
+- **ASCII Art**: Well-formatted text-based diagrams
+- **Text Diagrams**: Consistent formatting for visual elements
+
+**Installation:**
+```bash
+/plugin install readability
+```
+
 ## Plugin Development
 
 This repository serves as both a marketplace and a development workspace for custom Claude Code plugins.
@@ -41,7 +65,15 @@ cc-plugins/
 │   │   └── plugin.json
 │   ├── commands/
 │   ├── agents/
-│   └── templates/
+│   └── skills/
+├── thinking/                     # Thinking frameworks plugin
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   └── skills/
+├── readability/                  # Text formatting plugin
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   └── skills/
 └── README.md
 ```
 
