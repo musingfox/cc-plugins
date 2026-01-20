@@ -1,0 +1,27 @@
+{
+  "name": "thinking",
+  "description": "Thinking frameworks for better decision-making: scenario-driven design, dimensional analysis, and explicit trade-offs",
+  "version": "1.0.0",
+  "author": {
+    "name": "Nick Huang",
+    "email": "nick12703990@gmail.com"
+  },
+  "keywords": [
+    "thinking",
+    "decision-making",
+    "scenario",
+    "trade-offs",
+    "dimensional-analysis",
+    "architecture",
+    "design"
+  ],
+  "homepage": "https://github.com/musingfox/cc-plugins/tree/main/thinking",
+  "license": "MIT",
+  "skills": [
+    {
+      "name": "scenario-thinking",
+      "description": "Scenario-driven solution design that focuses on future use cases, dimensional analysis, and explicit trade-offs",
+      "path": "skills/scenario-thinking.md"
+    }
+  ]
+}
