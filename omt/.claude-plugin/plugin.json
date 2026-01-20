@@ -48,6 +48,11 @@
       "name": "contract-validation",
       "description": "Validate agent input/output contracts",
       "path": "skills/contract-validation.md"
+    },
+    {
+      "name": "scenario-thinking",
+      "description": "Scenario-driven solution design that focuses on future use cases, dimensional analysis, and explicit trade-offs",
+      "path": "skills/scenario-thinking.md"
     }
   ],
   "hooks": [
