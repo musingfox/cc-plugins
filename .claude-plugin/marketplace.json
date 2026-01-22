@@ -11,9 +11,14 @@
       "description": "OMT - One Man Team: Your personal development squad powered by Agent-First workflow with 9 autonomous agents"
     },
     {
-      "name": "readability-formatting",
-      "source": "./readability-formatting",
+      "name": "readability",
+      "source": "./readability",
       "description": "Readability Formatting: Enhances AI-generated text readability through proper alignment and formatting of markdown tables, ASCII art, and text-based diagrams"
+    },
+    {
+      "name": "thinking",
+      "source": "./thinking",
+      "description": "Thinking frameworks for better decision-making: scenario-driven design, dimensional analysis, and explicit trade-offs"
     }
   ]
 }
