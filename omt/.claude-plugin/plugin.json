@@ -43,13 +43,7 @@
       "path": "agents/coord-exec.md"
     }
   ],
-  "skills": [
-    {
-      "name": "contract-validation",
-      "description": "Validate agent input/output contracts",
-      "path": "skills/contract-validation.md"
-    }
-  ],
+  "skills": "./skills/",
   "hooks": [
     {
       "name": "state-sync",

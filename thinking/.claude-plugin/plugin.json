@@ -17,11 +17,5 @@
   ],
   "homepage": "https://github.com/musingfox/cc-plugins/tree/main/thinking",
   "license": "MIT",
-  "skills": [
-    {
-      "name": "scenario-thinking",
-      "description": "Scenario-driven solution design that focuses on future use cases, dimensional analysis, and explicit trade-offs",
-      "path": "skills/scenario-thinking.md"
-    }
-  ]
+  "skills": "./skills/"
 }

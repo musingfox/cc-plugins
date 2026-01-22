@@ -17,11 +17,5 @@
   ],
   "homepage": "https://github.com/musingfox/cc-plugins",
   "license": "MIT",
-  "skills": [
-    {
-      "name": "readable-text-formatting",
-      "description": "Generate human-readable formatted text including aligned markdown tables and ASCII diagrams",
-      "path": "skills/readable-text-formatting.md"
-    }
-  ]
+  "skills": "./skills/"
 }
