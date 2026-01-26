@@ -1,13 +1,14 @@
 {
-  "agent": "tdd",
-  "description": "Test-Driven Development implementation agent",
+  "agent": "dev",
+  "description": "Development implementation agent with TDD and debugging",
   "method": {
-    "name": "Test-Driven Development",
-    "description": "Red → Green → Refactor cycle for robust code",
+    "name": "TDD + Debugging",
+    "description": "Test-Driven Development with systematic debugging",
     "steps": [
       "Write failing tests (Red)",
       "Implement minimal code to pass (Green)",
       "Refactor for quality",
+      "Debug with 5 Whys if errors occur",
       "Repeat"
     ]
   },
@@ -37,6 +38,11 @@
         "field_name": "existing_tests",
         "description": "Existing test files to build upon",
         "type": "array"
+      },
+      {
+        "field_name": "error_context",
+        "description": "Error information if debugging task",
+        "type": "object"
       }
     ],
     "source": [
@@ -85,13 +91,18 @@
         "field_name": "coverage",
         "description": "Test coverage percentage",
         "type": "number"
+      },
+      {
+        "field_name": "debugging_report",
+        "description": "Root cause analysis if debugging was performed",
+        "type": "string"
       }
     ],
     "destination": [
       "tests/",
       "src/",
-      "outputs/tdd.md",
-      "state.json:execution.tdd_result"
+      "outputs/dev.md",
+      "state.json:execution.dev_result"
     ]
   },
   "validation": [
@@ -99,5 +110,6 @@
     "test coverage >= 80%",
     "complexity_actual should match estimate ±30%"
   ],
-  "complexity_range": [8, 21]
+  "complexity_range": [8, 21],
+  "retry_limit": 3
 }

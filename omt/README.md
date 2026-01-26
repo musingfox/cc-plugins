@@ -1,60 +1,143 @@
 # OMT - One Man Team Plugin
 
-A comprehensive Agent-First development workflow system for Claude Code, featuring 9 autonomous agents, intelligent task management, and automated quality assurance. Your personal development squad that makes one person feel like a team.
+A streamlined Agent-First development workflow for Claude Code. Your personal development squad that makes one person feel like a team.
 
 ## Overview
 
-**OMT (One Man Team)** transforms your development workflow by introducing an **Agent-First** approach where:
-- **Agents handle complex automation** - Autonomous execution of multi-step tasks
-- **Commands are for critical decisions** - Human input only at key decision points
-- **Quality is built-in** - Automated code review, testing, and git commit workflows
+**OMT (One Man Team)** transforms your development workflow:
+
+- **Humans plan** - Deep involvement in requirements → clarification → planning
+- **Agents execute** - Autonomous development until completion or conflict
+- **Contracts connect** - Clear input/output definitions between agents
+- **Minimal intervention** - @coord-exec only escalates after 3 failures
 
 ## Features
 
-### 🤖 9 Specialized Agents
+### 5 Core Agents
 
-- **@agent-planner**: Task decomposition and PRD generation
-- **@agent-coder**: TDD implementation with test-first approach
-- **@agent-reviewer**: Code quality review + automatic git commits
-- **@agent-debugger**: Systematic error diagnosis and fixes
-- **@agent-optimizer**: Performance optimization and refactoring
-- **@agent-doc**: Documentation generation and maintenance (see `agents/doc.md` for dual-trigger details)
-- **@agent-devops**: Deployment configuration and infrastructure (see `agents/devops.md` for triple-trigger details)
-- **@agent-pm**: Project management and status tracking
-- **@agent-retro**: Retrospective analysis and estimation improvement
+| Agent | Phase | Model | Purpose |
+|-------|-------|-------|---------|
+| @pm | Planning | claude-haiku-4-5 | Requirements management and clarification |
+| @arch | Planning | claude-sonnet-4-5 | API-First architecture design |
+| @coord-exec | Coordination | claude-sonnet-4-5 | Dispatch execution agents, escalate after 3 failures |
+| @dev | Execution | claude-sonnet-4-5 | Development implementation (TDD + debugging) |
+| @reviewer | Review | claude-sonnet-4-5 | Code review + git commit authority |
 
-### 📋 Task Management Integration
-
-- **Linear**: Full MCP integration with workflow automation
-- **GitHub Issues**: Native integration
-- **Jira**: API-based synchronization
-- **Local Files**: Self-contained task management
-
-### 🎯 Critical Decision Commands
-
-- `/po` (Product Owner): Define requirements and features
-- `/techlead`: Make architectural decisions
-- `/approve`: Review important changes (API, schema, security)
-- `/git-commit`: Manual git commits (emergency only)
-- `/init-agents`: Initialize agent workspace (see `docs/workflow.md` for initialization workflow details)
-
-### 🔄 Automated Workflow
+### Workflow
 
 ```
-/po → /techlead → @agent-planner → @agent-coder → @agent-reviewer → (auto commit)
-                                          ↓
-                                    @agent-debugger (if needed)
-                                          ↓
-                                    @agent-optimizer (if needed)
+┌─────────────────────────────────────────────────────────────────┐
+│  PLANNING PHASE - Triangle Consensus                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│                      Human                                      │
+│                    [goal.md]                                    │
+│                   Describe goal                                 │
+│                   /        \                                    │
+│                  /   Agree   \                                  │
+│                 /             \                                 │
+│            @pm ─────Agree────── @arch                           │
+│         [requirements.md]  [implementation.md]                  │
+│          Describe needs        Describe approach                │
+│                                                                 │
+│  All three must agree before entering execution phase           │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+                           │
+                           ▼ Consensus reached
+┌─────────────────────────────────────────────────────────────────┐
+│  EXECUTION PHASE (Agent Autonomous)                             │
+├─────────────────────────────────────────────────────────────────┤
+│  @coord-exec auto-dispatches:                                   │
+│    ├─ @dev (development implementation)                         │
+│    └─ @reviewer (review + commit)                               │
+│                                                                 │
+│  Loop until:                                                    │
+│    ✓ All planned items implemented                              │
+│    ✗ Or 3 failures → summarize status and escalate to user      │
+└─────────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  COMPLETION or ESCALATION                                       │
+├─────────────────────────────────────────────────────────────────┤
+│  ✓ Complete: All planned items implemented and committed        │
+│  ⚠ Conflict: Implementation conflicts with plan, needs review   │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### 📊 Fibonacci Complexity Estimation
+**Planning Phase Outputs**:
 
-- Token-based complexity (1 point = 1000 tokens)
-- Fibonacci scale: 1, 2, 3, 5, 8, 13, 21, 34, 55, 89
-- Continuous learning through @agent-retro
+| Role | Output File | Content |
+|------|-------------|---------|
+| Human | goal.md | Describe the goal |
+| @pm | requirements.md | Describe requirements |
+| @arch | implementation.md | Describe implementation approach |
 
-### 🛡️ Failure Protection
+**Consensus Mechanism (Review Loop)**:
+
+```
+1. Human creates goal.md
+2. @pm reviews goal.md → creates requirements.md
+3. @arch reviews goal.md + requirements.md → creates implementation.md
+4. Human reviews all documents
+   - If changes needed → return to steps 1-3 for relevant party
+   - If all agree → enter execution phase
+```
+
+### Commands
+
+| Command | Purpose |
+|---------|---------|
+| /init-agents | Initialize agent workspace |
+| /help | Help and command reference |
+| /approve | Review important changes |
+| /git-commit | Emergency manual commit |
+
+### Contract-First Design
+
+**Planning Phase Outputs (Three-party Collaboration)**:
+
+| Role | Output | Contract |
+|------|--------|----------|
+| Human | goal.md | - |
+| @pm | requirements.md | pm.json |
+| @arch | implementation.md | arch.json |
+
+**Execution Phase Contracts**:
+
+| Contract | Connection | Definition |
+|----------|------------|------------|
+| dev.json | @dev → @reviewer | Implementation results and test coverage |
+
+**Skills**:
+- `contract-validation` - Validate agent contracts
+
+### Git Workflow
+
+**Commit Authority**:
+
+**✅ Has commit authority:**
+- `@reviewer` (automatic after review)
+- `/git-commit` (manual, emergency only)
+
+**❌ No commit authority:**
+- All other agents
+- Agents create code changes but cannot commit
+
+**Commit Format**:
+
+```
+<type>[optional scope]: <description>
+
+Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
+
+### Failure Protection
 
 - Auto-escalation after 3 retries
 - State preservation with git stash
@@ -84,7 +167,6 @@ In your project root:
 
 This will:
 - Create `.agents/` directory structure
-- Configure task management system (Linear/GitHub/Jira/Local)
 - Initialize state definitions and helper library
 - Update `.gitignore` rules
 
@@ -93,61 +175,27 @@ This will:
 ### Quick Start
 
 ```bash
-# 1. Define requirements
-/po "Implement user authentication system"
-
-# 2. Make architecture decisions
-/techlead
-
-# 3. Agents automatically execute
-# - @agent-planner breaks down tasks
-# - @agent-coder implements with TDD
-# - @agent-reviewer reviews and commits
-# - @agent-pm updates task management
+# 1. Create goal.md describing what you want to build
+# 2. @pm clarifies requirements
+# 3. @arch designs implementation approach
+# 4. Once consensus reached, @coord-exec takes over
+# 5. Autonomous execution until complete or escalation
 ```
 
-### Example: Bug Fix
+### Example: New Feature
 
 ```bash
-# Fully automated
-@agent-debugger "Fix login 500 error"
-# → Diagnoses issue
-# → Hands off to @agent-coder
-# → @agent-reviewer reviews and commits
+# Human creates goal.md
+echo "Build user authentication with JWT" > .agents/goal.md
+
+# @pm reviews and creates requirements.md
+# @arch reviews and creates implementation.md
+# Human reviews all three documents
+
+# If all agree, @coord-exec dispatches:
+# - @dev implements with TDD
+# - @reviewer reviews and commits
 ```
-
-### Example: Performance Optimization
-
-```bash
-@agent-optimizer "Optimize API response time"
-# → Analyzes bottlenecks
-# → Implements optimizations
-# → @agent-reviewer validates and commits
-```
-
-## Git Workflow
-
-### Commit Authority
-
-**✅ Has commit authority:**
-- `@agent-reviewer` (automatic after review)
-- `/git-commit` (manual, emergency only)
-
-**❌ No commit authority:**
-- All other agents
-- Agents create code changes but cannot commit
-
-### Commit Format
-
-```
-<type>[optional scope]: <description>
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>
-```
-
-Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
 
 ## Agent Workspace
 
@@ -155,153 +203,26 @@ Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
 
 ```
 .agents/
-├── package.json           # Dependencies (yaml)
-├── config.yml            # Dynamic runtime state
-├── states.yml            # State definitions
-├── lib.js               # Helper library (AgentTask class)
-├── tasks/               # Active tasks (gitignored)
-│   ├── LIN-123.json    # Task state
-│   └── LIN-123/        # Agent outputs
-│       ├── planner.md
-│       ├── coder.md
-│       └── reviewer.md
-└── retro/              # Retrospective analysis (gitignored)
+├── goal.md              # Human's goal (planning input)
+├── requirements.md      # @pm output
+├── implementation.md    # @arch output
+├── state.json           # Runtime state
+├── outputs/             # Agent execution outputs
+│   ├── dev.md          # @dev execution report
+│   └── reviewer.md     # @reviewer report
+└── tasks/              # Active tasks
 ```
 
-### Task Lifecycle
+## Library (lib/)
 
-1. **Create**: `AgentTask.create(taskId, title, complexity)`
-2. **Work**: Agents update status and write outputs
-3. **Handoff**: Automatic agent-to-agent task transfer
-4. **Complete**: Calculate actual complexity
-5. **Cleanup**: Auto-delete after 90 days (based on file mtime)
-
-### API Example
-
-```javascript
-const { AgentTask } = require('./.agents/lib');
-
-// Create task
-const task = AgentTask.create('LIN-123', 'Implement auth API', 8);
-
-// Agent updates
-task.updateAgent('planner', {
-  status: 'completed',
-  tokens_used: 1200,
-  handoff_to: 'coder'
-});
-
-// Write detailed output
-task.writeAgentOutput('planner', '# PRD\n...');
-
-// Find my tasks
-const myTasks = AgentTask.findMyTasks('coder');
-
-// Complete task
-task.complete();
-```
-
-## Configuration
-
-### Task Management (in project CLAUDE.md)
-
-```markdown
-## Task Management System
-
-**System**: Linear
-**Configuration**:
-- Team ID: TEAM-ABC
-- Workspace: my-workspace
-```
-
-### Agent Behavior (in .agents/config.yml)
-
-```yaml
-workspace:
-  version: "1.0.0"
-  location: ".agents/"
-
-task_management:
-  system: "Linear"
-```
-
-## Best Practices
-
-### 1. Agent-First Priority
-
-- ✅ Complex tasks → Use agents
-- ✅ Automation → Use agents
-- ⚠️ Critical decisions → Use commands
-
-### 2. Complexity Estimation
-
-- Based on token consumption, not human hours
-- Use Fibonacci scale
-- Let @agent-retro improve estimates
-
-### 3. Workspace Maintenance
-
-```bash
-# Cleanup old tasks (90 days)
-cd .agents
-node -e "require('./lib').AgentTask.cleanup(90)"
-```
-
-### 4. Monitor Progress
-
-```bash
-# View task status
-cat .agents/tasks/LIN-123.json | jq
-
-# View agent output
-cat .agents/tasks/LIN-123/coder.md
-
-# View retro analysis
-cat .agents/retro/*.md
-```
-
-## Troubleshooting
-
-### Agent Not Finding Tasks
-
-Check `current_agent` field:
-```bash
-cat .agents/tasks/LIN-123.json | jq '.current_agent'
-```
-
-### Task State Issues
-
-Verify state definitions:
-```bash
-cat .agents/states.yml
-```
-
-### Workspace Size
-
-Monitor and cleanup:
-```bash
-du -sh .agents/
-node -e "require('./.agents/lib').AgentTask.cleanup(30)"
-```
-
-## Advanced Topics
-
-### Custom Agents
-
-Extend the system by creating new agents in `~/.claude/agents/`.
-
-### Integration with CI/CD
-
-Agents can trigger builds and deployments via @agent-devops.
-
-### Team Workflows
-
-Configure plugins at repository level via `.claude/settings.json`.
+- `contract-validator.ts` - Contract validation
+- `state-manager.ts` - State management
 
 ## Documentation
 
 - **Workflow Overview**: See plugin's `docs/workflow.md`
-- **Workspace Guide**: See plugin's `docs/agent-workspace-guide.md`
+- **Quick Start**: See plugin's `docs/quick-start.md`
+- **Contract Validation**: See plugin's `docs/contract-validation.md`
 - **Command Reference**: See `commands/` directory
 - **Agent Specifications**: See `agents/` directory
 
@@ -317,6 +238,6 @@ For issues and feedback:
 
 ---
 
-**Version**: 1.0.0
-**Last Updated**: 2025-10-16
+**Version**: 2.0.0
+**Last Updated**: 2026-01-23
 **Status**: Production Ready

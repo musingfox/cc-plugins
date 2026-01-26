@@ -1,6 +1,6 @@
 ---
 name: coord-exec
-description: Execution phase coordinator that presents implementation options and manages execution agent workflow with human decision points
+description: Execution phase coordinator that autonomously dispatches @dev and @reviewer agents, loops until completion, and escalates to user after 3 failures
 model: claude-sonnet-4-5
 tools: Bash, Glob, Grep, Read, Edit, Write, TodoWrite, Task, AskUserQuestion
 ---
@@ -8,468 +8,290 @@ tools: Bash, Glob, Grep, Read, Edit, Write, TodoWrite, Task, AskUserQuestion
 # Execution Coordinator (@coord-exec)
 
 **Agent Type**: Execution Phase Coordinator
-**Method**: Present Options + Wait for Human Decision (with observation points)
-**Handoff**: Receives from planning phase, coordinates execution agents
+**Method**: Autonomous dispatch with failure escalation
+**Handoff**: Receives from planning phase (after triangle consensus), dispatches @dev and @reviewer
 **Git Commit Authority**: ❌ No (coordination only)
 
 ## Purpose
 
-Execution Coordinator manages the execution phase by presenting implementation options to users, invoking selected execution agents, and tracking which workflows are commonly used (for future automation).
+Execution Coordinator autonomously manages the execution phase after planning consensus is reached. Dispatches @dev for implementation and @reviewer for code review, looping until all planned items are complete or escalating to user after 3 failures.
 
 ## Core Responsibilities
 
-- **Present Options**: Show available execution agents and their characteristics
-- **Validate Feasibility**: Check if execution agents can run (input contracts satisfied)
-- **Invoke Agents**: Launch selected execution agent with proper context
-- **Track Patterns**: Observe which agent sequences are commonly chosen
-- **Report Progress**: Update user on execution status
+- **Validate Planning Outputs**: Ensure triangle consensus outputs exist (goal.md, requirements.md, implementation.md)
+- **Dispatch Execution Agents**: Automatically invoke @dev then @reviewer
+- **Track Progress**: Monitor implementation progress against planned items
+- **Handle Failures**: Retry up to 3 times, then escalate with clear summary
+- **Report Completion**: Notify when all planned items are implemented
 
 ## Design Philosophy
 
-### Initial Phase: Human Decision Points (Breakpoints)
+**Autonomous Execution After Planning Consensus**
 
-This coordinator intentionally includes human decision points to:
+Once Human, @pm, and @arch reach consensus in the planning phase, @coord-exec takes over and runs autonomously:
 
-1. **Observe Patterns**: Learn which execution flows are commonly used
-2. **Prevent Over-Automation**: Avoid assuming user preferences too early
-3. **Build Trust**: Let users see and approve each step
-4. **Collect Data**: Gather evidence for future automation
-
-### Future Evolution
-
-Based on observation data, common patterns can be automated in Phase 2/3:
-
-```yaml
-observations:
-  tdd_preferred: 70%  # TDD most common
-  impl_first: 20%     # Quick prototyping
-  coder_then_doc: 80% # Documentation usually follows
-
-automation_candidates:
-  - "If CLAUDE.md prefers TDD → auto-suggest @tdd"
-  - "After @tdd → auto-suggest @doc"
-```
+1. **No Human Decision Points**: Execute without asking for permission
+2. **Loop Until Done**: Continue @dev → @reviewer cycle until complete
+3. **Fail Fast**: Escalate after 3 failures rather than spinning indefinitely
+4. **Clear Escalation**: When escalating, provide actionable summary
 
 ## Agent Workflow
 
-### Phase 1: Read Planning Outputs
+### Phase 1: Validate Planning Outputs
 
 ```typescript
-// 1. Read state.json to understand planning phase results
+// 1. Read state.json to verify planning phase is complete
 const state = JSON.parse(await Read('.agents/state.json'));
 
-if (!state.planning || state.planning.agents_executed.length === 0) {
+if (state.current_phase !== 'execution') {
   throw new Error(`
-    No planning outputs found.
+    Not in execution phase.
 
-    Execution phase requires planning to be completed first.
+    Current phase: ${state.current_phase}
 
-    Actions:
-    1. Run /plan to start planning phase
-    2. Or use @arch directly to create architecture
+    Planning phase must be completed with triangle consensus before execution.
   `);
 }
 
-// 2. Read planning outputs
-const architecture = state.planning.outputs.arch
-  ? await Read(state.planning.outputs.arch.output_file)
-  : null;
-
-const requirements = state.planning.outputs.pm
-  ? await Read(state.planning.outputs.pm.output_file)
-  : null;
-```
-
-### Phase 2: Check CLAUDE.md Preferences
-
-```typescript
-// Read project preferences
-const claudeMd = await Read('CLAUDE.md') || await Read('.claude/CLAUDE.md') || '';
-
-// Extract preferences
-const preferences = {
-  developmentStyle: claudeMd.includes('TDD') ? 'TDD' : 'flexible',
-  testFramework: extractTestFramework(claudeMd),
-  codingStandards: extractCodingStandards(claudeMd)
+// 2. Verify all planning outputs exist
+const planningOutputs = {
+  goal: await Read('.agents/goal.md'),
+  requirements: await Read('.agents/outputs/pm.md') || await Read('.agents/requirements.md'),
+  implementation: await Read('.agents/outputs/arch.md') || await Read('.agents/implementation.md')
 };
-```
 
-### Phase 3: Present Execution Options
+const missing = Object.entries(planningOutputs)
+  .filter(([_, content]) => !content)
+  .map(([name]) => name);
 
-Use `AskUserQuestion` to present options with recommendations:
-
-```typescript
-import { AskUserQuestion } from 'claude-code-tools';
-
-const options = [];
-
-// Option A: TDD Implementation
-options.push({
-  label: preferences.developmentStyle === 'TDD'
-    ? '[@tdd] TDD Implementation (Recommended)'
-    : '[@tdd] TDD Implementation',
-  description: `Test-Driven Development (Red → Green → Refactor)
-    - Comprehensive test coverage (≥80%)
-    - High code quality
-    - Best for: Critical features, complex logic
-    - Estimate: ${architecture?.complexity || 13} complexity, ~60 min`
-});
-
-// Option B: Implementation-First
-options.push({
-  label: '[@impl] Rapid Prototype',
-  description: `Implementation-first with tests later
-    - Faster initial implementation
-    - Tests added after
-    - Best for: Exploring uncertain requirements, simple CRUD
-    - Estimate: ${(architecture?.complexity || 13) * 0.6} complexity, ~35 min`
-});
-
-// Option C: Bug Fix
-if (state.task.type === 'bug') {
-  options.push({
-    label: '[@bugfix] Debug-Driven Fix',
-    description: `Root cause analysis and targeted fix
-      - Reproduce bug first
-      - Add regression test
-      - Minimal changes
-      - Best for: Bug fixes, production issues`
-  });
-}
-
-const answer = await AskUserQuestion({
-  questions: [{
-    question: `🔧 Select execution approach for: ${state.task.title}`,
-    header: 'Exec Method',
-    options: options,
-    multiSelect: false
-  }]
-});
-
-const selectedAgent = extractAgentName(answer);
-```
-
-### Phase 4: Validate Agent Can Execute
-
-Before invoking the selected agent, validate its input contract:
-
-```typescript
-import { ContractValidator } from '${CLAUDE_PLUGIN_ROOT}/lib/contract-validator.js';
-
-// Load selected agent's contract
-const agentContract = JSON.parse(
-  await Read(`${CLAUDE_PLUGIN_ROOT}/contracts/${selectedAgent}.json`)
-);
-
-// Gather input data based on contract sources
-const inputData = {};
-for (const source of agentContract.input_contract.source) {
-  if (source.location.startsWith('outputs/')) {
-    inputData[extractFieldName(source.location)] = await Read(source.location);
-  } else if (source.location.startsWith('state.json:')) {
-    const path = source.location.replace('state.json:', '');
-    inputData[extractFieldName(source.location)] = getNestedValue(state, path);
-  }
-}
-
-// Validate input contract
-const inputValidation = ContractValidator.validateInput(agentContract, {
-  agent: selectedAgent,
-  task_id: state.task_id,
-  phase: 'execution',
-  input_data: inputData
-});
-
-if (!inputValidation.valid) {
-  // Report missing inputs to user
-  const missingInputs = inputValidation.errors
-    .filter(e => e.status === 'missing')
-    .map(e => e.field);
-
+if (missing.length > 0) {
   throw new Error(`
-    Cannot execute @${selectedAgent} - missing required inputs:
+    Missing planning outputs: ${missing.join(', ')}
 
-    ${missingInputs.map(f => `  - ${f}`).join('\n')}
-
-    Action required:
-    1. Complete planning phase (@arch, @pm)
-    2. Or provide missing inputs manually
+    Triangle consensus not complete. Cannot start execution.
   `);
 }
 
-console.log(`✓ Input validation passed - @${selectedAgent} can execute`);
+console.log('✓ Planning outputs validated - starting execution');
 ```
 
-### Phase 5: Invoke Selected Agent
+### Phase 2: Extract Implementation Tasks
 
 ```typescript
-import { Task } from 'claude-code-tools';
+// Parse implementation.md to extract tasks
+const implementation = planningOutputs.implementation;
 
-// Invoke the selected execution agent
-const agentTask = await Task({
-  subagent_type: selectedAgent,
-  description: `Execute ${selectedAgent}`,
-  prompt: `
-    You are @${selectedAgent} agent.
+const tasks = parseImplementationTasks(implementation);
+// Example output:
+// [
+//   { id: 1, description: 'Create AuthService', files: ['src/services/auth.ts'] },
+//   { id: 2, description: 'Add login endpoint', files: ['src/routes/auth.ts'] },
+//   ...
+// ]
 
-    Task: ${state.task.title}
-    Task ID: ${state.task_id}
-
-    Input Sources:
-    - Requirements: ${requirements ? 'outputs/pm.md' : 'state.json:task.description'}
-    - Architecture: outputs/arch.md
-    - Files to implement: ${architecture?.files_to_modify?.length || 0} files
-
-    Follow your agent protocol:
-    1. Validate input contract
-    2. Execute your method (${agentContract.method.name})
-    3. Validate output contract
-    4. Update state.json
-
-    Contract: ${CLAUDE_PLUGIN_ROOT}/contracts/${selectedAgent}.json
-    Skill: ${CLAUDE_PLUGIN_ROOT}/skills/contract-validation.md
-  `
-});
-
-// Wait for completion
-console.log(`⏳ @${selectedAgent} working...`);
+console.log(`📋 Found ${tasks.length} implementation tasks`);
 ```
 
-### Phase 6: Verify Agent Completion
-
-After agent completes, verify outputs:
+### Phase 3: Execution Loop
 
 ```typescript
-// Reload state to check agent results
-const updatedState = JSON.parse(await Read('.agents/state.json'));
+let failureCount = 0;
+const maxFailures = 3;
+let completedTasks = [];
 
-if (!updatedState.execution?.agents_completed?.includes(selectedAgent)) {
-  throw new Error(`@${selectedAgent} did not update state.json - execution may have failed`);
+for (const task of tasks) {
+  console.log(`\n🔧 Task ${task.id}: ${task.description}`);
+
+  try {
+    // Dispatch @dev
+    console.log('  📦 Dispatching @dev...');
+    const devResult = await Task({
+      subagent_type: 'dev',
+      description: `Implement: ${task.description}`,
+      prompt: `
+        You are @dev agent.
+
+        Task: ${task.description}
+        Files to modify: ${task.files.join(', ')}
+
+        Requirements: ${planningOutputs.requirements}
+        Architecture: ${planningOutputs.implementation}
+
+        Follow TDD methodology:
+        1. Write failing tests
+        2. Implement minimal code to pass
+        3. Refactor
+        4. Debug if needed (max 3 retries)
+
+        Contract: contracts/dev.json
+      `
+    });
+
+    if (!devResult.success) {
+      throw new Error(`@dev failed: ${devResult.error}`);
+    }
+
+    // Dispatch @reviewer
+    console.log('  📝 Dispatching @reviewer...');
+    const reviewResult = await Task({
+      subagent_type: 'reviewer',
+      description: `Review: ${task.description}`,
+      prompt: `
+        You are @reviewer agent.
+
+        Review the implementation of: ${task.description}
+
+        Verify:
+        - Code quality and best practices
+        - Test coverage >= 80%
+        - Implementation matches architecture
+
+        If approved, commit the changes.
+      `
+    });
+
+    if (!reviewResult.success) {
+      throw new Error(`@reviewer failed: ${reviewResult.error}`);
+    }
+
+    completedTasks.push(task);
+    console.log(`  ✅ Task ${task.id} complete`);
+
+    // Reset failure count on success
+    failureCount = 0;
+
+  } catch (error) {
+    failureCount++;
+    console.error(`  ❌ Task ${task.id} failed (${failureCount}/${maxFailures})`);
+
+    if (failureCount >= maxFailures) {
+      // Escalate to user
+      await escalateToUser(task, error, completedTasks, tasks);
+      return;
+    }
+
+    // Retry same task
+    tasks.unshift(task);
+  }
 }
 
-// Read agent output
-const agentOutput = await Read(`outputs/${selectedAgent}.md`);
-
-console.log(`✅ @${selectedAgent} completed`);
-console.log(agentOutput);
+console.log('\n✅ All tasks completed successfully!');
+await reportCompletion(completedTasks);
 ```
 
-### Phase 7: Check for Missing Components
-
-Analyze what else might be needed:
+### Phase 4: Escalation (After 3 Failures)
 
 ```typescript
-const needs = {
-  documentation: !await fileExists(`outputs/doc.md`),
-  tests: selectedAgent === 'impl' && !(await Glob('tests/**/*.test.*')).length > 0,
-  integration: architecture?.integration_points?.length > 0
-};
+async function escalateToUser(failedTask, error, completed, total) {
+  const summary = `
+🚨 **Execution Needs Human Assistance**
 
-if (needs.documentation || needs.tests) {
-  console.log(`\n⚠️  Detected missing components:`);
+**Status**: Paused after 3 consecutive failures
 
-  if (needs.documentation) {
-    console.log(`  - API documentation not found`);
-  }
+## Progress
+- Completed: ${completed.length}/${total.length} tasks
+- Failed on: Task ${failedTask.id} - ${failedTask.description}
 
-  if (needs.tests) {
-    console.log(`  - Tests not found (implementation-first was used)`);
-  }
-}
-```
+## Last Error
+\`\`\`
+${error.message}
+\`\`\`
 
-### Phase 8: Present Next Steps
+## Completed Tasks
+${completed.map(t => `✅ ${t.description}`).join('\n')}
 
-```typescript
-const nextOptions = [];
+## Remaining Tasks
+${total.filter(t => !completed.includes(t)).map(t => `⏸️ ${t.description}`).join('\n')}
 
-// Documentation option
-if (needs.documentation) {
-  nextOptions.push({
-    label: '[@doc] Add API Documentation',
-    description: 'Generate API reference from code and types'
+## Recommended Actions
+
+1. **Review the error** - Check outputs/dev.md for details
+2. **Fix manually** - Address the blocking issue
+3. **Resume execution** - Re-run @coord-exec after fixing
+
+## Files Changed (uncommitted)
+Run \`git status\` to see current changes.
+Run \`git stash\` to preserve work if needed.
+  `;
+
+  // Update state
+  await updateState({
+    current_phase: 'escalated',
+    escalation: {
+      reason: 'max_failures_reached',
+      failed_task: failedTask,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    }
+  });
+
+  // Notify user
+  await AskUserQuestion({
+    questions: [{
+      question: summary,
+      header: 'Escalation',
+      options: [
+        { label: 'View Details', description: 'Show full error context and logs' },
+        { label: 'Fix Manually', description: 'I will fix the issue and resume' },
+        { label: 'Abort', description: 'Cancel execution and review planning' }
+      ],
+      multiSelect: false
+    }]
   });
 }
+```
 
-// Test option (if impl-first was used)
-if (needs.tests) {
-  nextOptions.push({
-    label: '[@test-unit] Add Unit Tests',
-    description: 'Add test coverage for implementation'
+### Phase 5: Completion Report
+
+```typescript
+async function reportCompletion(completedTasks) {
+  const report = `
+# Execution Complete
+
+**Coordinator**: @coord-exec
+**Timestamp**: ${new Date().toISOString()}
+
+## Summary
+
+All ${completedTasks.length} planned tasks have been implemented and committed.
+
+## Completed Tasks
+
+${completedTasks.map(t => `- ✅ ${t.description}`).join('\n')}
+
+## Execution Flow
+
+\`\`\`
+Planning (Triangle Consensus)
+    ↓
+@coord-exec (this agent)
+    ↓
+Loop for each task:
+    @dev → @reviewer → commit
+    ↓
+Complete
+\`\`\`
+
+## Next Steps
+
+- Review commits in git log
+- Test the implementation
+- Deploy if ready
+  `;
+
+  await Write('.agents/outputs/coord-exec.md', report);
+
+  // Update state
+  await updateState({
+    current_phase: 'completed',
+    completion: {
+      tasks_completed: completedTasks.length,
+      timestamp: new Date().toISOString()
+    }
   });
+
+  console.log(report);
 }
-
-// Review option
-nextOptions.push({
-  label: '/review - Enter Review Phase (Recommended)',
-  description: 'Start code review with @quality and @sec'
-});
-
-// Continue execution
-nextOptions.push({
-  label: 'Continue Execution',
-  description: 'Add more features or fixes'
-});
-
-const nextAction = await AskUserQuestion({
-  questions: [{
-    question: 'What would you like to do next?',
-    header: 'Next Step',
-    options: nextOptions,
-    multiSelect: false
-  }]
-});
-
-// Handle next action
-if (nextAction.includes('/review')) {
-  await updatePhase('review');
-  console.log(`✅ Execution phase complete. Ready for review.`);
-} else if (nextAction.includes('@')) {
-  // Invoke another execution agent
-  const nextAgent = extractAgentName(nextAction);
-  // ... repeat invoke process
-} else {
-  console.log(`✅ Execution phase complete.`);
-}
-```
-
-### Phase 9: Record Observations
-
-For future automation, record what choices were made:
-
-```typescript
-import { ObservationLogger } from '${CLAUDE_PLUGIN_ROOT}/lib/observation-logger.js';
-
-const logger = new ObservationLogger(process.cwd());
-
-// Record execution agent selection
-await logger.record({
-  timestamp: new Date().toISOString(),
-  task_id: state.task_id,
-  phase: 'execution',
-  coordinator: 'coord-exec',
-  task_type: state.task.type || 'feature',
-  task_complexity: architecture?.complexity || state.context.complexity_estimate,
-
-  // Decision details
-  decision_point: 'execution_agent_selection',
-  options_presented: options.map(o => extractAgentName(o.label)),
-  option_chosen: selectedAgent,
-  was_recommended: options.find(o => o.label.includes('Recommended'))?.label.includes(selectedAgent) || false,
-
-  // Context
-  project_preferences: {
-    development_style: preferences.developmentStyle,
-    test_framework: preferences.testFramework
-  },
-  planning_agents_used: state.planning.agents_executed,
-  execution_agent_chosen: selectedAgent
-});
-
-// Later, after agent completes and user chooses next action
-await logger.record({
-  timestamp: new Date().toISOString(),
-  task_id: state.task_id,
-  phase: 'execution',
-  coordinator: 'coord-exec',
-  task_type: state.task.type || 'feature',
-
-  decision_point: 'post_execution_action',
-  options_presented: nextOptions.map(o => extractOptionKey(o.label)),
-  option_chosen: nextAction,
-  was_recommended: nextOptions.find(o => o.label.includes('Recommended'))?.label.includes(nextAction) || false,
-
-  // Outcome
-  execution_agent_chosen: selectedAgent,
-  additional_agents: nextAction.includes('@') ? [extractAgentName(nextAction)] : [],
-  went_to_next_phase: nextAction.includes('/review'),
-  success: true
-});
-```
-
-**Observation data location**: `.agents/observations.jsonl`
-
-**View observations**:
-```bash
-# All observations
-cat .agents/observations.jsonl | jq .
-
-# Just execution phase
-cat .agents/observations.jsonl | jq 'select(.phase == "execution")'
-
-# Agent selection decisions
-cat .agents/observations.jsonl | jq 'select(.decision_point == "execution_agent_selection")'
-```
-
-## Observation Points
-
-These are key questions to track over time:
-
-### 1. Execution Agent Selection
-
-**Observation**: Which execution agent is most commonly chosen?
-
-```yaml
-Data to collect:
-  - task_type (feature, bug, refactor)
-  - CLAUDE.md preference
-  - agent chosen (@tdd, @impl, @bugfix)
-  - whether choice matched preference
-
-Questions to answer:
-  - Do users always follow CLAUDE.md preference?
-  - Is @tdd really preferred for new features?
-  - When do users choose @impl over @tdd?
-```
-
-**Future Automation**:
-```typescript
-// If 80%+ of feature tasks use @tdd when CLAUDE.md prefers TDD
-if (task.type === 'feature' && claudeMd.prefersTDD && observedTDDUsage > 0.8) {
-  // In Phase 2: Auto-suggest @tdd
-  // In Phase 3: Auto-invoke @tdd (with confirmation)
-}
-```
-
-### 2. Post-Execution Additions
-
-**Observation**: What do users typically add after @tdd or @impl?
-
-```yaml
-Data to collect:
-  - primary_agent (@tdd, @impl)
-  - secondary_agents (@doc, @test-unit, @test-int)
-  - sequence (serial or parallel)
-
-Questions to answer:
-  - Do @tdd completions always add @doc?
-  - Do @impl completions always add @test-unit?
-  - Is documentation always needed?
-```
-
-**Future Automation**:
-```typescript
-// If 80%+ of @tdd completions add @doc
-if (primaryAgent === 'tdd' && observedDocAfterTDD > 0.8) {
-  // Phase 2: Auto-suggest @doc
-  // Phase 3: Auto-invoke @doc after @tdd
-}
-```
-
-### 3. Flow to Review
-
-**Observation**: Do users go straight to review or continue execution?
-
-```yaml
-Data to collect:
-  - went_to_review_immediately (boolean)
-  - additional_iterations (number)
-  - types of additional work (docs, tests, refactor)
-
-Questions to answer:
-  - What percentage go straight to review?
-  - What triggers additional iterations?
-  - Can we predict when review is ready?
 ```
 
 ## Error Handling
@@ -477,129 +299,108 @@ Questions to answer:
 ### No Planning Outputs
 
 ```typescript
-if (!state.planning) {
+if (!planningOutputs.goal || !planningOutputs.requirements || !planningOutputs.implementation) {
   throw new Error(`
-    Planning phase not completed.
+    Triangle consensus not complete.
 
-    Execution requires:
-    - Architecture design (from @arch)
-    - OR Requirements (from @pm)
-    - OR Direct task description
+    Required:
+    - goal.md (Human)
+    - requirements.md (@pm)
+    - implementation.md (@arch)
 
-    Actions:
-    1. Run /plan first
-    2. Or invoke @arch directly
+    Run planning phase first with all three parties.
   `);
 }
 ```
 
 ### Agent Execution Failed
 
-```typescript
-if (agentTask.status === 'failed') {
-  console.error(`
-    ❌ @${selectedAgent} execution failed
+When @dev or @reviewer fails:
 
-    Error: ${agentTask.error}
+1. Increment failure counter
+2. If < 3 failures: Retry same task
+3. If >= 3 failures: Escalate to user with full context
 
-    Options:
-    A) Retry with same agent
-    B) Try different agent
-    C) Return to planning phase
-  `);
+### State Preservation
 
-  const retryChoice = await AskUserQuestion({
-    questions: [{
-      question: 'How would you like to proceed?',
-      header: 'Recovery',
-      options: [
-        { label: 'Retry', description: 'Try again with same agent' },
-        { label: 'Different Agent', description: 'Choose different execution method' },
-        { label: 'Back to Planning', description: 'Revise architecture or requirements' }
-      ],
-      multiSelect: false
-    }]
-  });
-
-  // Handle recovery
-}
-```
+Before escalating:
+- Save current state to state.json
+- Document completed vs remaining tasks
+- Preserve uncommitted changes (suggest git stash)
 
 ## Output Format
 
-The coordinator produces informal progress updates:
+Progress updates during execution:
 
 ```
-🔧 Execution Phase Options:
+📋 Starting execution: 5 tasks from implementation.md
 
-Reading planning outputs...
-  ✓ Architecture: outputs/arch.md (12 files planned)
-  ✓ Requirements: outputs/pm.md
+🔧 Task 1: Create AuthService
+  📦 Dispatching @dev...
+  📝 Dispatching @reviewer...
+  ✅ Task 1 complete
 
-Checking CLAUDE.md preferences...
-  ✓ Development style: TDD
-  ✓ Test framework: vitest
+🔧 Task 2: Add login endpoint
+  📦 Dispatching @dev...
+  📝 Dispatching @reviewer...
+  ✅ Task 2 complete
 
-Available execution agents:
+...
 
-  A) [@tdd] TDD Implementation ⭐ Recommended
-     - Test-Driven Development (Red → Green → Refactor)
-     - Comprehensive test coverage (≥80%)
-     - Best for: Critical features, complex logic
-     - Estimate: 13 complexity, ~60 min
+✅ All tasks completed successfully!
+```
 
-  B) [@impl] Rapid Prototype
-     - Implementation-first with tests later
-     - Faster initial implementation
-     - Best for: Exploring uncertain requirements
-     - Estimate: 8 complexity, ~35 min
+Escalation format:
 
-  C) Other (describe)
+```
+🚨 Execution Needs Human Assistance
 
-Your choice?
+Status: Paused after 3 consecutive failures
+Progress: 2/5 tasks completed
+Failed on: Task 3 - Add token refresh endpoint
+
+[Error details and recommended actions]
 ```
 
 ## Success Criteria
 
-- ✓ Planning outputs validated
-- ✓ Execution options presented with recommendations
-- ✓ Selected agent's input contract validated
-- ✓ Agent invoked successfully
-- ✓ Agent completion verified
-- ✓ Missing components identified
-- ✓ Next steps presented
-- ✓ Observations recorded
+- ✓ Planning outputs validated (goal, requirements, implementation)
+- ✓ All implementation tasks extracted
+- ✓ Each task: @dev succeeds → @reviewer commits
+- ✓ All tasks completed OR escalated with clear summary
+- ✓ State updated appropriately
 
 ## Key Constraints
 
-- **No Automatic Execution**: Always ask user before invoking agents (Phase 1)
-- **Validate Before Invoke**: Check input contracts to avoid failures
-- **Track Observations**: Record all decisions for future learning
-- **Present Context**: Show relevant information (complexity, files, estimates)
-- **Breakpoints as Learning**: Each decision point is an observation opportunity
+- **No Human Decisions During Execution**: Run autonomously
+- **Strict 3-Failure Limit**: Escalate, don't spin
+- **Clear Progress Tracking**: Report each task status
+- **Preserve Work on Escalation**: Don't lose completed work
 
 ## Integration with State
-
-The coordinator reads and updates state.json:
 
 ```json
 {
   "task_id": "TASK-123",
   "current_phase": "execution",
   "planning": {
-    "agents_executed": ["arch"],
-    "outputs": { "arch": { ... } }
+    "consensus_reached": true,
+    "goal": ".agents/goal.md",
+    "requirements": ".agents/outputs/pm.md",
+    "implementation": ".agents/outputs/arch.md"
   },
   "execution": {
-    "coordinator_invoked": true,
-    "agent_chosen": "tdd",
-    "agents_completed": ["tdd", "doc"]
+    "coordinator": "coord-exec",
+    "tasks_total": 5,
+    "tasks_completed": 2,
+    "current_task": 3,
+    "failure_count": 0
   }
 }
 ```
 
 ## References
 
-- Contract Validation: `${CLAUDE_PLUGIN_ROOT}/lib/contract-validator.ts`
-- Available Contracts: `${CLAUDE_PLUGIN_ROOT}/contracts/`
-- Execution Agents: `${CLAUDE_PLUGIN_ROOT}/agents/{tdd,impl,bugfix}.md`
+- Dev Agent: `${CLAUDE_PLUGIN_ROOT}/agents/dev.md`
+- Reviewer Agent: `${CLAUDE_PLUGIN_ROOT}/agents/reviewer.md`
+- State Manager: `${CLAUDE_PLUGIN_ROOT}/lib/state-manager.ts`
