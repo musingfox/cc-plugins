@@ -1,0 +1,24 @@
+{
+  "name": "mermaid-viz",
+  "description": "Display Mermaid diagrams as high-quality PNG images: flowcharts, sequence diagrams, class diagrams, state machines, and more",
+  "version": "1.0.0",
+  "author": {
+    "name": "Nick Huang",
+    "email": "nick12703990@gmail.com"
+  },
+  "keywords": [
+    "mermaid",
+    "diagram",
+    "visualization",
+    "flowchart",
+    "sequence-diagram",
+    "class-diagram",
+    "state-diagram",
+    "er-diagram",
+    "uml",
+    "architecture"
+  ],
+  "homepage": "https://github.com/musingfox/cc-plugins/tree/main/mermaid-viz",
+  "license": "MIT",
+  "skills": "./skills/"
+}

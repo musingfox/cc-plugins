@@ -19,6 +19,11 @@
       "name": "thinking",
       "source": "./thinking",
       "description": "Thinking frameworks for better decision-making: scenario-driven design, dimensional analysis, and explicit trade-offs"
+    },
+    {
+      "name": "mermaid-viz",
+      "source": "./mermaid-viz",
+      "description": "Mermaid Visualization: Display Mermaid diagrams as high-quality PNG images - flowcharts, sequence diagrams, class diagrams, state machines, and more"
     }
   ]
 }
