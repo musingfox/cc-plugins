@@ -20,5 +20,8 @@
   ],
   "homepage": "https://github.com/musingfox/cc-plugins/tree/main/mermaid-viz",
   "license": "MIT",
+  "commands": [
+    "./commands/diagram.md"
+  ],
   "skills": "./skills/"
 }
