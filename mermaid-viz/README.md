@@ -53,7 +53,30 @@ No manual steps, no context switching, no friction.
 
 ### Prerequisites
 
-This plugin requires [mermaid-cli](https://github.com/mermaid-js/mermaid-cli) to render diagrams:
+**Minimal requirements**: Just Node.js/npm (which you likely already have)
+
+```bash
+# Check if you have npm
+npm --version
+```
+
+If not installed:
+```bash
+# macOS
+brew install node
+
+# Ubuntu/Debian
+sudo apt install nodejs npm
+
+# Windows
+# Download from https://nodejs.org
+```
+
+The plugin automatically uses `npx` to run mermaid-cli without global installation.
+
+### Optional: Install mermaid-cli for faster execution
+
+For instant diagram generation (skips ~10-20s first-time download):
 
 ```bash
 npm install -g @mermaid-js/mermaid-cli
@@ -63,6 +86,11 @@ Verify installation:
 ```bash
 mmdc --version
 ```
+
+**When to install globally:**
+- ✅ You create diagrams frequently (multiple times per day)
+- ✅ You want instant execution without initial download wait
+- ❌ Don't install if you only occasionally need diagrams - npx auto-caching is sufficient
 
 ### Installing the Plugin
 
@@ -146,11 +174,15 @@ When you request a diagram, Claude will:
 
 1. Generate appropriate Mermaid syntax based on your requirements
 2. Save the Mermaid code to a temporary file
-3. Render it to a PNG image using `mmdc`
-4. Automatically open the image in your default viewer (Preview on macOS)
-5. Inform you that the diagram is ready
+3. Automatically detect the best rendering tool:
+   - Use `mmdc` if installed (fastest, ~50ms)
+   - Use `npx -y @mermaid-js/mermaid-cli` as fallback (fast after cache, ~300ms)
+4. Apply your configuration from environment variables (theme, background, size, etc.)
+5. Render to PNG image (first time with npx: 10-20s download, then cached)
+6. Automatically open the image in your default viewer (Preview on macOS)
+7. Inform you that the diagram is ready
 
-The temporary files are saved in `/tmp` and will be automatically cleaned up by your system.
+**Customization**: Set environment variables like `MERMAID_THEME=dark` to change defaults. See Configuration section below
 
 ### Advanced Options
 
@@ -167,6 +199,105 @@ Create a sequence diagram with a white background for printing.
 **Request multiple related diagrams:**
 ```
 Create three diagrams: 1) system architecture flowchart, 2) authentication sequence diagram, 3) database ER diagram.
+```
+
+## Configuration
+
+Customize diagram rendering with environment variables. All configurations work with both the automatic skill and the `/diagram` command.
+
+### Available Options
+
+| Variable | Values | Default | Description |
+|----------|--------|---------|-------------|
+| `MERMAID_THEME` | `default`, `forest`, `dark`, `neutral` | `default` | Color theme for diagrams |
+| `MERMAID_BG` | `transparent`, `white`, `black`, `#HEX` | `transparent` | Background color |
+| `MERMAID_CONFIG` | File path | (none) | Path to custom mermaid config JSON |
+| `MERMAID_WIDTH` | Number | `800` | Width in pixels |
+| `MERMAID_HEIGHT` | Number | `600` | Height in pixels |
+| `MERMAID_SCALE` | Number | `1` | Scale factor for higher resolution |
+
+### Usage Examples
+
+**Temporary (one-time use)**:
+```bash
+MERMAID_THEME=dark claude
+```
+
+**Session-level (current terminal session)**:
+```bash
+export MERMAID_THEME=dark
+export MERMAID_BG=transparent
+claude
+```
+
+**Permanent (all sessions)**:
+
+Add to your shell config file (`~/.zshrc` or `~/.bashrc`):
+```bash
+# Mermaid diagram preferences
+export MERMAID_THEME=dark
+export MERMAID_BG=transparent
+export MERMAID_SCALE=2  # Higher resolution
+```
+
+Then reload:
+```bash
+source ~/.zshrc  # or ~/.bashrc
+```
+
+**Project-specific**:
+
+Create a `.env` file in your project:
+```bash
+# .env
+MERMAID_THEME=dark
+MERMAID_CONFIG=./mermaid.config.json
+MERMAID_WIDTH=1200
+```
+
+Load before running Claude:
+```bash
+source .env && claude
+```
+
+### Common Configurations
+
+**Dark mode diagrams**:
+```bash
+export MERMAID_THEME=dark
+export MERMAID_BG=#1a1a1a
+```
+
+**High-resolution for presentations**:
+```bash
+export MERMAID_WIDTH=1600
+export MERMAID_HEIGHT=1200
+export MERMAID_SCALE=2
+```
+
+**Custom styling with config file**:
+
+Create `~/.config/mermaid/config.json`:
+```json
+{
+  "theme": "dark",
+  "themeVariables": {
+    "primaryColor": "#BB86FC",
+    "primaryTextColor": "#E1E1E1",
+    "lineColor": "#03DAC6"
+  }
+}
+```
+
+Set environment variable:
+```bash
+export MERMAID_CONFIG=~/.config/mermaid/config.json
+```
+
+**White background for printing**:
+```bash
+export MERMAID_BG=white
+export MERMAID_THEME=default
 ```
 
 ## Examples
@@ -291,64 +422,117 @@ Show a pie chart of web traffic by browser (Chrome 45%, Safari 30%, Firefox 15%,
 
 ## Troubleshooting
 
-### Issue: "mmdc: command not found"
+### Issue: "No mermaid renderer available"
 
-**Cause:** mermaid-cli is not installed
+**Cause:** Neither npm nor mmdc is installed
 
 **Solution:**
+Install Node.js (includes npm):
+
 ```bash
+# macOS
+brew install node
+
+# Ubuntu/Debian
+sudo apt install nodejs npm
+
+# Or install mermaid-cli directly
 npm install -g @mermaid-js/mermaid-cli
 ```
 
-If you don't have npm:
+Verify:
 ```bash
-# Install Node.js and npm first
-brew install node
+npm --version  # Should show version number
 ```
 
-### Issue: Diagram renders but looks incorrect
+### Issue: First diagram generation is slow
 
-**Cause:** Invalid Mermaid syntax
+**Cause:** npx downloading mermaid-cli package (~100MB) on first use
 
 **Solution:**
-- Ask Claude to fix the syntax
-- Test syntax at https://mermaid.live
-- Check the [Mermaid documentation](https://mermaid.js.org/)
+- This only happens once per machine - package is cached in `~/.npm/_npx`
+- Subsequent diagrams generate in ~300ms using the cached package
+- Optional: Install globally for instant execution: `npm install -g @mermaid-js/mermaid-cli`
 
-### Issue: Image doesn't open automatically
+**Check cache**:
+```bash
+ls ~/.npm/_npx/@mermaid-js/mermaid-cli/
+```
 
-**Cause:** macOS `open` command issue
+### Issue: Environment variables not applied
+
+**Cause:** Variables not exported or not visible to Claude process
+
+**Solution:**
+
+1. Verify variable is set:
+```bash
+echo $MERMAID_THEME  # Should show your value
+```
+
+2. If empty, export it:
+```bash
+export MERMAID_THEME=dark
+```
+
+3. For permanent configuration, add to shell config:
+```bash
+echo 'export MERMAID_THEME=dark' >> ~/.zshrc
+source ~/.zshrc
+```
+
+4. Restart Claude Code to pick up new environment
+
+### Issue: Custom config file not working
+
+**Cause:** File path incorrect or invalid JSON
+
+**Solution:**
+
+1. Verify file exists:
+```bash
+cat $MERMAID_CONFIG  # Should show your config
+```
+
+2. Validate JSON syntax:
+```bash
+cat $MERMAID_CONFIG | jq .  # Should pretty-print without errors
+```
+
+3. Use absolute path:
+```bash
+export MERMAID_CONFIG="$HOME/.config/mermaid/config.json"
+```
+
+### Issue: Diagram looks different than expected
+
+**Cause:** Environment variables overriding your request
+
+**Solution:**
+Check current settings:
+```bash
+env | grep MERMAID
+```
+
+Temporarily unset to use defaults:
+```bash
+unset MERMAID_THEME
+unset MERMAID_BG
+/diagram
+```
+
+### Issue: "mmdc: command not found" (legacy)
+
+**Cause:** Old plugin version that required global installation
 
 **Solution:**
 ```bash
-# Manually open the diagram
-open /tmp/mermaid-diagram-*.png
-```
+# Update plugin
+cd /path/to/cc-plugins/mermaid-viz
+git pull
 
-Check that you have a default app for PNG files:
-```bash
-# Set Preview as default
-duti -s com.apple.Preview public.png all
-```
-
-### Issue: Diagram is too small or text is hard to read
-
-**Cause:** Default resolution may be too low
-
-**Solution:** Request a larger diagram:
-```
-Create a large, high-resolution flowchart...
-```
-
-Claude will adjust rendering parameters for better readability.
-
-### Issue: Diagram disappears when viewer closes
-
-**Cause:** Files are in `/tmp` which may be cleaned periodically
-
-**Solution:** If you need to keep the diagram, ask Claude:
-```
-Save the diagram to ~/Downloads instead of /tmp
+# Or continue using global installation (still supported)
+npm install -g @mermaid-js/mermaid-cli
 ```
 
 ## Technical Details
@@ -357,12 +541,31 @@ Save the diagram to ~/Downloads instead of /tmp
 
 1. **Mermaid Code Generation**: Claude generates appropriate Mermaid syntax based on your request
 2. **File Creation**: Code is written to `/tmp/mermaid-diagram-{timestamp}.mmd`
-3. **PNG Rendering**: `mmdc` CLI tool converts Mermaid to PNG with these defaults:
-   - Transparent background (`-b transparent`)
-   - Automatic dimensions based on content
-   - High-quality output
-4. **Display**: macOS `open` command launches the PNG in your default image viewer
-5. **Cleanup**: Files remain in `/tmp` for reference but are automatically cleaned by the system
+3. **Tool Detection**: Automatically selects rendering tool:
+   - Priority 1: `mmdc` (if installed globally) - Direct execution, ~50ms
+   - Priority 2: `npx -y @mermaid-js/mermaid-cli` (universal fallback) - ~300ms after cache
+4. **Configuration Loading**: Reads environment variables:
+   - `MERMAID_THEME` (default: `default`)
+   - `MERMAID_BG` (default: `transparent`)
+   - `MERMAID_CONFIG`, `MERMAID_WIDTH`, `MERMAID_HEIGHT`, `MERMAID_SCALE` (optional)
+5. **PNG Rendering**: Selected tool converts Mermaid to PNG with user configuration:
+   - Theme and background from environment variables
+   - Custom config file if specified
+   - Size and scale adjustments if specified
+6. **Auto-caching**: npx automatically caches mermaid-cli after first download (~100MB in `~/.npm/_npx`)
+7. **Display**: macOS `open` command launches the PNG in your default image viewer
+8. **Cleanup**: Files remain in `/tmp` for reference but are automatically cleaned by the system
+
+### Configuration Precedence
+
+When multiple configuration sources exist, they are applied in this order (later overrides earlier):
+
+1. mermaid-cli defaults (built-in)
+2. Custom config file (if `MERMAID_CONFIG` is set)
+3. Environment variables (e.g., `MERMAID_THEME`, `MERMAID_BG`)
+4. Command-line arguments (from skill/command logic)
+
+Example: If your config file sets `theme: "forest"` but `MERMAID_THEME=dark` is set, dark theme is used
 
 ### File Locations
 

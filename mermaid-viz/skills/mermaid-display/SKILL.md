@@ -1,6 +1,6 @@
 ---
 name: mermaid-display
-description: Display Mermaid diagrams as high-quality PNG images using mmdc renderer and macOS open command
+description: Display Mermaid diagrams as high-quality PNG images using mermaid-cli (via npx/mmdc) and macOS open command
 ---
 
 # Mermaid Diagram Display
@@ -23,15 +23,61 @@ Do NOT use when:
 
 ## Prerequisites
 
-This skill requires `mermaid-cli` to be installed. If not installed, provide installation instructions:
+**No installation required!** This skill automatically uses mermaid-cli via `npx`.
+
+**Requirements**: Only npm/Node.js (which you likely already have)
+
+**Optional: Install for faster execution**
+If you frequently create diagrams, install mermaid-cli globally for instant execution:
 
 ```bash
 npm install -g @mermaid-js/mermaid-cli
 ```
 
-Verify installation:
+**Tool selection priority**:
+1. `mmdc` (if installed) - Fastest (~50ms)
+2. `npx -y @mermaid-js/mermaid-cli` (fallback) - Universal compatibility (~300ms after cache)
+
+## Configuration
+
+Customize diagram rendering with environment variables:
+
+**Available options**:
 ```bash
-mmdc --version
+# Theme (default, forest, dark, neutral)
+export MERMAID_THEME=dark
+
+# Background color (transparent, white, black, #HEX)
+export MERMAID_BG=transparent
+
+# Custom config file path (optional)
+export MERMAID_CONFIG=~/.config/mermaid/config.json
+
+# Size and scale (optional)
+export MERMAID_WIDTH=1200
+export MERMAID_HEIGHT=800
+export MERMAID_SCALE=2
+```
+
+**Usage examples**:
+
+One-time use:
+```bash
+MERMAID_THEME=dark claude
+```
+
+Persistent (add to ~/.zshrc or ~/.bashrc):
+```bash
+export MERMAID_THEME=dark
+export MERMAID_BG=transparent
+```
+
+Project-specific (.env file):
+```bash
+# .env
+MERMAID_THEME=dark
+MERMAID_CONFIG=./mermaid.config.json
+MERMAID_WIDTH=1200
 ```
 
 ## Workflow
@@ -84,22 +130,52 @@ Use `date +%s` in bash to get current Unix timestamp, or use a descriptive name 
 
 ### Step 3: Render to PNG
 
-Use Bash tool to convert Mermaid to PNG using mmdc:
+Use Bash tool to convert Mermaid to PNG. The skill automatically selects the best available tool and applies user configuration:
 
 ```bash
-mmdc -i /tmp/mermaid-diagram-{timestamp}.mmd -o /tmp/mermaid-diagram-{timestamp}.png -b transparent
+# Smart tool selection
+if command -v mmdc &> /dev/null; then
+    MERMAID_CMD="mmdc"
+elif command -v npx &> /dev/null; then
+    MERMAID_CMD="npx -y @mermaid-js/mermaid-cli"
+else
+    echo "Error: No mermaid renderer available. Install npm or mermaid-cli."
+    exit 1
+fi
+
+# Load configuration from environment variables (with defaults)
+MERMAID_THEME=${MERMAID_THEME:-default}
+MERMAID_BG=${MERMAID_BG:-transparent}
+MERMAID_CONFIG=${MERMAID_CONFIG:-}
+MERMAID_WIDTH=${MERMAID_WIDTH:-}
+MERMAID_HEIGHT=${MERMAID_HEIGHT:-}
+MERMAID_SCALE=${MERMAID_SCALE:-}
+
+# Render diagram with configuration
+$MERMAID_CMD \
+  -i /tmp/mermaid-diagram-{timestamp}.mmd \
+  -o /tmp/mermaid-diagram-{timestamp}.png \
+  -t "$MERMAID_THEME" \
+  -b "$MERMAID_BG" \
+  ${MERMAID_CONFIG:+-c "$MERMAID_CONFIG"} \
+  ${MERMAID_WIDTH:+-w "$MERMAID_WIDTH"} \
+  ${MERMAID_HEIGHT:+-H "$MERMAID_HEIGHT"} \
+  ${MERMAID_SCALE:+-s "$MERMAID_SCALE"}
 ```
 
-**Parameters**:
+**Core Parameters** (always applied):
 - `-i`: Input Mermaid file path
 - `-o`: Output PNG file path
-- `-b transparent`: Transparent background (recommended for better viewing)
-- Alternative: `-b white` or `-b black` if transparency causes issues
+- `-t`: Theme (env: `MERMAID_THEME`, default: `default`)
+- `-b`: Background color (env: `MERMAID_BG`, default: `transparent`)
 
-**Optional quality parameters**:
-- `-w 1200`: Set width (default 800)
-- `-H 800`: Set height (auto-calculated by default)
-- `-s 2`: Scale factor for higher resolution
+**Optional Parameters** (applied if env var is set):
+- `-c`: Config file path (env: `MERMAID_CONFIG`)
+- `-w`: Width in pixels (env: `MERMAID_WIDTH`)
+- `-H`: Height in pixels (env: `MERMAID_HEIGHT`)
+- `-s`: Scale factor (env: `MERMAID_SCALE`)
+
+**First-time execution with npx**: Will automatically download and cache mermaid-cli (~100MB, 10-20 seconds). Subsequent runs use the cached version and complete in ~300ms
 
 ### Step 4: Open Image in Default Viewer
 
@@ -135,29 +211,41 @@ rm /tmp/mermaid-diagram-{timestamp}.mmd /tmp/mermaid-diagram-{timestamp}.png
 
 ## Error Handling
 
-### Tool Not Installed
+### No Renderer Available
 
-If `mmdc` command fails with "command not found":
-
+If all rendering methods fail:
 ```
-Error: mermaid-cli is not installed. Please install it with:
-npm install -g @mermaid-js/mermaid-cli
+Error: No mermaid renderer available.
 
-After installation, I can generate the diagram for you.
+Solutions:
+1. Install Node.js (includes npm): brew install node
+2. Install mermaid-cli globally: npm install -g @mermaid-js/mermaid-cli
+
+Either option will enable diagram rendering.
 ```
+
+### Slow First Execution
+
+If first execution takes 10-20 seconds:
+- **Cause**: npx downloading mermaid-cli (~100MB) on first use
+- **Solution**: This only happens once. Package is cached for future use (~300ms after cache)
+- **Optional**: Install globally for instant execution: `npm install -g @mermaid-js/mermaid-cli`
 
 ### Invalid Mermaid Syntax
 
-If mmdc fails to render due to syntax errors:
+If rendering fails due to syntax errors:
+1. Check Mermaid syntax validity
+2. Provide corrected syntax to user
+3. Suggest testing at https://mermaid.live
 
-1. Check the Mermaid syntax against the [official docs](https://mermaid.js.org/)
-2. Test the syntax at https://mermaid.live to validate
-3. Provide corrected syntax to the user
-4. Common issues:
-   - Missing arrow syntax (`-->`, `->`, `->>`)
-   - Invalid node IDs (must start with letter, no spaces)
-   - Unmatched quotes in labels
-   - Invalid diagram type declaration
+### Configuration Not Working
+
+If environment variables are not applied:
+- **Cause**: Variables not exported or Claude not restarted
+- **Solution**:
+  1. Verify: `echo $MERMAID_THEME` (should show your value)
+  2. Export: `export MERMAID_THEME=dark` (for current session)
+  3. Persistent: Add to `~/.zshrc` or `~/.bashrc` and restart terminal
 
 ### File Permission Issues
 
@@ -330,7 +418,10 @@ timestamp=$(date +%s)
 
 **Step 3**: Render to PNG
 ```bash
-mmdc -i /tmp/mermaid-diagram-1706382451.mmd -o /tmp/mermaid-diagram-1706382451.png -b transparent
+# Using the automatic tool selection from Step 3, which resolves to:
+# mmdc ... (if installed), or
+# npx -y @mermaid-js/mermaid-cli ... (fallback)
+mmdc -i /tmp/mermaid-diagram-1706382451.mmd -o /tmp/mermaid-diagram-1706382451.png -t default -b transparent
 ```
 
 **Step 4**: Open image

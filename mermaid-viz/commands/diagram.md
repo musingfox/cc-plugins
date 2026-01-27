@@ -50,7 +50,7 @@ Based on the user's input:
 
 ### Step 3: Render to PNG
 
-Create a temporary file and render:
+Create a temporary file and render using auto-detected tool with user configuration:
 
 ```bash
 # Generate timestamp
@@ -59,12 +59,42 @@ timestamp=$(date +%s)
 # Write Mermaid code to file
 # [Use Write tool to create /tmp/diagram-${timestamp}.mmd]
 
-# Render to PNG with transparent background
-mmdc -i /tmp/diagram-${timestamp}.mmd -o /tmp/diagram-${timestamp}.png -b transparent
+# Smart tool selection
+if command -v mmdc &> /dev/null; then
+    MERMAID_CMD="mmdc"
+elif command -v npx &> /dev/null; then
+    MERMAID_CMD="npx -y @mermaid-js/mermaid-cli"
+else
+    echo "Error: No mermaid renderer available. Install npm or mermaid-cli."
+    exit 1
+fi
+
+# Load configuration from environment variables
+MERMAID_THEME=${MERMAID_THEME:-default}
+MERMAID_BG=${MERMAID_BG:-transparent}
+MERMAID_CONFIG=${MERMAID_CONFIG:-}
+MERMAID_WIDTH=${MERMAID_WIDTH:-}
+MERMAID_HEIGHT=${MERMAID_HEIGHT:-}
+MERMAID_SCALE=${MERMAID_SCALE:-}
+
+# Render with configuration
+$MERMAID_CMD \
+  -i /tmp/diagram-${timestamp}.mmd \
+  -o /tmp/diagram-${timestamp}.png \
+  -t "$MERMAID_THEME" \
+  -b "$MERMAID_BG" \
+  ${MERMAID_CONFIG:+-c "$MERMAID_CONFIG"} \
+  ${MERMAID_WIDTH:+-w "$MERMAID_WIDTH"} \
+  ${MERMAID_HEIGHT:+-H "$MERMAID_HEIGHT"} \
+  ${MERMAID_SCALE:+-s "$MERMAID_SCALE"}
 
 # Open the image
 open /tmp/diagram-${timestamp}.png
 ```
+
+**Note**: First execution with npx may take 10-20 seconds to download mermaid-cli. Subsequent runs are fast (~300ms using cached package).
+
+**Configuration**: All mmdc parameters can be customized via environment variables. See the Configuration section in the skill documentation
 
 ### Step 4: Inform User
 
@@ -252,15 +282,18 @@ To create a helpful diagram, I need a bit more detail. Could you describe:
 
 ### Tool Not Installed
 
-If mmdc is not available:
+If no renderer is available:
 ```
-Error: mermaid-cli is not installed.
+Error: No mermaid renderer available.
 
-To use the diagram generator, please install it:
-npm install -g @mermaid-js/mermaid-cli
+To use the diagram generator, install either:
+1. Node.js (includes npm): brew install node
+2. mermaid-cli globally: npm install -g @mermaid-js/mermaid-cli
 
 After installation, run /diagram again.
 ```
+
+**Note**: You don't need to install mermaid-cli globally. Having npm is sufficient - it will auto-download mermaid-cli when needed (first time takes 10-20s, then cached)
 
 ## Tips for Users
 
@@ -291,6 +324,33 @@ Example: "Blog system with User, Post, and Comment. User has many Posts, Post ha
 - Mention what triggers each transition
 
 Example: "Order states: Pending, Processing, Shipped, Delivered, Cancelled. Orders move from Pending to Processing when payment confirms, to Shipped when dispatched, to Delivered when received"
+
+## Configuration
+
+The diagram command respects the same environment variables as the mermaid-display skill:
+
+**Common configurations**:
+
+Dark mode diagrams:
+```bash
+export MERMAID_THEME=dark
+/diagram
+```
+
+High-resolution diagrams:
+```bash
+export MERMAID_WIDTH=1600
+export MERMAID_SCALE=2
+/diagram
+```
+
+Custom config file:
+```bash
+export MERMAID_CONFIG=~/.config/mermaid/config.json
+/diagram
+```
+
+See the full Configuration section in skills/mermaid-display/SKILL.md for all available options.
 
 ## Advanced Options
 
