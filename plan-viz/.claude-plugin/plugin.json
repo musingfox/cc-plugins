@@ -1,0 +1,9 @@
+{
+  "name": "plan-viz",
+  "version": "0.1.0",
+  "description": "Visualize Claude Code plan files as formatted HTML",
+  "author": {
+    "name": "Nick Huang",
+    "email": "nick12703990@gmail.com"
+  }
+}
