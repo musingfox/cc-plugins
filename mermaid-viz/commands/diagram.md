@@ -48,53 +48,78 @@ Based on the user's input:
    - Use appropriate arrow types for the diagram type
    - Include decision branches where relevant
 
-### Step 3: Render to PNG
+### Step 3: Render to PNG/SVG with Theme
 
-Create a temporary file and render using auto-detected tool with user configuration:
+Create a temporary file and render using auto-detected tool with theme configuration. Use the **exact same bash script** as in `mermaid-display` skill (Step 3):
 
 ```bash
-# Generate timestamp
-timestamp=$(date +%s)
+#!/bin/bash
 
-# Write Mermaid code to file
-# [Use Write tool to create /tmp/diagram-${timestamp}.mmd]
-
-# Smart tool selection
+# Step 3.1: Tool Selection
 if command -v mmdc &> /dev/null; then
     MERMAID_CMD="mmdc"
 elif command -v npx &> /dev/null; then
     MERMAID_CMD="npx -y @mermaid-js/mermaid-cli"
 else
-    echo "Error: No mermaid renderer available. Install npm or mermaid-cli."
+    echo "Error: No mermaid renderer available. Install Node.js or mermaid-cli."
     exit 1
 fi
 
-# Load configuration from environment variables
-MERMAID_THEME=${MERMAID_THEME:-default}
-MERMAID_BG=${MERMAID_BG:-transparent}
-MERMAID_CONFIG=${MERMAID_CONFIG:-}
-MERMAID_WIDTH=${MERMAID_WIDTH:-}
-MERMAID_HEIGHT=${MERMAID_HEIGHT:-}
-MERMAID_SCALE=${MERMAID_SCALE:-}
+# Step 3.2: Configuration
+TIMESTAMP=$(date +%s)
+INPUT_FILE="/tmp/diagram-${TIMESTAMP}.mmd"
+FORMAT=${MERMAID_OUTPUT_FORMAT:-png}
+OUTPUT_FILE="/tmp/diagram-${TIMESTAMP}.${FORMAT}"
+SCHEME=${MERMAID_COLOR_SCHEME:-default}
 
-# Render with configuration
-$MERMAID_CMD \
-  -i /tmp/diagram-${timestamp}.mmd \
-  -o /tmp/diagram-${timestamp}.png \
-  -t "$MERMAID_THEME" \
-  -b "$MERMAID_BG" \
-  ${MERMAID_CONFIG:+-c "$MERMAID_CONFIG"} \
-  ${MERMAID_WIDTH:+-w "$MERMAID_WIDTH"} \
-  ${MERMAID_HEIGHT:+-H "$MERMAID_HEIGHT"} \
-  ${MERMAID_SCALE:+-s "$MERMAID_SCALE"}
+# Step 3.3: Generate Theme Configuration (same as mermaid-display)
+TEMP_CONFIG=""
+if [ "$SCHEME" != "default" ]; then
+    TEMP_CONFIG="/tmp/mermaid-config-${TIMESTAMP}.json"
 
-# Open the image
-open /tmp/diagram-${timestamp}.png
+    case "$SCHEME" in
+        tokyo-night|nord|catppuccin-mocha|catppuccin-latte|dracula|github-dark|github-light|solarized-dark|custom)
+            # Use the exact same theme generation logic from mermaid-display skill
+            # See skills/mermaid-display/SKILL.md Step 3.3 for full implementation
+            ;;
+        *)
+            SCHEME="default"
+            ;;
+    esac
+fi
+
+# Step 3.4: Render Diagram
+if [ "$SCHEME" = "default" ]; then
+    $MERMAID_CMD -i "$INPUT_FILE" -o "$OUTPUT_FILE" -b transparent
+else
+    $MERMAID_CMD -i "$INPUT_FILE" -o "$OUTPUT_FILE" -c "$TEMP_CONFIG" -b transparent
+    rm -f "$TEMP_CONFIG"
+fi
+
+# Step 3.5: Open with platform-specific command
+case "$OSTYPE" in
+  darwin*)
+    open "$OUTPUT_FILE"
+    ;;
+  linux*)
+    xdg-open "$OUTPUT_FILE"
+    ;;
+  msys*|cygwin*|win32)
+    start "$OUTPUT_FILE"
+    ;;
+  *)
+    echo "Diagram saved to: $OUTPUT_FILE"
+    ;;
+esac
 ```
 
-**Note**: First execution with npx may take 10-20 seconds to download mermaid-cli. Subsequent runs are fast (~300ms using cached package).
+**Important**: The full theme configuration case statements are identical to `mermaid-display` skill. Refer to that file for the complete JSON configurations for all 8 color schemes.
 
-**Configuration**: All mmdc parameters can be customized via environment variables. See the Configuration section in the skill documentation
+**Note**:
+- First execution with npx may take 10-20 seconds to download mermaid-cli. Subsequent runs are fast (~300ms using cached package).
+- Cross-platform support: macOS (open), Linux (xdg-open), Windows (start)
+- Supports both PNG and SVG output via `MERMAID_OUTPUT_FORMAT` environment variable
+- Automatic theme configuration via `MERMAID_COLOR_SCHEME` environment variable
 
 ### Step 4: Inform User
 
@@ -327,46 +352,67 @@ Example: "Order states: Pending, Processing, Shipped, Delivered, Cancelled. Orde
 
 ## Configuration
 
-The diagram command respects the same environment variables as the mermaid-display skill:
+The diagram command uses the **same simplified environment variables** as the mermaid-display skill:
 
-**Common configurations**:
+**Simplified environment variables** (only 2 variables):
 
-Dark mode diagrams:
 ```bash
-export MERMAID_THEME=dark
+# Output format (png or svg)
+export MERMAID_OUTPUT_FORMAT=png  # or svg
+
+# Color scheme (set by mermaid-theme skill, or use default)
+export MERMAID_COLOR_SCHEME=tokyo-night
+```
+
+**Available color schemes**:
+- `tokyo-night` - Deep blue-purple tones (dark theme)
+- `nord` - Ice blue tones (dark theme)
+- `catppuccin-mocha` - Warm purple tones (dark theme)
+- `catppuccin-latte` - Warm tones (light theme)
+- `dracula` - Purple-pink tones (dark theme)
+- `github-dark` - Deep blue tones (dark theme)
+- `github-light` - Light blue tones (light theme)
+- `solarized-dark` - Amber-blue tones (dark theme)
+- `default` - Mermaid default theme (no custom colors)
+
+**Quick examples**:
+
+Use a color scheme:
+```bash
+export MERMAID_COLOR_SCHEME=nord
 /diagram
 ```
 
-High-resolution diagrams:
+Use SVG output:
 ```bash
-export MERMAID_WIDTH=1600
-export MERMAID_SCALE=2
+export MERMAID_OUTPUT_FORMAT=svg
 /diagram
 ```
 
-Custom config file:
+Persistent configuration (recommended - use mermaid-theme skill):
 ```bash
-export MERMAID_CONFIG=~/.config/mermaid/config.json
+# The mermaid-theme skill creates ~/.mermaid-theme.sh
+source ~/.mermaid-theme.sh
 /diagram
 ```
 
-See the full Configuration section in skills/mermaid-display/SKILL.md for all available options.
+See the full Configuration section in skills/mermaid-display/SKILL.md for all available options and theme details.
 
 ## Advanced Options
 
-Users can request specific rendering options in their description:
+Users can request specific rendering options:
 
-**High resolution:**
-"Create a high-resolution flowchart showing..."
-→ Add `-s 2` or `-w 1600` to mmdc command
+**SVG output:**
+"Create an SVG diagram for documentation..."
+→ Set `export MERMAID_OUTPUT_FORMAT=svg` before running `/diagram`
 
-**Specific background:**
-"Create a diagram with white background for printing..."
-→ Use `-b white` instead of `-b transparent`
+**Custom theme:**
+"Create a diagram with Nord theme..."
+→ Set `export MERMAID_COLOR_SCHEME=nord` or use the `mermaid-theme` skill
 
-**Large diagram:**
-"Create a detailed, large diagram showing..."
-→ Increase width: `-w 1600`
+**Different color scheme:**
+"I want to use the Tokyo Night color scheme..."
+→ Use the `mermaid-theme` skill for interactive selection, or `export MERMAID_COLOR_SCHEME=tokyo-night`
 
 ## Follow-up Actions
 

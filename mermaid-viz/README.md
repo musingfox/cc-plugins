@@ -1,6 +1,6 @@
 # Mermaid Visualization Plugin
 
-A Claude Code plugin that enables high-quality diagram visualization using Mermaid. Generate flowcharts, sequence diagrams, class diagrams, state machines, and more—all automatically rendered as PNG images and displayed in your default viewer.
+A Claude Code plugin that enables high-quality diagram visualization using Mermaid. Generate flowcharts, sequence diagrams, class diagrams, state machines, and more—all automatically rendered as **PNG or SVG images** with **beautiful color themes** and displayed in your default viewer.
 
 ## Problem Statement
 
@@ -23,9 +23,10 @@ This creates friction when you need to quickly visualize:
 This plugin provides a seamless workflow for generating and viewing Mermaid diagrams directly from Claude Code:
 
 1. **Request a diagram** - Ask Claude to create a flowchart, sequence diagram, etc.
-2. **Automatic rendering** - Claude generates Mermaid code and renders it to PNG
-3. **Instant display** - Image opens automatically in your default viewer
-4. **High quality** - Professional PNG output with transparent background
+2. **Automatic rendering** - Claude generates Mermaid code and renders it to PNG or SVG
+3. **Instant display** - Image opens automatically in your default viewer (cross-platform)
+4. **Beautiful themes** - Choose from 8 color schemes or create your own
+5. **High quality** - Professional PNG/SVG output with transparent background
 
 No manual steps, no context switching, no friction.
 
@@ -44,10 +45,13 @@ No manual steps, no context switching, no friction.
 ### Key Benefits
 
 - 🚀 **Zero friction** - Diagrams open automatically in your viewer
-- 🎨 **High quality** - PNG output with customizable resolution and background
+- 🎨 **Beautiful themes** - 8 built-in color schemes (Tokyo Night, Nord, Catppuccin, etc.)
+- 📐 **SVG & PNG** - Vector format for docs, raster for sharing
+- 🌍 **Cross-platform** - Works on macOS, Linux, and Windows
 - 🔄 **Stay in flow** - No need to leave your terminal or switch tools
 - 📝 **Comprehensive** - Supports all major Mermaid diagram types
 - 🎯 **Simple** - Natural language requests, no manual rendering
+- ⚙️ **Customizable** - Interactive theme selection or environment variables
 
 ## Installation
 
@@ -203,41 +207,82 @@ Create three diagrams: 1) system architecture flowchart, 2) authentication seque
 
 ## Configuration
 
-Customize diagram rendering with environment variables. All configurations work with both the automatic skill and the `/diagram` command.
+### Quick Setup: Interactive Theme Selection
 
-### Available Options
+The easiest way to configure themes is using the `mermaid-theme` skill:
+
+```
+Ask Claude: "I want to configure mermaid themes"
+```
+
+Claude will:
+1. Show you 8 color schemes with descriptions
+2. Let you select one interactively
+3. Generate `~/.mermaid-theme.sh` configuration file
+4. Provide instructions to load it permanently
+
+### Available Color Schemes
+
+Choose from **8 beautiful built-in themes**:
+
+| Theme | Description | Best For |
+|-------|-------------|----------|
+| **tokyo-night** | Deep blue-purple tones | Dark terminals, modern aesthetic |
+| **nord** | Ice blue tones | Arctic-inspired, cool palette |
+| **catppuccin-mocha** | Warm purple tones | Cozy dark theme with pastels |
+| **catppuccin-latte** | Warm light tones | Light mode, soft colors |
+| **dracula** | Purple-pink tones | High contrast, vibrant |
+| **github-dark** | Deep blue tones | Familiar GitHub colors |
+| **github-light** | Light blue tones | Clean, professional |
+| **solarized-dark** | Amber-blue tones | Precision colors for technical work |
+
+### Simplified Environment Variables
+
+**Only 2 variables** (no complex configuration needed):
 
 | Variable | Values | Default | Description |
 |----------|--------|---------|-------------|
-| `MERMAID_THEME` | `default`, `forest`, `dark`, `neutral` | `default` | Color theme for diagrams |
-| `MERMAID_BG` | `transparent`, `white`, `black`, `#HEX` | `transparent` | Background color |
-| `MERMAID_CONFIG` | File path | (none) | Path to custom mermaid config JSON |
-| `MERMAID_WIDTH` | Number | `800` | Width in pixels |
-| `MERMAID_HEIGHT` | Number | `600` | Height in pixels |
-| `MERMAID_SCALE` | Number | `1` | Scale factor for higher resolution |
+| `MERMAID_OUTPUT_FORMAT` | `png`, `svg` | `png` | Output format |
+| `MERMAID_COLOR_SCHEME` | See table above | `default` | Color scheme name |
 
-### Usage Examples
+### Configuration Examples
 
-**Temporary (one-time use)**:
-```bash
-MERMAID_THEME=dark claude
+**Quick Start (Recommended - Interactive)**:
+
+Use the mermaid-theme skill for interactive configuration:
+```
+Ask Claude: "Configure mermaid themes"
 ```
 
-**Session-level (current terminal session)**:
+Then load the generated configuration:
 ```bash
-export MERMAID_THEME=dark
-export MERMAID_BG=transparent
+source ~/.mermaid-theme.sh
+```
+
+**Manual Configuration**:
+
+**Use a color scheme**:
+```bash
+export MERMAID_COLOR_SCHEME=tokyo-night
 claude
 ```
 
-**Permanent (all sessions)**:
+**Output as SVG** (vector format, infinite zoom):
+```bash
+export MERMAID_OUTPUT_FORMAT=svg
+claude
+```
+
+**Permanent configuration**:
 
 Add to your shell config file (`~/.zshrc` or `~/.bashrc`):
 ```bash
 # Mermaid diagram preferences
-export MERMAID_THEME=dark
-export MERMAID_BG=transparent
-export MERMAID_SCALE=2  # Higher resolution
+export MERMAID_COLOR_SCHEME=nord
+export MERMAID_OUTPUT_FORMAT=png
+
+# Load theme configuration
+source ~/.mermaid-theme.sh
 ```
 
 Then reload:
@@ -245,60 +290,60 @@ Then reload:
 source ~/.zshrc  # or ~/.bashrc
 ```
 
-**Project-specific**:
-
-Create a `.env` file in your project:
+**Temporary (one-time use)**:
 ```bash
-# .env
-MERMAID_THEME=dark
-MERMAID_CONFIG=./mermaid.config.json
-MERMAID_WIDTH=1200
+MERMAID_COLOR_SCHEME=dracula MERMAID_OUTPUT_FORMAT=svg claude
 ```
 
-Load before running Claude:
+### Common Use Cases
+
+**Dark terminal users**:
 ```bash
-source .env && claude
+export MERMAID_COLOR_SCHEME=tokyo-night
+# Or: nord, catppuccin-mocha, dracula, github-dark, solarized-dark
 ```
 
-### Common Configurations
-
-**Dark mode diagrams**:
+**Light terminal users**:
 ```bash
-export MERMAID_THEME=dark
-export MERMAID_BG=#1a1a1a
+export MERMAID_COLOR_SCHEME=catppuccin-latte
+# Or: github-light
 ```
 
-**High-resolution for presentations**:
+**Documentation (SVG format)**:
 ```bash
-export MERMAID_WIDTH=1600
-export MERMAID_HEIGHT=1200
-export MERMAID_SCALE=2
+export MERMAID_OUTPUT_FORMAT=svg
+export MERMAID_COLOR_SCHEME=github-light
 ```
 
-**Custom styling with config file**:
-
-Create `~/.config/mermaid/config.json`:
-```json
-{
-  "theme": "dark",
-  "themeVariables": {
-    "primaryColor": "#BB86FC",
-    "primaryTextColor": "#E1E1E1",
-    "lineColor": "#03DAC6"
-  }
-}
-```
-
-Set environment variable:
+**Sharing diagrams (PNG format)**:
 ```bash
-export MERMAID_CONFIG=~/.config/mermaid/config.json
+export MERMAID_OUTPUT_FORMAT=png
+export MERMAID_COLOR_SCHEME=github-dark
 ```
 
-**White background for printing**:
+**Custom colors (advanced)**:
 ```bash
-export MERMAID_BG=white
-export MERMAID_THEME=default
+export MERMAID_COLOR_SCHEME=custom
+export MERMAID_PRIMARY_COLOR=#7aa2f7
+export MERMAID_SECONDARY_COLOR=#bb9af7
+export MERMAID_TEXT_COLOR=#c0caf5
 ```
+
+### SVG vs PNG
+
+**SVG (Vector Format)**:
+- ✅ Infinite zoom without quality loss
+- ✅ Smaller file size (typically 30-50% of PNG)
+- ✅ Perfect for documentation and web
+- ❌ Less universal compatibility
+
+**PNG (Raster Format)**:
+- ✅ Universal compatibility
+- ✅ Works everywhere (email, chat, screenshots)
+- ❌ Fixed resolution
+- ❌ Larger file size
+
+**Recommendation**: Use SVG for documentation, PNG for sharing.
 
 ## Examples
 
@@ -591,12 +636,12 @@ The plugin supports these rendering customizations through natural language:
 
 ### Platform Support
 
-**Currently supported:**
+**Fully supported:**
 - ✅ macOS (using `open` command)
+- ✅ Linux (using `xdg-open` command)
+- ✅ Windows (using `start` command via Git Bash/Cygwin/WSL)
 
-**Future support planned:**
-- 🔄 Linux (using `xdg-open`)
-- 🔄 Windows (using `start`)
+Diagrams automatically open in your default image viewer on all platforms.
 
 ## Configuration
 
@@ -659,6 +704,23 @@ MIT License - see LICENSE file for details
 - GitHub: [@musingfox](https://github.com/musingfox)
 
 ## Changelog
+
+### Version 2.0.0 (2026-01-30)
+
+**Major Features:**
+- ✨ **8 Beautiful Color Schemes** - Tokyo Night, Nord, Catppuccin (Mocha/Latte), Dracula, GitHub (Dark/Light), Solarized Dark
+- ✨ **Interactive Theme Selection** - New `mermaid-theme` skill for easy configuration
+- ✨ **SVG Output Support** - Vector format with infinite zoom and smaller file sizes
+- ✨ **Cross-Platform Support** - Works on macOS, Linux, and Windows
+- 🔧 **Simplified Configuration** - Only 2 environment variables (down from 6)
+- 🔧 **Dynamic Theme Generation** - No manual JSON config files needed
+- 🎨 **Custom Color Support** - Define your own primary/secondary/text colors
+- 📚 **Updated Documentation** - Complete guide for themes and SVG output
+
+**Breaking Changes:**
+- Old environment variables (`MERMAID_THEME`, `MERMAID_BG`, `MERMAID_CONFIG`, `MERMAID_WIDTH`, `MERMAID_HEIGHT`, `MERMAID_SCALE`) are deprecated
+- Use `MERMAID_COLOR_SCHEME` and `MERMAID_OUTPUT_FORMAT` instead
+- Backward compatibility: Unset variables use sensible defaults
 
 ### Version 1.0.0 (2026-01-27)
 

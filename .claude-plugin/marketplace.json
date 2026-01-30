@@ -23,7 +23,12 @@
     {
       "name": "mermaid-viz",
       "source": "./mermaid-viz",
-      "description": "Mermaid Visualization: Display Mermaid diagrams as high-quality PNG images - flowcharts, sequence diagrams, class diagrams, state machines, and more"
+      "description": "Mermaid Visualization: Display Mermaid diagrams as high-quality PNG/SVG images with 8 beautiful color schemes - flowcharts, sequence diagrams, and more"
+    },
+    {
+      "name": "plan-viz",
+      "source": "./plan-viz",
+      "description": "Plan Visualizer: Transform plan files into beautiful HTML with Mermaid diagram support and UTF-8 handling"
     }
   ]
 }

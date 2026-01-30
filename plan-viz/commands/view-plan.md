@@ -154,7 +154,7 @@ plan_base64 = base64.b64encode(plan_content.encode('utf-8')).decode('ascii')
 
     <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 
     <script>
         // Helper function to decode base64 with UTF-8 support
@@ -201,7 +201,7 @@ plan_base64 = base64.b64encode(plan_content.encode('utf-8')).decode('ascii')
                 mermaid.initialize({
                     startOnLoad: false,
                     theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default',
-                    securityLevel: 'loose'
+                    securityLevel: 'strict'
                 });
 
                 mermaid.run();

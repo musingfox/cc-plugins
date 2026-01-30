@@ -1,11 +1,11 @@
 ---
 name: mermaid-display
-description: Display Mermaid diagrams as high-quality PNG images using mermaid-cli (via npx/mmdc) and macOS open command
+description: Display Mermaid diagrams as high-quality PNG/SVG images using mermaid-cli (via npx/mmdc)
 ---
 
 # Mermaid Diagram Display
 
-Display Mermaid diagrams as high-quality PNG images that automatically open in your default image viewer. This provides clear, professional visualization for flowcharts, sequence diagrams, class diagrams, and more.
+Display Mermaid diagrams as high-quality PNG or SVG images that automatically open in your default viewer. This provides clear, professional visualization for flowcharts, sequence diagrams, class diagrams, and more.
 
 ## When to Use
 
@@ -40,44 +40,51 @@ npm install -g @mermaid-js/mermaid-cli
 
 ## Configuration
 
-Customize diagram rendering with environment variables:
+**Simplified environment variables** (only 2 variables):
 
-**Available options**:
 ```bash
-# Theme (default, forest, dark, neutral)
-export MERMAID_THEME=dark
+# Output format (png or svg)
+export MERMAID_OUTPUT_FORMAT=png  # or svg
 
-# Background color (transparent, white, black, #HEX)
-export MERMAID_BG=transparent
+# Color scheme (set by mermaid-theme skill, or use default)
+export MERMAID_COLOR_SCHEME=tokyo-night
+```
 
-# Custom config file path (optional)
-export MERMAID_CONFIG=~/.config/mermaid/config.json
+**Available color schemes**:
+- `tokyo-night` - Deep blue-purple tones (dark theme)
+- `nord` - Ice blue tones (dark theme)
+- `catppuccin-mocha` - Warm purple tones (dark theme)
+- `catppuccin-latte` - Warm tones (light theme)
+- `dracula` - Purple-pink tones (dark theme)
+- `github-dark` - Deep blue tones (dark theme)
+- `github-light` - Light blue tones (light theme)
+- `solarized-dark` - Amber-blue tones (dark theme)
+- `default` - Mermaid default theme (no custom colors)
 
-# Size and scale (optional)
-export MERMAID_WIDTH=1200
-export MERMAID_HEIGHT=800
-export MERMAID_SCALE=2
+**For custom colors** (advanced users):
+```bash
+export MERMAID_COLOR_SCHEME=custom
+export MERMAID_PRIMARY_COLOR=#7aa2f7
+export MERMAID_SECONDARY_COLOR=#bb9af7
+export MERMAID_TEXT_COLOR=#c0caf5
 ```
 
 **Usage examples**:
 
 One-time use:
 ```bash
-MERMAID_THEME=dark claude
+MERMAID_COLOR_SCHEME=nord claude
 ```
 
-Persistent (add to ~/.zshrc or ~/.bashrc):
+Persistent (recommended - use mermaid-theme skill):
 ```bash
-export MERMAID_THEME=dark
-export MERMAID_BG=transparent
+# The mermaid-theme skill creates ~/.mermaid-theme.sh
+source ~/.mermaid-theme.sh
 ```
 
-Project-specific (.env file):
+SVG output (vector format, infinite zoom):
 ```bash
-# .env
-MERMAID_THEME=dark
-MERMAID_CONFIG=./mermaid.config.json
-MERMAID_WIDTH=1200
+export MERMAID_OUTPUT_FORMAT=svg
 ```
 
 ## Workflow
@@ -126,79 +133,288 @@ Use Write tool to create a temporary Mermaid file with timestamp to avoid confli
 /tmp/mermaid-diagram-1706382451.mmd
 ```
 
-Use `date +%s` in bash to get current Unix timestamp, or use a descriptive name if the diagram has specific context.
+Use `date +%s` in bash to get current Unix timestamp.
 
-### Step 3: Render to PNG
+### Step 3: Render to PNG/SVG with Theme
 
-Use Bash tool to convert Mermaid to PNG. The skill automatically selects the best available tool and applies user configuration:
+Use Bash tool to convert Mermaid to PNG/SVG with automatic theme configuration:
 
 ```bash
-# Smart tool selection
+#!/bin/bash
+
+# Step 3.1: Tool Selection
 if command -v mmdc &> /dev/null; then
     MERMAID_CMD="mmdc"
 elif command -v npx &> /dev/null; then
     MERMAID_CMD="npx -y @mermaid-js/mermaid-cli"
 else
-    echo "Error: No mermaid renderer available. Install npm or mermaid-cli."
+    echo "Error: No mermaid renderer available. Install Node.js or mermaid-cli."
     exit 1
 fi
 
-# Load configuration from environment variables (with defaults)
-MERMAID_THEME=${MERMAID_THEME:-default}
-MERMAID_BG=${MERMAID_BG:-transparent}
-MERMAID_CONFIG=${MERMAID_CONFIG:-}
-MERMAID_WIDTH=${MERMAID_WIDTH:-}
-MERMAID_HEIGHT=${MERMAID_HEIGHT:-}
-MERMAID_SCALE=${MERMAID_SCALE:-}
+# Step 3.2: Configuration
+TIMESTAMP=$(date +%s)
+INPUT_FILE="/tmp/mermaid-diagram-${TIMESTAMP}.mmd"
+FORMAT=${MERMAID_OUTPUT_FORMAT:-png}
+OUTPUT_FILE="/tmp/mermaid-diagram-${TIMESTAMP}.${FORMAT}"
+SCHEME=${MERMAID_COLOR_SCHEME:-default}
 
-# Render diagram with configuration
-$MERMAID_CMD \
-  -i /tmp/mermaid-diagram-{timestamp}.mmd \
-  -o /tmp/mermaid-diagram-{timestamp}.png \
-  -t "$MERMAID_THEME" \
-  -b "$MERMAID_BG" \
-  ${MERMAID_CONFIG:+-c "$MERMAID_CONFIG"} \
-  ${MERMAID_WIDTH:+-w "$MERMAID_WIDTH"} \
-  ${MERMAID_HEIGHT:+-H "$MERMAID_HEIGHT"} \
-  ${MERMAID_SCALE:+-s "$MERMAID_SCALE"}
+# Step 3.3: Generate Theme Configuration
+TEMP_CONFIG=""
+if [ "$SCHEME" != "default" ]; then
+    TEMP_CONFIG="/tmp/mermaid-config-${TIMESTAMP}.json"
+
+    case "$SCHEME" in
+        tokyo-night)
+            cat > "$TEMP_CONFIG" <<'EOF'
+{
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#7aa2f7",
+    "secondaryColor": "#bb9af7",
+    "primaryTextColor": "#c0caf5",
+    "background": "transparent",
+    "lineColor": "#565f89",
+    "tertiaryColor": "#9ece6a",
+    "primaryBorderColor": "#565f89",
+    "secondaryBorderColor": "#565f89",
+    "tertiaryBorderColor": "#565f89"
+  }
+}
+EOF
+            ;;
+        nord)
+            cat > "$TEMP_CONFIG" <<'EOF'
+{
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#88c0d0",
+    "secondaryColor": "#81a1c1",
+    "primaryTextColor": "#eceff4",
+    "background": "transparent",
+    "lineColor": "#4c566a",
+    "tertiaryColor": "#a3be8c",
+    "primaryBorderColor": "#4c566a",
+    "secondaryBorderColor": "#4c566a",
+    "tertiaryBorderColor": "#4c566a"
+  }
+}
+EOF
+            ;;
+        catppuccin-mocha)
+            cat > "$TEMP_CONFIG" <<'EOF'
+{
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#89b4fa",
+    "secondaryColor": "#cba6f7",
+    "primaryTextColor": "#cdd6f4",
+    "background": "transparent",
+    "lineColor": "#6c7086",
+    "tertiaryColor": "#a6e3a1",
+    "primaryBorderColor": "#6c7086",
+    "secondaryBorderColor": "#6c7086",
+    "tertiaryBorderColor": "#6c7086"
+  }
+}
+EOF
+            ;;
+        catppuccin-latte)
+            cat > "$TEMP_CONFIG" <<'EOF'
+{
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#1e66f5",
+    "secondaryColor": "#8839ef",
+    "primaryTextColor": "#4c4f69",
+    "background": "transparent",
+    "lineColor": "#9ca0b0",
+    "tertiaryColor": "#40a02b",
+    "primaryBorderColor": "#9ca0b0",
+    "secondaryBorderColor": "#9ca0b0",
+    "tertiaryBorderColor": "#9ca0b0"
+  }
+}
+EOF
+            ;;
+        dracula)
+            cat > "$TEMP_CONFIG" <<'EOF'
+{
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#bd93f9",
+    "secondaryColor": "#ff79c6",
+    "primaryTextColor": "#f8f8f2",
+    "background": "transparent",
+    "lineColor": "#6272a4",
+    "tertiaryColor": "#50fa7b",
+    "primaryBorderColor": "#6272a4",
+    "secondaryBorderColor": "#6272a4",
+    "tertiaryBorderColor": "#6272a4"
+  }
+}
+EOF
+            ;;
+        github-dark)
+            cat > "$TEMP_CONFIG" <<'EOF'
+{
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#58a6ff",
+    "secondaryColor": "#79c0ff",
+    "primaryTextColor": "#c9d1d9",
+    "background": "transparent",
+    "lineColor": "#30363d",
+    "tertiaryColor": "#56d364",
+    "primaryBorderColor": "#30363d",
+    "secondaryBorderColor": "#30363d",
+    "tertiaryBorderColor": "#30363d"
+  }
+}
+EOF
+            ;;
+        github-light)
+            cat > "$TEMP_CONFIG" <<'EOF'
+{
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#0969da",
+    "secondaryColor": "#0550ae",
+    "primaryTextColor": "#24292f",
+    "background": "transparent",
+    "lineColor": "#d0d7de",
+    "tertiaryColor": "#1a7f37",
+    "primaryBorderColor": "#d0d7de",
+    "secondaryBorderColor": "#d0d7de",
+    "tertiaryBorderColor": "#d0d7de"
+  }
+}
+EOF
+            ;;
+        solarized-dark)
+            cat > "$TEMP_CONFIG" <<'EOF'
+{
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#268bd2",
+    "secondaryColor": "#2aa198",
+    "primaryTextColor": "#839496",
+    "background": "transparent",
+    "lineColor": "#586e75",
+    "tertiaryColor": "#859900",
+    "primaryBorderColor": "#586e75",
+    "secondaryBorderColor": "#586e75",
+    "tertiaryBorderColor": "#586e75"
+  }
+}
+EOF
+            ;;
+        custom)
+            # Use custom colors from environment variables
+            PRIMARY=${MERMAID_PRIMARY_COLOR:-#7aa2f7}
+            SECONDARY=${MERMAID_SECONDARY_COLOR:-#bb9af7}
+            TEXT=${MERMAID_TEXT_COLOR:-#c0caf5}
+            cat > "$TEMP_CONFIG" <<EOF
+{
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "$PRIMARY",
+    "secondaryColor": "$SECONDARY",
+    "primaryTextColor": "$TEXT",
+    "background": "transparent",
+    "lineColor": "#565f89",
+    "primaryBorderColor": "#565f89",
+    "secondaryBorderColor": "#565f89"
+  }
+}
+EOF
+            ;;
+        *)
+            # Unknown scheme, fall back to default
+            SCHEME="default"
+            ;;
+    esac
+fi
+
+# Step 3.4: Render Diagram
+if [ "$SCHEME" = "default" ]; then
+    # Use default Mermaid theme (no config file)
+    $MERMAID_CMD \
+        -i "$INPUT_FILE" \
+        -o "$OUTPUT_FILE" \
+        -b transparent
+else
+    # Use custom theme configuration
+    $MERMAID_CMD \
+        -i "$INPUT_FILE" \
+        -o "$OUTPUT_FILE" \
+        -c "$TEMP_CONFIG" \
+        -b transparent
+
+    # Cleanup temporary config
+    rm -f "$TEMP_CONFIG"
+fi
+
+# Output the file path for the next step
+echo "$OUTPUT_FILE"
 ```
 
-**Core Parameters** (always applied):
-- `-i`: Input Mermaid file path
-- `-o`: Output PNG file path
-- `-t`: Theme (env: `MERMAID_THEME`, default: `default`)
-- `-b`: Background color (env: `MERMAID_BG`, default: `transparent`)
-
-**Optional Parameters** (applied if env var is set):
-- `-c`: Config file path (env: `MERMAID_CONFIG`)
-- `-w`: Width in pixels (env: `MERMAID_WIDTH`)
-- `-H`: Height in pixels (env: `MERMAID_HEIGHT`)
-- `-s`: Scale factor (env: `MERMAID_SCALE`)
-
-**First-time execution with npx**: Will automatically download and cache mermaid-cli (~100MB, 10-20 seconds). Subsequent runs use the cached version and complete in ~300ms
+**Important notes**:
+- All themes use `transparent` background by default
+- Temporary config files are automatically cleaned up
+- SVG output is supported natively by mmdc (just change the extension)
+- First-time npx execution will download mermaid-cli (~100MB, 10-20 seconds)
 
 ### Step 4: Open Image in Default Viewer
 
-Use Bash tool to open the PNG file with macOS `open` command:
+Use Bash tool to open the PNG/SVG file with platform-specific command:
 
 ```bash
-open /tmp/mermaid-diagram-{timestamp}.png
+# Platform detection and open
+case "$OSTYPE" in
+  darwin*)
+    # macOS
+    open "$OUTPUT_FILE"
+    ;;
+  linux*)
+    # Linux
+    xdg-open "$OUTPUT_FILE"
+    ;;
+  msys*|cygwin*|win32)
+    # Windows (Git Bash, Cygwin, etc.)
+    start "$OUTPUT_FILE"
+    ;;
+  *)
+    # Fallback: just echo the path
+    echo "Diagram saved to: $OUTPUT_FILE"
+    echo "Please open the file manually."
+    ;;
+esac
 ```
 
-The image will automatically open in the user's default image viewer (Preview, Photos, etc.).
+**Cross-platform support**:
+- macOS: `open` command (Preview, Photos, etc.)
+- Linux: `xdg-open` command (default image viewer)
+- Windows: `start` command (default image viewer)
+- Other: Displays file path for manual opening
 
 ### Step 5: Inform User
 
 Let the user know the diagram has been opened:
 
 ```
-I've generated and opened the [diagram type] in your default image viewer.
+I've generated and opened the [diagram type] in your default image viewer using the [color-scheme-name] theme.
 ```
 
-Optionally provide the file path so they can reference it later:
+Provide the file path so they can reference it later:
 
 ```
-The diagram has been saved to: /tmp/mermaid-diagram-{timestamp}.png
+Diagram saved to: /tmp/mermaid-diagram-{timestamp}.{format}
+```
+
+If SVG format was used, mention the benefits:
+```
+The SVG format provides infinite zoom and smaller file size compared to PNG.
 ```
 
 ### Step 6: Cleanup (Optional)
@@ -206,7 +422,7 @@ The diagram has been saved to: /tmp/mermaid-diagram-{timestamp}.png
 The files are in `/tmp` and will be automatically cleaned by the system, but you can provide cleanup instructions if requested:
 
 ```bash
-rm /tmp/mermaid-diagram-{timestamp}.mmd /tmp/mermaid-diagram-{timestamp}.png
+rm /tmp/mermaid-diagram-{timestamp}.mmd /tmp/mermaid-diagram-{timestamp}.{format}
 ```
 
 ## Error Handling
@@ -238,14 +454,12 @@ If rendering fails due to syntax errors:
 2. Provide corrected syntax to user
 3. Suggest testing at https://mermaid.live
 
-### Configuration Not Working
+### Theme Not Applied
 
-If environment variables are not applied:
-- **Cause**: Variables not exported or Claude not restarted
-- **Solution**:
-  1. Verify: `echo $MERMAID_THEME` (should show your value)
-  2. Export: `export MERMAID_THEME=dark` (for current session)
-  3. Persistent: Add to `~/.zshrc` or `~/.bashrc` and restart terminal
+If custom theme is not working:
+- **Check**: Verify `MERMAID_COLOR_SCHEME` is set: `echo $MERMAID_COLOR_SCHEME`
+- **Solution**: Use the `mermaid-theme` skill to configure themes properly
+- **Fallback**: System will use default theme if scheme name is invalid
 
 ### File Permission Issues
 
@@ -271,7 +485,8 @@ ls -ld /tmp
   - Class: Object structure, data models
   - State: State machines, workflows
   - ER: Database schemas
-- Use transparent background (`-b transparent`) for versatility
+- Use SVG format for documentation (infinite zoom, smaller files)
+- Use PNG format for sharing (universal compatibility)
 - Include meaningful arrows labels for decision branches
 - Use subgraphs to organize complex flowcharts
 
@@ -411,27 +626,19 @@ sequenceDiagram
 
 **Step 2**: Write to file
 ```bash
-# Get timestamp
 timestamp=$(date +%s)
 ```
 [Use Write tool to create `/tmp/mermaid-diagram-${timestamp}.mmd` with the Mermaid code]
 
-**Step 3**: Render to PNG
-```bash
-# Using the automatic tool selection from Step 3, which resolves to:
-# mmdc ... (if installed), or
-# npx -y @mermaid-js/mermaid-cli ... (fallback)
-mmdc -i /tmp/mermaid-diagram-1706382451.mmd -o /tmp/mermaid-diagram-1706382451.png -t default -b transparent
-```
+**Step 3**: Render with theme
+[Use the complete bash script from Step 3 above]
 
 **Step 4**: Open image
-```bash
-open /tmp/mermaid-diagram-1706382451.png
-```
+[Use the platform-specific open command from Step 4 above]
 
 **Step 5**: Inform user
 ```
-I've created a sequence diagram showing the authentication flow and opened it in your default image viewer. The diagram illustrates the interaction between the user, browser, API, authentication service, and database during the login process.
+I've created a sequence diagram showing the authentication flow using the tokyo-night theme and opened it in your default image viewer. The diagram illustrates the interaction between the user, browser, API, authentication service, and database during the login process.
 
 Diagram saved to: /tmp/mermaid-diagram-1706382451.png
 ```
@@ -468,15 +675,47 @@ graph TD
     B --> C
 ```
 
+## Advanced Configuration
+
+### SVG vs PNG
+
+**SVG (Vector Format)**:
+- ✓ Infinite zoom without quality loss
+- ✓ Smaller file size (typically 30-50% of PNG)
+- ✓ Perfect for documentation and web
+- ✗ Less universal compatibility
+
+**PNG (Raster Format)**:
+- ✓ Universal compatibility
+- ✓ Works everywhere (email, chat, etc.)
+- ✗ Fixed resolution
+- ✗ Larger file size
+
+**Recommendation**: Use SVG for documentation, PNG for sharing.
+
+### Custom Themes
+
+For advanced customization, use the `custom` color scheme:
+
+```bash
+export MERMAID_COLOR_SCHEME=custom
+export MERMAID_PRIMARY_COLOR=#your-hex-color
+export MERMAID_SECONDARY_COLOR=#your-hex-color
+export MERMAID_TEXT_COLOR=#your-hex-color
+```
+
+Or use the `mermaid-theme` skill for interactive theme selection.
+
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| Diagram too small | Use `-w 1600 -s 2` for higher resolution |
+| Theme not applied | Check `echo $MERMAID_COLOR_SCHEME`, use mermaid-theme skill |
+| Diagram not opening | Check platform support, verify file exists at output path |
 | Text overlapping | Shorten labels or use abbreviations |
 | Layout looks wrong | Try different direction (TD vs LR) or restructure nodes |
-| Dark theme issue | Use `-b white` or `-b black` instead of transparent |
 | Complex diagram unreadable | Split into multiple smaller diagrams |
+| SVG not rendering | Ensure mmdc/npx is up to date, try PNG format |
 
 ## Reference
 
@@ -486,4 +725,4 @@ graph TD
 
 ---
 
-**Remember**: The goal is clarity. If a diagram becomes too complex, simplify it or split it into multiple focused diagrams.
+**Remember**: The goal is clarity. If a diagram becomes too complex, simplify it or split it into multiple focused diagrams. Use the right color scheme to match your environment (dark/light) and output format (SVG/PNG) based on your use case.
