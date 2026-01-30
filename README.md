@@ -38,6 +38,20 @@ Thinking frameworks for better decision-making:
 /plugin install thinking
 ```
 
+### Mermaid Visualization
+
+Generate and display high-quality diagrams instantly:
+- **Interactive Command**: `/diagram` asks what to visualize and creates it
+- **Universal Support**: Flowcharts, sequence diagrams, class diagrams, state machines, ER diagrams, Gantt charts, pie charts
+- **Zero Friction**: Automatically opens PNG in your viewer
+- **Configurable**: Environment variables for themes, background, resolution
+- **Smart Detection**: Uses `mmdc` if installed, falls back to `npx` automatically
+
+**Installation:**
+```bash
+/plugin install mermaid-viz
+```
+
 ### Readability
 
 Enhances AI-generated text readability:
@@ -48,6 +62,21 @@ Enhances AI-generated text readability:
 **Installation:**
 ```bash
 /plugin install readability
+```
+
+### Plan Visualizer
+
+Transform Claude Code plan files into beautifully formatted HTML:
+- **Instant Visualization**: `/view-plan` command opens plans in browser
+- **Markdown Rendering**: Full support for headers, tables, code blocks, and lists
+- **Mermaid Diagrams**: Inline diagram rendering with auto dark mode
+- **UTF-8 Support**: Perfect handling of Chinese and other Unicode characters
+- **Zero Dependencies**: All libraries loaded from CDN
+- **Secure**: XSS protection via DOMPurify sanitization
+
+**Installation:**
+```bash
+/plugin install plan-viz
 ```
 
 ## Plugin Development
@@ -70,10 +99,23 @@ cc-plugins/
 │   ├── .claude-plugin/
 │   │   └── plugin.json
 │   └── skills/
+├── mermaid-viz/                  # Mermaid Visualization plugin
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   ├── commands/
+│   │   └── diagram.md
+│   ├── skills/
+│   └── README.md
 ├── readability/                  # Text formatting plugin
 │   ├── .claude-plugin/
 │   │   └── plugin.json
 │   └── skills/
+├── plan-viz/                     # Plan Visualizer plugin
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   ├── commands/
+│   │   └── view-plan.md
+│   └── README.md
 └── README.md
 ```
 
