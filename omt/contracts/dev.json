@@ -108,6 +108,7 @@
   "validation": [
     "all tests must pass",
     "test coverage >= 80%",
+    "implementation must follow referenced pseudocode exactly",
     "complexity_actual should match estimate ±30%"
   ],
   "complexity_range": [8, 21],

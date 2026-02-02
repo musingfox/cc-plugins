@@ -166,6 +166,70 @@ interface AuthToken {
 \`\`\`
 ```
 
+### Phase 3.5: Generate Pseudocode (L2 Design Layer)
+
+For each key function (≥3 logic branches), **draft pseudocode for human review**:
+
+```pseudocode
+function login(email, password):
+  // Validate input
+  if email is empty OR password is empty:
+    throw InvalidCredentialsError
+
+  // Look up user
+  user = database.findByEmail(email)
+  if user does not exist:
+    throw InvalidCredentialsError
+
+  // Verify password
+  if NOT bcrypt.verify(password, user.passwordHash):
+    throw InvalidCredentialsError
+
+  // Generate tokens
+  return { accessToken, refreshToken, expiresIn }
+```
+
+**Criteria for pseudocode**:
+- Functions with ≥3 logic branches REQUIRE pseudocode
+- Simple getter/setter functions do NOT need pseudocode
+- Each conditional becomes a test case for @dev
+
+**Human Review Gate**:
+After drafting pseudocode, @arch MUST ask human:
+"Please review the pseudocode above. Approve (Y), Modify (M), or Skip (S)?"
+- Only approved pseudocode becomes binding for @dev
+- Modified pseudocode replaces the draft
+- Skipped functions proceed without L2 constraint
+
+**Output to outputs/arch.md**:
+
+```markdown
+## Pseudocode (L2 Layer)
+
+### login(email, password)
+
+**Status**: Approved ✓
+
+\`\`\`pseudocode
+function login(email, password):
+  if email is empty OR password is empty:
+    throw InvalidCredentialsError
+  user = database.findByEmail(email)
+  if user does not exist:
+    throw InvalidCredentialsError
+  if NOT bcrypt.verify(password, user.passwordHash):
+    throw InvalidCredentialsError
+  return { accessToken, refreshToken, expiresIn }
+\`\`\`
+
+**Derived Test Cases**:
+1. should reject empty email
+2. should reject empty password
+3. should reject nonexistent user
+4. should reject invalid password
+5. should return tokens for valid credentials
+```
+
 ### Phase 4: Create Architecture Diagram
 
 Use Mermaid to visualize system architecture:
@@ -232,6 +296,7 @@ List all files to create/modify with clear purposes:
 1. `src/services/auth.service.ts`
    - Purpose: Implement AuthService interface
    - Exports: AuthService class
+   - **Pseudocode Source**: Phase 3.5 login() pseudocode
 
 2. `src/middleware/auth.middleware.ts`
    - Purpose: Express middleware for token validation

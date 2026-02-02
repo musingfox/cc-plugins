@@ -77,6 +77,18 @@
         "field_name": "files_to_modify",
         "description": "Existing files to modify",
         "type": "array"
+      },
+      {
+        "field_name": "pseudocode_steps",
+        "description": "L2 pseudocode for functions with ≥3 logic branches",
+        "type": "array",
+        "items": {
+          "function_name": "string",
+          "pseudocode": "string",
+          "approval_status": "string",
+          "test_cases_derived": ["string"]
+        },
+        "validation": ["optional_if_no_complex_functions"]
       }
     ],
     "destination": [

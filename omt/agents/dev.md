@@ -137,6 +137,28 @@ Before writing any code, understand what needs to be built:
 4. **Plan Test Structure**: Decide test file organization
 ```
 
+### Phase 2.5: Reference Pseudocode Layer (L2)
+
+**Critical**: Before writing tests, check outputs/arch.md for pseudocode:
+
+1. **Read Pseudocode**: Each function's step-by-step logic
+2. **Derive Test Cases**: Each conditional → one test case
+3. **Map Implementation**: Each pseudocode line → one code block
+
+Example:
+```
+function login(email, password):
+  if email is empty → Test: "should reject empty email"
+  if user not found → Test: "should reject nonexistent user"
+  if password invalid → Test: "should reject invalid password"
+  [success] → Test: "should return tokens for valid credentials"
+```
+
+**Pseudocode is a Contract, Not a Cage**:
+- You MUST implement every line of **approved** pseudocode
+- You MAY add optimizations not in pseudocode (document as deviation)
+- If pseudocode was skipped, proceed with normal TDD (no L2 constraint)
+
 ### Phase 3: TDD Implementation
 
 **For each feature, follow strict TDD cycle:**
@@ -245,6 +267,37 @@ TypeError: Cannot read property 'id' of undefined
 - Test setup didn't seed the database
 
 **ROOT CAUSE**: Missing test fixture setup
+```
+
+#### Step 2.5: Pseudocode Compliance Check (Before Fix)
+
+When a test fails, FIRST check for L2 pseudocode compliance:
+
+1. Does the implementation follow the pseudocode exactly?
+2. If divergence found → this is likely the root cause
+3. Fix: Update code to match pseudocode
+
+Example:
+```
+Pseudocode: "redis.set(refreshToken, userId, ttl=7days)"
+Actual code: "redis.set(refreshToken, userId, ttl=1hour)"
+→ Root cause: Implementation diverged from L2 specification
+→ Fix: Correct ttl to 7days as specified
+```
+
+**Report Format**:
+```markdown
+## Pseudocode Compliance Check
+
+**Function**: login()
+**Pseudocode Status**: Approved ✓
+**Implementation Match**: ❌ Divergence found
+
+**Divergence**:
+- Line 5: Pseudocode says "throw InvalidCredentialsError"
+- Actual: returns null instead of throwing
+
+**Action**: Fix implementation to match L2 pseudocode
 ```
 
 #### Step 3: Fix with Regression Test
