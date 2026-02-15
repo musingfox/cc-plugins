@@ -66,14 +66,14 @@ When validation fails, examine the full result:
 | Missing required field | Source file doesn't exist or is empty | Check upstream agent completed successfully |
 | Type mismatch | Data structure doesn't match contract | Verify the producing agent's output format |
 | Validation rule failed | Actual value doesn't match rule pattern | Check the specific rule and actual value |
-| State update failed | state.json is corrupted or locked | Reset state.json from last known good state |
+| State update failed | .state/state.json is corrupted or locked | Reset state.json from last known good state |
 
 ## Best Practices
 
 1. **Validate early**: Check input contract before doing any work
 2. **Validate completely**: Never skip output validation
 3. **Report clearly**: Use `ContractValidator.formatValidationResult()` for readable output
-4. **Update state**: Always record validation results in state.json via StateManager
+4. **Update state**: Always record validation results in .state/state.json via StateManager
 5. **Handle errors gracefully**: Decide whether to fix, retry, or escalate to user
 6. **Chain validations**: One agent's output validation feeds into the next agent's input validation
 
@@ -120,7 +120,7 @@ This shows the full lifecycle of the @dev agent with contract validation:
 
 7. UPDATE STATE
    Call StateManager.recordExecutionAgent("dev", validationResult)
-   This updates .agents/state.json with execution results
+   This updates .agents/.state/state.json with execution results
 
 8. DONE
    Report completion status to @hive

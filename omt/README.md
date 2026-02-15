@@ -142,8 +142,8 @@ In your project root:
 ```
 
 This will:
-- Create `.agents/` directory structure
-- Initialize state definitions and helper library
+- Create `.agents/` directory structure with `.state/` infrastructure
+- Configure task management system
 - Update `.gitignore` rules
 
 ## Usage
@@ -182,14 +182,18 @@ This will:
 
 ```
 .agents/
+├── .gitignore           # Ignores .state/
 ├── goal.md              # Human's goal
-├── hive-state.json      # @hive lifecycle state
 ├── outputs/
 │   ├── pm.md            # @pm requirements
 │   ├── arch.md          # @arch architecture
 │   ├── dev.md           # @dev execution report
 │   └── hive.md          # @hive completion report
-└── tasks/               # Active tasks
+└── .state/              # Infrastructure (gitignored)
+    ├── config.json      # Workspace configuration
+    ├── state.json       # Task state
+    ├── hive-state.json  # @hive lifecycle state
+    └── tasks/           # Task tracking data
 ```
 
 ## Library (lib/)

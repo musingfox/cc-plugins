@@ -66,7 +66,7 @@ optional:
 source:
   - outputs/pm.md (requirements)
   - outputs/arch.md (architecture)
-  - state.json:planning.architecture.files_to_modify
+  - .state/state.json:planning.architecture.files_to_modify
 ```
 
 ### Output Contract
@@ -84,7 +84,7 @@ destination:
   - tests/ (test files)
   - src/ (implementation files)
   - outputs/dev.md (execution report)
-  - state.json:execution.dev_result
+  - .state/state.json:execution.dev_result
 ```
 
 ## Agent Workflow
@@ -98,7 +98,7 @@ Validate all required inputs before starting:
 const contract = JSON.parse(await Read('${CLAUDE_PLUGIN_ROOT}/contracts/dev.json'));
 
 // 2. Gather input data
-const state = JSON.parse(await Read('.agents/state.json'));
+const state = JSON.parse(await Read('.agents/.state/state.json'));
 const inputData = {
   requirements: await Read('outputs/pm.md') || state.task.description,
   architecture: await Read('outputs/arch.md'),

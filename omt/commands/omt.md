@@ -64,7 +64,7 @@ Task({
     Goal: ${GOAL}
 
     Execute the full lifecycle:
-    1. Initialize (.agents/goal.md + hive-state.json)
+    1. Initialize (.agents/goal.md + .agents/.state/hive-state.json)
     2. Dispatch @pm in autonomous mode
     3. Dispatch @arch in autonomous mode
     4. Present consensus summary with decision points → AskUserQuestion

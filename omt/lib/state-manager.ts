@@ -55,10 +55,12 @@ export interface TaskState {
 }
 
 export class StateManager {
+  private workspaceRoot: string;
   private statePath: string;
 
   constructor(workspaceRoot: string) {
-    this.statePath = path.join(workspaceRoot, '.agents', 'state.json');
+    this.workspaceRoot = workspaceRoot;
+    this.statePath = path.join(workspaceRoot, '.agents', '.state', 'state.json');
   }
 
   /**
@@ -217,7 +219,7 @@ export class StateManager {
    * Get outputs directory path
    */
   getOutputsDir(): string {
-    return path.join(path.dirname(this.statePath), 'outputs');
+    return path.join(this.workspaceRoot, '.agents', 'outputs');
   }
 
   /**

@@ -42,7 +42,7 @@ optional:
   - existing_architecture: Existing architecture docs
 source:
   - outputs/pm.md (if @pm was run)
-  - state.json:task.description (direct task)
+  - .state/state.json:task.description (direct task)
   - CLAUDE.md (project standards)
 ```
 
@@ -57,7 +57,7 @@ required:
   - files_to_modify: Existing files list
 destination:
   - outputs/arch.md
-  - state.json:planning.architecture
+  - .state/state.json:planning.architecture
 ```
 
 ## Agent Workflow
@@ -72,7 +72,7 @@ const contract = JSON.parse(await Read('${CLAUDE_PLUGIN_ROOT}/contracts/arch.jso
 
 // 2. Gather input data
 const inputData = {
-  requirements: await Read('outputs/pm.md') || await Read('.agents/state.json', { path: 'task.description' }),
+  requirements: await Read('outputs/pm.md') || await Read('.agents/.state/state.json', { path: 'task.description' }),
   project_structure: await Glob('**/*.{ts,js,tsx,jsx,py,go,rs}', { limit: 100 }),
   existing_architecture: await Read('docs/architecture.md') || null
 };
@@ -370,7 +370,7 @@ if (!outputValidation.valid) {
 
 ### Phase 9: Update State
 
-Record completion in state.json:
+Record completion in .state/state.json:
 
 ```typescript
 import { StateManager } from '${CLAUDE_PLUGIN_ROOT}/lib/state-manager.js';
@@ -534,7 +534,7 @@ Waiting for decision...
 - ✓ Technical decisions documented with rationale
 - ✓ File plan complete and within scope (≤15 files)
 - ✓ All required outputs validated
-- ✓ state.json updated with results
+- ✓ .state/state.json updated with results
 
 ## Example Execution
 
@@ -564,7 +564,7 @@ User: "Implement JWT-based authentication API"
 ✓ Total: 12 files (within limit)
 
 # 6. @arch updates state
-state.json updated:
+.state/state.json updated:
   planning.agents_executed: ['arch']
   planning.outputs.arch.contract_validated: true
   context.files_involved: 12

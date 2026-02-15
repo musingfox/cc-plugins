@@ -81,7 +81,7 @@
       ".agents/goal.md",
       ".agents/outputs/pm.md",
       ".agents/outputs/arch.md",
-      ".agents/hive-state.json",
+      ".agents/.state/hive-state.json",
       ".agents/outputs/hive.md"
     ]
   },

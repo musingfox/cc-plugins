@@ -9,7 +9,7 @@ OMT 使用 **Contract-First** 設計原則來確保 agents 正確執行。每個
 1. **確保正確性**: 在 agent 執行前驗證所有必要的輸入都存在
 2. **早期錯誤檢測**: 在 agent 開始工作前就發現問題
 3. **明確的預期**: 每個 agent 都清楚知道需要產生什麼輸出
-4. **可追蹤性**: 所有驗證結果記錄在 state.json 和 jj 中
+4. **可追蹤性**: 所有驗證結果記錄在 `.state/state.json` 中
 
 ### Contract-First vs. Ad-hoc
 
@@ -29,7 +29,7 @@ OMT 使用 **Contract-First** 設計原則來確保 agents 正確執行。每個
 
 - **types.ts**: Contract 型別定義
 - **contract-validator.ts**: 驗證邏輯實作
-- **state-manager.ts**: state.json 管理
+- **state-manager.ts**: `.state/state.json` 管理
 - **index.ts**: 主要 export
 
 ### 2. Agent Contracts
@@ -106,7 +106,7 @@ Before starting:
 After completing:
 1. Collect output data
 2. Validate output contract
-3. Update state.json with results
+3. Update .state/state.json with results
 ```
 
 #### Step 3: 執行驗證
@@ -214,7 +214,7 @@ interface ContractField {
 
 ### state.json 結構
 
-Contract validation 結果會記錄在 state.json:
+Contract validation 結果會記錄在 `.state/state.json`:
 
 ```json
 {
@@ -241,17 +241,7 @@ Contract validation 結果會記錄在 state.json:
 
 ## 開發工作流程
 
-### 1. 編譯 TypeScript
-
-```bash
-cd omt
-npm install
-npm run build
-```
-
-這會將 `lib/*.ts` 編譯成 `dist/*.js`。
-
-### 2. 測試 Contract
+### 1. 測試 Contract
 
 創建測試文件來驗證 contract:
 
@@ -275,7 +265,7 @@ const result = ContractValidator.validateInput(contract, {
 console.log(ContractValidator.formatValidationResult(result, 'input'));
 ```
 
-### 3. 更新 Contracts
+### 2. 更新 Contracts
 
 當 agent 需求改變時：
 

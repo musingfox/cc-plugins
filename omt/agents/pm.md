@@ -255,9 +255,7 @@ Create a comprehensive completion report for the user including:
 ---
 
 **Report Generated**: [timestamp]
-**Retrospective Analysis**: .agents/retro/[task-id]-retro.md
-**Development Log**: .agents/tasks/[task-id]/coder.md
-**Debug Analysis**: .agents/tasks/[task-id]/debugger.md (if applicable)
+**Development Log**: .agents/outputs/dev.md
 
 ---
 

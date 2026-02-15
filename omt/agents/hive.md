@@ -44,7 +44,7 @@ Read the goal from the dispatch prompt. Set up workspace files.
 // 1. Write goal to .agents/goal.md
 await Write('.agents/goal.md', goal);
 
-// 2. Initialize hive-state.json
+// 2. Initialize .state/hive-state.json
 const hiveState = {
   phase: 'init',
   goal: goal,
@@ -66,14 +66,14 @@ const hiveState = {
     max_failures: 3
   }
 };
-await Write('.agents/hive-state.json', JSON.stringify(hiveState, null, 2));
+await Write('.agents/.state/hive-state.json', JSON.stringify(hiveState, null, 2));
 ```
 
 Ensure `.agents/outputs/` directory exists. If not, create it.
 
 ## Phase 2: Dispatch @pm (Autonomous Mode)
 
-Update hive-state.json: `phase: 'pm'`, `agents.pm.status: 'running'`.
+Update .state/hive-state.json: `phase: 'pm'`, `agents.pm.status: 'running'`.
 
 Dispatch @pm using Task tool with the following override prompt:
 
@@ -102,7 +102,7 @@ Your output MUST include:
 Write the complete requirements to .agents/outputs/pm.md
 ```
 
-After @pm completes, read `.agents/outputs/pm.md` and update hive-state.json:
+After @pm completes, read `.agents/outputs/pm.md` and update .state/hive-state.json:
 - `agents.pm.status: 'completed'`
 - `agents.pm.output: '.agents/outputs/pm.md'`
 
@@ -110,7 +110,7 @@ If @pm fails, update `agents.pm.status: 'failed'` and report the error to the us
 
 ## Phase 3: Dispatch @arch (Autonomous Mode)
 
-Update hive-state.json: `phase: 'arch'`, `agents.arch.status: 'running'`.
+Update .state/hive-state.json: `phase: 'arch'`, `agents.arch.status: 'running'`.
 
 Dispatch @arch using Task tool with the following override prompt:
 
@@ -145,7 +145,7 @@ Your output MUST follow the standard arch output format:
 Write the complete architecture to .agents/outputs/arch.md
 ```
 
-After @arch completes, read `.agents/outputs/arch.md` and update hive-state.json:
+After @arch completes, read `.agents/outputs/arch.md` and update .state/hive-state.json:
 - `agents.arch.status: 'completed'`
 - `agents.arch.output: '.agents/outputs/arch.md'`
 
@@ -153,7 +153,7 @@ If @arch fails, update `agents.arch.status: 'failed'` and report the error to th
 
 ## Phase 4: Consensus Gate (Single Human Interaction)
 
-Update hive-state.json: `phase: 'consensus'`.
+Update .state/hive-state.json: `phase: 'consensus'`.
 
 This is the **only point where @hive interacts with the human**. The goal is to present everything needed for a decision and collect all approvals at once.
 
@@ -244,7 +244,7 @@ await AskUserQuestion({
 
 ### Step 4.4: Handle Consensus Response
 
-**Approve**: Update hive-state.json `consensus.status: 'approved'` and proceed to Phase 5.
+**Approve**: Update .state/hive-state.json `consensus.status: 'approved'` and proceed to Phase 5.
 
 **Modify**:
 - Read user's modification feedback
@@ -252,11 +252,11 @@ await AskUserQuestion({
 - Re-dispatch affected agent(s) with modifications included in the prompt
 - Return to Step 4.2 to present updated consensus
 
-**Abort**: Update hive-state.json `phase: 'aborted'`, `consensus.status: 'aborted'`. Write abort reason to `.agents/outputs/hive.md`. Stop.
+**Abort**: Update .state/hive-state.json `phase: 'aborted'`, `consensus.status: 'aborted'`. Write abort reason to `.agents/outputs/hive.md`. Stop.
 
 ## Phase 5: Execution Loop
 
-Update hive-state.json: `phase: 'execution'`.
+Update .state/hive-state.json: `phase: 'execution'`.
 
 ### Step 5.1: Extract Implementation Tasks
 
@@ -272,7 +272,7 @@ const maxFailures = 3;
 let completedTasks = [];
 
 for (const task of tasks) {
-  // Update hive-state.json with current task
+  // Update .state/hive-state.json with current task
   updateHiveState({
     'execution.current_task': task.id,
     'execution.tasks_total': tasks.length
@@ -318,7 +318,7 @@ for (const task of tasks) {
     completedTasks.push(task);
     failureCount = 0; // Reset on success
 
-    // Update hive-state.json
+    // Update .state/hive-state.json
     updateHiveState({
       'execution.tasks_completed': completedTasks.length,
       'execution.failure_count': 0
@@ -386,7 +386,7 @@ ${total.filter(t => !completed.includes(t)).map(t => `- ${t.description}`).join(
 
 ## Phase 6: Completion
 
-Update hive-state.json: `phase: 'completed'`.
+Update .state/hive-state.json: `phase: 'completed'`.
 
 Generate completion report and write to `.agents/outputs/hive.md`:
 
@@ -459,7 +459,7 @@ If @pm or @arch fails to produce output:
 
 - **Single Human Interaction**: Only the consensus gate (Phase 4) should involve the user, plus escalation if execution fails
 - **No Agent File Modifications**: @pm and @arch behavior is overridden via dispatch prompts, not by editing their .md files
-- **Separate State**: Uses `hive-state.json`, not `state.json`
+- **Separate State**: Uses `.state/hive-state.json`, not `.state/state.json`
 - **3-Failure Escalation**: Matches @dev's internal retry limit to avoid cascading retries
 - **@reviewer Does NOT Hand Off to @pm**: In hive mode, @reviewer reports back to @hive, not to @pm
 
@@ -472,7 +472,7 @@ If @pm or @arch fails to produce output:
 - ✓ User approved consensus (single interaction)
 - ✓ All tasks executed via @dev → @reviewer loop
 - ✓ Completion report generated
-- ✓ hive-state.json tracks all phases accurately
+- ✓ .state/hive-state.json tracks all phases accurately
 
 ## References
 

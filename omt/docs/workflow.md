@@ -237,19 +237,23 @@ Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
 
 ```
 .agents/
+├── .gitignore           # Ignores .state/
 ├── goal.md              # Human's goal
-├── hive-state.json      # @hive lifecycle state
 ├── outputs/
 │   ├── pm.md            # @pm requirements
 │   ├── arch.md          # @arch architecture
 │   ├── dev.md           # @dev execution report
 │   └── hive.md          # @hive completion report
-└── tasks/               # Active tasks
+└── .state/              # Infrastructure (gitignored)
+    ├── config.json      # Workspace configuration
+    ├── state.json       # Task state
+    ├── hive-state.json  # @hive lifecycle state
+    └── tasks/           # Task tracking data
 ```
 
 ### Hive State Management
 
-hive-state.json tracks the lifecycle:
+`.state/hive-state.json` tracks the lifecycle:
 
 ```json
 {
@@ -352,13 +356,13 @@ Check:
 
 ```bash
 # View current state
-cat .agents/hive-state.json | jq
+cat .agents/.state/hive-state.json | jq
 
 # Check outputs
 ls -la .agents/outputs/
 
 # Reset if needed (caution: loses state)
-rm -rf .agents && /init-agents
+rm -rf .agents/.state && bun run omt/bin/cli.ts init
 ```
 
 ## References

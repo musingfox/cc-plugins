@@ -75,6 +75,9 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 - **Library** (`lib/`):
   - `contract-validator.ts`, `state-manager.ts` - Runtime utilities
 
+- **CLI** (`bin/`):
+  - `cli.ts` - Bun CLI for workspace management (init, validate, status)
+
 **Workflow**: `/omt "goal"` → @hive dispatches @pm → @arch → Consensus Gate (single human interaction) → @dev/@reviewer execution loop → Completion/Escalation
 
 ### 2. Mermaid Visualization
@@ -175,19 +178,20 @@ function base64DecodeUTF8(base64) {
 ### mermaid-viz Tool Detection
 Priority order: `mmdc` (global) → `npx -y @mermaid-js/mermaid-cli` (fallback)
 
-### OMT Agent Communication
-Agents use contract files in `.agents/` directory:
-- `goal.md` (Human)
-- `requirements.md` (@pm)
-- `implementation.md` (@arch)
+### OMT Agent Workspace
+`.agents/` is the clean development workspace. Infrastructure lives in `.agents/.state/` (gitignored):
+- `goal.md` — Human goal
+- `outputs/` — Agent output files (pm.md, arch.md, dev.md, hive.md)
+- `.state/` — config.json, state.json, hive-state.json, tasks/
 
-Triangle consensus requires all three parties to agree before execution phase.
+CLI management: `bun run omt/bin/cli.ts <init|validate|status>`
 
 ### OMT Contract-First Design
 Agent contracts are defined in `omt/contracts/`:
 - `pm.json` - @pm input/output contract
 - `arch.json` - @arch input/output contract
 - `dev.json` - @dev → @reviewer execution contract
+- `hive.json` - @hive lifecycle contract
 
 State synchronization is handled by `hooks/state-sync.sh` triggered on Write/Edit operations.
 

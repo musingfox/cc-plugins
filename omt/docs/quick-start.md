@@ -11,15 +11,7 @@ cd ~/.claude/plugins
 git clone <your-omt-repo> omt
 ```
 
-2. **安裝依賴並編譯 TypeScript**:
-
-```bash
-cd omt
-npm install
-npm run build
-```
-
-3. **驗證安裝**:
+2. **驗證安裝**:
 
 ```bash
 # 在 Claude Code 中
@@ -264,7 +256,7 @@ User: "C"
 
 ## State Management
 
-所有 agents 的執行狀態都記錄在 `.agents/state.json`:
+所有 agents 的執行狀態都記錄在 `.agents/.state/state.json`:
 
 ```json
 {
@@ -413,10 +405,10 @@ Planning → Execution → Review → Approve
 
 ### 4. 檢查 State
 
-遇到問題時，檢查 state.json：
+遇到問題時，檢查 `.state/state.json`：
 
 ```bash
-cat .agents/state.json | jq .
+cat .agents/.state/state.json | jq .
 ```
 
 確認：
@@ -441,19 +433,15 @@ cat .agents/state.json | jq .
 # 檢查 plugin 是否正確安裝
 ls ~/.claude/plugins/omt
 
-# 檢查 TypeScript 是否已編譯
-ls ~/.claude/plugins/omt/dist
-
-# 重新編譯
-cd ~/.claude/plugins/omt
-npm run build
+# 驗證 CLI 可用
+bun run ~/.claude/plugins/omt/bin/cli.ts status
 ```
 
 ### Input Validation 失敗
 
 ```bash
 # 檢查 state.json 內容
-cat .agents/state.json | jq .planning
+cat .agents/.state/state.json | jq .planning
 
 # 確認所需檔案存在
 ls outputs/

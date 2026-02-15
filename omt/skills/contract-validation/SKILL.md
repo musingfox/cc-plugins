@@ -71,7 +71,7 @@ After completing agent work:
    - Check arrays have minimum items (`minItems:N`)
    - Check strings match patterns (`pattern:REGEX`)
 
-3. **Update state** — Use `StateManager.recordExecutionAgent()` from `lib/state-manager.ts` to record results in `.agents/state.json`.
+3. **Update state** — Use `StateManager.recordExecutionAgent()` from `lib/state-manager.ts` to record results in `.agents/.state/state.json`.
 
 ## Example: Dev Agent Contract
 

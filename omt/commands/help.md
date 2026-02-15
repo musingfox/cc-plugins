@@ -36,7 +36,7 @@ The **Agent-First Workflow** uses Contract-First design and autonomous execution
 
 ### `/init-agents`
 **When**: New project setup
-**Does**: Creates `.agents/` workspace, task management config, state definitions
+**Does**: Creates `.agents/` workspace with `.state/` infrastructure
 
 ### `/approve`
 **When**: API changes, schema modifications, security updates
@@ -108,14 +108,18 @@ The **Agent-First Workflow** uses Contract-First design and autonomous execution
 
 ```
 .agents/
+├── .gitignore          # Ignores .state/
 ├── goal.md             # Human-defined goal
-├── hive-state.json     # @hive lifecycle state
 ├── outputs/
 │   ├── pm.md           # @pm requirements
 │   ├── arch.md         # @arch architecture
 │   ├── dev.md          # @dev implementation summary
 │   └── hive.md         # @hive completion report
-└── tasks/              # Task tracking data
+└── .state/             # Infrastructure (gitignored)
+    ├── config.json     # Workspace configuration
+    ├── state.json      # Task state
+    ├── hive-state.json # @hive lifecycle state
+    └── tasks/          # Task tracking data
 ```
 
 ## Contract Validation
