@@ -20,7 +20,6 @@
   "homepage": "https://github.com/musingfox/cc-plugins/tree/main/omt",
   "license": "MIT",
   "commands": "./commands/",
-  "agents": "./agents/",
   "skills": "./skills/",
   "hooks": "./hooks/hooks.json"
 }
