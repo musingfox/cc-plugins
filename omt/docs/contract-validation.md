@@ -46,12 +46,6 @@ OMT 使用 **Contract-First** 設計原則來確保 agents 正確執行。每個
 
 - **contract-validation.md**: 教導 agents 如何使用驗證工具
 
-### 4. Hooks
-
-位於 `hooks/` 目錄：
-
-- **state-sync.sh**: 自動同步 agent 輸出到 state.json 和 jj
-
 ## 使用方式
 
 ### Agent 開發者視角
@@ -245,20 +239,6 @@ Contract validation 結果會記錄在 state.json:
 }
 ```
 
-### jj Integration
-
-Hook 會自動創建 jj bookmarks 和 metadata:
-
-```bash
-# Automatic bookmark
-agent-tdd-2025-01-14T12:00:00Z
-
-# Commit description includes
-Agent Output: @tdd
-Timestamp: 2025-01-14T12:00:00Z
-Output: outputs/tdd.md
-```
-
 ## 開發工作流程
 
 ### 1. 編譯 TypeScript
@@ -378,4 +358,3 @@ A: Optional fields 如果存在會被驗證，但不存在不算錯誤。用於�
 1. 閱讀 [skills/contract-validation.md](../skills/contract-validation.md) 了解詳細用法
 2. 查看範例 contracts 了解如何定義
 3. 在新 agent 中整合 contract validation
-4. 使用 state-sync hook 自動追蹤進度

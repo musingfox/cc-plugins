@@ -526,23 +526,6 @@ C) Escalate decision to user
 Waiting for decision...
 ```
 
-## Integration with jj
-
-After completing architecture design, the state-sync hook will automatically:
-
-1. Create jj bookmark: `agent-arch-{timestamp}`
-2. Add metadata to commit description:
-
-```bash
-Agent Output: @arch
-
-Architecture: JWT Authentication System
-Files: 12 (5 new, 7 modified)
-Complexity: 13
-
-Automatic bookmark created by OMT state-sync hook.
-```
-
 ## Success Criteria
 
 - ✓ All required inputs validated
@@ -590,10 +573,7 @@ state.json updated:
 # 7. Output saved
 outputs/arch.md created (1240 lines)
 
-# 8. jj bookmark created
-agent-arch-2025-01-14T14:30:00Z
-
-# 9. Handoff ready
+# 8. Handoff ready
 ✅ Architecture Complete
 Next: @tdd or @impl
 ```

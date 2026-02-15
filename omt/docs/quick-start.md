@@ -300,30 +300,6 @@ User: "C"
 }
 ```
 
-## jj Integration
-
-每個 agent 完成後，`state-sync` hook 會自動：
-
-1. **創建 jj bookmark**:
-```bash
-agent-tdd-2025-01-14T15:30:00Z
-```
-
-2. **添加 metadata 到 commit description**:
-```
-Agent Output: @tdd
-
-TDD Implementation: JWT Auth
-Tests: 15/15 passed
-Coverage: 95%
-Complexity: 13
-```
-
-查看 agent 歷史：
-```bash
-jj log | grep "Agent Output"
-```
-
 ## Contract Validation
 
 ### 為什麼需要 Contract Validation？
@@ -448,18 +424,6 @@ cat .agents/state.json | jq .
 - 是否有 validation errors
 - 目前在哪個 phase
 
-### 5. 使用 jj 歷史
-
-查看 agent 執行歷史：
-
-```bash
-# 列出所有 agent bookmarks
-jj bookmark list | grep agent-
-
-# 查看特定 agent 的 output
-jj log -r agent-tdd-2025-01-14T15:30:00Z
-```
-
 ## 下一步
 
 - 閱讀 [Contract Validation Guide](./contract-validation.md) 了解詳細驗證機制
@@ -495,18 +459,6 @@ cat .agents/state.json | jq .planning
 ls outputs/
 ls outputs/arch.md
 ls outputs/pm.md
-```
-
-### Agent 執行後沒有更新 state.json
-
-檢查 hook 是否正常運作：
-
-```bash
-# 確認 hook 可執行
-ls -la ~/.claude/plugins/omt/hooks/state-sync.sh
-
-# 如果沒有執行權限
-chmod +x ~/.claude/plugins/omt/hooks/state-sync.sh
 ```
 
 ## 支援
