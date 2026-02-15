@@ -39,7 +39,7 @@ Ask the user to describe what the diagram should show — components, actors, re
 ### Step 2: Generate Mermaid Code
 
 Based on user input:
-1. Choose appropriate diagram syntax from `references/diagram-types.md`
+1. Choose appropriate diagram syntax from `../skills/mermaid-display/references/diagram-types.md`
 2. Generate clean, well-structured Mermaid code
 3. Use descriptive labels (<30 characters), meaningful node IDs (no spaces)
 4. Keep focused: 5-15 nodes optimal
@@ -47,7 +47,7 @@ Based on user input:
 ### Step 3: Render and Open
 
 1. Use the Write tool to save Mermaid code to `/tmp/diagram-{timestamp}.mmd`
-2. Run the render script from `references/render-script.sh` via Bash tool (set `INPUT_FILE` to the .mmd path)
+2. Run the render script from `../skills/mermaid-display/references/render-script.sh` via Bash tool (set `INPUT_FILE` to the .mmd path)
 3. The script handles tool detection, theme config, rendering, and opening in viewer
 
 ### Step 4: Inform User
@@ -78,7 +78,7 @@ Which one first?
 Uses the same environment variables as mermaid-display:
 ```bash
 export MERMAID_OUTPUT_FORMAT=png       # or svg
-export MERMAID_COLOR_SCHEME=tokyo-night  # see references/color-schemes.md
+export MERMAID_COLOR_SCHEME=tokyo-night  # see ../skills/mermaid-display/references/color-schemes.md
 ```
 
 ## Error Handling
@@ -89,6 +89,6 @@ export MERMAID_COLOR_SCHEME=tokyo-night  # see references/color-schemes.md
 
 ## References
 
-- **Color schemes**: `references/color-schemes.md`
-- **Render script**: `references/render-script.sh`
-- **Diagram type syntax**: `references/diagram-types.md`
+- **Color schemes**: `../skills/mermaid-display/references/color-schemes.md`
+- **Render script**: `../skills/mermaid-display/references/render-script.sh`
+- **Diagram type syntax**: `../skills/mermaid-display/references/diagram-types.md`
