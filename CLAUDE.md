@@ -46,7 +46,7 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 
 ### 1. OMT (One Man Team)
 **Location**: `omt/`
-**Purpose**: Agent-First development workflow with autonomous execution
+**Purpose**: Agent-First development workflow with Contract-First design and autonomous execution
 
 **Key Components**:
 - **5 Core Agents** (`agents/`):
@@ -62,17 +62,30 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
   - `/git-commit` - Emergency manual commit
   - `/help` - Command reference
 
+- **Skills** (`skills/`):
+  - `contract-validation` - Validate agent input/output contracts
+
+- **Contracts** (`contracts/`):
+  - `pm.json`, `arch.json`, `dev.json` - Agent contract definitions
+
+- **Hooks** (`hooks/`):
+  - `hooks.json` - PostToolUse hook on Write/Edit triggers `state-sync.sh`
+
+- **Library** (`lib/`):
+  - `contract-validator.ts`, `state-manager.ts` - Runtime utilities
+
 **Workflow**: Triangle Consensus (Human ↔ @pm ↔ @arch) → Autonomous Execution (@coord-exec dispatches @dev/@reviewer) → Completion/Escalation
 
 ### 2. Mermaid Visualization
 **Location**: `mermaid-viz/`
-**Purpose**: Interactive diagram generation as PNG files
+**Purpose**: Interactive diagram generation as PNG/SVG images with theme support
 
 **Key Components**:
 - `/diagram` command - Interactive diagram creation wizard
 - `mermaid-display` skill - Automatic rendering when diagrams requested
+- `mermaid-theme` skill - Configure color themes (8 built-in schemes: Tokyo Night, Nord, Catppuccin, Dracula, etc.)
 - Uses `mmdc` (if installed) or `npx @mermaid-js/mermaid-cli` as fallback
-- Environment variables: `MERMAID_THEME`, `MERMAID_BG`, `MERMAID_WIDTH`, etc.
+- Environment variables: `MERMAID_THEME`, `MERMAID_BG`, `MERMAID_WIDTH`, `MERMAID_COLOR_SCHEME`, etc.
 
 ### 3. Plan Visualizer
 **Location**: `plan-viz/`
@@ -168,6 +181,14 @@ Agents use contract files in `.agents/` directory:
 - `implementation.md` (@arch)
 
 Triangle consensus requires all three parties to agree before execution phase.
+
+### OMT Contract-First Design
+Agent contracts are defined in `omt/contracts/`:
+- `pm.json` - @pm input/output contract
+- `arch.json` - @arch input/output contract
+- `dev.json` - @dev → @reviewer execution contract
+
+State synchronization is handled by `hooks/state-sync.sh` triggered on Write/Edit operations.
 
 ## Marketplace Installation
 

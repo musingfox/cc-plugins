@@ -15,11 +15,11 @@ Add this marketplace to your Claude Code:
 ### OMT - One Man Team
 
 Your personal development squad powered by Agent-First workflow:
-- **Autonomous Agents**: 9 specialized agents for planning, coding, reviewing, debugging, and optimization
-- **Task Management**: Integrated with Linear, GitHub Issues, Jira, or local files
+- **5 Core Agents**: @pm (requirements), @arch (architecture), @coord-exec (coordination), @dev (TDD implementation), @reviewer (code review + commit)
+- **Contract-First Design**: Defined input/output contracts between agents (`pm.json`, `arch.json`, `dev.json`)
+- **Triangle Consensus**: Human ↔ @pm ↔ @arch must agree before autonomous execution
 - **Quality Assurance**: Automated code review and git commit workflows
-- **Fibonacci Complexity**: Token-based complexity estimation
-- **Retrospective Analysis**: Continuous improvement through agent learning
+- **State Synchronization**: PostToolUse hooks for automatic state tracking
 
 **Installation:**
 ```bash
@@ -43,8 +43,9 @@ Thinking frameworks for better decision-making:
 Generate and display high-quality diagrams instantly:
 - **Interactive Command**: `/diagram` asks what to visualize and creates it
 - **Universal Support**: Flowcharts, sequence diagrams, class diagrams, state machines, ER diagrams, Gantt charts, pie charts
-- **Zero Friction**: Automatically opens PNG in your viewer
-- **Configurable**: Environment variables for themes, background, resolution
+- **8 Color Schemes**: Tokyo Night, Nord, Catppuccin, Dracula, and more via `mermaid-theme` skill
+- **Zero Friction**: Automatically opens PNG/SVG in your viewer
+- **Configurable**: Environment variables for themes, background, resolution, color scheme
 - **Smart Detection**: Uses `mmdc` if installed, falls back to `npx` automatically
 
 **Installation:**
@@ -92,30 +93,36 @@ cc-plugins/
 ├── omt/                          # OMT - One Man Team plugin
 │   ├── .claude-plugin/
 │   │   └── plugin.json
-│   ├── commands/
-│   ├── agents/
-│   └── skills/
-├── thinking/                     # Thinking frameworks plugin
-│   ├── .claude-plugin/
-│   │   └── plugin.json
-│   └── skills/
+│   ├── agents/                   # 5 core agents (pm, arch, coord-exec, dev, reviewer)
+│   ├── commands/                 # init-agents, approve, git-commit, help
+│   ├── contracts/                # Agent contract definitions (pm, arch, dev)
+│   ├── docs/                     # Workflow, quick-start, contract-validation docs
+│   ├── hooks/                    # PostToolUse state-sync hook
+│   ├── lib/                      # contract-validator, state-manager
+│   ├── skills/                   # contract-validation skill
+│   └── README.md
 ├── mermaid-viz/                  # Mermaid Visualization plugin
 │   ├── .claude-plugin/
 │   │   └── plugin.json
 │   ├── commands/
 │   │   └── diagram.md
-│   ├── skills/
+│   ├── skills/                   # mermaid-display, mermaid-theme
 │   └── README.md
-├── readability/                  # Text formatting plugin
-│   ├── .claude-plugin/
-│   │   └── plugin.json
-│   └── skills/
 ├── plan-viz/                     # Plan Visualizer plugin
 │   ├── .claude-plugin/
 │   │   └── plugin.json
 │   ├── commands/
 │   │   └── view-plan.md
 │   └── README.md
+├── readability/                  # Text formatting plugin
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   ├── skills/                   # readable-text-formatting
+│   └── README.md
+├── thinking/                     # Thinking frameworks plugin
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   └── skills/                   # scenario-thinking
 └── README.md
 ```
 
