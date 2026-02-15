@@ -15,9 +15,9 @@ Add this marketplace to your Claude Code:
 ### OMT - One Man Team
 
 Your personal development squad powered by Agent-First workflow:
-- **5 Core Agents**: @pm (requirements), @arch (architecture), @coord-exec (coordination), @dev (TDD implementation), @reviewer (code review + commit)
-- **Contract-First Design**: Defined input/output contracts between agents (`pm.json`, `arch.json`, `dev.json`)
-- **Triangle Consensus**: Human ↔ @pm ↔ @arch must agree before autonomous execution
+- **5 Core Agents**: @hive (lifecycle coordinator), @pm (requirements), @arch (architecture), @dev (TDD implementation), @reviewer (code review + commit)
+- **Contract-First Design**: Defined input/output contracts between agents (`hive.json`, `pm.json`, `arch.json`, `dev.json`)
+- **One Command**: `/omt "goal"` → autonomous planning → consensus gate → execution
 - **Quality Assurance**: Automated code review and git commit workflows
 - **State Synchronization**: PostToolUse hooks for automatic state tracking
 
@@ -93,9 +93,9 @@ cc-plugins/
 ├── omt/                          # OMT - One Man Team plugin
 │   ├── .claude-plugin/
 │   │   └── plugin.json
-│   ├── agents/                   # 5 core agents (pm, arch, coord-exec, dev, reviewer)
-│   ├── commands/                 # init-agents, approve, git-commit, help
-│   ├── contracts/                # Agent contract definitions (pm, arch, dev)
+│   ├── agents/                   # 5 core agents (hive, pm, arch, dev, reviewer)
+│   ├── commands/                 # omt, init-agents, approve, git-commit, help
+│   ├── contracts/                # Agent contract definitions (hive, pm, arch, dev)
 │   ├── docs/                     # Workflow, quick-start, contract-validation docs
 │   ├── hooks/                    # PostToolUse state-sync hook
 │   ├── lib/                      # contract-validator, state-manager

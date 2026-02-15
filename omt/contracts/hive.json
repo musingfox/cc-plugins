@@ -1,0 +1,126 @@
+{
+  "agent": "hive",
+  "description": "Full lifecycle coordinator that autonomously orchestrates planning and execution phases",
+  "method": {
+    "name": "Autonomous Lifecycle Coordination",
+    "description": "Dispatch @pm and @arch autonomously, collect consensus, execute @dev/@reviewer loop",
+    "steps": [
+      "Initialize workspace and goal",
+      "Dispatch @pm (autonomous mode)",
+      "Dispatch @arch (autonomous mode, pseudocode auto-approved)",
+      "Present consensus summary with decision points",
+      "Execute @dev → @reviewer loop per task",
+      "Generate completion report"
+    ]
+  },
+  "input_contract": {
+    "required": [
+      {
+        "field_name": "goal",
+        "description": "Human-provided goal description for what to build",
+        "type": "string",
+        "validation": ["minLength:10"]
+      },
+      {
+        "field_name": "workspace_initialized",
+        "description": "Whether .agents/ directory exists (from /init-agents)",
+        "type": "boolean"
+      }
+    ],
+    "optional": [
+      {
+        "field_name": "constraints",
+        "description": "Additional constraints or preferences from user",
+        "type": "string"
+      }
+    ],
+    "source": [
+      {
+        "location": "/omt command argument",
+        "description": "Goal passed via /omt command"
+      },
+      {
+        "location": ".agents/",
+        "description": "Workspace directory from /init-agents"
+      }
+    ]
+  },
+  "output_contract": {
+    "required": [
+      {
+        "field_name": "goal_file",
+        "description": "Goal document written to .agents/goal.md",
+        "type": "string",
+        "validation": ["minLength:10"]
+      },
+      {
+        "field_name": "pm_output",
+        "description": "Requirements produced by @pm in autonomous mode",
+        "type": "string",
+        "validation": ["minLength:20"]
+      },
+      {
+        "field_name": "arch_output",
+        "description": "Architecture produced by @arch in autonomous mode",
+        "type": "string",
+        "validation": ["minLength:20"]
+      },
+      {
+        "field_name": "consensus_status",
+        "description": "User consensus decision: approved, modified, or aborted",
+        "type": "string",
+        "validation": ["pattern:^(approved|modified|aborted)$"]
+      },
+      {
+        "field_name": "execution_summary",
+        "description": "Summary of execution phase results",
+        "type": "string"
+      }
+    ],
+    "destination": [
+      ".agents/goal.md",
+      ".agents/outputs/pm.md",
+      ".agents/outputs/arch.md",
+      ".agents/hive-state.json",
+      ".agents/outputs/hive.md"
+    ]
+  },
+  "hive_state_schema": {
+    "phase": {
+      "type": "string",
+      "enum": ["init", "pm", "arch", "consensus", "execution", "completed", "aborted", "escalated"]
+    },
+    "goal": {
+      "type": "string"
+    },
+    "agents": {
+      "pm": {
+        "status": "pending | running | completed | failed",
+        "output": "string | null"
+      },
+      "arch": {
+        "status": "pending | running | completed | failed",
+        "output": "string | null"
+      }
+    },
+    "consensus": {
+      "status": "pending | approved | modified | aborted",
+      "decision_points": "array",
+      "user_decisions": "object | null"
+    },
+    "execution": {
+      "tasks_total": "number",
+      "tasks_completed": "number",
+      "current_task": "number",
+      "failure_count": "number",
+      "max_failures": 3
+    }
+  },
+  "validation": [
+    "workspace must be initialized before starting",
+    "goal must be at least 10 characters",
+    "consensus must be reached before execution phase",
+    "execution escalates after 3 consecutive failures"
+  ],
+  "complexity_range": [13, 34]
+}

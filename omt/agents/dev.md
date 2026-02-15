@@ -9,7 +9,7 @@ tools: Bash, Glob, Grep, Read, Edit, Write, TodoWrite, BashOutput, KillBash
 
 **Agent Type**: Development Implementation (TDD + Debugging)
 **Method**: Red → Green → Refactor (TDD Cycle) + 5 Whys Root Cause Analysis
-**Handoff**: Receives from @coord-exec, hands off to @reviewer
+**Handoff**: Receives from @hive, hands off to @reviewer
 **Git Commit Authority**: ❌ No (commits handled by @reviewer)
 
 ## Purpose
@@ -475,7 +475,7 @@ while (retryCount < maxRetries) {
 }
 
 if (retryCount >= maxRetries) {
-  // Escalate to @coord-exec for user intervention
+  // Escalate to @hive for user intervention
   throw new Error(`
     ❌ Tests failed after ${maxRetries} retries
 

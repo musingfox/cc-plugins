@@ -6,10 +6,47 @@ A streamlined Agent-First development workflow for Claude Code. Your personal de
 
 **OMT (One Man Team)** transforms your development workflow:
 
-- **Humans plan** - Deep involvement in requirements → clarification → planning
-- **Agents execute** - Autonomous development until completion or conflict
-- **Contracts connect** - Clear input/output definitions between agents
-- **Minimal intervention** - @coord-exec only escalates after 3 failures
+- **One command** — `/omt "goal"` launches the full lifecycle
+- **One decision point** — approve the consensus, then sit back
+- **Agents execute** — autonomous development until completion or escalation
+- **Contracts connect** — clear input/output definitions between agents
+
+## Hive Mode: Autonomous Lifecycle
+
+The `/omt` command launches **@hive**, the lifecycle coordinator that handles everything:
+
+```
+/omt "Build user authentication with JWT"
+  │
+  ▼
+@hive initializes workspace
+  │
+  ▼
+@hive ──dispatch──▶ @pm (autonomous requirements)
+                    └─▶ .agents/outputs/pm.md
+  │
+  ▼
+@hive ──dispatch──▶ @arch (autonomous architecture)
+                    └─▶ .agents/outputs/arch.md
+  │
+  ▼
+@hive presents consensus summary
+  + all decision points collected upfront
+  │
+  ▼
+Human approves (single interaction)
+  │
+  ▼
+For each task:
+  @hive ──dispatch──▶ @dev (TDD implementation)
+  @hive ──dispatch──▶ @reviewer (review + commit)
+  (retry ≤3, then escalate)
+  │
+  ▼
+Completion report → .agents/outputs/hive.md
+```
+
+**Key Design**: All decision points are front-loaded into the consensus gate. After approval, execution proceeds without interruption.
 
 ## Features
 
@@ -17,98 +54,38 @@ A streamlined Agent-First development workflow for Claude Code. Your personal de
 
 | Agent | Phase | Model | Purpose |
 |-------|-------|-------|---------|
+| @hive | Coordination | claude-sonnet-4-5 | Full lifecycle coordinator — dispatches all other agents |
 | @pm | Planning | claude-haiku-4-5 | Requirements management and clarification |
 | @arch | Planning | claude-sonnet-4-5 | API-First architecture design |
-| @coord-exec | Coordination | claude-sonnet-4-5 | Dispatch execution agents, escalate after 3 failures |
 | @dev | Execution | claude-sonnet-4-5 | Development implementation (TDD + debugging) |
 | @reviewer | Review | claude-sonnet-4-5 | Code review + git commit authority |
-
-### Workflow
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  PLANNING PHASE - Triangle Consensus                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│                      Human                                      │
-│                    [goal.md]                                    │
-│                   Describe goal                                 │
-│                   /        \                                    │
-│                  /   Agree   \                                  │
-│                 /             \                                 │
-│            @pm ─────Agree────── @arch                           │
-│         [requirements.md]  [implementation.md]                  │
-│          Describe needs        Describe approach                │
-│                                                                 │
-│  All three must agree before entering execution phase           │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-                           │
-                           ▼ Consensus reached
-┌─────────────────────────────────────────────────────────────────┐
-│  EXECUTION PHASE (Agent Autonomous)                             │
-├─────────────────────────────────────────────────────────────────┤
-│  @coord-exec auto-dispatches:                                   │
-│    ├─ @dev (development implementation)                         │
-│    └─ @reviewer (review + commit)                               │
-│                                                                 │
-│  Loop until:                                                    │
-│    ✓ All planned items implemented                              │
-│    ✗ Or 3 failures → summarize status and escalate to user      │
-└─────────────────────────────────────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  COMPLETION or ESCALATION                                       │
-├─────────────────────────────────────────────────────────────────┤
-│  ✓ Complete: All planned items implemented and committed        │
-│  ⚠ Conflict: Implementation conflicts with plan, needs review   │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**Planning Phase Outputs**:
-
-| Role | Output File | Content |
-|------|-------------|---------|
-| Human | goal.md | Describe the goal |
-| @pm | requirements.md | Describe requirements |
-| @arch | implementation.md | Describe implementation approach |
-
-**Consensus Mechanism (Review Loop)**:
-
-```
-1. Human creates goal.md
-2. @pm reviews goal.md → creates requirements.md
-3. @arch reviews goal.md + requirements.md → creates implementation.md
-4. Human reviews all documents
-   - If changes needed → return to steps 1-3 for relevant party
-   - If all agree → enter execution phase
-```
 
 ### Commands
 
 | Command | Purpose |
 |---------|---------|
-| /init-agents | Initialize agent workspace |
+| /omt \<goal\> | Launch autonomous lifecycle — the primary entry point |
+| /init-agents | Initialize agent workspace (once per project) |
 | /help | Help and command reference |
 | /approve | Review important changes |
 | /git-commit | Emergency manual commit |
 
 ### Contract-First Design
 
-**Planning Phase Outputs (Three-party Collaboration)**:
+**Planning Phase Outputs (Autonomous via @hive)**:
 
-| Role | Output | Contract |
-|------|--------|----------|
+| Agent | Output | Contract |
+|-------|--------|----------|
 | Human | goal.md | - |
-| @pm | requirements.md | pm.json |
-| @arch | implementation.md | arch.json |
+| @pm | outputs/pm.md | pm.json |
+| @arch | outputs/arch.md | arch.json |
 
 **Execution Phase Contracts**:
 
 | Contract | Connection | Definition |
 |----------|------------|------------|
 | dev.json | @dev → @reviewer | Implementation results and test coverage |
+| hive.json | @hive lifecycle | Full lifecycle coordination |
 
 **Skills**:
 - `contract-validation` - Validate agent contracts
@@ -117,13 +94,12 @@ A streamlined Agent-First development workflow for Claude Code. Your personal de
 
 **Commit Authority**:
 
-**✅ Has commit authority:**
+**Has commit authority:**
 - `@reviewer` (automatic after review)
 - `/git-commit` (manual, emergency only)
 
-**❌ No commit authority:**
-- All other agents
-- Agents create code changes but cannot commit
+**No commit authority:**
+- All other agents (including @hive)
 
 **Commit Format**:
 
@@ -139,9 +115,9 @@ Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
 
 ### Failure Protection
 
-- Auto-escalation after 3 retries
-- State preservation with git stash
-- Clear error reporting and recovery options
+- Auto-escalation after 3 consecutive failures
+- Clear error reporting with actionable suggestions
+- All decision points front-loaded to prevent mid-execution blocks
 
 ## Installation
 
@@ -175,26 +151,29 @@ This will:
 ### Quick Start
 
 ```bash
-# 1. Create goal.md describing what you want to build
-# 2. @pm clarifies requirements
-# 3. @arch designs implementation approach
-# 4. Once consensus reached, @coord-exec takes over
-# 5. Autonomous execution until complete or escalation
+# 1. Initialize workspace (once per project)
+/init-agents
+
+# 2. Launch autonomous workflow
+/omt "Implement a REST API for user management with CRUD operations"
+
+# 3. Review the consensus summary when @hive presents it
+# 4. Approve → autonomous execution begins
+# 5. Done!
 ```
 
 ### Example: New Feature
 
 ```bash
-# Human creates goal.md
-echo "Build user authentication with JWT" > .agents/goal.md
+# Launch with a detailed goal
+/omt "Build user authentication with JWT, including login, signup, password reset, and role-based access control"
 
-# @pm reviews and creates requirements.md
-# @arch reviews and creates implementation.md
-# Human reviews all three documents
-
-# If all agree, @coord-exec dispatches:
-# - @dev implements with TDD
-# - @reviewer reviews and commits
+# @hive will:
+# 1. Dispatch @pm to define requirements autonomously
+# 2. Dispatch @arch to design architecture autonomously
+# 3. Present a consensus summary with all decision points
+# 4. After your approval, execute @dev → @reviewer for each task
+# 5. Generate a completion report
 ```
 
 ## Agent Workspace
@@ -203,14 +182,14 @@ echo "Build user authentication with JWT" > .agents/goal.md
 
 ```
 .agents/
-├── goal.md              # Human's goal (planning input)
-├── requirements.md      # @pm output
-├── implementation.md    # @arch output
-├── state.json           # Runtime state
-├── outputs/             # Agent execution outputs
-│   ├── dev.md          # @dev execution report
-│   └── reviewer.md     # @reviewer report
-└── tasks/              # Active tasks
+├── goal.md              # Human's goal
+├── hive-state.json      # @hive lifecycle state
+├── outputs/
+│   ├── pm.md            # @pm requirements
+│   ├── arch.md          # @arch architecture
+│   ├── dev.md           # @dev execution report
+│   └── hive.md          # @hive completion report
+└── tasks/               # Active tasks
 ```
 
 ## Library (lib/)
@@ -220,11 +199,10 @@ echo "Build user authentication with JWT" > .agents/goal.md
 
 ## Documentation
 
-- **Workflow Overview**: See plugin's `docs/workflow.md`
-- **Quick Start**: See plugin's `docs/quick-start.md`
-- **Contract Validation**: See plugin's `docs/contract-validation.md`
+- **Quick Start**: See `commands/help.md`
 - **Command Reference**: See `commands/` directory
 - **Agent Specifications**: See `agents/` directory
+- **Contracts**: See `contracts/` directory
 
 ## License
 
@@ -238,6 +216,6 @@ For issues and feedback:
 
 ---
 
-**Version**: 2.0.0
-**Last Updated**: 2026-01-23
+**Version**: 3.0.0
+**Last Updated**: 2026-02-15
 **Status**: Production Ready

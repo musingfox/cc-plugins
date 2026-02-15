@@ -60,7 +60,7 @@ output_contract:
 - `@tdd` - TDD 實作 (Test-Driven Development)
 
 **Coordinators** (協調器):
-- `@coord-exec` - 執行階段協調器
+- `@hive` - 執行階段協調器
 
 ## 基本使用流程
 
@@ -73,10 +73,10 @@ output_contract:
 User: "實作 JWT 認證 API"
 
 # 2. 調用 coordinator
-User: "@coord-exec"
+User: "@hive"
 
 # 3. Coordinator 會呈現選項
-@coord-exec:
+@hive:
   🔧 Execution Phase Options:
 
   讀取專案偏好...
@@ -99,13 +99,13 @@ User: "@coord-exec"
 User: "A"
 
 # 5. Agent 開始執行
-@coord-exec: → 調用 @tdd
+@hive: → 調用 @tdd
 
   ✓ 輸入驗證通過
   ⏳ @tdd 工作中...
 
 # 6. 完成後呈現下一步
-@coord-exec:
+@hive:
   ✅ @tdd 完成
 
   測試: 15/15 passed
@@ -369,7 +369,7 @@ if (!outputValidation.valid) {
 
 ### Q: 如何知道該用哪個 agent？
 
-**A**: 使用 coordinator！`@coord-exec` 會根據你的專案設定 (CLAUDE.md) 和任務類型推薦合適的 agent。
+**A**: 使用 coordinator！`@hive` 會根據你的專案設定 (CLAUDE.md) 和任務類型推薦合適的 agent。
 
 ### Q: 可以跳過 planning 直接執行嗎？
 
@@ -467,7 +467,7 @@ jj log -r agent-tdd-2025-01-14T15:30:00Z
 - 閱讀個別 agent 文件:
   - [agents/arch.md](../agents/arch.md) - 架構設計
   - [agents/tdd.md](../agents/tdd.md) - TDD 實作
-  - [agents/coord-exec.md](../agents/coord-exec.md) - 執行協調器
+  - [agents/hive.md](../agents/hive.md) - 生命週期協調器
 
 ## 故障排除
 

@@ -1,126 +1,137 @@
-# OMT Workflow: Humans Plan, Agents Execute
+# OMT Workflow: One Command, Autonomous Execution
 
 ## Overview
 
-This document defines the **Agent-First** human-agent collaborative development workflow. The core principle: **Humans plan through triangle consensus**, **Agents execute autonomously**.
+This document defines the **Agent-First** development workflow. The core principle: **One command to start, one decision to approve, then fully autonomous execution**.
 
 ## Core Principles
 
-1. **Triangle Consensus**: Human + @pm + @arch must agree before execution
-2. **Contract-Driven**: Clear input/output definitions between agents
-3. **Autonomous Execution**: @coord-exec drives @dev and @reviewer without human intervention
+1. **Single Entry Point**: `/omt "goal"` launches the full lifecycle
+2. **Decision Points Front-Loaded**: All choices collected before execution
+3. **Autonomous Execution**: @hive drives @dev and @reviewer without human intervention
 4. **Fail Fast**: Escalate after 3 failures, don't spin indefinitely
 
 ## 5 Core Agents
 
 | Agent | Phase | Purpose |
 |-------|-------|---------|
+| @hive | Coordination | Full lifecycle coordinator — dispatches all other agents |
 | @pm | Planning | Requirements management and clarification |
 | @arch | Planning | API-First architecture design |
-| @coord-exec | Coordination | Dispatch execution agents, escalate after 3 failures |
 | @dev | Execution | Development implementation (TDD + debugging) |
 | @reviewer | Review | Code review + git commit authority |
 
 ## Workflow Architecture
 
 ```
+/omt "Build feature X"
+  │
+  ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  PLANNING PHASE - Triangle Consensus                            │
+│  PLANNING PHASE (Autonomous via @hive)                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│                      Human                                      │
-│                    [goal.md]                                    │
-│                   Describe goal                                 │
-│                   /        \                                    │
-│                  /   Agree   \                                  │
-│                 /             \                                 │
-│            @pm ─────Agree────── @arch                           │
-│         [requirements.md]  [implementation.md]                  │
-│          Describe needs        Describe approach                │
+│  @hive dispatches @pm (autonomous mode)                         │
+│    └─▶ .agents/outputs/pm.md (requirements)                     │
 │                                                                 │
-│  All three must agree before entering execution phase           │
+│  @hive dispatches @arch (autonomous mode)                       │
+│    └─▶ .agents/outputs/arch.md (architecture)                   │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
                            │
-                           ▼ Consensus reached
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  CONSENSUS GATE (Single Human Interaction)                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  @hive presents:                                                │
+│    - Requirements summary                                       │
+│    - Architecture summary                                       │
+│    - ALL decision points collected from both agents              │
+│    - Risk areas                                                  │
+│                                                                 │
+│  Human: Approve / Modify / Abort                                │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+                           │
+                           ▼ Approved
 ┌─────────────────────────────────────────────────────────────────┐
 │  EXECUTION PHASE (Agent Autonomous)                             │
 ├─────────────────────────────────────────────────────────────────┤
-│  @coord-exec auto-dispatches:                                   │
-│    ├─ @dev (development implementation)                         │
+│  @hive auto-dispatches per task:                                │
+│    ├─ @dev (TDD implementation)                                 │
 │    └─ @reviewer (review + commit)                               │
 │                                                                 │
 │  Loop until:                                                    │
 │    ✓ All planned items implemented                              │
-│    ✗ Or 3 failures → summarize status and escalate to user      │
+│    ✗ Or 3 failures → escalate to user                           │
 └─────────────────────────────────────────────────────────────────┘
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  COMPLETION or ESCALATION                                       │
 ├─────────────────────────────────────────────────────────────────┤
-│  ✓ Complete: All planned items implemented and committed        │
-│  ⚠ Conflict: Implementation conflicts with plan, needs review   │
+│  ✓ Complete: All items implemented, report at outputs/hive.md   │
+│  ⚠ Escalated: 3 failures, user intervention needed              │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Planning Phase
 
-### Participants
+### How @hive Orchestrates Planning
 
-1. **Human**: Provides the goal (what to build and why)
-2. **@pm**: Clarifies requirements (acceptance criteria, constraints)
-3. **@arch**: Designs implementation (API contracts, file structure)
+1. **Capture Goal**: From `/omt` command argument
+2. **Dispatch @pm**: In autonomous mode (HIVE MODE OVERRIDE) — no user interaction
+3. **Dispatch @arch**: In autonomous mode — pseudocode auto-approved
+4. **Extract Decision Points**: Collect all `[DECISION NEEDED]` items from both outputs
 
 ### Outputs
 
-| Role | Output File | Content |
-|------|-------------|---------|
-| Human | goal.md | Describe the goal |
-| @pm | requirements.md | Describe requirements |
-| @arch | implementation.md | Describe implementation approach |
+| Agent | Output File | Content |
+|-------|-------------|---------|
+| Human | goal.md | Goal description (from /omt argument) |
+| @pm | outputs/pm.md | Requirements, user stories, acceptance criteria |
+| @arch | outputs/arch.md | API contracts, architecture, file plan |
 
-### Consensus Mechanism
+## Consensus Gate
 
-```
-1. Human creates goal.md
-2. @pm reviews goal.md → creates requirements.md
-3. @arch reviews goal.md + requirements.md → creates implementation.md
-4. Human reviews all documents
-   - If changes needed → return to steps 1-3 for relevant party
-   - If all agree → enter execution phase
-```
+The **only point** where @hive interacts with the human.
 
-**Key Points:**
-- No execution starts until all three parties agree
-- Each party can request changes to previous outputs
-- Iteration continues until consensus is reached
+@hive presents a structured summary containing:
+- Requirements overview
+- Architecture overview
+- All decision points (technical choices, scope boundaries, risks)
+- Auto-approved pseudocode list
+
+The human can:
+- **Approve**: Execution begins immediately
+- **Modify**: Provide feedback, @hive re-runs affected agents
+- **Abort**: Stop the entire workflow
 
 ## Execution Phase
 
-### Coordinator: @coord-exec
+### Coordinator: @hive
 
-Once consensus is reached, @coord-exec takes over and runs autonomously:
+After consensus approval, @hive executes autonomously:
 
-1. **Validate Planning Outputs**: Ensure goal.md, requirements.md, implementation.md exist
-2. **Extract Tasks**: Parse implementation.md for discrete tasks
-3. **Execute Loop**: For each task:
-   - Dispatch @dev for implementation (TDD + debugging)
+1. **Extract Tasks**: Parse outputs/arch.md for implementation tasks
+2. **Execute Loop**: For each task:
+   - Dispatch @dev for implementation (TDD)
    - Dispatch @reviewer for review + commit
-4. **Handle Failures**: Retry up to 3 times per task
-5. **Report Completion**: Or escalate with clear summary
+3. **Handle Failures**: Retry up to 3 times per task
+4. **Report Completion**: Or escalate with clear summary
 
 ### Execution Flow
 
 ```
-@coord-exec receives planning outputs
+@hive receives consensus approval
     │
     ├── Task 1: Feature A
-    │   ├── @dev implements
+    │   ├── @dev implements (TDD)
     │   └── @reviewer commits
     │
     ├── Task 2: Feature B
-    │   ├── @dev implements
+    │   ├── @dev implements (TDD)
     │   └── @reviewer commits
     │
     └── ... continues until complete or escalation
@@ -146,6 +157,7 @@ Task fails
 
 | Command | Purpose |
 |---------|---------|
+| /omt \<goal\> | Launch autonomous lifecycle |
 | /init-agents | Initialize agent workspace |
 | /help | Help and command reference |
 | /approve | Review important changes |
@@ -155,48 +167,57 @@ Task fails
 
 Each agent has defined input/output contracts:
 
+### @hive Contract (hive.json)
+
+```yaml
+Input:
+  - goal: Human's goal description (≥10 chars)
+  - workspace_initialized: .agents/ exists
+Output:
+  - goal_file, pm_output, arch_output
+  - consensus_status: approved/modified/aborted
+  - execution_summary
+```
+
 ### @pm Contract (pm.json)
 
 ```yaml
 Input:
-  - goal.md: Human's goal description
+  - task_description: Goal or task description
 Output:
-  - requirements.md: Detailed requirements with acceptance criteria
+  - user_stories, acceptance_criteria, scope
 ```
 
 ### @arch Contract (arch.json)
 
 ```yaml
 Input:
-  - goal.md: Human's goal
-  - requirements.md: @pm's requirements
+  - requirements: From @pm or task description
+  - project_structure: Current codebase
 Output:
-  - implementation.md: API contracts, file structure, implementation plan
+  - api_contracts, architecture_diagram, tech_decisions
+  - files_to_create, files_to_modify, pseudocode_steps
 ```
 
 ### @dev Contract (dev.json)
 
 ```yaml
 Input:
-  - requirements.md: What to build
-  - implementation.md: How to build
-  - files_to_modify: List of files
+  - requirements, architecture, files_to_modify
 Output:
-  - test_files: Tests created
-  - implementation_files: Code created
-  - tests_status: "X/Y passed"
+  - test_files, implementation_files, tests_status
 ```
 
 ## Git Workflow
 
 ### Commit Authority
 
-**✅ Has commit authority:**
+**Has commit authority:**
 - `@reviewer` (automatic after review)
 - `/git-commit` (manual, emergency only)
 
-**❌ No commit authority:**
-- All other agents
+**No commit authority:**
+- All other agents (including @hive)
 
 ### Commit Format
 
@@ -216,36 +237,40 @@ Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
 
 ```
 .agents/
-├── goal.md              # Human's goal (planning input)
-├── requirements.md      # @pm output
-├── implementation.md    # @arch output
-├── state.json           # Runtime state
-├── outputs/             # Agent execution outputs
-│   ├── dev.md          # @dev execution report
-│   ├── reviewer.md     # @reviewer report
-│   └── coord-exec.md   # Coordination report
-└── tasks/              # Active tasks
+├── goal.md              # Human's goal
+├── hive-state.json      # @hive lifecycle state
+├── outputs/
+│   ├── pm.md            # @pm requirements
+│   ├── arch.md          # @arch architecture
+│   ├── dev.md           # @dev execution report
+│   └── hive.md          # @hive completion report
+└── tasks/               # Active tasks
 ```
 
-### State Management
+### Hive State Management
 
-state.json tracks workflow progress:
+hive-state.json tracks the lifecycle:
 
 ```json
 {
-  "task_id": "TASK-123",
-  "current_phase": "execution",
-  "planning": {
-    "consensus_reached": true,
-    "goal": ".agents/goal.md",
-    "requirements": ".agents/requirements.md",
-    "implementation": ".agents/implementation.md"
+  "phase": "execution",
+  "goal": "Build user authentication with JWT",
+  "started_at": "2026-02-15T10:00:00Z",
+  "agents": {
+    "pm": { "status": "completed", "output": ".agents/outputs/pm.md" },
+    "arch": { "status": "completed", "output": ".agents/outputs/arch.md" }
+  },
+  "consensus": {
+    "status": "approved",
+    "decision_points": ["JWT vs session", "PostgreSQL vs SQLite"],
+    "user_decisions": { ... }
   },
   "execution": {
-    "coordinator": "coord-exec",
     "tasks_total": 5,
     "tasks_completed": 2,
-    "failure_count": 0
+    "current_task": 3,
+    "failure_count": 0,
+    "max_failures": 3
   }
 }
 ```
@@ -255,18 +280,14 @@ state.json tracks workflow progress:
 ### Example 1: New Feature
 
 ```bash
-# 1. Human creates goal
-echo "Build user authentication with JWT" > .agents/goal.md
+# 1. Launch autonomous workflow
+/omt "Build user authentication with JWT"
 
-# 2. @pm reviews and clarifies
-# → Creates requirements.md with acceptance criteria
+# 2. @hive dispatches @pm and @arch autonomously
+# 3. @hive presents consensus with decision points
+# 4. Human approves
 
-# 3. @arch reviews and designs
-# → Creates implementation.md with API contracts
-
-# 4. Human approves all three documents
-
-# 5. @coord-exec takes over
+# 5. @hive executes autonomously
 # → Dispatches @dev for each task
 # → @reviewer commits each completion
 # → Reports when done
@@ -279,8 +300,8 @@ echo "Build user authentication with JWT" > .agents/goal.md
 
 # @dev fails on Task 3 after 3 retries
 
-# @coord-exec escalates:
-# 🚨 Execution Needs Human Assistance
+# @hive escalates:
+# Execution paused after 3 consecutive failures.
 #
 # Progress: 2/5 tasks completed
 # Failed: Task 3 - Token refresh endpoint
@@ -288,53 +309,50 @@ echo "Build user authentication with JWT" > .agents/goal.md
 #
 # Options:
 # A) View Details
-# B) Fix Manually
+# B) Fix and Retry
 # C) Abort
-
-# Human fixes issue, re-runs @coord-exec
 ```
 
 ## Best Practices
 
-### 1. Planning Phase
+### 1. Writing Good Goals
 
-- **Be Specific in goal.md**: Clear goals lead to better requirements
-- **Review All Documents**: Don't skip reviewing @pm and @arch outputs
-- **Iterate If Needed**: Better to fix the plan than the implementation
+- **Be Specific**: "Implement JWT auth with refresh tokens" > "Add auth"
+- **Include Context**: Mention constraints, preferences, or existing patterns
+- **Scope Appropriately**: One feature per `/omt` invocation
 
-### 2. Execution Phase
+### 2. During Consensus
 
-- **Trust the Process**: Let @coord-exec run autonomously
-- **Don't Intervene Prematurely**: Wait for 3 failures before escalation
-- **Check Progress Reports**: Review outputs/coord-exec.md for status
+- **Review Decision Points**: These are the critical choices
+- **Check Scope**: Ensure file count is reasonable
+- **Validate Architecture**: Verify the design makes sense for your project
 
 ### 3. On Escalation
 
-- **Read the Error Summary**: @coord-exec provides actionable information
+- **Read the Error Summary**: @hive provides actionable information
 - **Fix Root Cause**: Address the underlying issue, not symptoms
-- **Resume Cleanly**: Re-run @coord-exec after fixing
+- **Resume Cleanly**: Re-run `/omt` after fixing
 
 ## Troubleshooting
 
-### Planning Consensus Not Reached
+### Consensus Takes Too Long
 
 Check:
-- Does goal.md clearly state the objective?
-- Did @pm identify all requirements?
-- Does @arch's design address all requirements?
+- Is the goal too vague? Provide more detail
+- Is the project too complex? Split into smaller goals
 
 ### Execution Keeps Failing
 
 Check:
 - Is the task scope too large? Split into smaller tasks
-- Are dependencies met? Check implementation.md
+- Are dependencies met? Check outputs/arch.md
 - Is there an environment issue? Verify test setup
 
 ### Workspace Issues
 
 ```bash
 # View current state
-cat .agents/state.json | jq
+cat .agents/hive-state.json | jq
 
 # Check outputs
 ls -la .agents/outputs/
@@ -348,10 +366,9 @@ rm -rf .agents && /init-agents
 - **Agents**: `agents/` directory
 - **Contracts**: `contracts/` directory
 - **Commands**: `commands/` directory
-- **Quick Start**: `docs/quick-start.md`
 
 ---
 
-**Last Updated**: 2026-01-23
-**Version**: 2.0 - Humans Plan, Agents Execute
-**Status**: Active Development
+**Last Updated**: 2026-02-15
+**Version**: 3.0 - One Command, Autonomous Execution
+**Status**: Production Ready

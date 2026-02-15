@@ -50,13 +50,14 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 
 **Key Components**:
 - **5 Core Agents** (`agents/`):
+  - `hive.md` - Full lifecycle coordinator (Sonnet) — dispatched by `/omt`
   - `pm.md` - Requirements management (Haiku)
   - `arch.md` - API-First architecture design (Sonnet)
-  - `coord-exec.md` - Agent coordination and dispatch (Sonnet)
   - `dev.md` - TDD implementation (Sonnet)
   - `reviewer.md` - Code review + git commit authority (Sonnet)
 
 - **Commands** (`commands/`):
+  - `/omt` - Launch autonomous lifecycle (primary entry point)
   - `/init-agents` - Initialize agent workspace
   - `/approve` - Review important changes
   - `/git-commit` - Emergency manual commit
@@ -66,7 +67,7 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
   - `contract-validation` - Validate agent input/output contracts
 
 - **Contracts** (`contracts/`):
-  - `pm.json`, `arch.json`, `dev.json` - Agent contract definitions
+  - `hive.json`, `pm.json`, `arch.json`, `dev.json` - Agent contract definitions
 
 - **Hooks** (`hooks/`):
   - `hooks.json` - PostToolUse hook on Write/Edit triggers `state-sync.sh`
@@ -74,7 +75,7 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 - **Library** (`lib/`):
   - `contract-validator.ts`, `state-manager.ts` - Runtime utilities
 
-**Workflow**: Triangle Consensus (Human ↔ @pm ↔ @arch) → Autonomous Execution (@coord-exec dispatches @dev/@reviewer) → Completion/Escalation
+**Workflow**: `/omt "goal"` → @hive dispatches @pm → @arch → Consensus Gate (single human interaction) → @dev/@reviewer execution loop → Completion/Escalation
 
 ### 2. Mermaid Visualization
 **Location**: `mermaid-viz/`

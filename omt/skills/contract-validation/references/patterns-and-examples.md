@@ -123,5 +123,5 @@ This shows the full lifecycle of the @dev agent with contract validation:
    This updates .agents/state.json with execution results
 
 8. DONE
-   Report completion status to @coord-exec
+   Report completion status to @hive
 ```
