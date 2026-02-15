@@ -1,6 +1,6 @@
 {
   "name": "thinking",
-  "description": "Thinking frameworks for better decision-making: scenario-driven design, dimensional analysis, and explicit trade-offs",
+  "description": "Thinking frameworks for better decision-making: scenario-driven design, dimensional analysis, explicit trade-offs, and agentic complexity scoring",
   "version": "1.0.0",
   "author": {
     "name": "Nick Huang",
