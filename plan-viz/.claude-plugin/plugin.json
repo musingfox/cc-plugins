@@ -5,5 +5,8 @@
   "author": {
     "name": "Nick Huang",
     "email": "nick12703990@gmail.com"
-  }
+  },
+  "homepage": "https://github.com/musingfox/cc-plugins/tree/main/plan-viz",
+  "license": "MIT",
+  "commands": "./commands/"
 }
