@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Canonical Mermaid render script — single source of truth
 # Used by: mermaid-display skill, diagram command
 #
@@ -9,9 +9,9 @@
 #   - MERMAID_PRIMARY_COLOR, MERMAID_SECONDARY_COLOR, MERMAID_TEXT_COLOR (for custom scheme)
 
 # === Tool Selection ===
-if command -v mmdc &> /dev/null; then
+if command -v mmdc > /dev/null 2>&1; then
     MERMAID_CMD="mmdc"
-elif command -v npx &> /dev/null; then
+elif command -v npx > /dev/null 2>&1; then
     MERMAID_CMD="npx -y @mermaid-js/mermaid-cli"
 else
     echo "Error: No mermaid renderer available. Install Node.js or mermaid-cli."
@@ -96,9 +96,10 @@ fi
 echo "$OUTPUT_FILE"
 
 # === Open in viewer ===
-case "$OSTYPE" in
-  darwin*)  open "$OUTPUT_FILE" ;;
-  linux*)   xdg-open "$OUTPUT_FILE" ;;
-  msys*|cygwin*|win32) start "$OUTPUT_FILE" ;;
+OS=$(uname -s)
+case "$OS" in
+  Darwin)   open "$OUTPUT_FILE" ;;
+  Linux)    xdg-open "$OUTPUT_FILE" ;;
+  MINGW*|MSYS*|CYGWIN*) start "$OUTPUT_FILE" ;;
   *)        echo "Diagram saved to: $OUTPUT_FILE" ;;
 esac
