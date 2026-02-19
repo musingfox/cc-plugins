@@ -87,6 +87,32 @@ destination:
   - .state/state.json:execution.dev_result
 ```
 
+## Hive State Protocol (Check-in / Check-out)
+
+When operating within the OMT lifecycle (dispatched by @hive or `/omt`), update hive-state.json to keep execution tracking current. This is **best-effort** — if the file doesn't exist (standalone usage), skip silently and proceed with core work.
+
+### Check-in (first action before Phase 1)
+
+```
+Read .agents/.state/hive-state.json
+If file exists AND execution block exists:
+  Note current tasks_completed count for later
+  Set updated_at = current ISO timestamp
+  Write back to .agents/.state/hive-state.json
+If file does not exist → skip (non-fatal)
+```
+
+### Check-out (after Phase 8 state update)
+
+```
+Read .agents/.state/hive-state.json
+If file exists AND execution block exists:
+  Increment execution.tasks_completed by 1
+  Set updated_at = current ISO timestamp
+  Write back to .agents/.state/hive-state.json
+If file does not exist → skip (non-fatal)
+```
+
 ## Agent Workflow
 
 ### Phase 1: Input Validation
@@ -364,7 +390,9 @@ console.log('✓ Output validation passed');
 
 ### Phase 7: Generate Execution Report
 
-Create `outputs/dev.md` with execution summary:
+**IMPORTANT**: Write execution report to `.agents/outputs/dev.md`, NOT to the project root.
+
+Create `.agents/outputs/dev.md` with execution summary:
 
 ```markdown
 # Dev Execution: [Task Title]

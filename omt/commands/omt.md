@@ -44,6 +44,31 @@ Run /init-agents first to set up the workspace, then run /omt again.
 
 Stop execution here if workspace is missing.
 
+### Step 2.5: Check for Interrupted Session
+
+Read `.agents/.state/hive-state.json`. If the file exists and `phase` is non-null and NOT a terminal phase (`completed` or `aborted`):
+
+An interrupted session is detected. Use `AskUserQuestion` to ask the user:
+
+```
+Detected an interrupted OMT session.
+
+Phase: {phase}
+Goal: {goal from hive-state.json}
+Last updated: {updated_at from hive-state.json}
+```
+
+Options:
+1. **Resume** — Continue the interrupted session from where it left off (uses the original goal)
+2. **Start Fresh** — Discard the previous session and start a new one with the current goal
+3. **Cancel** — Stop without doing anything
+
+**Resume**: Dispatch @hive with the ORIGINAL goal from `hive-state.json` (not `$GOAL`). @hive's Phase 0 resume detection will determine the correct re-entry point.
+
+**Start Fresh**: Write `{ "phase": null }` to `.agents/.state/hive-state.json` to reset, then proceed to Step 3 with `$GOAL`.
+
+**Cancel**: Stop execution.
+
 ### Step 3: Ensure outputs directory exists
 
 ```bash

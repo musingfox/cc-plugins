@@ -231,3 +231,175 @@ export class StateManager {
     return outputsDir;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Hive State Manager
+//
+// Manages hive-state.json for @hive lifecycle coordination.
+// Tracks phase progression, agent statuses, and execution state.
+// Used by CLI tooling — agents interact via Read/Write tools directly.
+// ---------------------------------------------------------------------------
+
+export type HivePhase =
+  | 'init'
+  | 'pm'
+  | 'arch'
+  | 'consensus'
+  | 'execution'
+  | 'completed'
+  | 'aborted'
+  | 'escalated';
+
+export type AgentStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export interface HiveAgentEntry {
+  status: AgentStatus;
+  output: string | null;
+}
+
+export interface HiveState {
+  phase: HivePhase | null;
+  goal?: string;
+  started_at?: string;
+  updated_at?: string;
+  agents?: {
+    pm: HiveAgentEntry;
+    arch: HiveAgentEntry;
+  };
+  consensus?: {
+    status: 'pending' | 'approved' | 'modified' | 'aborted';
+    decision_points: unknown[];
+    user_decisions: unknown | null;
+  };
+  execution?: {
+    tasks_total: number;
+    tasks_completed: number;
+    current_task: number;
+    failure_count: number;
+    max_failures: number;
+  };
+}
+
+const TERMINAL_PHASES: ReadonlySet<HivePhase | null> = new Set([
+  'completed',
+  'aborted',
+  null,
+]);
+
+export class HiveStateManager {
+  private hiveStatePath: string;
+
+  constructor(workspaceRoot: string) {
+    this.hiveStatePath = path.join(
+      workspaceRoot,
+      '.agents',
+      '.state',
+      'hive-state.json',
+    );
+  }
+
+  async readState(): Promise<HiveState | null> {
+    try {
+      const data = await fs.promises.readFile(this.hiveStatePath, 'utf-8');
+      return JSON.parse(data);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async saveState(state: HiveState): Promise<void> {
+    state.updated_at = new Date().toISOString();
+    const dir = path.dirname(this.hiveStatePath);
+    await fs.promises.mkdir(dir, { recursive: true });
+    await fs.promises.writeFile(
+      this.hiveStatePath,
+      JSON.stringify(state, null, 2),
+      'utf-8',
+    );
+  }
+
+  async setPhase(phase: HivePhase): Promise<void> {
+    const state = await this.readState();
+    if (!state) {
+      throw new Error('No hive state found');
+    }
+    state.phase = phase;
+    await this.saveState(state);
+  }
+
+  async updateAgentStatus(
+    agent: 'pm' | 'arch',
+    status: AgentStatus,
+    output?: string,
+  ): Promise<void> {
+    const state = await this.readState();
+    if (!state) {
+      throw new Error('No hive state found');
+    }
+    if (!state.agents) {
+      state.agents = {
+        pm: { status: 'pending', output: null },
+        arch: { status: 'pending', output: null },
+      };
+    }
+    state.agents[agent].status = status;
+    if (output !== undefined) {
+      state.agents[agent].output = output;
+    }
+    await this.saveState(state);
+  }
+
+  async updateExecution(
+    updates: Partial<NonNullable<HiveState['execution']>>,
+  ): Promise<void> {
+    const state = await this.readState();
+    if (!state) {
+      throw new Error('No hive state found');
+    }
+    if (!state.execution) {
+      state.execution = {
+        tasks_total: 0,
+        tasks_completed: 0,
+        current_task: 0,
+        failure_count: 0,
+        max_failures: 3,
+      };
+    }
+    Object.assign(state.execution, updates);
+    await this.saveState(state);
+  }
+
+  async isResumable(): Promise<boolean> {
+    const state = await this.readState();
+    if (!state) return false;
+    return !TERMINAL_PHASES.has(state.phase);
+  }
+
+  static createInitialState(goal: string): HiveState {
+    return {
+      phase: 'init',
+      goal,
+      started_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      agents: {
+        pm: { status: 'pending', output: null },
+        arch: { status: 'pending', output: null },
+      },
+      consensus: {
+        status: 'pending',
+        decision_points: [],
+        user_decisions: null,
+      },
+      execution: {
+        tasks_total: 0,
+        tasks_completed: 0,
+        current_task: 0,
+        failure_count: 0,
+        max_failures: 3,
+      },
+    };
+  }
+}

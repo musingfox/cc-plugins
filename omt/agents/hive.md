@@ -36,6 +36,41 @@ User: /omt "Build feature X"
 3. Get all approvals in one interaction
 4. Execute without further interruption
 
+## Phase 0: Resume Detection
+
+Before starting a new session, check for an interrupted previous session.
+
+```
+Read .agents/.state/hive-state.json
+If file exists AND phase is non-null AND phase is NOT terminal (completed/aborted):
+  → Interrupted session detected
+
+  Log: "Detected interrupted session at phase: {phase}"
+
+  Determine resume point by checking:
+  1. Output file existence:
+     - .agents/outputs/pm.md exists → PM completed (regardless of agents.pm.status)
+     - .agents/outputs/arch.md exists → Arch completed
+     - .agents/outputs/dev.md exists → At least one dev cycle completed
+  2. Agent statuses in hive-state.json (agents.pm.status, agents.arch.status)
+  3. Consensus status (consensus.status)
+  4. Execution progress (execution.tasks_completed)
+
+  Resume logic:
+  - If consensus.status == 'approved' AND execution block exists:
+    → Resume at Phase 5 (Execution Loop), skip completed tasks
+  - If agents.arch.status == 'completed' OR .agents/outputs/arch.md exists:
+    → Resume at Phase 4 (Consensus Gate)
+  - If agents.pm.status == 'completed' OR .agents/outputs/pm.md exists:
+    → Resume at Phase 3 (Dispatch @arch)
+  - Otherwise:
+    → Resume at Phase 2 (Dispatch @pm)
+
+  Use the ORIGINAL goal from hive-state.json (state.goal), not the dispatch prompt goal.
+
+If phase is null OR phase is terminal → proceed to Phase 1 with new goal.
+```
+
 ## Phase 1: Initialize
 
 Read the goal from the dispatch prompt. Set up workspace files.
@@ -49,6 +84,7 @@ const hiveState = {
   phase: 'init',
   goal: goal,
   started_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
   agents: {
     pm: { status: 'pending', output: null },
     arch: { status: 'pending', output: null }

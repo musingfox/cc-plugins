@@ -11,6 +11,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { ContractValidator } from '../lib/contract-validator.js';
+import { HiveStateManager } from '../lib/state-manager.js';
+import type { HiveState, AgentStatus } from '../lib/state-manager.js';
 import type { AgentContract, AgentExecutionContext } from '../lib/types.js';
 
 // ---------------------------------------------------------------------------
@@ -212,9 +214,33 @@ async function cmdStatus() {
   if (hiveState) {
     console.log(`Hive Phase: ${hiveState.phase ?? '(none)'}`);
     if (hiveState.goal) console.log(`Goal: ${hiveState.goal}`);
-    if (hiveState.execution) {
-      console.log(`Execution: ${hiveState.execution.tasks_completed ?? 0}/${hiveState.execution.tasks_total ?? 0} tasks`);
+    if (hiveState.updated_at) console.log(`Last Updated: ${hiveState.updated_at}`);
+
+    // Agent statuses
+    if (hiveState.agents) {
+      const agents = hiveState.agents as Record<string, { status: string; output: string | null }>;
+      const agentLines = Object.entries(agents)
+        .map(([name, info]) => `${name}: ${info.status}`)
+        .join(', ');
+      console.log(`Agents: ${agentLines}`);
     }
+
+    // Consensus
+    if (hiveState.consensus) {
+      console.log(`Consensus: ${hiveState.consensus.status ?? '(none)'}`);
+    }
+
+    if (hiveState.execution) {
+      console.log(`Execution: ${hiveState.execution.tasks_completed ?? 0}/${hiveState.execution.tasks_total ?? 0} tasks (failures: ${hiveState.execution.failure_count ?? 0})`);
+    }
+
+    // Resumable indicator
+    const phase = hiveState.phase as string | null;
+    const isTerminal = phase === null || phase === 'completed' || phase === 'aborted';
+    if (!isTerminal && phase) {
+      console.log(`Resumable: YES (interrupted at phase '${phase}')`);
+    }
+
     console.log();
   }
 
@@ -228,6 +254,86 @@ async function cmdStatus() {
       console.log(`Execution agents: ${state.execution.agents_completed.join(', ')}`);
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// state-check
+// ---------------------------------------------------------------------------
+
+async function cmdStateCheck() {
+  const root = resolveWorkspaceRoot();
+  const stateDir = path.join(root, '.agents', '.state');
+  const outputsDir = path.join(root, '.agents', 'outputs');
+
+  if (!fs.existsSync(stateDir)) {
+    die('.agents/.state/ not found — run `bun run omt/bin/cli.ts init` first');
+  }
+
+  const hiveStatePath = path.join(stateDir, 'hive-state.json');
+  if (!fs.existsSync(hiveStatePath)) {
+    console.log('No hive-state.json found — nothing to check.');
+    return;
+  }
+
+  const hiveState: HiveState = JSON.parse(fs.readFileSync(hiveStatePath, 'utf-8'));
+  const issues: string[] = [];
+
+  // Cross-check output file existence vs agent status claims
+  const agentOutputMap: Record<string, string> = {
+    pm: path.join(outputsDir, 'pm.md'),
+    arch: path.join(outputsDir, 'arch.md'),
+  };
+
+  if (hiveState.agents) {
+    for (const [agent, expectedPath] of Object.entries(agentOutputMap)) {
+      const agentEntry = (hiveState.agents as Record<string, { status: AgentStatus; output: string | null }>)[agent];
+      if (!agentEntry) continue;
+
+      const fileExists = fs.existsSync(expectedPath);
+
+      if (agentEntry.status === 'completed' && !fileExists) {
+        issues.push(`Agent '${agent}' claims completed but output file missing: ${expectedPath}`);
+      }
+      if (agentEntry.status === 'pending' && fileExists) {
+        issues.push(`Agent '${agent}' status is 'pending' but output file exists: ${expectedPath}`);
+      }
+    }
+  }
+
+  // Check dev output
+  const devOutput = path.join(outputsDir, 'dev.md');
+  if (hiveState.execution && hiveState.execution.tasks_completed > 0 && !fs.existsSync(devOutput)) {
+    issues.push(`Execution claims ${hiveState.execution.tasks_completed} tasks completed but dev.md not found`);
+  }
+
+  // Check staleness: updated_at > 24h with non-terminal phase
+  const TERMINAL_PHASES = new Set(['completed', 'aborted', null]);
+  if (hiveState.updated_at && !TERMINAL_PHASES.has(hiveState.phase)) {
+    const updatedAt = new Date(hiveState.updated_at).getTime();
+    const now = Date.now();
+    const hoursSinceUpdate = (now - updatedAt) / (1000 * 60 * 60);
+    if (hoursSinceUpdate > 24) {
+      issues.push(`Stale session: phase '${hiveState.phase}' has not been updated for ${Math.round(hoursSinceUpdate)}h`);
+    }
+  }
+
+  // Phase vs consensus consistency
+  if (hiveState.phase === 'execution' && hiveState.consensus?.status !== 'approved') {
+    issues.push(`Phase is 'execution' but consensus status is '${hiveState.consensus?.status ?? 'missing'}' (expected 'approved')`);
+  }
+
+  console.log('=== OMT State Consistency Check ===\n');
+
+  if (issues.length === 0) {
+    console.log('PASS — No issues found.');
+  } else {
+    console.log(`ISSUES FOUND (${issues.length}):\n`);
+    for (const issue of issues) {
+      console.log(`  - ${issue}`);
+    }
+  }
+
+  process.exit(issues.length > 0 ? 1 : 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -246,12 +352,16 @@ switch (subcommand) {
   case 'status':
     await cmdStatus();
     break;
+  case 'state-check':
+    await cmdStateCheck();
+    break;
   default:
     console.log(`Usage: bun run omt/bin/cli.ts <command>
 
 Commands:
   init [--task-mgmt <system>]    Initialize .agents/ workspace
   validate --agent <name> --phase <input|output> --data '<json>'
-  status                         Show workspace state`);
+  status                         Show workspace state
+  state-check                    Cross-check state consistency`);
     process.exit(subcommand ? 1 : 0);
 }

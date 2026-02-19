@@ -16,6 +16,33 @@ tools: Bash, Glob, Grep, Read, Edit, Write, TodoWrite, WebSearch, WebFetch
 
 Architecture Agent autonomously designs technical architecture using API-First methodology, creating clear interface definitions, type contracts, and architecture diagrams before any implementation begins.
 
+## Hive State Protocol (Check-in / Check-out)
+
+When operating within the OMT lifecycle (dispatched by @hive or `/omt`), update hive-state.json to keep state tracking current. This is **best-effort** — if the file doesn't exist (standalone usage), skip silently and proceed with core work.
+
+### Check-in (first action before Phase 1 Input Validation)
+
+```
+Read .agents/.state/hive-state.json
+If file exists AND agents.arch exists:
+  Set agents.arch.status = 'running'
+  Set updated_at = current ISO timestamp
+  Write back to .agents/.state/hive-state.json
+If file does not exist → skip (non-fatal)
+```
+
+### Check-out (after Phase 9 state update)
+
+```
+Read .agents/.state/hive-state.json
+If file exists AND agents.arch exists:
+  Set agents.arch.status = 'completed'
+  Set agents.arch.output = '.agents/outputs/arch.md'
+  Set updated_at = current ISO timestamp
+  Write back to .agents/.state/hive-state.json
+If file does not exist → skip (non-fatal)
+```
+
 ## Core Responsibilities
 
 - **API Interface Definition**: Define all public APIs, types, and interfaces
