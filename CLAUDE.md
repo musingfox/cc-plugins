@@ -211,6 +211,30 @@ Then install individual plugins:
 /plugin install thinking
 ```
 
+## Version Management
+
+Claude Code uses the `version` field in each plugin's `plugin.json` to determine whether updates are available. **If the version doesn't change, users' cached copies won't update.**
+
+### Auto-Bump Pre-Commit Hook
+
+A pre-commit hook at `.githooks/pre-commit` automatically bumps the **patch** version of any plugin whose files are staged for commit.
+
+**Setup** (required once per clone):
+```bash
+git config core.hooksPath .githooks
+```
+
+**Behavior**:
+- Detects which plugin directories have staged changes
+- Bumps `X.Y.Z` → `X.Y.(Z+1)` in `plugin.json`
+- Re-stages the modified `plugin.json`
+- Skips if `plugin.json` is already staged (manual bump takes priority)
+
+**Manual version bumps** (for minor/major changes):
+- Edit `plugin.json` version directly and stage it — the hook will skip auto-bump
+- Use **minor** bump (`X.Y+1.0`) for new features
+- Use **major** bump (`X+1.0.0`) for breaking changes
+
 ## Design Philosophy
 
 - **Single Responsibility**: Each plugin focuses on one specific capability

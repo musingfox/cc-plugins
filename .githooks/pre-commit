@@ -1,0 +1,61 @@
+#!/bin/sh
+#
+# Pre-commit hook: auto-bump patch version for changed plugins.
+#
+# When files in a plugin directory are staged for commit, the plugin's
+# patch version in plugin.json is automatically incremented and re-staged.
+#
+# Skips auto-bump when:
+#   - plugin.json is already staged (manual version bump takes priority)
+#   - Only plugin.json changed (no content changes)
+#   - plugin.json does not exist
+#
+
+PLUGINS="omt mermaid-viz plan-viz readability thinking"
+
+staged_files=$(git diff --cached --name-only --diff-filter=d)
+
+if [ -z "$staged_files" ]; then
+  exit 0
+fi
+
+for plugin in $PLUGINS; do
+  plugin_json="${plugin}/.claude-plugin/plugin.json"
+
+  # Skip if plugin.json is already staged (manual bump takes priority)
+  already_staged=$(echo "$staged_files" | grep "^${plugin_json}$")
+  if [ -n "$already_staged" ]; then
+    continue
+  fi
+
+  # Check if any non-plugin.json file in this plugin dir is staged
+  changed=$(echo "$staged_files" | grep "^${plugin}/" | grep -v "^${plugin_json}$")
+  if [ -z "$changed" ]; then
+    continue
+  fi
+
+  if [ ! -f "$plugin_json" ]; then
+    continue
+  fi
+
+  # Extract current version
+  current_version=$(grep '"version"' "$plugin_json" | head -1 | sed 's/.*"version": *"\([^"]*\)".*/\1/')
+  if [ -z "$current_version" ]; then
+    continue
+  fi
+
+  # Parse major.minor.patch and bump patch
+  major=$(echo "$current_version" | cut -d. -f1)
+  minor=$(echo "$current_version" | cut -d. -f2)
+  patch=$(echo "$current_version" | cut -d. -f3)
+  new_patch=$((patch + 1))
+  new_version="${major}.${minor}.${new_patch}"
+
+  # Update plugin.json (portable in-place edit)
+  tmp=$(mktemp)
+  sed "s/\"version\": \"${current_version}\"/\"version\": \"${new_version}\"/" "$plugin_json" > "$tmp" && mv "$tmp" "$plugin_json"
+
+  git add "$plugin_json"
+
+  echo "Auto-bumped ${plugin} version: ${current_version} -> ${new_version}"
+done
