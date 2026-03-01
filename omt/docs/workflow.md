@@ -71,7 +71,7 @@ This document defines the **Agent-First** development workflow. The core princip
 ┌─────────────────────────────────────────────────────────────────┐
 │  COMPLETION or ESCALATION                                       │
 ├─────────────────────────────────────────────────────────────────┤
-│  ✓ Complete: All items implemented, report at outputs/hive.md   │
+│  ✓ Complete: All items implemented, report at .agents/outputs/hive.md   │
 │  ⚠ Escalated: 3 failures, user intervention needed              │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -90,8 +90,8 @@ This document defines the **Agent-First** development workflow. The core princip
 | Agent | Output File | Content |
 |-------|-------------|---------|
 | Human | goal.md | Goal description (from /omt argument) |
-| @pm | outputs/pm.md | Requirements, user stories, acceptance criteria |
-| @arch | outputs/arch.md | API contracts, architecture, file plan |
+| @pm | .agents/outputs/pm.md | Requirements, user stories, acceptance criteria |
+| @arch | .agents/outputs/arch.md | API contracts, architecture, file plan |
 
 ## Consensus Gate
 
@@ -114,7 +114,7 @@ The human can:
 
 After consensus approval, @hive executes autonomously:
 
-1. **Extract Tasks**: Parse outputs/arch.md for implementation tasks
+1. **Extract Tasks**: Parse .agents/outputs/arch.md for implementation tasks
 2. **Execute Loop**: For each task:
    - Dispatch @dev for implementation (TDD)
    - Dispatch @reviewer for review + commit
@@ -160,7 +160,6 @@ Task fails
 | /omt \<goal\> | Launch autonomous lifecycle |
 | /init-agents | Initialize agent workspace |
 | /help | Help and command reference |
-| /approve | Review important changes |
 | /git-commit | Emergency manual commit |
 
 ## Contract-First Design
@@ -242,7 +241,8 @@ Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
 ├── outputs/
 │   ├── pm.md            # @pm requirements
 │   ├── arch.md          # @arch architecture
-│   ├── dev.md           # @dev execution report
+│   ├── dev/             # Per-stage @dev reports
+│   ├── reviews/         # Per-stage @reviewer reports
 │   └── hive.md          # @hive completion report
 └── .state/              # Infrastructure (gitignored)
     ├── config.json      # Workspace configuration
@@ -349,7 +349,7 @@ Check:
 
 Check:
 - Is the task scope too large? Split into smaller tasks
-- Are dependencies met? Check outputs/arch.md
+- Are dependencies met? Check .agents/outputs/arch.md
 - Is there an environment issue? Verify test setup
 
 ### Workspace Issues

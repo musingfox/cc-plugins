@@ -22,7 +22,8 @@ project-root/
 │   ├── outputs/                # Agent output files
 │   │   ├── pm.md               # @pm requirements
 │   │   ├── arch.md             # @arch architecture
-│   │   ├── dev.md              # @dev execution report
+│   │   ├── dev/                # Per-stage @dev reports
+│   │   ├── reviews/            # Per-stage @reviewer reports
 │   │   └── hive.md             # @hive completion report
 │   └── .state/                 # Infrastructure (gitignored)
 │       ├── config.json         # Workspace configuration
@@ -74,7 +75,7 @@ await stateManager.initTask('TASK-123', 'Implement auth API');
 const state = await stateManager.readState();
 
 // Record agent completion
-await stateManager.recordPlanningAgent('arch', 'outputs/arch.md', validationResult);
+await stateManager.recordPlanningAgent('arch', '.agents/outputs/arch.md', validationResult);
 
 // Get outputs directory
 const outputsDir = stateManager.getOutputsDir(); // → .agents/outputs
@@ -100,7 +101,7 @@ In the OMT workflow, @hive coordinates all agent handoffs:
 ```
 @hive dispatches @pm → writes .agents/outputs/pm.md
 @hive dispatches @arch → reads pm.md, writes .agents/outputs/arch.md
-@hive dispatches @dev → reads pm.md + arch.md, writes .agents/outputs/dev.md
+@hive dispatches @dev → reads pm.md + arch.md, writes .agents/outputs/dev/{stage-id}.md
 @hive dispatches @reviewer → reviews dev output, creates git commit
 ```
 
@@ -140,8 +141,8 @@ cat .agents/outputs/pm.md
 # View architecture
 cat .agents/outputs/arch.md
 
-# View development report
-cat .agents/outputs/dev.md
+# View development reports (per-stage)
+ls .agents/outputs/dev/
 
 # View hive completion report
 cat .agents/outputs/hive.md
@@ -214,6 +215,7 @@ If missing, re-run the upstream agent or the full `/omt` workflow.
 
 - `docs/workflow.md` - Complete workflow documentation
 - `docs/contract-validation.md` - Contract validation system
+- `docs/sdd-methodology.md` - SDD methodology
 - `contracts/` - Agent contract definitions
 
 ---

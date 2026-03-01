@@ -172,7 +172,7 @@ After defining API contracts (Phase 3), @arch drafts L2 pseudocode for complex f
 
 ### @dev Phase 2.5
 
-Before writing tests (Phase 3), @dev reads approved L2 pseudocode from outputs/arch.md and derives test cases.
+Before writing tests (Phase 3), @dev reads approved L2 pseudocode from `.agents/outputs/arch.md` and derives test cases.
 
 ### @dev Step 2.5 (Debugging)
 

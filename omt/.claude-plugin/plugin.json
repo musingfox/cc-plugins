@@ -1,7 +1,7 @@
 {
   "name": "omt",
   "description": "OMT - One Man Team: Your personal development squad powered by Agent-First workflow. Contract-First design with autonomous agents for planning, execution, and review.",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": {
     "name": "Nick Huang",
     "email": "nick12703990@gmail.com"
