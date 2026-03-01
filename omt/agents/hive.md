@@ -99,7 +99,8 @@ const hiveState = {
     tasks_completed: 0,
     current_task: 0,
     failure_count: 0,
-    max_failures: 3
+    max_failures: 3,
+    tasks: []
   }
 };
 await Write('.agents/.state/hive-state.json', JSON.stringify(hiveState, null, 2));
@@ -168,15 +169,25 @@ Requirements (from @pm):
 
 Project context: Read CLAUDE.md and scan the project structure.
 
-Your output MUST follow the standard arch output format:
-1. API Contracts (interfaces, types)
-2. Architecture Diagram (Mermaid)
-3. Technical Decisions with rationale
-4. Pseudocode for complex functions (auto-approved)
-5. File plan (files to create/modify)
-6. Decision points — list ANY architectural choices where trade-offs exist
-   (e.g., "Caching: Redis vs in-memory", "Pattern: Repository vs Active Record")
-   Mark each with: [DECISION NEEDED] tag
+Your output MUST follow the L1/L2 arch output format:
+
+Section 1: Contract Artifacts (L1)
+  - Write ACTUAL type/interface definition files to the project
+  - Write contract test stubs (RED state — compile but FAIL)
+  - Document package dependency graph
+  - Record all contract artifact file paths in arch.md Section 1
+
+Section 2: Architecture Diagram (Mermaid)
+Section 3: Technical Decisions with rationale
+  - Mark trade-offs with [DECISION NEEDED] tag
+
+Section 4: Stage Plan with Change Budgets
+  - Each stage: scope, files (max 5), change budget (max 300 impl lines), NOT in scope
+  - Use vertical slice strategy (each stage = end-to-end functional slice)
+
+Section 5: Pseudocode for complex functions (auto-approved in hive mode)
+
+Also include: File plan (files to create/modify)
 
 Write the complete architecture to .agents/outputs/arch.md
 ```
@@ -203,7 +214,38 @@ Read both `.agents/outputs/pm.md` and `.agents/outputs/arch.md`. Extract:
 4. **Risk areas** identified by either agent
 5. **Pseudocode summary** (functions with auto-approved pseudocode)
 
-### Step 4.2: Build Consensus Summary
+### Step 4.2: Verify Contract Artifacts (Interface Lock)
+
+Before presenting consensus, verify that @arch's contract artifacts are valid:
+
+```bash
+# 1. Extract contract artifact file list from arch.md Section 1
+# Parse "Section 1: Contract Artifacts" to get file paths
+
+# 2. Verify all listed files exist
+for file in $contract_files; do
+  test -f "$file" || echo "MISSING: $file"
+done
+
+# 3. Run contract tests — they should ALL FAIL (RED state)
+# This confirms tests are meaningful (not vacuous passes)
+# Use project's test runner (detect from package.json, pyproject.toml, etc.)
+npm test -- --testPathPattern='contracts/' 2>&1 || true
+# Expected: all tests FAIL (exit code non-zero)
+
+# 4. Run type checker — verify type definitions compile
+# TypeScript: npx tsc --noEmit
+# Python: mypy src/types/
+# Go: go build ./...
+```
+
+**Verification Results** to include in Consensus Summary:
+- Contract files found: X/Y
+- Contract tests: X tests, all RED (PASS = meaningful contracts)
+- Type definitions: compile OK / compile FAIL
+- If any verification fails: report to user in consensus, do NOT proceed silently
+
+### Step 4.3: Build Consensus Summary
 
 Create a structured summary for the user. This summary should be concise but complete — the user must be able to make all decisions from this single presentation.
 
@@ -226,6 +268,28 @@ Format:
 - API contracts: {count} interfaces defined
 - Files: {X} new + {Y} modified = {Z} total
 - Complexity estimate: {fibonacci}
+
+## Contract Artifacts (Interface Lock)
+
+These files were created by @arch and will be FROZEN after approval:
+
+| File | Type | Status |
+|------|------|--------|
+| `src/types/auth.types.ts` | Type Definition | Compiles ✓ |
+| `tests/contracts/auth.contract.test.ts` | Test Stub (5 tests) | RED ✓ |
+| ... | ... | ... |
+
+**Verification**: {X} contract files found, {Y} tests all RED, types compile OK
+
+⚠️ **Approving = these contract files are FROZEN. @dev implements to make tests GREEN but CANNOT modify contract files.**
+
+## Stage Plan
+
+| Stage | Scope | Files | Budget |
+|-------|-------|-------|--------|
+| 1 | {scope} | {count} | {N} lines |
+| 2 | {scope} | {count} | {N} lines |
+| ... | ... | ... | ... |
 
 ## Decision Points
 
@@ -250,7 +314,7 @@ The following functions have auto-approved pseudocode (review now if needed):
 - Architecture: .agents/outputs/arch.md
 ```
 
-### Step 4.3: Ask for Consensus
+### Step 4.4: Ask for Consensus
 
 Use AskUserQuestion with three options:
 
@@ -278,7 +342,7 @@ await AskUserQuestion({
 });
 ```
 
-### Step 4.4: Handle Consensus Response
+### Step 4.5: Handle Consensus Response
 
 **Approve**: Update .state/hive-state.json `consensus.status: 'approved'` and proceed to Phase 5.
 
@@ -290,75 +354,121 @@ await AskUserQuestion({
 
 **Abort**: Update .state/hive-state.json `phase: 'aborted'`, `consensus.status: 'aborted'`. Write abort reason to `.agents/outputs/hive.md`. Stop.
 
-## Phase 5: Execution Loop
+## Phase 5: Per-Stage Execution Loop
 
 Update .state/hive-state.json: `phase: 'execution'`.
 
-### Step 5.1: Extract Implementation Tasks
+### Step 5.1: Extract Stages from Arch
 
-Parse `.agents/outputs/arch.md` to extract the list of implementation tasks from the file plan section. Each file (or logical group of related files) becomes a task.
+Parse `.agents/outputs/arch.md` Section 4 (Stage Plan) to extract the ordered list of stages. Each stage has: id, scope, files, change budget, contract tests, and exclusions.
 
-### Step 5.2: Execute Task Loop
+Also extract the contract artifact file list from Section 1 — these are FROZEN and must be passed to both @dev and @reviewer.
 
-For each task, dispatch @dev then @reviewer:
+### Step 5.2: Prepare Output Directories
+
+```bash
+mkdir -p .agents/outputs/dev
+mkdir -p .agents/outputs/reviews
+```
+
+### Step 5.3: Execute Per-Stage Loop
+
+For each stage, dispatch @dev then @reviewer sequentially:
 
 ```typescript
 let failureCount = 0;
 const maxFailures = 3;
-let completedTasks = [];
+let completedStages = [];
 
-for (const task of tasks) {
-  // Update .state/hive-state.json with current task
+// Extract contract artifact files from arch.md Section 1
+const contractFiles = extractContractFiles(archMd);
+
+for (const stage of stages) {
+  const stageId = `stage-${stage.number}`;
+
+  // Update hive-state.json
   updateHiveState({
-    'execution.current_task': task.id,
-    'execution.tasks_total': tasks.length
+    'execution.current_task': stage.number,
+    'execution.tasks_total': stages.length
   });
 
   try {
-    // Dispatch @dev
+    // Dispatch @dev with stage context
     const devResult = await Task({
       subagent_type: 'omt:dev',
-      description: `Implement: ${task.description}`,
+      description: `Implement: ${stage.scope}`,
       prompt: `
-        You are @dev agent dispatched by @hive.
+        HIVE MODE — Per-Stage Dispatch
 
-        Task: ${task.description}
-        Files: ${task.files.join(', ')}
+        You are @dev agent dispatched by @hive for stage execution.
+
+        Stage ID: ${stageId}
+        Stage Scope: ${stage.scope}
+        Files: ${stage.files.join(', ')}
+        Change Budget: ${stage.budget} implementation lines (max)
+        Contract Tests to make GREEN: ${stage.contractTests}
+        NOT in Scope: ${stage.notInScope}
+
+        Contract Artifact Files (FROZEN — DO NOT MODIFY):
+        ${contractFiles.join('\n')}
 
         Requirements: Read .agents/outputs/pm.md
         Architecture: Read .agents/outputs/arch.md
 
-        Follow TDD methodology. Write output summary to .agents/outputs/dev.md
+        Output path: Write your stage report to .agents/outputs/dev/${stageId}.md
+        Follow TDD methodology. @arch's contract test stubs are your RED starting point.
       `
     });
 
-    // Dispatch @reviewer
+    // Dispatch @reviewer with stage context
     const reviewResult = await Task({
       subagent_type: 'omt:reviewer',
-      description: `Review: ${task.description}`,
+      description: `Review: ${stage.scope}`,
       prompt: `
-        You are @reviewer agent dispatched by @hive.
+        HIVE MODE — Per-Stage Review
 
-        Review the implementation of: ${task.description}
+        You are @reviewer agent dispatched by @hive for stage review.
+
+        Stage ID: ${stageId}
+        Stage Scope: ${stage.scope}
+        Change Budget: ${stage.budget} implementation lines
+        Contract Artifact Files (must be UNCHANGED):
+        ${contractFiles.join('\n')}
 
         Verify against:
         - Requirements in .agents/outputs/pm.md
         - Architecture in .agents/outputs/arch.md
+        - Contract integrity (git diff on contract files must be empty)
+        - Change budget compliance
         - Test coverage >= 80%
 
-        If review passes, create a git commit.
+        Dev Report: Read .agents/outputs/dev/${stageId}.md for contract concerns and budget actuals.
+        Output path: Write review report to .agents/outputs/reviews/${stageId}.md
+        If review passes, create a git commit with Stage: ${stageId} trailer.
         Do NOT hand off to @pm — report back to @hive directly.
       `
     });
 
-    completedTasks.push(task);
-    failureCount = 0; // Reset on success
+    completedStages.push(stage);
+    failureCount = 0;
 
-    // Update .state/hive-state.json
+    // Record stage completion in hive-state.json execution.tasks[]
+    const taskRecord = {
+      id: stageId,
+      description: stage.scope,
+      status: 'completed',
+      dev_report: `.agents/outputs/dev/${stageId}.md`,
+      review_report: `.agents/outputs/reviews/${stageId}.md`,
+      started_at: stage.startedAt,
+      completed_at: new Date().toISOString()
+    };
+
     updateHiveState({
-      'execution.tasks_completed': completedTasks.length,
+      'execution.tasks_completed': completedStages.length,
       'execution.failure_count': 0
     });
+    // Append taskRecord to execution.tasks[]
+    appendToHiveStateArray('execution.tasks', taskRecord);
 
   } catch (error) {
     failureCount++;
@@ -368,12 +478,12 @@ for (const task of tasks) {
     });
 
     if (failureCount >= maxFailures) {
-      await escalateToUser(task, error, completedTasks, tasks);
+      await escalateToUser(stage, error, completedStages, stages);
       return;
     }
 
-    // Retry: re-add task to front
-    tasks.unshift(task);
+    // Retry: re-add stage to front
+    stages.unshift(stage);
   }
 }
 ```
@@ -400,7 +510,7 @@ ${completed.map(t => `- ${t.description}`).join('\n')}
 ${total.filter(t => !completed.includes(t)).map(t => `- ${t.description}`).join('\n')}
 
 **Recommended Actions**:
-1. Review the error details in .agents/outputs/dev.md
+1. Review the error details in .agents/outputs/dev/ (per-stage reports)
 2. Fix the blocking issue manually
 3. Re-run /omt to resume (or adjust the goal)
   `;
@@ -445,17 +555,18 @@ All {N} tasks implemented and committed.
 
 ## Execution Phase
 
-| # | Task | Status |
-|---|------|--------|
-| 1 | {description} | Committed |
-| 2 | {description} | Committed |
+| Stage | Scope | Budget | Actual | Status | Commit |
+|-------|-------|--------|--------|--------|--------|
+| stage-1 | {scope} | {budget} | {actual} | Committed | {sha} |
+| stage-2 | {scope} | {budget} | {actual} | Committed | {sha} |
 ...
 
 ## Artifacts
 - Goal: .agents/goal.md
 - Requirements: .agents/outputs/pm.md
 - Architecture: .agents/outputs/arch.md
-- Dev Report: .agents/outputs/dev.md
+- Dev Reports: .agents/outputs/dev/stage-*.md
+- Review Reports: .agents/outputs/reviews/stage-*.md
 - This Report: .agents/outputs/hive.md
 
 ## Next Steps
@@ -503,12 +614,14 @@ If @pm or @arch fails to produce output:
 
 - ✓ Goal captured and workspace initialized
 - ✓ @pm produced requirements autonomously
-- ✓ @arch produced architecture autonomously
+- ✓ @arch produced architecture with contract artifacts autonomously
+- ✓ Contract artifacts verified (tests RED, types compile)
 - ✓ Decision points extracted and presented to user
-- ✓ User approved consensus (single interaction)
-- ✓ All tasks executed via @dev → @reviewer loop
+- ✓ User approved consensus with Interface Lock (single interaction)
+- ✓ All stages executed via per-stage @dev → @reviewer loop
+- ✓ Per-stage dev reports and review reports generated
 - ✓ Completion report generated
-- ✓ .state/hive-state.json tracks all phases accurately
+- ✓ .state/hive-state.json tracks all phases and stages accurately
 
 ## References
 

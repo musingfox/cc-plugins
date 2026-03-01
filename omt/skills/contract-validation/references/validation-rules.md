@@ -61,6 +61,7 @@ Each contract JSON in `contracts/` follows this schema:
 
 | Contract File | Agent | Input Sources | Output Destinations |
 |--------------|-------|---------------|---------------------|
-| `contracts/pm.json` | @pm | User goal | `outputs/pm.md` |
-| `contracts/arch.json` | @arch | PM requirements | `outputs/arch.md` |
-| `contracts/dev.json` | @dev | PM + Arch outputs | `tests/`, `src/`, `outputs/dev.md` |
+| `contracts/pm.json` | @pm | User goal | `.agents/outputs/pm.md` |
+| `contracts/arch.json` | @arch | PM requirements | `.agents/outputs/arch.md` |
+| `contracts/dev.json` | @dev | PM + Arch outputs | `tests/`, `src/`, `.agents/outputs/dev/{stage-id}.md` (per-stage) or `.agents/outputs/dev.md` (standalone) |
+| `contracts/hive.json` | @hive | User goal + workspace | `.agents/outputs/hive.md`, `.agents/.state/hive-state.json` |

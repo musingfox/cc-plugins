@@ -7,6 +7,9 @@
     "steps": [
       "Analyze requirements and project structure",
       "Define API interfaces and types",
+      "Create contract artifact files (type defs + test stubs)",
+      "Generate pseudocode for complex functions",
+      "Generate stage plan with change budgets",
       "Create architecture diagram",
       "Document technical decisions",
       "List files to create/modify"
@@ -35,11 +38,11 @@
     ],
     "source": [
       {
-        "location": "outputs/pm.md",
+        "location": ".agents/outputs/pm.md",
         "description": "Requirements from PM (if available)"
       },
       {
-        "location": "state.json:task.description",
+        "location": ".agents/.state/state.json:task.description",
         "description": "Direct task description"
       },
       {
@@ -89,16 +92,40 @@
           "test_cases_derived": ["string"]
         },
         "validation": ["optional_if_no_complex_functions"]
+      },
+      {
+        "field_name": "contract_artifact_files",
+        "description": "Type/interface definition file paths created by @arch",
+        "type": "array"
+      },
+      {
+        "field_name": "contract_test_stubs",
+        "description": "Contract test stub file paths (RED state)",
+        "type": "array"
+      },
+      {
+        "field_name": "stage_plan",
+        "description": "Per-stage implementation plan with change budgets",
+        "type": "array",
+        "items": {
+          "stage_id": "string",
+          "scope": "string",
+          "files": ["string"],
+          "change_budget": "number",
+          "contract_tests": ["string"],
+          "not_in_scope": "string"
+        }
       }
     ],
     "destination": [
-      "outputs/arch.md",
-      "state.json:planning.architecture"
+      ".agents/outputs/arch.md",
+      ".agents/.state/state.json:planning.architecture"
     ]
   },
   "validation": [
     "all APIs must have interface definitions",
-    "files_to_create + files_to_modify <= 15 (otherwise split task)"
+    "files_to_create + files_to_modify <= 15 (otherwise split task)",
+    "each stage max 5 files, max 300 implementation lines"
   ],
   "complexity_range": [5, 13]
 }

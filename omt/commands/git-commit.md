@@ -80,7 +80,7 @@ git add [files]
 git commit -m "$(cat <<'EOF'
 <type>[optional scope]: <description>
 
-🤖 Generated with [Claude Code](https://claude.ai/code)
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
 Co-Authored-By: Claude <noreply@anthropic.com>
 EOF
@@ -147,7 +147,7 @@ Creating commit...
 git commit -m "$(cat <<'EOF'
 feat(auth): implement JWT token service with validation
 
-🤖 Generated with [Claude Code](https://claude.ai/code)
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
 Co-Authored-By: Claude <noreply@anthropic.com>
 EOF

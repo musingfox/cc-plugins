@@ -65,14 +65,26 @@ Options:
 
 **Resume**: Dispatch @hive with the ORIGINAL goal from `hive-state.json` (not `$GOAL`). @hive's Phase 0 resume detection will determine the correct re-entry point.
 
-**Start Fresh**: Write `{ "phase": null }` to `.agents/.state/hive-state.json` to reset, then proceed to Step 3 with `$GOAL`.
+**Start Fresh**: Write a clean initial state to `.agents/.state/hive-state.json` to reset:
+```json
+{
+  "phase": null,
+  "goal": null,
+  "started_at": null,
+  "updated_at": null,
+  "agents": { "pm": { "status": "pending", "output": null }, "arch": { "status": "pending", "output": null } },
+  "consensus": { "status": "pending", "decision_points": [], "user_decisions": null },
+  "execution": { "tasks_total": 0, "tasks_completed": 0, "current_task": 0, "failure_count": 0, "max_failures": 3, "tasks": [] }
+}
+```
+Then proceed to Step 3 with `$GOAL`.
 
 **Cancel**: Stop execution.
 
 ### Step 3: Ensure outputs directory exists
 
 ```bash
-mkdir -p .agents/outputs
+mkdir -p .agents/outputs .agents/outputs/dev .agents/outputs/reviews
 ```
 
 ### Step 4: Dispatch @hive

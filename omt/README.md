@@ -67,7 +67,6 @@ Completion report → .agents/outputs/hive.md
 | /omt \<goal\> | Launch autonomous lifecycle — the primary entry point |
 | /init-agents | Initialize agent workspace (once per project) |
 | /help | Help and command reference |
-| /approve | Review important changes |
 | /git-commit | Emergency manual commit |
 
 ### Contract-First Design
@@ -187,7 +186,8 @@ This will:
 ├── outputs/
 │   ├── pm.md            # @pm requirements
 │   ├── arch.md          # @arch architecture
-│   ├── dev.md           # @dev execution report
+│   ├── dev/             # Per-stage @dev reports
+│   ├── reviews/        # Per-stage @reviewer reports
 │   └── hive.md          # @hive completion report
 └── .state/              # Infrastructure (gitignored)
     ├── config.json      # Workspace configuration
@@ -220,6 +220,5 @@ For issues and feedback:
 
 ---
 
-**Version**: 3.0.0
-**Last Updated**: 2026-02-15
+**Last Updated**: 2026-03-01
 **Status**: Production Ready

@@ -122,7 +122,8 @@ Location: `.agents/`
 ├── outputs/            # Agent output files
 │   ├── pm.md           # @pm requirements
 │   ├── arch.md         # @arch architecture
-│   ├── dev.md          # @dev execution report
+│   ├── dev/            # Per-stage @dev reports
+│   ├── reviews/        # Per-stage @reviewer reports
 │   └── hive.md         # @hive completion report
 └── .state/             # Infrastructure (gitignored)
     ├── config.json     # Workspace configuration

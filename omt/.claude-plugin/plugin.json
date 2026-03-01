@@ -14,8 +14,7 @@
     "tdd",
     "code-review",
     "task-management",
-    "linear",
-    "retrospective"
+    "linear"
   ],
   "homepage": "https://github.com/musingfox/cc-plugins/tree/main/omt",
   "license": "MIT",

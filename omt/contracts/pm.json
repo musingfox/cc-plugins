@@ -29,12 +29,8 @@
     ],
     "source": [
       {
-        "location": "state.json:task.title",
+        "location": ".agents/.state/state.json:task.title",
         "description": "Task title from state"
-      },
-      {
-        "location": "docs/PRD/*.md",
-        "description": "Existing PRD documents (if any)"
       }
     ]
   },
@@ -67,8 +63,8 @@
       }
     ],
     "destination": [
-      "outputs/pm.md",
-      "state.json:planning.requirements"
+      ".agents/outputs/pm.md",
+      ".agents/.state/state.json:planning.requirements"
     ]
   },
   "validation": [

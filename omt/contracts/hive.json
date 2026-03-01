@@ -113,7 +113,16 @@
       "tasks_completed": "number",
       "current_task": "number",
       "failure_count": "number",
-      "max_failures": 3
+      "max_failures": 3,
+      "tasks": [{
+        "id": "string",
+        "description": "string",
+        "status": "string",
+        "dev_report": "string",
+        "review_report": "string",
+        "started_at": "string",
+        "completed_at": "string"
+      }]
     }
   },
   "validation": [

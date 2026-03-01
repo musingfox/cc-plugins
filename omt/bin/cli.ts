@@ -114,11 +114,34 @@ async function cmdInit() {
     );
   }
 
-  // .agents/.state/hive-state.json (empty initial state)
+  // .agents/.state/hive-state.json (full initial state matching HiveState schema)
   if (!fs.existsSync(path.join(agentsDir, '.state', 'hive-state.json'))) {
+    const initialHiveState: HiveState = {
+      phase: null,
+      goal: undefined,
+      started_at: undefined,
+      updated_at: undefined,
+      agents: {
+        pm: { status: 'pending', output: null },
+        arch: { status: 'pending', output: null },
+      },
+      consensus: {
+        status: 'pending',
+        decision_points: [],
+        user_decisions: null,
+      },
+      execution: {
+        tasks_total: 0,
+        tasks_completed: 0,
+        current_task: 0,
+        failure_count: 0,
+        max_failures: 3,
+        tasks: [],
+      },
+    };
     fs.writeFileSync(
       path.join(agentsDir, '.state', 'hive-state.json'),
-      JSON.stringify({ phase: null }, null, 2) + '\n',
+      JSON.stringify(initialHiveState, null, 2) + '\n',
     );
   }
 
@@ -300,10 +323,14 @@ async function cmdStateCheck() {
     }
   }
 
-  // Check dev output
+  // Check dev output (supports both per-stage dev/ directory and standalone dev.md)
   const devOutput = path.join(outputsDir, 'dev.md');
-  if (hiveState.execution && hiveState.execution.tasks_completed > 0 && !fs.existsSync(devOutput)) {
-    issues.push(`Execution claims ${hiveState.execution.tasks_completed} tasks completed but dev.md not found`);
+  const devDir = path.join(outputsDir, 'dev');
+  if (hiveState.execution && hiveState.execution.tasks_completed > 0) {
+    const hasDevOutput = fs.existsSync(devOutput) || fs.existsSync(devDir);
+    if (!hasDevOutput) {
+      issues.push(`Execution claims ${hiveState.execution.tasks_completed} tasks completed but neither dev.md nor dev/ directory found`);
+    }
   }
 
   // Check staleness: updated_at > 24h with non-terminal phase

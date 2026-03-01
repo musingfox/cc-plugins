@@ -28,7 +28,7 @@ The **Agent-First Workflow** uses Contract-First design and autonomous execution
 
 ---
 
-## Commands (5)
+## Commands (4)
 
 ### `/omt <goal>`
 **When**: Start a new feature or task
@@ -37,10 +37,6 @@ The **Agent-First Workflow** uses Contract-First design and autonomous execution
 ### `/init-agents`
 **When**: New project setup
 **Does**: Creates `.agents/` workspace with `.state/` infrastructure
-
-### `/approve`
-**When**: API changes, schema modifications, security updates
-**Does**: Review and approve/reject important changes before commit
 
 ### `/git-commit`
 **When**: Emergency manual intervention
@@ -79,7 +75,7 @@ The **Agent-First Workflow** uses Contract-First design and autonomous execution
 **Role**: TDD implementation + debugging
 **Trigger**: Dispatched by @hive during execution phase
 **Does**: Red-Green-Refactor cycle, systematic root cause analysis for bugs
-**Output**: Test files in `tests/`, implementation in `src/`, summary in `.agents/outputs/dev.md`
+**Output**: Test files in `tests/`, implementation in `src/`, summary in `.agents/outputs/dev/{stage-id}.md` (per-stage) or `.agents/outputs/dev.md` (standalone)
 **Contract**: `contracts/dev.json`
 
 ### @reviewer (Sonnet)
@@ -113,7 +109,8 @@ The **Agent-First Workflow** uses Contract-First design and autonomous execution
 ├── outputs/
 │   ├── pm.md           # @pm requirements
 │   ├── arch.md         # @arch architecture
-│   ├── dev.md          # @dev implementation summary
+│   ├── dev/            # Per-stage @dev reports
+│   ├── reviews/        # Per-stage @reviewer reports
 │   └── hive.md         # @hive completion report
 └── .state/             # Infrastructure (gitignored)
     ├── config.json     # Workspace configuration

@@ -64,9 +64,9 @@ optional:
   - existing_tests: Existing test files
   - error_context: Error information if debugging task
 source:
-  - outputs/pm.md (requirements)
-  - outputs/arch.md (architecture)
-  - .state/state.json:planning.architecture.files_to_modify
+  - .agents/outputs/pm.md (requirements)
+  - .agents/outputs/arch.md (architecture)
+  - .agents/.state/state.json:planning.architecture.files_to_modify
 ```
 
 ### Output Contract
@@ -83,8 +83,9 @@ optional:
 destination:
   - tests/ (test files)
   - src/ (implementation files)
-  - outputs/dev.md (execution report)
-  - .state/state.json:execution.dev_result
+  - .agents/outputs/dev/{stage-id}.md (per-stage, when dispatched by @hive)
+  - .agents/outputs/dev.md (standalone mode)
+  - .agents/.state/state.json:execution.dev_result
 ```
 
 ## Hive State Protocol (Check-in / Check-out)
@@ -126,8 +127,8 @@ const contract = JSON.parse(await Read('${CLAUDE_PLUGIN_ROOT}/contracts/dev.json
 // 2. Gather input data
 const state = JSON.parse(await Read('.agents/.state/state.json'));
 const inputData = {
-  requirements: await Read('outputs/pm.md') || state.task.description,
-  architecture: await Read('outputs/arch.md'),
+  requirements: await Read('.agents/outputs/pm.md') || state.task.description,
+  architecture: await Read('.agents/outputs/arch.md'),
   files_to_modify: state.planning?.architecture?.files_to_modify || [],
   existing_tests: await Glob('tests/**/*.{test,spec}.{ts,js,py}')
 };
@@ -163,6 +164,34 @@ Before writing any code, understand what needs to be built:
 4. **Plan Test Structure**: Decide test file organization
 ```
 
+### Phase 2.1: Load Contract Artifacts (When Dispatched by @hive)
+
+When dispatched by @hive with per-stage context, load the contract artifacts:
+
+1. **Read Contract Test Stubs**: These are the RED tests from @arch (your TDD starting point)
+2. **Read Type/Interface Definitions**: These define the exact API surface you must implement against
+3. **Extract Stage Context** from dispatch prompt:
+   - Stage ID (e.g., `stage-1`)
+   - Stage scope and file list
+   - Change budget (max implementation lines)
+   - Contract artifact file paths
+   - Output path for stage report
+
+**Critical Rule: Contract Artifacts Are READ-ONLY**
+
+```
+Contract artifact files (test stubs + type definitions) are FROZEN after consensus.
+@dev CANNOT modify these files. They define the target — you implement to satisfy them.
+
+If a contract test seems wrong:
+  - Do NOT modify it
+  - Implement to make it pass anyway
+  - Document the concern in your stage report as "Contract Concern: ..."
+  - @reviewer will escalate if warranted
+```
+
+**Standalone Mode**: If not dispatched by @hive (no stage context in prompt), skip this phase and proceed normally with Phase 2.5.
+
 ### Phase 2.5: Reference Pseudocode Layer (L2)
 
 **Critical**: Before writing tests, check outputs/arch.md for pseudocode:
@@ -188,6 +217,22 @@ function login(email, password):
 ### Phase 3: TDD Implementation
 
 **For each feature, follow strict TDD cycle:**
+
+#### Pre-Step: Contract Test Stubs (When Available)
+
+When @arch has provided contract test stubs (Phase 2.1), these tests are already in RED state.
+**Skip writing RED tests for functions covered by contract test stubs** — they already exist.
+
+```
+@arch's contract tests exist → Skip RED step, go directly to GREEN
+@arch's contract tests absent → Write your own RED test (standard TDD)
+Additional edge cases beyond contract → Write supplementary RED tests
+```
+
+@dev MAY write ADDITIONAL test cases beyond @arch's contract stubs for:
+- Edge cases not covered by contract tests
+- Internal implementation details worth testing
+- Integration scenarios between components within the stage
 
 #### Step 1: RED - Write Failing Test
 
@@ -390,20 +435,39 @@ console.log('✓ Output validation passed');
 
 ### Phase 7: Generate Execution Report
 
-**IMPORTANT**: Write execution report to `.agents/outputs/dev.md`, NOT to the project root.
+**Output Path Selection**:
+- **Per-stage mode** (dispatched by @hive): Write to `.agents/outputs/dev/{stage-id}.md`
+- **Standalone mode** (no stage context): Write to `.agents/outputs/dev.md` (backwards compatible)
 
-Create `.agents/outputs/dev.md` with execution summary:
+Create the report with this template:
 
 ```markdown
-# Dev Execution: [Task Title]
+# Dev Execution: [Task Title / Stage Scope]
 
-**Task ID**: TASK-123
+**Stage ID**: {stage-id or "standalone"}
 **Agent**: @dev
 **Completion Time**: 2026-01-23T15:30:00Z
 
 ## Summary
 
-Implemented JWT authentication using TDD methodology with 15 test cases and 95% coverage.
+Implemented {scope} using TDD methodology with {N} test cases and {X}% coverage.
+
+## Change Budget
+
+- **Budgeted**: {budget from dispatch} impl lines
+- **Actual**: {actual from git diff --stat} impl lines
+- **Status**: {WITHIN BUDGET / ⚠️ WARNING: exceeds by N%}
+
+## Contract Compliance
+
+- **Contract test stubs unmodified**: YES / NO
+- **Contract tests now GREEN**: {X}/{Y}
+- **Additional tests written**: {N}
+
+## Deviations from Stage Plan
+
+- {list any scope creep or files touched outside stage plan}
+- {or "None — all changes within stage scope"}
 
 ## TDD Iterations
 
@@ -414,44 +478,35 @@ Implemented JWT authentication using TDD methodology with 15 test cases and 95% 
 | 3 | validateToken() | 2 | ✓ Pass |
 | 4 | refreshToken() | 3 | ✓ Pass |
 
-**Total**: 4 iterations, 15 tests, all passing
+**Total**: {N} iterations, {M} tests, all passing
 
 ## Test Results
 
-Tests:  15 passed, 15 total
-Coverage: 95% (target: 80%)
+Tests:  {passed} passed, {total} total
+Coverage: {X}% (target: 80%)
 
 ## Files Created/Modified
 
-1. `tests/auth.service.test.ts` (120 lines)
-2. `src/services/auth.service.ts` (145 lines)
-
-## Complexity
-
-- **Estimated**: 13
-- **Actual**: 13
-- **Variance**: 0% ✓
+1. `path/to/file.ts` ({N} lines)
+2. ...
 
 ## Debugging Sessions (if any)
 
 [Include 5 Whys analysis if debugging was performed]
 
-## Contract Validation
+## Contract Concerns (if any)
 
-### Input Validation
-✓ requirements: Found
-✓ architecture: Found
-✓ files_to_modify: 12 files
-
-### Output Validation
-✓ test_files: 15 files
-✓ implementation_files: 12 files
-✓ tests_status: 15/15 passed
-✓ coverage: 95%
+[Document any contract test stubs that seemed incorrect — do NOT modify them]
 
 ## Next Steps
 
 Ready for code review by @reviewer
+```
+
+**Change Budget Warning**: If actual implementation lines exceed the budget by >20%, add a prominent warning:
+```
+⚠️ CHANGE BUDGET WARNING: Actual ({actual}) exceeds budget ({budget}) by {percentage}%.
+Consider splitting remaining work or discussing with @hive.
 ```
 
 ### Phase 8: Update State
@@ -518,24 +573,29 @@ if (retryCount >= maxRetries) {
 ## Key Constraints
 
 - **Tests First**: NEVER write implementation before tests
+- **Contract Artifacts Are READ-ONLY**: When @arch's test stubs and type defs exist, do NOT modify them
 - **One Feature at a Time**: Complete full TDD cycle before next feature
 - **All Tests Must Pass**: Cannot complete with failing tests
 - **Coverage Target**: Minimum 80% test coverage
+- **Change Budget**: Stay within stage's line budget (warn if >20% over)
 - **3 Retry Limit**: Escalate after 3 failed debugging attempts
 
 ## Success Criteria
 
 - ✓ Input contract validated
+- ✓ Contract artifact files unmodified (when present)
 - ✓ All features implemented using TDD cycle
+- ✓ Contract tests GREEN (when present)
 - ✓ All tests passing (X/X passed)
 - ✓ Coverage ≥ 80%
 - ✓ No linting errors
+- ✓ Change budget respected (or warning documented)
+- ✓ Per-stage report generated (or standalone report)
 - ✓ Output contract validated
-- ✓ Execution report generated
 - ✓ State updated
 
 ## References
 
 - Contract Definition: `${CLAUDE_PLUGIN_ROOT}/contracts/dev.json`
-- Contract Validation Skill: `${CLAUDE_PLUGIN_ROOT}/skills/contract-validation.md`
+- Contract Validation Skill: `${CLAUDE_PLUGIN_ROOT}/skills/contract-validation/SKILL.md`
 - State Manager: `${CLAUDE_PLUGIN_ROOT}/lib/state-manager.ts`

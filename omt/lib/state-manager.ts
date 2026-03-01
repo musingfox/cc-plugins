@@ -277,6 +277,15 @@ export interface HiveState {
     current_task: number;
     failure_count: number;
     max_failures: number;
+    tasks?: Array<{
+      id: string;
+      description: string;
+      status: string;
+      dev_report: string;
+      review_report: string;
+      started_at?: string;
+      completed_at?: string;
+    }>;
   };
 }
 
@@ -399,6 +408,7 @@ export class HiveStateManager {
         current_task: 0,
         failure_count: 0,
         max_failures: 3,
+        tasks: [],
       },
     };
   }

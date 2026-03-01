@@ -15,7 +15,7 @@ When Agent B depends on Agent A's output:
 6. Execute Agent B
 ```
 
-This is the standard OMT pipeline: @pm → @arch → @dev → @reviewer.
+This is the standard OMT pipeline: @hive → @pm → @arch → (Consensus) → @dev → @reviewer (per stage).
 
 ### Pattern 2: Error Recovery
 
