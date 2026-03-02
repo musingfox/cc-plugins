@@ -1,0 +1,28 @@
+{
+  "name": "jj",
+  "description": "Jujutsu (jj) VCS helper: workflow commands, natural language operations, and Git-to-jj translation",
+  "version": "1.0.0",
+  "author": {
+    "name": "Nick Huang",
+    "email": "nick12703990@gmail.com"
+  },
+  "keywords": [
+    "jujutsu",
+    "jj",
+    "vcs",
+    "version-control",
+    "git",
+    "workflow",
+    "colocated"
+  ],
+  "homepage": "https://github.com/musingfox/cc-plugins/tree/main/jj",
+  "license": "MIT",
+  "commands": [
+    "./commands/jj-status.md",
+    "./commands/jj-sync.md",
+    "./commands/jj-submit.md",
+    "./commands/jj-clean.md",
+    "./commands/jj-undo.md"
+  ],
+  "skills": "./skills/"
+}

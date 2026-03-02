@@ -29,6 +29,11 @@
       "name": "plan-viz",
       "source": "./plan-viz",
       "description": "Plan Visualizer: Transform plan files into beautiful HTML with Mermaid diagram support and UTF-8 handling"
+    },
+    {
+      "name": "jj",
+      "source": "./jj",
+      "description": "Jujutsu (jj) VCS helper: workflow commands, natural language operations, and Git-to-jj translation"
     }
   ]
 }
