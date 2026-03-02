@@ -66,7 +66,7 @@ optional:
 source:
   - .agents/outputs/pm.md (requirements)
   - .agents/outputs/arch.md (architecture)
-  - .agents/.state/state.json:planning.architecture.files_to_modify
+  - .agents/.state/workflow-state.json:planning.architecture.files_to_modify
 ```
 
 ### Output Contract
@@ -85,32 +85,32 @@ destination:
   - src/ (implementation files)
   - .agents/outputs/dev/{stage-id}.md (per-stage, when dispatched by @hive)
   - .agents/outputs/dev.md (standalone mode)
-  - .agents/.state/state.json:execution.dev_result
+  - .agents/.state/workflow-state.json:execution.dev_result
 ```
 
 ## Hive State Protocol (Check-in / Check-out)
 
-When operating within the OMT lifecycle (dispatched by @hive or `/omt`), update hive-state.json to keep execution tracking current. This is **best-effort** — if the file doesn't exist (standalone usage), skip silently and proceed with core work.
+When operating within the OMT lifecycle (dispatched by @hive or `/omt`), update workflow-state.json to keep execution tracking current. This is **best-effort** — if the file doesn't exist (standalone usage), skip silently and proceed with core work.
 
 ### Check-in (first action before Phase 1)
 
 ```
-Read .agents/.state/hive-state.json
+Read .agents/.state/workflow-state.json
 If file exists AND execution block exists:
   Note current tasks_completed count for later
   Set updated_at = current ISO timestamp
-  Write back to .agents/.state/hive-state.json
+  Write back to .agents/.state/workflow-state.json
 If file does not exist → skip (non-fatal)
 ```
 
 ### Check-out (after Phase 8 state update)
 
 ```
-Read .agents/.state/hive-state.json
+Read .agents/.state/workflow-state.json
 If file exists AND execution block exists:
   Increment execution.tasks_completed by 1
   Set updated_at = current ISO timestamp
-  Write back to .agents/.state/hive-state.json
+  Write back to .agents/.state/workflow-state.json
 If file does not exist → skip (non-fatal)
 ```
 
@@ -125,7 +125,7 @@ Validate all required inputs before starting:
 const contract = JSON.parse(await Read('${CLAUDE_PLUGIN_ROOT}/contracts/dev.json'));
 
 // 2. Gather input data
-const state = JSON.parse(await Read('.agents/.state/state.json'));
+const state = JSON.parse(await Read('.agents/.state/workflow-state.json'));
 const inputData = {
   requirements: await Read('.agents/outputs/pm.md') || state.task.description,
   architecture: await Read('.agents/outputs/arch.md'),
@@ -518,9 +518,9 @@ Consider splitting remaining work or discussing with @hive.
 ### Phase 8: Update State
 
 ```typescript
-import { StateManager } from '${CLAUDE_PLUGIN_ROOT}/lib/state-manager.js';
+import { WorkflowStateManager } from '${CLAUDE_PLUGIN_ROOT}/lib/state-manager.js';
 
-const stateManager = new StateManager(process.cwd());
+const stateManager = new WorkflowStateManager(process.cwd());
 
 // Record execution completion
 await stateManager.recordExecutionAgent('dev', outputValidation);

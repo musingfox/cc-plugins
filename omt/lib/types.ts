@@ -70,3 +70,71 @@ export interface AgentExecutionContext {
   input_data: Record<string, unknown>;
   output_data?: Record<string, unknown>;
 }
+
+/**
+ * Workflow State Types
+ *
+ * Unified state schema replacing the split StateManager/HiveStateManager.
+ */
+
+export type WorkflowPhase =
+  | 'init'
+  | 'pm'
+  | 'arch'
+  | 'consensus'
+  | 'execution'
+  | 'completed'
+  | 'aborted'
+  | 'escalated';
+
+export type AgentStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export interface AgentEntry {
+  status: AgentStatus;
+  output: string | null;
+}
+
+export interface ExecutionTask {
+  id: string;
+  description: string;
+  status: string;
+  dev_report: string;
+  review_report: string;
+  started_at?: string;
+  completed_at?: string;
+}
+
+export interface EventLogEntry {
+  timestamp: string;
+  agent: string;
+  type: 'check_in' | 'check_out' | 'status_change' | 'error' | 'milestone';
+  stage_id?: string;
+  detail?: string;
+}
+
+export interface WorkflowState {
+  phase: WorkflowPhase | null;
+  goal?: string;
+  started_at?: string;
+  updated_at?: string;
+  agents: {
+    pm: AgentEntry;
+    arch: AgentEntry;
+    dev: AgentEntry[];
+    reviewer: AgentEntry[];
+  };
+  consensus: {
+    status: 'pending' | 'approved' | 'modified' | 'aborted';
+    decision_points: unknown[];
+    user_decisions: unknown | null;
+  };
+  execution: {
+    tasks_total: number;
+    tasks_completed: number;
+    current_task: number;
+    failure_count: number;
+    max_failures: number;
+    tasks: ExecutionTask[];
+  };
+  event_log: EventLogEntry[];
+}

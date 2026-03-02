@@ -114,8 +114,7 @@ The **Agent-First Workflow** uses Contract-First design and autonomous execution
 │   └── hive.md         # @hive completion report
 └── .state/             # Infrastructure (gitignored)
     ├── config.json     # Workspace configuration
-    ├── state.json      # Task state
-    ├── hive-state.json # @hive lifecycle state
+    ├── workflow-state.json  # Unified workflow state
     └── tasks/          # Task tracking data
 ```
 

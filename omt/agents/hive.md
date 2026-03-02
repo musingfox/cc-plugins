@@ -41,7 +41,7 @@ User: /omt "Build feature X"
 Before starting a new session, check for an interrupted previous session.
 
 ```
-Read .agents/.state/hive-state.json
+Read .agents/.state/workflow-state.json
 If file exists AND phase is non-null AND phase is NOT terminal (completed/aborted):
   → Interrupted session detected
 
@@ -52,11 +52,13 @@ If file exists AND phase is non-null AND phase is NOT terminal (completed/aborte
      - .agents/outputs/pm.md exists → PM completed (regardless of agents.pm.status)
      - .agents/outputs/arch.md exists → Arch completed
      - .agents/outputs/dev.md exists → At least one dev cycle completed
-  2. Agent statuses in hive-state.json (agents.pm.status, agents.arch.status)
+  2. Agent statuses in workflow-state.json (agents.pm.status, agents.arch.status)
   3. Consensus status (consensus.status)
   4. Execution progress (execution.tasks_completed)
 
   Resume logic:
+  - If phase == 'escalated':
+    → Resume at Phase 5 (Execution Loop), present escalation context to user first
   - If consensus.status == 'approved' AND execution block exists:
     → Resume at Phase 5 (Execution Loop), skip completed tasks
   - If agents.arch.status == 'completed' OR .agents/outputs/arch.md exists:
@@ -66,7 +68,7 @@ If file exists AND phase is non-null AND phase is NOT terminal (completed/aborte
   - Otherwise:
     → Resume at Phase 2 (Dispatch @pm)
 
-  Use the ORIGINAL goal from hive-state.json (state.goal), not the dispatch prompt goal.
+  Use the ORIGINAL goal from workflow-state.json (state.goal), not the dispatch prompt goal.
 
 If phase is null OR phase is terminal → proceed to Phase 1 with new goal.
 ```
@@ -79,15 +81,17 @@ Read the goal from the dispatch prompt. Set up workspace files.
 // 1. Write goal to .agents/goal.md
 await Write('.agents/goal.md', goal);
 
-// 2. Initialize .state/hive-state.json
-const hiveState = {
+// 2. Initialize .state/workflow-state.json
+const workflowState = {
   phase: 'init',
   goal: goal,
   started_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
   agents: {
     pm: { status: 'pending', output: null },
-    arch: { status: 'pending', output: null }
+    arch: { status: 'pending', output: null },
+    dev: [],
+    reviewer: []
   },
   consensus: {
     status: 'pending',
@@ -101,16 +105,17 @@ const hiveState = {
     failure_count: 0,
     max_failures: 3,
     tasks: []
-  }
+  },
+  event_log: []
 };
-await Write('.agents/.state/hive-state.json', JSON.stringify(hiveState, null, 2));
+await Write('.agents/.state/workflow-state.json', JSON.stringify(workflowState, null, 2));
 ```
 
 Ensure `.agents/outputs/` directory exists. If not, create it.
 
 ## Phase 2: Dispatch @pm (Autonomous Mode)
 
-Update .state/hive-state.json: `phase: 'pm'`, `agents.pm.status: 'running'`.
+Update .state/workflow-state.json: `phase: 'pm'`, `agents.pm.status: 'running'`.
 
 Dispatch @pm using Task tool with the following override prompt:
 
@@ -139,7 +144,7 @@ Your output MUST include:
 Write the complete requirements to .agents/outputs/pm.md
 ```
 
-After @pm completes, read `.agents/outputs/pm.md` and update .state/hive-state.json:
+After @pm completes, read `.agents/outputs/pm.md` and update .state/workflow-state.json:
 - `agents.pm.status: 'completed'`
 - `agents.pm.output: '.agents/outputs/pm.md'`
 
@@ -147,7 +152,7 @@ If @pm fails, update `agents.pm.status: 'failed'` and report the error to the us
 
 ## Phase 3: Dispatch @arch (Autonomous Mode)
 
-Update .state/hive-state.json: `phase: 'arch'`, `agents.arch.status: 'running'`.
+Update .state/workflow-state.json: `phase: 'arch'`, `agents.arch.status: 'running'`.
 
 Dispatch @arch using Task tool with the following override prompt:
 
@@ -192,7 +197,7 @@ Also include: File plan (files to create/modify)
 Write the complete architecture to .agents/outputs/arch.md
 ```
 
-After @arch completes, read `.agents/outputs/arch.md` and update .state/hive-state.json:
+After @arch completes, read `.agents/outputs/arch.md` and update .state/workflow-state.json:
 - `agents.arch.status: 'completed'`
 - `agents.arch.output: '.agents/outputs/arch.md'`
 
@@ -200,7 +205,7 @@ If @arch fails, update `agents.arch.status: 'failed'` and report the error to th
 
 ## Phase 4: Consensus Gate (Single Human Interaction)
 
-Update .state/hive-state.json: `phase: 'consensus'`.
+Update .state/workflow-state.json: `phase: 'consensus'`.
 
 This is the **only point where @hive interacts with the human**. The goal is to present everything needed for a decision and collect all approvals at once.
 
@@ -344,7 +349,7 @@ await AskUserQuestion({
 
 ### Step 4.5: Handle Consensus Response
 
-**Approve**: Update .state/hive-state.json `consensus.status: 'approved'` and proceed to Phase 5.
+**Approve**: Update .state/workflow-state.json `consensus.status: 'approved'` and proceed to Phase 5.
 
 **Modify**:
 - Read user's modification feedback
@@ -352,11 +357,11 @@ await AskUserQuestion({
 - Re-dispatch affected agent(s) with modifications included in the prompt
 - Return to Step 4.2 to present updated consensus
 
-**Abort**: Update .state/hive-state.json `phase: 'aborted'`, `consensus.status: 'aborted'`. Write abort reason to `.agents/outputs/hive.md`. Stop.
+**Abort**: Update .state/workflow-state.json `phase: 'aborted'`, `consensus.status: 'aborted'`. Write abort reason to `.agents/outputs/hive.md`. Stop.
 
 ## Phase 5: Per-Stage Execution Loop
 
-Update .state/hive-state.json: `phase: 'execution'`.
+Update .state/workflow-state.json: `phase: 'execution'`.
 
 ### Step 5.1: Extract Stages from Arch
 
@@ -386,7 +391,7 @@ const contractFiles = extractContractFiles(archMd);
 for (const stage of stages) {
   const stageId = `stage-${stage.number}`;
 
-  // Update hive-state.json
+  // Update workflow-state.json
   updateHiveState({
     'execution.current_task': stage.number,
     'execution.tasks_total': stages.length
@@ -452,7 +457,7 @@ for (const stage of stages) {
     completedStages.push(stage);
     failureCount = 0;
 
-    // Record stage completion in hive-state.json execution.tasks[]
+    // Record stage completion in workflow-state.json execution.tasks[]
     const taskRecord = {
       id: stageId,
       description: stage.scope,
@@ -532,7 +537,7 @@ ${total.filter(t => !completed.includes(t)).map(t => `- ${t.description}`).join(
 
 ## Phase 6: Completion
 
-Update .state/hive-state.json: `phase: 'completed'`.
+Update .state/workflow-state.json: `phase: 'completed'`.
 
 Generate completion report and write to `.agents/outputs/hive.md`:
 
@@ -606,7 +611,7 @@ If @pm or @arch fails to produce output:
 
 - **Single Human Interaction**: Only the consensus gate (Phase 4) should involve the user, plus escalation if execution fails
 - **No Agent File Modifications**: @pm and @arch behavior is overridden via dispatch prompts, not by editing their .md files
-- **Separate State**: Uses `.state/hive-state.json`, not `.state/state.json`
+- **Unified State**: Uses `.state/workflow-state.json` for all agents
 - **3-Failure Escalation**: Matches @dev's internal retry limit to avoid cascading retries
 - **@reviewer Does NOT Hand Off to @pm**: In hive mode, @reviewer reports back to @hive, not to @pm
 
@@ -621,7 +626,7 @@ If @pm or @arch fails to produce output:
 - ✓ All stages executed via per-stage @dev → @reviewer loop
 - ✓ Per-stage dev reports and review reports generated
 - ✓ Completion report generated
-- ✓ .state/hive-state.json tracks all phases and stages accurately
+- ✓ .state/workflow-state.json tracks all phases and stages accurately
 
 ## References
 

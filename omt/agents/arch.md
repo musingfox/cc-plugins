@@ -18,28 +18,28 @@ Architecture Agent autonomously designs technical architecture using API-First m
 
 ## Hive State Protocol (Check-in / Check-out)
 
-When operating within the OMT lifecycle (dispatched by @hive or `/omt`), update hive-state.json to keep state tracking current. This is **best-effort** — if the file doesn't exist (standalone usage), skip silently and proceed with core work.
+When operating within the OMT lifecycle (dispatched by @hive or `/omt`), update workflow-state.json to keep state tracking current. This is **best-effort** — if the file doesn't exist (standalone usage), skip silently and proceed with core work.
 
 ### Check-in (first action before Phase 1 Input Validation)
 
 ```
-Read .agents/.state/hive-state.json
+Read .agents/.state/workflow-state.json
 If file exists AND agents.arch exists:
   Set agents.arch.status = 'running'
   Set updated_at = current ISO timestamp
-  Write back to .agents/.state/hive-state.json
+  Write back to .agents/.state/workflow-state.json
 If file does not exist → skip (non-fatal)
 ```
 
 ### Check-out (after Phase 9 state update)
 
 ```
-Read .agents/.state/hive-state.json
+Read .agents/.state/workflow-state.json
 If file exists AND agents.arch exists:
   Set agents.arch.status = 'completed'
   Set agents.arch.output = '.agents/outputs/arch.md'
   Set updated_at = current ISO timestamp
-  Write back to .agents/.state/hive-state.json
+  Write back to .agents/.state/workflow-state.json
 If file does not exist → skip (non-fatal)
 ```
 
@@ -69,7 +69,7 @@ optional:
   - existing_architecture: Existing architecture docs
 source:
   - .agents/outputs/pm.md (if @pm was run)
-  - .agents/.state/state.json:task.description (direct task)
+  - .agents/.state/workflow-state.json:task.description (direct task)
   - CLAUDE.md (project standards)
 ```
 
@@ -84,7 +84,7 @@ required:
   - files_to_modify: Existing files list
 destination:
   - .agents/outputs/arch.md
-  - .agents/.state/state.json:planning.architecture
+  - .agents/.state/workflow-state.json:planning.architecture
 ```
 
 ## Agent Workflow
@@ -99,7 +99,7 @@ const contract = JSON.parse(await Read('${CLAUDE_PLUGIN_ROOT}/contracts/arch.jso
 
 // 2. Gather input data
 const inputData = {
-  requirements: await Read('.agents/outputs/pm.md') || await Read('.agents/.state/state.json', { path: 'task.description' }),
+  requirements: await Read('.agents/outputs/pm.md') || await Read('.agents/.state/workflow-state.json', { path: 'task.description' }),
   project_structure: await Glob('**/*.{ts,js,tsx,jsx,py,go,rs}', { limit: 100 }),
   existing_architecture: await Read('docs/architecture.md') || null
 };
@@ -564,12 +564,12 @@ if (!outputValidation.valid) {
 
 ### Phase 9: Update State
 
-Record completion in .state/state.json:
+Record completion in .state/workflow-state.json:
 
 ```typescript
-import { StateManager } from '${CLAUDE_PLUGIN_ROOT}/lib/state-manager.js';
+import { WorkflowStateManager } from '${CLAUDE_PLUGIN_ROOT}/lib/state-manager.js';
 
-const stateManager = new StateManager(process.cwd());
+const stateManager = new WorkflowStateManager(process.cwd());
 
 // Record planning agent completion
 await stateManager.recordPlanningAgent('arch', '.agents/outputs/arch.md', outputValidation);
@@ -758,7 +758,7 @@ Waiting for decision...
 - ✓ Technical decisions documented with rationale
 - ✓ File plan complete and within scope (≤15 files)
 - ✓ All required outputs validated
-- ✓ .state/state.json updated with results
+- ✓ .state/workflow-state.json updated with results
 
 ## Example Execution
 
@@ -788,7 +788,7 @@ User: "Implement JWT-based authentication API"
 ✓ Total: 12 files (within limit)
 
 # 6. @arch updates state
-.state/state.json updated:
+.state/workflow-state.json updated:
   planning.agents_executed: ['arch']
   planning.outputs.arch.contract_validated: true
   context.files_involved: 12

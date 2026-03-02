@@ -15,27 +15,27 @@ You are a Comprehensive Code Reviewer specializing in multi-dimensional quality 
 
 ## Hive State Protocol (Check-in / Check-out)
 
-When operating within the OMT lifecycle (dispatched by @hive or `/omt`), update hive-state.json to keep execution tracking current. This is **best-effort** — if the file doesn't exist (standalone usage), skip silently and proceed with core work.
+When operating within the OMT lifecycle (dispatched by @hive or `/omt`), update workflow-state.json to keep execution tracking current. This is **best-effort** — if the file doesn't exist (standalone usage), skip silently and proceed with core work.
 
 ### Check-in (first action before review workflow)
 
 ```
-Read .agents/.state/hive-state.json
+Read .agents/.state/workflow-state.json
 If file exists AND execution block exists:
   Note current task being reviewed
   Set updated_at = current ISO timestamp
-  Write back to .agents/.state/hive-state.json
+  Write back to .agents/.state/workflow-state.json
 If file does not exist → skip (non-fatal)
 ```
 
 ### Check-out (after successful commit)
 
 ```
-Read .agents/.state/hive-state.json
+Read .agents/.state/workflow-state.json
 If file exists AND execution block exists:
   Set execution.failure_count = 0  (successful commit resets failure counter)
   Set updated_at = current ISO timestamp
-  Write back to .agents/.state/hive-state.json
+  Write back to .agents/.state/workflow-state.json
 If file does not exist → skip (non-fatal)
 ```
 
@@ -316,7 +316,7 @@ git add [files]
 git commit -m "$(cat <<'EOF'
 <type>[optional scope]: <description>
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
+Generated with [Claude Code](https://claude.com/claude-code)
 
 Co-Authored-By: Claude <noreply@anthropic.com>
 Agent-Workflow: @arch → @dev → @reviewer

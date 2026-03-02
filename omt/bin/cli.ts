@@ -6,14 +6,20 @@
  *   init [--task-mgmt <system>]   Create .agents/ directory structure
  *   validate --agent <name> --phase <input|output> --data '<json>'
  *   status                        Show current workspace state
+ *   state-check                   Cross-check state consistency
+ *   state-sync                    Infer state from output files
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
 import { ContractValidator } from '../lib/contract-validator.js';
-import { HiveStateManager } from '../lib/state-manager.js';
-import type { HiveState, AgentStatus } from '../lib/state-manager.js';
-import type { AgentContract, AgentExecutionContext } from '../lib/types.js';
+import { WorkflowStateManager } from '../lib/state-manager.js';
+import type {
+  WorkflowState,
+  AgentStatus,
+  AgentContract,
+  AgentExecutionContext,
+} from '../lib/types.js';
 
 // ---------------------------------------------------------------------------
 // Constants (replaces states.yml + config.yml)
@@ -89,7 +95,7 @@ async function cmdInit() {
   // .agents/.state/config.json
   const config = {
     workspace: {
-      version: '2.0.0',
+      version: '3.0.0',
       initialized_at: new Date().toISOString(),
     },
     task_management: {
@@ -106,17 +112,9 @@ async function cmdInit() {
     JSON.stringify(config, null, 2) + '\n',
   );
 
-  // .agents/.state/state.json (empty initial state)
-  if (!fs.existsSync(path.join(agentsDir, '.state', 'state.json'))) {
-    fs.writeFileSync(
-      path.join(agentsDir, '.state', 'state.json'),
-      JSON.stringify({ task_id: null, current_phase: null, context: {} }, null, 2) + '\n',
-    );
-  }
-
-  // .agents/.state/hive-state.json (full initial state matching HiveState schema)
-  if (!fs.existsSync(path.join(agentsDir, '.state', 'hive-state.json'))) {
-    const initialHiveState: HiveState = {
+  // .agents/.state/workflow-state.json (unified state)
+  if (!fs.existsSync(path.join(agentsDir, '.state', 'workflow-state.json'))) {
+    const initialState: WorkflowState = {
       phase: null,
       goal: undefined,
       started_at: undefined,
@@ -124,6 +122,8 @@ async function cmdInit() {
       agents: {
         pm: { status: 'pending', output: null },
         arch: { status: 'pending', output: null },
+        dev: [],
+        reviewer: [],
       },
       consensus: {
         status: 'pending',
@@ -138,10 +138,11 @@ async function cmdInit() {
         max_failures: 3,
         tasks: [],
       },
+      event_log: [],
     };
     fs.writeFileSync(
-      path.join(agentsDir, '.state', 'hive-state.json'),
-      JSON.stringify(initialHiveState, null, 2) + '\n',
+      path.join(agentsDir, '.state', 'workflow-state.json'),
+      JSON.stringify(initialState, null, 2) + '\n',
     );
   }
 
@@ -152,8 +153,7 @@ async function cmdInit() {
   console.log(`  .agents/.state/tasks/`);
   console.log(`  .agents/.gitignore`);
   console.log(`  .agents/.state/config.json`);
-  console.log(`  .agents/.state/state.json`);
-  console.log(`  .agents/.state/hive-state.json`);
+  console.log(`  .agents/.state/workflow-state.json`);
   console.log(`  task_management: ${taskMgmt}`);
 }
 
@@ -221,8 +221,7 @@ async function cmdStatus() {
     return JSON.parse(fs.readFileSync(p, 'utf-8'));
   };
 
-  const hiveState = readJson('hive-state.json');
-  const state = readJson('state.json');
+  const state: WorkflowState | null = readJson('workflow-state.json');
   const config = readJson('config.json');
 
   console.log('=== OMT Workspace Status ===\n');
@@ -234,48 +233,58 @@ async function cmdStatus() {
     console.log();
   }
 
-  if (hiveState) {
-    console.log(`Hive Phase: ${hiveState.phase ?? '(none)'}`);
-    if (hiveState.goal) console.log(`Goal: ${hiveState.goal}`);
-    if (hiveState.updated_at) console.log(`Last Updated: ${hiveState.updated_at}`);
+  if (state) {
+    console.log(`Phase: ${state.phase ?? '(none)'}`);
+    if (state.goal) console.log(`Goal: ${state.goal}`);
+    if (state.updated_at) console.log(`Last Updated: ${state.updated_at}`);
 
-    // Agent statuses
-    if (hiveState.agents) {
-      const agents = hiveState.agents as Record<string, { status: string; output: string | null }>;
-      const agentLines = Object.entries(agents)
-        .map(([name, info]) => `${name}: ${info.status}`)
-        .join(', ');
-      console.log(`Agents: ${agentLines}`);
+    // Agent statuses — single agents
+    const singleAgents = ['pm', 'arch'] as const;
+    const agentLines: string[] = [];
+    for (const name of singleAgents) {
+      agentLines.push(`${name}: ${state.agents[name].status}`);
     }
+    // Array agents
+    for (const name of ['dev', 'reviewer'] as const) {
+      const entries = state.agents[name];
+      if (entries.length > 0) {
+        const completed = entries.filter(e => e.status === 'completed').length;
+        agentLines.push(`${name}: ${completed}/${entries.length} completed`);
+      }
+    }
+    console.log(`Agents: ${agentLines.join(', ')}`);
 
     // Consensus
-    if (hiveState.consensus) {
-      console.log(`Consensus: ${hiveState.consensus.status ?? '(none)'}`);
+    if (state.consensus) {
+      console.log(`Consensus: ${state.consensus.status ?? '(none)'}`);
     }
 
-    if (hiveState.execution) {
-      console.log(`Execution: ${hiveState.execution.tasks_completed ?? 0}/${hiveState.execution.tasks_total ?? 0} tasks (failures: ${hiveState.execution.failure_count ?? 0})`);
+    if (state.execution) {
+      console.log(`Execution: ${state.execution.tasks_completed}/${state.execution.tasks_total} tasks (failures: ${state.execution.failure_count})`);
     }
 
     // Resumable indicator
-    const phase = hiveState.phase as string | null;
+    const phase = state.phase;
     const isTerminal = phase === null || phase === 'completed' || phase === 'aborted';
     if (!isTerminal && phase) {
       console.log(`Resumable: YES (interrupted at phase '${phase}')`);
     }
 
-    console.log();
-  }
+    // Event log (last 5 entries)
+    if (state.event_log && state.event_log.length > 0) {
+      console.log();
+      console.log(`Event Log (last ${Math.min(5, state.event_log.length)} of ${state.event_log.length}):`);
+      const recentEvents = state.event_log.slice(-5);
+      for (const event of recentEvents) {
+        const stageInfo = event.stage_id ? ` [${event.stage_id}]` : '';
+        const detail = event.detail ? ` — ${event.detail}` : '';
+        console.log(`  ${event.timestamp} ${event.agent} ${event.type}${stageInfo}${detail}`);
+      }
+    }
 
-  if (state) {
-    console.log(`Task: ${state.task_id ?? '(none)'}`);
-    console.log(`Phase: ${state.current_phase ?? '(none)'}`);
-    if (state.planning?.agents_executed) {
-      console.log(`Planning agents: ${state.planning.agents_executed.join(', ')}`);
-    }
-    if (state.execution?.agents_completed) {
-      console.log(`Execution agents: ${state.execution.agents_completed.join(', ')}`);
-    }
+    console.log();
+  } else {
+    console.log('No workflow state found. Run `bun run omt/bin/cli.ts init` first.');
   }
 }
 
@@ -292,13 +301,13 @@ async function cmdStateCheck() {
     die('.agents/.state/ not found — run `bun run omt/bin/cli.ts init` first');
   }
 
-  const hiveStatePath = path.join(stateDir, 'hive-state.json');
-  if (!fs.existsSync(hiveStatePath)) {
-    console.log('No hive-state.json found — nothing to check.');
+  const statePath = path.join(stateDir, 'workflow-state.json');
+  if (!fs.existsSync(statePath)) {
+    console.log('No workflow-state.json found — nothing to check.');
     return;
   }
 
-  const hiveState: HiveState = JSON.parse(fs.readFileSync(hiveStatePath, 'utf-8'));
+  const state: WorkflowState = JSON.parse(fs.readFileSync(statePath, 'utf-8'));
   const issues: string[] = [];
 
   // Cross-check output file existence vs agent status claims
@@ -307,46 +316,49 @@ async function cmdStateCheck() {
     arch: path.join(outputsDir, 'arch.md'),
   };
 
-  if (hiveState.agents) {
-    for (const [agent, expectedPath] of Object.entries(agentOutputMap)) {
-      const agentEntry = (hiveState.agents as Record<string, { status: AgentStatus; output: string | null }>)[agent];
-      if (!agentEntry) continue;
+  for (const [agent, expectedPath] of Object.entries(agentOutputMap)) {
+    const agentEntry = state.agents[agent as 'pm' | 'arch'];
+    if (!agentEntry) continue;
 
-      const fileExists = fs.existsSync(expectedPath);
+    const fileExists = fs.existsSync(expectedPath);
 
-      if (agentEntry.status === 'completed' && !fileExists) {
-        issues.push(`Agent '${agent}' claims completed but output file missing: ${expectedPath}`);
-      }
-      if (agentEntry.status === 'pending' && fileExists) {
-        issues.push(`Agent '${agent}' status is 'pending' but output file exists: ${expectedPath}`);
-      }
+    if (agentEntry.status === 'completed' && !fileExists) {
+      issues.push(`Agent '${agent}' claims completed but output file missing: ${expectedPath}`);
+    }
+    if (agentEntry.status === 'pending' && fileExists) {
+      issues.push(`Agent '${agent}' status is 'pending' but output file exists: ${expectedPath}`);
     }
   }
 
   // Check dev output (supports both per-stage dev/ directory and standalone dev.md)
   const devOutput = path.join(outputsDir, 'dev.md');
   const devDir = path.join(outputsDir, 'dev');
-  if (hiveState.execution && hiveState.execution.tasks_completed > 0) {
+  if (state.execution && state.execution.tasks_completed > 0) {
     const hasDevOutput = fs.existsSync(devOutput) || fs.existsSync(devDir);
     if (!hasDevOutput) {
-      issues.push(`Execution claims ${hiveState.execution.tasks_completed} tasks completed but neither dev.md nor dev/ directory found`);
+      issues.push(`Execution claims ${state.execution.tasks_completed} tasks completed but neither dev.md nor dev/ directory found`);
     }
   }
 
   // Check staleness: updated_at > 24h with non-terminal phase
-  const TERMINAL_PHASES = new Set(['completed', 'aborted', null]);
-  if (hiveState.updated_at && !TERMINAL_PHASES.has(hiveState.phase)) {
-    const updatedAt = new Date(hiveState.updated_at).getTime();
+  const TERMINAL = new Set(['completed', 'aborted', null]);
+  if (state.updated_at && !TERMINAL.has(state.phase)) {
+    const updatedAt = new Date(state.updated_at).getTime();
     const now = Date.now();
     const hoursSinceUpdate = (now - updatedAt) / (1000 * 60 * 60);
     if (hoursSinceUpdate > 24) {
-      issues.push(`Stale session: phase '${hiveState.phase}' has not been updated for ${Math.round(hoursSinceUpdate)}h`);
+      issues.push(`Stale session: phase '${state.phase}' has not been updated for ${Math.round(hoursSinceUpdate)}h`);
     }
   }
 
   // Phase vs consensus consistency
-  if (hiveState.phase === 'execution' && hiveState.consensus?.status !== 'approved') {
-    issues.push(`Phase is 'execution' but consensus status is '${hiveState.consensus?.status ?? 'missing'}' (expected 'approved')`);
+  if (state.phase === 'execution' && state.consensus?.status !== 'approved') {
+    issues.push(`Phase is 'execution' but consensus status is '${state.consensus?.status ?? 'missing'}' (expected 'approved')`);
+  }
+
+  // Dev/reviewer array vs execution tasks consistency
+  if (state.execution.tasks.length !== state.agents.dev.length && state.agents.dev.length > 0) {
+    issues.push(`Execution has ${state.execution.tasks.length} task records but dev has ${state.agents.dev.length} entries`);
   }
 
   console.log('=== OMT State Consistency Check ===\n');
@@ -361,6 +373,124 @@ async function cmdStateCheck() {
   }
 
   process.exit(issues.length > 0 ? 1 : 0);
+}
+
+// ---------------------------------------------------------------------------
+// state-sync — Infer state from output files
+// ---------------------------------------------------------------------------
+
+async function cmdStateSync() {
+  const root = resolveWorkspaceRoot();
+  const stateDir = path.join(root, '.agents', '.state');
+  const outputsDir = path.join(root, '.agents', 'outputs');
+
+  if (!fs.existsSync(stateDir)) {
+    die('.agents/.state/ not found — run `bun run omt/bin/cli.ts init` first');
+  }
+
+  const statePath = path.join(stateDir, 'workflow-state.json');
+  if (!fs.existsSync(statePath)) {
+    die('No workflow-state.json found — run `bun run omt/bin/cli.ts init` first');
+  }
+
+  const state: WorkflowState = JSON.parse(fs.readFileSync(statePath, 'utf-8'));
+  let changes = 0;
+
+  // Infer PM status from output file
+  const pmOutput = path.join(outputsDir, 'pm.md');
+  if (fs.existsSync(pmOutput) && state.agents.pm.status !== 'completed') {
+    state.agents.pm.status = 'completed';
+    state.agents.pm.output = '.agents/outputs/pm.md';
+    changes++;
+    console.log('  Synced: pm → completed (output file exists)');
+  }
+
+  // Infer Arch status from output file
+  const archOutput = path.join(outputsDir, 'arch.md');
+  if (fs.existsSync(archOutput) && state.agents.arch.status !== 'completed') {
+    state.agents.arch.status = 'completed';
+    state.agents.arch.output = '.agents/outputs/arch.md';
+    changes++;
+    console.log('  Synced: arch → completed (output file exists)');
+  }
+
+  // Infer dev stages from dev/ directory
+  const devDir = path.join(outputsDir, 'dev');
+  if (fs.existsSync(devDir)) {
+    const devFiles = fs.readdirSync(devDir).filter(f => f.endsWith('.md'));
+    for (const file of devFiles) {
+      const stageId = file.replace('.md', '');
+      const alreadyTracked = state.execution.tasks.some(t => t.id === stageId);
+      if (!alreadyTracked) {
+        state.execution.tasks.push({
+          id: stageId,
+          description: `(synced from ${file})`,
+          status: 'completed',
+          dev_report: `.agents/outputs/dev/${file}`,
+          review_report: '',
+          completed_at: new Date().toISOString(),
+        });
+        changes++;
+        console.log(`  Synced: execution task '${stageId}' (dev report exists)`);
+      }
+    }
+    // Update tasks_completed count
+    const completedCount = state.execution.tasks.filter(t => t.status === 'completed').length;
+    if (state.execution.tasks_completed !== completedCount) {
+      state.execution.tasks_completed = completedCount;
+      changes++;
+    }
+  }
+
+  // Infer review stages from reviews/ directory
+  const reviewsDir = path.join(outputsDir, 'reviews');
+  if (fs.existsSync(reviewsDir)) {
+    const reviewFiles = fs.readdirSync(reviewsDir).filter(f => f.endsWith('.md'));
+    for (const file of reviewFiles) {
+      const stageId = file.replace('.md', '');
+      const task = state.execution.tasks.find(t => t.id === stageId);
+      if (task && !task.review_report) {
+        task.review_report = `.agents/outputs/reviews/${file}`;
+        changes++;
+        console.log(`  Synced: review report for '${stageId}'`);
+      }
+    }
+  }
+
+  // Infer phase from overall state
+  if (state.phase === 'init' || state.phase === null) {
+    if (state.execution.tasks_completed > 0) {
+      state.phase = 'execution';
+      changes++;
+      console.log(`  Synced: phase → execution (tasks completed)`);
+    } else if (state.consensus?.status === 'approved') {
+      state.phase = 'execution';
+      changes++;
+      console.log(`  Synced: phase → execution (consensus approved)`);
+    } else if (state.agents.arch.status === 'completed') {
+      state.phase = 'consensus';
+      changes++;
+      console.log(`  Synced: phase → consensus (arch completed)`);
+    } else if (state.agents.pm.status === 'completed') {
+      state.phase = 'arch';
+      changes++;
+      console.log(`  Synced: phase → arch (pm completed)`);
+    }
+  }
+
+  if (changes > 0) {
+    state.updated_at = new Date().toISOString();
+    state.event_log.push({
+      timestamp: new Date().toISOString(),
+      agent: 'cli',
+      type: 'milestone',
+      detail: `state-sync: ${changes} corrections applied`,
+    });
+    fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n');
+    console.log(`\nState synced: ${changes} corrections applied.`);
+  } else {
+    console.log('State is already in sync — no corrections needed.');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -382,6 +512,9 @@ switch (subcommand) {
   case 'state-check':
     await cmdStateCheck();
     break;
+  case 'state-sync':
+    await cmdStateSync();
+    break;
   default:
     console.log(`Usage: bun run omt/bin/cli.ts <command>
 
@@ -389,6 +522,7 @@ Commands:
   init [--task-mgmt <system>]    Initialize .agents/ workspace
   validate --agent <name> --phase <input|output> --data '<json>'
   status                         Show workspace state
-  state-check                    Cross-check state consistency`);
+  state-check                    Cross-check state consistency
+  state-sync                     Infer state from output files`);
     process.exit(subcommand ? 1 : 0);
 }

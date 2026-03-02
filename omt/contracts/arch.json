@@ -42,7 +42,7 @@
         "description": "Requirements from PM (if available)"
       },
       {
-        "location": ".agents/.state/state.json:task.description",
+        "location": ".agents/.state/workflow-state.json:task.description",
         "description": "Direct task description"
       },
       {
@@ -119,7 +119,7 @@
     ],
     "destination": [
       ".agents/outputs/arch.md",
-      ".agents/.state/state.json:planning.architecture"
+      ".agents/.state/workflow-state.json:planning.architecture"
     ]
   },
   "validation": [

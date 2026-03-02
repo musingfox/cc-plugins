@@ -2,7 +2,7 @@
 name: contract-validation
 description: >-
   Activated when an OMT agent starts or finishes execution, when debugging a failed agent run,
-  or when verifying state.json updates. Validates input/output contracts using the Contract-First
+  or when verifying workflow-state.json updates. Validates input/output contracts using the Contract-First
   pattern defined in contracts/*.json and lib/contract-validator.ts.
 ---
 
@@ -27,7 +27,7 @@ Every agent must define:
 3. Validate input contract
 4. Execute agent logic
 5. Validate output contract
-6. Update state.json with results
+6. Update workflow-state.json with results
 ```
 
 ## How to Validate
@@ -71,7 +71,7 @@ After completing agent work:
    - Check arrays have minimum items (`minItems:N`)
    - Check strings match patterns (`pattern:REGEX`)
 
-3. **Update state** — Use `StateManager.recordExecutionAgent()` from `lib/state-manager.ts` to record results in `.agents/.state/state.json`.
+3. **Update state** — Use `WorkflowStateManager.recordExecutionAgent()` from `lib/state-manager.ts` to record results in `.agents/.state/workflow-state.json`.
 
 ## Example: Dev Agent Contract
 

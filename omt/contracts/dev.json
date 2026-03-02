@@ -55,7 +55,7 @@
         "description": "Architecture from Architect agent"
       },
       {
-        "location": ".agents/.state/state.json:planning.architecture.files_to_modify",
+        "location": ".agents/.state/workflow-state.json:planning.architecture.files_to_modify",
         "description": "Files list from state"
       }
     ]
@@ -81,8 +81,8 @@
         "validation": ["pattern:^\\d+/\\d+ passed$"]
       },
       {
-        "field_name": "complexity_actual",
-        "description": "Actual complexity score",
+        "field_name": "acs_actual",
+        "description": "Actual ACS score (0 = no unresolved decisions during implementation)",
         "type": "number"
       }
     ],
@@ -103,14 +103,14 @@
       "src/",
       ".agents/outputs/dev/{stage-id}.md (per-stage, when dispatched by @hive)",
       ".agents/outputs/dev.md (standalone mode)",
-      ".agents/.state/state.json:execution.dev_result"
+      ".agents/.state/workflow-state.json:execution.dev_result"
     ]
   },
   "validation": [
     "all tests must pass",
     "test coverage >= 80%",
     "implementation must follow referenced pseudocode exactly",
-    "complexity_actual should match estimate ±30%"
+    "acs_actual should match estimate ±30%"
   ],
   "complexity_range": [8, 21],
   "retry_limit": 3

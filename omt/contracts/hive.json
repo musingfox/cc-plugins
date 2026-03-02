@@ -81,7 +81,7 @@
       ".agents/goal.md",
       ".agents/outputs/pm.md",
       ".agents/outputs/arch.md",
-      ".agents/.state/hive-state.json",
+      ".agents/.state/workflow-state.json",
       ".agents/outputs/hive.md"
     ]
   },
@@ -101,7 +101,9 @@
       "arch": {
         "status": "pending | running | completed | failed",
         "output": "string | null"
-      }
+      },
+      "dev": [{ "status": "AgentStatus", "output": "string | null" }],
+      "reviewer": [{ "status": "AgentStatus", "output": "string | null" }]
     },
     "consensus": {
       "status": "pending | approved | modified | aborted",
@@ -123,7 +125,14 @@
         "started_at": "string",
         "completed_at": "string"
       }]
-    }
+    },
+    "event_log": [{
+      "timestamp": "string",
+      "agent": "string",
+      "type": "check_in | check_out | status_change | error | milestone",
+      "stage_id": "string | undefined",
+      "detail": "string | undefined"
+    }]
   },
   "validation": [
     "workspace must be initialized before starting",

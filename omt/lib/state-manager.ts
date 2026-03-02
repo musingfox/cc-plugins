@@ -1,87 +1,41 @@
 /**
- * State Manager
+ * Workflow State Manager
  *
- * Manages state.json for agent workflow coordination.
- * Handles reading, writing, and updating agent execution state.
+ * Unified state manager replacing the split StateManager/HiveStateManager.
+ * Manages workflow-state.json for agent workflow coordination.
+ * Tracks phase progression, agent statuses, execution tasks, and event log.
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { ContractValidationResult } from './types.js';
+import type {
+  WorkflowState,
+  WorkflowPhase,
+  AgentStatus,
+  AgentEntry,
+  ExecutionTask,
+  EventLogEntry,
+} from './types.js';
 
-export interface AgentOutputRecord {
-  agent: string;
-  output_file: string;
-  contract_validated: boolean;
-  validation_results?: Record<string, string>;
-  timestamp?: string;
-}
+const TERMINAL_PHASES: ReadonlySet<WorkflowPhase | null> = new Set([
+  'completed',
+  'aborted',
+  null,
+]);
 
-export interface PlanningState {
-  agents_executed: string[];
-  outputs: Record<string, AgentOutputRecord>;
-}
-
-export interface ExecutionState {
-  current_agent?: string;
-  input_provided?: Record<string, unknown>;
-  expected_output?: Record<string, unknown>;
-  agents_completed: string[];
-}
-
-export interface ReviewState {
-  code_quality?: {
-    status: string;
-    issues: number;
-  };
-  security?: {
-    status: string;
-    vulnerabilities: number;
-  };
-}
-
-export interface TaskState {
-  task_id: string;
-  title: string;
-  current_phase: 'planning' | 'execution' | 'review' | 'complete';
-  planning?: PlanningState;
-  execution?: ExecutionState;
-  review?: ReviewState;
-  context: {
-    acs_score?: number;
-    files_involved?: number;
-    scope_overflow?: boolean;
-  };
-}
-
-export class StateManager {
-  private workspaceRoot: string;
+export class WorkflowStateManager {
   private statePath: string;
 
   constructor(workspaceRoot: string) {
-    this.workspaceRoot = workspaceRoot;
-    this.statePath = path.join(workspaceRoot, '.agents', '.state', 'state.json');
+    this.statePath = path.join(
+      workspaceRoot,
+      '.agents',
+      '.state',
+      'workflow-state.json',
+    );
   }
 
-  /**
-   * Initialize new task state
-   */
-  async initTask(taskId: string, title: string): Promise<TaskState> {
-    const state: TaskState = {
-      task_id: taskId,
-      title,
-      current_phase: 'planning',
-      context: {},
-    };
-
-    await this.saveState(state);
-    return state;
-  }
-
-  /**
-   * Read current state
-   */
-  async readState(): Promise<TaskState | null> {
+  async readState(): Promise<WorkflowState | null> {
     try {
       const data = await fs.promises.readFile(this.statePath, 'utf-8');
       return JSON.parse(data);
@@ -93,291 +47,125 @@ export class StateManager {
     }
   }
 
-  /**
-   * Save state
-   */
-  async saveState(state: TaskState): Promise<void> {
+  async saveState(state: WorkflowState): Promise<void> {
+    state.updated_at = new Date().toISOString();
     const dir = path.dirname(this.statePath);
     await fs.promises.mkdir(dir, { recursive: true });
     await fs.promises.writeFile(
       this.statePath,
       JSON.stringify(state, null, 2),
-      'utf-8'
-    );
-  }
-
-  /**
-   * Update planning phase
-   */
-  async recordPlanningAgent(
-    agentName: string,
-    outputFile: string,
-    validationResult: ContractValidationResult
-  ): Promise<void> {
-    const state = await this.readState();
-    if (!state) {
-      throw new Error('No active task state found');
-    }
-
-    if (!state.planning) {
-      state.planning = {
-        agents_executed: [],
-        outputs: {},
-      };
-    }
-
-    state.planning.agents_executed.push(agentName);
-    state.planning.outputs[agentName] = {
-      agent: agentName,
-      output_file: outputFile,
-      contract_validated: validationResult.valid,
-      validation_results: this.formatValidationForState(validationResult),
-      timestamp: validationResult.timestamp,
-    };
-
-    await this.saveState(state);
-  }
-
-  /**
-   * Update execution phase
-   */
-  async recordExecutionAgent(
-    agentName: string,
-    validationResult: ContractValidationResult
-  ): Promise<void> {
-    const state = await this.readState();
-    if (!state) {
-      throw new Error('No active task state found');
-    }
-
-    if (!state.execution) {
-      state.execution = {
-        agents_completed: [],
-      };
-    }
-
-    state.execution.agents_completed.push(agentName);
-    state.execution.current_agent = undefined;
-
-    await this.saveState(state);
-  }
-
-  /**
-   * Set current phase
-   */
-  async setPhase(phase: TaskState['current_phase']): Promise<void> {
-    const state = await this.readState();
-    if (!state) {
-      throw new Error('No active task state found');
-    }
-
-    state.current_phase = phase;
-    await this.saveState(state);
-  }
-
-  /**
-   * Update context
-   */
-  async updateContext(updates: Partial<TaskState['context']>): Promise<void> {
-    const state = await this.readState();
-    if (!state) {
-      throw new Error('No active task state found');
-    }
-
-    state.context = {
-      ...state.context,
-      ...updates,
-    };
-
-    await this.saveState(state);
-  }
-
-  /**
-   * Format validation results for state.json
-   */
-  private formatValidationForState(
-    result: ContractValidationResult
-  ): Record<string, string> {
-    const formatted: Record<string, string> = {};
-
-    for (const error of result.errors) {
-      formatted[error.field] = `✗ ${error.message || error.status}`;
-    }
-
-    for (const warning of result.warnings) {
-      formatted[warning.field] = `⚠ ${warning.message || warning.status}`;
-    }
-
-    if (result.valid) {
-      formatted['__status__'] = '✓ all valid';
-    }
-
-    return formatted;
-  }
-
-  /**
-   * Get outputs directory path
-   */
-  getOutputsDir(): string {
-    return path.join(this.workspaceRoot, '.agents', 'outputs');
-  }
-
-  /**
-   * Ensure outputs directory exists
-   */
-  async ensureOutputsDir(): Promise<string> {
-    const outputsDir = this.getOutputsDir();
-    await fs.promises.mkdir(outputsDir, { recursive: true });
-    return outputsDir;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Hive State Manager
-//
-// Manages hive-state.json for @hive lifecycle coordination.
-// Tracks phase progression, agent statuses, and execution state.
-// Used by CLI tooling — agents interact via Read/Write tools directly.
-// ---------------------------------------------------------------------------
-
-export type HivePhase =
-  | 'init'
-  | 'pm'
-  | 'arch'
-  | 'consensus'
-  | 'execution'
-  | 'completed'
-  | 'aborted'
-  | 'escalated';
-
-export type AgentStatus = 'pending' | 'running' | 'completed' | 'failed';
-
-export interface HiveAgentEntry {
-  status: AgentStatus;
-  output: string | null;
-}
-
-export interface HiveState {
-  phase: HivePhase | null;
-  goal?: string;
-  started_at?: string;
-  updated_at?: string;
-  agents?: {
-    pm: HiveAgentEntry;
-    arch: HiveAgentEntry;
-  };
-  consensus?: {
-    status: 'pending' | 'approved' | 'modified' | 'aborted';
-    decision_points: unknown[];
-    user_decisions: unknown | null;
-  };
-  execution?: {
-    tasks_total: number;
-    tasks_completed: number;
-    current_task: number;
-    failure_count: number;
-    max_failures: number;
-    tasks?: Array<{
-      id: string;
-      description: string;
-      status: string;
-      dev_report: string;
-      review_report: string;
-      started_at?: string;
-      completed_at?: string;
-    }>;
-  };
-}
-
-const TERMINAL_PHASES: ReadonlySet<HivePhase | null> = new Set([
-  'completed',
-  'aborted',
-  null,
-]);
-
-export class HiveStateManager {
-  private hiveStatePath: string;
-
-  constructor(workspaceRoot: string) {
-    this.hiveStatePath = path.join(
-      workspaceRoot,
-      '.agents',
-      '.state',
-      'hive-state.json',
-    );
-  }
-
-  async readState(): Promise<HiveState | null> {
-    try {
-      const data = await fs.promises.readFile(this.hiveStatePath, 'utf-8');
-      return JSON.parse(data);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return null;
-      }
-      throw error;
-    }
-  }
-
-  async saveState(state: HiveState): Promise<void> {
-    state.updated_at = new Date().toISOString();
-    const dir = path.dirname(this.hiveStatePath);
-    await fs.promises.mkdir(dir, { recursive: true });
-    await fs.promises.writeFile(
-      this.hiveStatePath,
-      JSON.stringify(state, null, 2),
       'utf-8',
     );
   }
 
-  async setPhase(phase: HivePhase): Promise<void> {
+  async setPhase(phase: WorkflowPhase): Promise<void> {
     const state = await this.readState();
     if (!state) {
-      throw new Error('No hive state found');
+      throw new Error('No workflow state found');
     }
     state.phase = phase;
     await this.saveState(state);
   }
 
+  /**
+   * Update agent status. Supports both single agents (pm, arch)
+   * and array agents (dev, reviewer) via optional stageId.
+   */
   async updateAgentStatus(
-    agent: 'pm' | 'arch',
+    agent: string,
     status: AgentStatus,
     output?: string,
+    stageId?: string,
   ): Promise<void> {
     const state = await this.readState();
     if (!state) {
-      throw new Error('No hive state found');
+      throw new Error('No workflow state found');
     }
-    if (!state.agents) {
-      state.agents = {
-        pm: { status: 'pending', output: null },
-        arch: { status: 'pending', output: null },
+
+    if (agent === 'pm' || agent === 'arch') {
+      state.agents[agent].status = status;
+      if (output !== undefined) {
+        state.agents[agent].output = output;
+      }
+    } else if (agent === 'dev' || agent === 'reviewer') {
+      const entry: AgentEntry = {
+        status,
+        output: output ?? null,
       };
+      // Find existing entry for this stage or append
+      if (stageId) {
+        const existing = state.agents[agent].findIndex(
+          (e) => e.output?.includes(stageId) ||
+            (e.status === 'running' && e.output === null),
+        );
+        if (existing >= 0) {
+          state.agents[agent][existing] = entry;
+        } else {
+          state.agents[agent].push(entry);
+        }
+      } else {
+        state.agents[agent].push(entry);
+      }
     }
-    state.agents[agent].status = status;
-    if (output !== undefined) {
-      state.agents[agent].output = output;
-    }
+
     await this.saveState(state);
   }
 
+  /**
+   * Update execution fields individually, avoiding Object.assign
+   * shallow merge that overwrites nested arrays.
+   */
   async updateExecution(
-    updates: Partial<NonNullable<HiveState['execution']>>,
+    updates: Partial<Omit<WorkflowState['execution'], 'tasks'>>,
   ): Promise<void> {
     const state = await this.readState();
     if (!state) {
-      throw new Error('No hive state found');
+      throw new Error('No workflow state found');
     }
-    if (!state.execution) {
-      state.execution = {
-        tasks_total: 0,
-        tasks_completed: 0,
-        current_task: 0,
-        failure_count: 0,
-        max_failures: 3,
-      };
+
+    if (updates.tasks_total !== undefined) {
+      state.execution.tasks_total = updates.tasks_total;
     }
-    Object.assign(state.execution, updates);
+    if (updates.tasks_completed !== undefined) {
+      state.execution.tasks_completed = updates.tasks_completed;
+    }
+    if (updates.current_task !== undefined) {
+      state.execution.current_task = updates.current_task;
+    }
+    if (updates.failure_count !== undefined) {
+      state.execution.failure_count = updates.failure_count;
+    }
+    if (updates.max_failures !== undefined) {
+      state.execution.max_failures = updates.max_failures;
+    }
+
+    await this.saveState(state);
+  }
+
+  /**
+   * Append a task to execution.tasks without overwriting existing entries.
+   */
+  async appendTask(task: ExecutionTask): Promise<void> {
+    const state = await this.readState();
+    if (!state) {
+      throw new Error('No workflow state found');
+    }
+    state.execution.tasks.push(task);
+    await this.saveState(state);
+  }
+
+  /**
+   * Append an event to the event_log (append-only audit trail).
+   */
+  async reportEvent(event: Omit<EventLogEntry, 'timestamp'>): Promise<void> {
+    const state = await this.readState();
+    if (!state) {
+      throw new Error('No workflow state found');
+    }
+    state.event_log.push({
+      ...event,
+      timestamp: new Date().toISOString(),
+    });
     await this.saveState(state);
   }
 
@@ -387,15 +175,18 @@ export class HiveStateManager {
     return !TERMINAL_PHASES.has(state.phase);
   }
 
-  static createInitialState(goal: string): HiveState {
+  static createInitialState(goal: string): WorkflowState {
+    const now = new Date().toISOString();
     return {
       phase: 'init',
       goal,
-      started_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      started_at: now,
+      updated_at: now,
       agents: {
         pm: { status: 'pending', output: null },
         arch: { status: 'pending', output: null },
+        dev: [],
+        reviewer: [],
       },
       consensus: {
         status: 'pending',
@@ -410,6 +201,7 @@ export class HiveStateManager {
         max_failures: 3,
         tasks: [],
       },
+      event_log: [],
     };
   }
 }

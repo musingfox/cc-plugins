@@ -1,0 +1,123 @@
+{
+  "agent": "reviewer",
+  "description": "Quality reviewer with git commit authority",
+  "method": {
+    "name": "Multi-dimensional Quality Review",
+    "description": "Validate implementation against requirements, test coverage, contract integrity, and create git commits",
+    "steps": [
+      "Verify contract artifact integrity (unchanged)",
+      "Verify change budget compliance",
+      "Run and validate test results",
+      "Check code quality (lint, types, security)",
+      "Generate review report",
+      "Create git commit if approved"
+    ]
+  },
+  "input_contract": {
+    "required": [
+      {
+        "field_name": "dev_report",
+        "description": "Dev agent execution report for the stage",
+        "type": "string",
+        "validation": ["minLength:10"]
+      },
+      {
+        "field_name": "architecture",
+        "description": "Architecture design from @arch",
+        "type": "string",
+        "validation": ["minLength:10"]
+      },
+      {
+        "field_name": "requirements",
+        "description": "Requirements document from @pm",
+        "type": "string",
+        "validation": ["minLength:10"]
+      }
+    ],
+    "optional": [
+      {
+        "field_name": "stage_id",
+        "description": "Stage ID when dispatched by @hive",
+        "type": "string"
+      },
+      {
+        "field_name": "contract_files",
+        "description": "Contract artifact files to check integrity",
+        "type": "array"
+      },
+      {
+        "field_name": "change_budget",
+        "description": "Maximum implementation lines for the stage",
+        "type": "number"
+      }
+    ],
+    "source": [
+      {
+        "location": ".agents/outputs/dev/{stage-id}.md",
+        "description": "Dev report (per-stage mode)"
+      },
+      {
+        "location": ".agents/outputs/dev.md",
+        "description": "Dev report (standalone mode)"
+      },
+      {
+        "location": ".agents/outputs/arch.md",
+        "description": "Architecture from @arch"
+      },
+      {
+        "location": ".agents/outputs/pm.md",
+        "description": "Requirements from @pm"
+      }
+    ]
+  },
+  "output_contract": {
+    "required": [
+      {
+        "field_name": "review_decision",
+        "description": "Review verdict: APPROVE, REQUEST_CHANGES, or ESCALATE",
+        "type": "string",
+        "validation": ["pattern:^(APPROVE|REQUEST_CHANGES|ESCALATE)$"]
+      },
+      {
+        "field_name": "contract_integrity",
+        "description": "Whether contract artifact files were unchanged",
+        "type": "string",
+        "validation": ["pattern:^(PASS|FAIL|N/A)$"]
+      },
+      {
+        "field_name": "tests_status",
+        "description": "Test execution result (format: X/Y passed)",
+        "type": "string",
+        "validation": ["pattern:^\\d+/\\d+ passed$"]
+      }
+    ],
+    "optional": [
+      {
+        "field_name": "commit_sha",
+        "description": "Git commit SHA if review approved and committed",
+        "type": "string"
+      },
+      {
+        "field_name": "change_budget_actual",
+        "description": "Actual implementation lines changed",
+        "type": "number"
+      },
+      {
+        "field_name": "coverage",
+        "description": "Test coverage percentage",
+        "type": "number"
+      }
+    ],
+    "destination": [
+      ".agents/outputs/reviews/{stage-id}.md (per-stage mode)",
+      ".agents/.state/workflow-state.json:execution.tasks"
+    ]
+  },
+  "validation": [
+    "contract integrity must PASS before review proceeds",
+    "all tests must pass for APPROVE decision",
+    "change budget warning if actual exceeds budget by >20%",
+    "only @reviewer can create git commits"
+  ],
+  "complexity_range": [5, 13]
+}

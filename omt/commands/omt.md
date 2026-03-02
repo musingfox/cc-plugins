@@ -46,7 +46,7 @@ Stop execution here if workspace is missing.
 
 ### Step 2.5: Check for Interrupted Session
 
-Read `.agents/.state/hive-state.json`. If the file exists and `phase` is non-null and NOT a terminal phase (`completed` or `aborted`):
+Read `.agents/.state/workflow-state.json`. If the file exists and `phase` is non-null and NOT a terminal phase (`completed` or `aborted`):
 
 An interrupted session is detected. Use `AskUserQuestion` to ask the user:
 
@@ -54,8 +54,8 @@ An interrupted session is detected. Use `AskUserQuestion` to ask the user:
 Detected an interrupted OMT session.
 
 Phase: {phase}
-Goal: {goal from hive-state.json}
-Last updated: {updated_at from hive-state.json}
+Goal: {goal from workflow-state.json}
+Last updated: {updated_at from workflow-state.json}
 ```
 
 Options:
@@ -63,18 +63,19 @@ Options:
 2. **Start Fresh** — Discard the previous session and start a new one with the current goal
 3. **Cancel** — Stop without doing anything
 
-**Resume**: Dispatch @hive with the ORIGINAL goal from `hive-state.json` (not `$GOAL`). @hive's Phase 0 resume detection will determine the correct re-entry point.
+**Resume**: Dispatch @hive with the ORIGINAL goal from `workflow-state.json` (not `$GOAL`). @hive's Phase 0 resume detection will determine the correct re-entry point.
 
-**Start Fresh**: Write a clean initial state to `.agents/.state/hive-state.json` to reset:
+**Start Fresh**: Write a clean initial state to `.agents/.state/workflow-state.json` to reset:
 ```json
 {
   "phase": null,
   "goal": null,
   "started_at": null,
   "updated_at": null,
-  "agents": { "pm": { "status": "pending", "output": null }, "arch": { "status": "pending", "output": null } },
+  "agents": { "pm": { "status": "pending", "output": null }, "arch": { "status": "pending", "output": null }, "dev": [], "reviewer": [] },
   "consensus": { "status": "pending", "decision_points": [], "user_decisions": null },
-  "execution": { "tasks_total": 0, "tasks_completed": 0, "current_task": 0, "failure_count": 0, "max_failures": 3, "tasks": [] }
+  "execution": { "tasks_total": 0, "tasks_completed": 0, "current_task": 0, "failure_count": 0, "max_failures": 3, "tasks": [] },
+  "event_log": []
 }
 ```
 Then proceed to Step 3 with `$GOAL`.
@@ -101,7 +102,7 @@ Task({
     Goal: ${GOAL}
 
     Execute the full lifecycle:
-    1. Initialize (.agents/goal.md + .agents/.state/hive-state.json)
+    1. Initialize (.agents/goal.md + .agents/.state/workflow-state.json)
     2. Dispatch @pm in autonomous mode
     3. Dispatch @arch in autonomous mode
     4. Present consensus summary with decision points → AskUserQuestion

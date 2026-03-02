@@ -29,7 +29,7 @@
     ],
     "source": [
       {
-        "location": ".agents/.state/state.json:task.title",
+        "location": ".agents/.state/workflow-state.json:task.title",
         "description": "Task title from state"
       }
     ]
@@ -64,7 +64,7 @@
     ],
     "destination": [
       ".agents/outputs/pm.md",
-      ".agents/.state/state.json:planning.requirements"
+      ".agents/.state/workflow-state.json:planning.requirements"
     ]
   },
   "validation": [
