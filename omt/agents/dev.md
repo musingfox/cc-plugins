@@ -76,7 +76,7 @@ required:
   - test_files: Test files created/modified
   - implementation_files: Implementation files
   - tests_status: "X/Y passed" format
-  - complexity_actual: Actual complexity score
+  - acs_actual: Actual ACS score (0 = no unresolved decisions during implementation)
 optional:
   - coverage: Test coverage percentage
   - debugging_report: Root cause analysis if debugging was needed
@@ -192,9 +192,15 @@ If a contract test seems wrong:
 
 **Standalone Mode**: If not dispatched by @hive (no stage context in prompt), skip this phase and proceed normally with Phase 2.5.
 
-### Phase 2.5: Reference Pseudocode Layer (L2)
+### Phase 2.5: Reference Pseudocode Layer (L2) & Verify ACS
 
-**Critical**: Before writing tests, check outputs/arch.md for pseudocode:
+**Critical**: Before writing tests, check outputs/arch.md for pseudocode and ACS score:
+
+**ACS Verification**: Read the ACS Quality Gate section in outputs/arch.md.
+- **ACS = 0**: All human decisions are resolved. L3 implementation should be **fully autonomous with zero human intervention**.
+- **ACS > 0**: Unresolved decisions exist — check if they affect your current stage. If yes, escalate to @hive rather than making assumptions.
+
+**Pseudocode Reference**:
 
 1. **Read Pseudocode**: Each function's step-by-step logic
 2. **Derive Test Cases**: Each conditional → one test case
@@ -414,7 +420,7 @@ const outputData = {
   test_files: await Glob('tests/**/*.{test,spec}.{ts,js}'),
   implementation_files: await Glob('src/**/*.{ts,js}'),
   tests_status: '15/15 passed',
-  complexity_actual: 13,
+  acs_actual: 0,  // ACS score: 0 = all decisions resolved during L1/L2
   coverage: 95
 };
 

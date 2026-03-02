@@ -341,6 +341,43 @@ function login(email, password):
 5. should return tokens for valid credentials
 ```
 
+### Phase 3.6: ACS Quality Gate
+
+After L2 pseudocode is complete, assess plan readiness using the **Agentic Complexity Score (ACS)**. ACS measures unresolved human decisions — if any remain, L3 implementation cannot be fully autonomous.
+
+Score each **unresolved human decision** using Fermi estimation (order-of-magnitude weights):
+
+| Score | Scope | Example |
+|-------|-------|---------|
+| 1 | Single file / local | error message, timeout value, single function logic |
+| 10 | Cross-module / multi-file | data flow between modules, shared interface, state management |
+| 100 | Architecture / tech stack | framework, database, deployment, auth strategy |
+
+```
+ACS = Σ (each unresolved human decision × scope score)
+```
+
+| ACS | Verdict |
+|-----|---------|
+| 0 | Plan complete — proceed to L3 (@dev) |
+| < 10 | Minor decisions — quick clarification then proceed |
+| 10-99 | Cross-module decisions unresolved — iterate L1/L2 |
+| 100+ | Architectural decisions unresolved — do not start implementation |
+
+**Critical**: If ACS ≥ 10, do NOT proceed to Phase 3.7 (stage plan). Return to L1/L2 phases to resolve unresolved decisions first.
+
+**Output to outputs/arch.md**:
+
+```markdown
+## ACS Quality Gate
+
+**Unresolved Decisions**: [list each with scope score, or "None"]
+**ACS Score**: 0
+**Verdict**: Plan complete — proceed to L3
+```
+
+**Note**: In Hive Mode, if ACS > 0, @arch escalates unresolved decisions to @hive for the consensus gate rather than blocking.
+
 ### Phase 3.7: Generate Stage Plan with Change Budgets
 
 After pseudocode is complete, generate a stage plan that breaks implementation into vertical slices. Each stage is an end-to-end functional slice — NOT horizontal layers.
@@ -539,7 +576,7 @@ await stateManager.recordPlanningAgent('arch', '.agents/outputs/arch.md', output
 
 // Update context
 await stateManager.updateContext({
-  complexity_estimate: estimatedComplexity,
+  acs_score: acsScore,  // Agentic Complexity Score from Phase 3.6
   files_involved: totalFiles,
   scope_overflow: totalFiles > 15
 });
@@ -553,7 +590,7 @@ The `outputs/arch.md` file MUST follow this L1/L2 layered structure:
 # Architecture: [Task Title]
 
 **Task ID**: TASK-123
-**Complexity Estimate**: 13 (Fibonacci)
+**ACS Score**: 0 (all human decisions resolved)
 **Files Involved**: 12
 
 ## Section 1: Contract Artifacts (L1)
@@ -588,7 +625,13 @@ module-d → module-b
 
 ### Decision 2: ...
 
-## Section 4: Stage Plan with Change Budgets (L1)
+## Section 4: ACS Quality Gate
+
+**Unresolved Decisions**: [list each with scope score, or "None"]
+**ACS Score**: 0
+**Verdict**: Plan complete — proceed to L3
+
+## Section 5: Stage Plan with Change Budgets (L1)
 
 ### Stage 1: [Name]
 **Scope**: [What this stage covers]
@@ -599,7 +642,7 @@ module-d → module-b
 
 ### Stage 2: ...
 
-## Section 5: Pseudocode (L2 — Auto-Approved in Hive Mode)
+## Section 6: Pseudocode (L2 — Auto-Approved in Hive Mode)
 
 ### function_name(params)
 **Status**: Approved ✓ / Auto-Approved (Hive Mode)
@@ -749,7 +792,7 @@ User: "Implement JWT-based authentication API"
   planning.agents_executed: ['arch']
   planning.outputs.arch.contract_validated: true
   context.files_involved: 12
-  context.complexity_estimate: 13
+  context.acs_score: 0
 
 # 7. Output saved
 outputs/arch.md created (1240 lines)

@@ -4,6 +4,8 @@
 
 **Human defines skeleton, AI fills implementation.**
 
+**Resolve all human decisions during planning (L1/L2). Once planning is complete, implementation (L3) should be fully autonomous with zero human intervention.**
+
 SDD separates development into distinct layers where humans make high-value architectural decisions while AI handles implementation details. This reduces hallucination risk and ensures human control over critical design choices.
 
 ## Three-Layer Model
@@ -68,6 +70,29 @@ AI translates approved L2 pseudocode into working code:
 - Each pseudocode line → one code block
 - Each conditional → one test case
 - Deviations must be documented
+
+## ACS Quality Gate (Agentic Complexity Score)
+
+After L2 pseudocode is complete, assess plan readiness by scoring each unresolved human decision using Fermi estimation (order-of-magnitude weights):
+
+| Score | Scope | Example |
+|-------|-------|---------|
+| 1 | Single file / local | error message, timeout value, single function logic |
+| 10 | Cross-module / multi-file | data flow between modules, shared interface, state management |
+| 100 | Architecture / tech stack | framework, database, deployment, auth strategy |
+
+```
+ACS = Σ (each unresolved human decision × scope score)
+```
+
+| ACS | Verdict |
+|-----|---------|
+| 0 | Plan complete — proceed to L3 |
+| < 10 | Minor decisions — quick clarification then proceed |
+| 10-99 | Cross-module decisions unresolved — iterate L1/L2 |
+| 100+ | Architectural decisions unresolved — do not start implementation |
+
+ACS replaces standalone task complexity assessment. It is integrated into the SDD workflow as the quality gate between L2 (planning) and L3 (implementation).
 
 ## Execution Strategies
 
@@ -157,7 +182,7 @@ Actual: "redis.setex(token, 604800, userId)" (using setex for atomic ttl)
 
 ## Integration with OMT
 
-SDD is integrated into OMT workflow:
+SDD is an independent methodology. OMT is one execution path that implements SDD, not the owner of it. The mapping below shows how OMT agents correspond to SDD layers:
 
 | OMT Agent | SDD Layer | Responsibility |
 |-----------|-----------|----------------|
@@ -206,4 +231,4 @@ If SDD needs to become a standalone plugin:
 
 ---
 
-*This methodology is integrated into OMT workflow but documented separately for potential future independence.*
+*SDD is an independent methodology. It is documented here alongside OMT as its primary execution path, but can be applied in any development workflow.*

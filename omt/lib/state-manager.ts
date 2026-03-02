@@ -48,7 +48,7 @@ export interface TaskState {
   execution?: ExecutionState;
   review?: ReviewState;
   context: {
-    complexity_estimate?: number;
+    acs_score?: number;
     files_involved?: number;
     scope_overflow?: boolean;
   };
