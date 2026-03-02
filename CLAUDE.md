@@ -91,13 +91,14 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 - Uses `mmdc` (if installed) or `npx @mermaid-js/mermaid-cli` as fallback
 - Environment variables: `MERMAID_THEME`, `MERMAID_BG`, `MERMAID_WIDTH`, `MERMAID_COLOR_SCHEME`, etc.
 
-### 3. Plan Visualizer
+### 3. Document Visualizer
 **Location**: `plan-viz/`
-**Purpose**: Render plan files (`~/.claude/plans/*.md`) as HTML
+**Purpose**: Render any markdown document as formatted HTML with syntax highlighting, math, diagrams, and animations
 
 **Key Components**:
-- `/view-plan [filename]` command
-- Zero dependencies (CDN libraries: marked.js, DOMPurify, Mermaid.js)
+- `/view-doc [file-path or plan-name]` command — accepts any file path or plan name (backward compatible)
+- `doc-render` skill — auto-triggers when content needs HTML rendering
+- Zero dependencies (CDN libraries: marked.js, DOMPurify, Mermaid.js, Highlight.js, KaTeX, AOS)
 - Base64 encoding for content safety
 - UTF-8 support via TextDecoder API
 
@@ -157,7 +158,7 @@ Agents are tested via Task tool or agent-specific workflows (e.g., OMT's `/init-
 
 - **Plan files**: `~/.claude/plans/*.md` (read by plan-viz)
 - **Mermaid output**: `/tmp/mermaid-diagram-{timestamp}.png`
-- **Plan HTML output**: `/tmp/plan-{name}-{timestamp}.html`
+- **Document HTML output**: `/tmp/doc-{name}-{timestamp}.html`
 - **Agent workspace** (OMT): `.agents/` directory
 
 ## Critical Implementation Details

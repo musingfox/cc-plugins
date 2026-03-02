@@ -65,14 +65,16 @@ Enhances AI-generated text readability:
 /plugin install readability
 ```
 
-### Plan Visualizer
+### Document Visualizer
 
-Transform Claude Code plan files into beautifully formatted HTML:
-- **Instant Visualization**: `/view-plan` command opens plans in browser
-- **Markdown Rendering**: Full support for headers, tables, code blocks, and lists
+Render any markdown document as beautifully formatted HTML:
+- **Any File**: `/view-doc` accepts any markdown file path, not just plan files
+- **Syntax Highlighting**: Language-aware code coloring via highlight.js
+- **Math Formulas**: Inline and block KaTeX rendering (`$E=mc^2$`, `$$\int_0^1$$`)
 - **Mermaid Diagrams**: Inline diagram rendering with auto dark mode
+- **Animations**: Page-load fade-in + scroll-triggered section reveals (AOS)
+- **Auto-Trigger**: `doc-render` skill activates when content needs HTML rendering
 - **UTF-8 Support**: Perfect handling of Chinese and other Unicode characters
-- **Zero Dependencies**: All libraries loaded from CDN
 - **Secure**: XSS protection via DOMPurify sanitization
 
 **Installation:**
@@ -108,11 +110,14 @@ cc-plugins/
 │   │   └── diagram.md
 │   ├── skills/                   # mermaid-display, mermaid-theme
 │   └── README.md
-├── plan-viz/                     # Plan Visualizer plugin
+├── plan-viz/                     # Document Visualizer plugin
 │   ├── .claude-plugin/
 │   │   └── plugin.json
 │   ├── commands/
-│   │   └── view-plan.md
+│   │   └── view-doc.md
+│   ├── skills/
+│   │   └── doc-render/
+│   │       └── SKILL.md
 │   └── README.md
 ├── readability/                  # Text formatting plugin
 │   ├── .claude-plugin/

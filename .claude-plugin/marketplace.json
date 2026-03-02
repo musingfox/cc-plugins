@@ -28,7 +28,7 @@
     {
       "name": "plan-viz",
       "source": "./plan-viz",
-      "description": "Plan Visualizer: Transform plan files into beautiful HTML with Mermaid diagram support and UTF-8 handling"
+      "description": "Document Visualizer: Render any markdown as formatted HTML with syntax highlighting, Mermaid diagrams, KaTeX math, and animations"
     },
     {
       "name": "jj",
