@@ -110,7 +110,7 @@
     "all tests must pass",
     "test coverage >= 80%",
     "implementation must follow referenced pseudocode exactly",
-    "acs_actual should match estimate ±30%"
+    "acs_actual should match acs_estimate ±30%"
   ],
   "complexity_range": [8, 21],
   "retry_limit": 3

@@ -272,7 +272,7 @@ Format:
 {2-3 sentence summary of architecture}
 - API contracts: {count} interfaces defined
 - Files: {X} new + {Y} modified = {Z} total
-- Complexity estimate: {fibonacci}
+- Complexity (ACS): {score}
 
 ## Contract Artifacts (Interface Lock)
 
