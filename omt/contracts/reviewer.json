@@ -3,13 +3,13 @@
   "description": "Quality reviewer with git commit authority",
   "method": {
     "name": "Multi-dimensional Quality Review",
-    "description": "Validate implementation against requirements, test coverage, contract integrity, and create git commits",
+    "description": "Validate implementation against requirements, test coverage, contract integrity, scope adherence, and create git commits",
     "steps": [
       "Verify contract artifact integrity (unchanged)",
-      "Verify change budget compliance",
+      "Verify scope adherence (only stage-plan files modified)",
       "Run and validate test results",
       "Check code quality (lint, types, security)",
-      "Generate review report",
+      "Generate review report with checklist",
       "Create git commit if approved"
     ]
   },
@@ -46,9 +46,9 @@
         "type": "array"
       },
       {
-        "field_name": "change_budget",
-        "description": "Maximum implementation lines for the stage",
-        "type": "number"
+        "field_name": "stage_files",
+        "description": "Files listed in the stage plan for scope adherence check",
+        "type": "array"
       }
     ],
     "source": [
@@ -89,6 +89,12 @@
         "description": "Test execution result (format: X/Y passed)",
         "type": "string",
         "validation": ["pattern:^\\d+/\\d+ passed$"]
+      },
+      {
+        "field_name": "scope_adherence",
+        "description": "Whether only stage-plan files were modified",
+        "type": "string",
+        "validation": ["pattern:^(PASS|WARNING)$"]
       }
     ],
     "optional": [
@@ -98,25 +104,19 @@
         "type": "string"
       },
       {
-        "field_name": "change_budget_actual",
-        "description": "Actual implementation lines changed",
-        "type": "number"
-      },
-      {
         "field_name": "coverage",
         "description": "Test coverage percentage",
         "type": "number"
       }
     ],
     "destination": [
-      ".agents/outputs/reviews/{stage-id}.md (per-stage mode)",
-      ".agents/.state/workflow-state.json:execution.tasks"
+      ".agents/outputs/reviews/{stage-id}.md (per-stage mode)"
     ]
   },
   "validation": [
     "contract integrity must PASS before review proceeds",
     "all tests must pass for APPROVE decision",
-    "change budget warning if actual exceeds budget by >20%",
+    "scope adherence WARNING if files outside stage plan were modified",
     "only @reviewer can create git commits"
   ],
   "complexity_range": [5, 13]

@@ -57,16 +57,32 @@ Stop execution here if workspace is missing.
 
 ### Step 2.5: Resume Detection
 
-Read `.agents/.state/workflow-state.json`. If the file exists and `phase` is non-null and NOT a terminal phase (`completed` or `aborted`):
+Check for existing output files to detect an interrupted session:
 
-An interrupted session is detected. Use `AskUserQuestion` to present the situation:
+```
+Resume detection:
+1. Read .agents/goal.md for the original goal
+2. Check output file existence:
+   - .agents/outputs/pm.md → PM completed
+   - .agents/outputs/arch.md → Arch completed
+   - .agents/outputs/hive-consensus.md → Consensus analysis done
+   - .agents/outputs/dev/stage-*.md → count completed dev stages
+   - .agents/outputs/reviews/stage-*.md → count completed review stages
+3. Determine re-entry point from file existence
+```
+
+If `.agents/goal.md` exists AND at least one output file exists, an interrupted session is detected. Use `AskUserQuestion` to present the situation:
 
 ```
 Detected an interrupted OMT session.
 
-Phase: {phase}
-Goal: {goal from workflow-state.json}
-Last updated: {updated_at from workflow-state.json}
+Goal: {goal from goal.md}
+Progress:
+  - PM: {exists/missing}
+  - Arch: {exists/missing}
+  - Consensus: {exists/missing}
+  - Dev stages: {count completed}
+  - Review stages: {count completed}
 ```
 
 Options:
@@ -74,44 +90,29 @@ Options:
 2. **Start Fresh** — Discard the previous session and start new with `$GOAL`
 3. **Cancel** — Stop without doing anything
 
-**Resume**: Determine re-entry point by checking output file existence and state:
+**Resume**: Determine re-entry point from file existence:
 
 ```
-Resume logic:
-1. Read workflow-state.json for phase, agent statuses, consensus status, execution progress
-2. Check output file existence:
-   - .agents/outputs/pm.md exists → PM completed
-   - .agents/outputs/arch.md exists → Arch completed
-   - .agents/outputs/hive-consensus.md exists → Consensus analysis completed
-   - .agents/outputs/dev/ has files → Execution in progress
+Re-entry logic:
+1. If .agents/outputs/reviews/ has stage files AND .agents/outputs/dev/ has more stages:
+   → Resume at Step 8 (Execution Loop), skip completed stages
+2. If .agents/outputs/hive-consensus.md exists:
+   → Resume at Step 8 (Execution Loop) — consensus was already approved
+3. If .agents/outputs/arch.md exists:
+   → Resume at Step 7 (Consensus Gate)
+4. If .agents/outputs/pm.md exists:
+   → Resume at Step 6 (Dispatch @arch)
+5. Otherwise:
+   → Resume at Step 5 (Dispatch @pm)
 
-3. Determine re-entry step:
-   - If phase == 'escalated':
-     → Resume at Step 8 (Execution Loop), present escalation context first
-   - If consensus.status == 'approved' AND execution block exists:
-     → Resume at Step 8 (Execution Loop), skip completed stages
-   - If .agents/outputs/arch.md exists:
-     → Resume at Step 7 (Consensus Gate)
-   - If .agents/outputs/pm.md exists:
-     → Resume at Step 6 (Dispatch @arch)
-   - Otherwise:
-     → Resume at Step 5 (Dispatch @pm)
-
-4. Use the ORIGINAL goal from workflow-state.json (state.goal), not $GOAL.
+Use the ORIGINAL goal from .agents/goal.md, not $GOAL.
 ```
 
-**Start Fresh**: Write a clean initial state to reset:
-```json
-{
-  "phase": null,
-  "goal": null,
-  "started_at": null,
-  "updated_at": null,
-  "agents": { "pm": { "status": "pending", "output": null }, "arch": { "status": "pending", "output": null }, "dev": [], "reviewer": [] },
-  "consensus": { "status": "pending", "decision_points": [], "user_decisions": null },
-  "execution": { "tasks_total": 0, "tasks_completed": 0, "current_task": 0, "failure_count": 0, "max_failures": 3, "tasks": [] },
-  "event_log": []
-}
+**Start Fresh**: Remove existing output files to reset:
+```bash
+rm -f .agents/goal.md
+rm -rf .agents/outputs/
+mkdir -p .agents/outputs .agents/outputs/dev .agents/outputs/reviews
 ```
 Then proceed to Step 3 with `$GOAL`.
 
@@ -123,45 +124,15 @@ Then proceed to Step 3 with `$GOAL`.
 mkdir -p .agents/outputs .agents/outputs/dev .agents/outputs/reviews
 ```
 
-### Step 4: Initialize State
+### Step 4: Initialize
 
-Write the goal and initialize workflow state.
+Write the goal file:
 
 ```
 Write .agents/goal.md with the goal text.
-
-Write .agents/.state/workflow-state.json:
-{
-  "phase": "init",
-  "goal": "$GOAL",
-  "started_at": "{ISO timestamp}",
-  "updated_at": "{ISO timestamp}",
-  "agents": {
-    "pm": { "status": "pending", "output": null },
-    "arch": { "status": "pending", "output": null },
-    "dev": [],
-    "reviewer": []
-  },
-  "consensus": {
-    "status": "pending",
-    "decision_points": [],
-    "user_decisions": null
-  },
-  "execution": {
-    "tasks_total": 0,
-    "tasks_completed": 0,
-    "current_task": 0,
-    "failure_count": 0,
-    "max_failures": 3,
-    "tasks": []
-  },
-  "event_log": []
-}
 ```
 
 ### Step 5: Dispatch @pm (Autonomous Mode)
-
-Update workflow-state.json: `phase: 'pm'`, `agents.pm.status: 'running'`.
 
 Dispatch @pm using Task tool:
 
@@ -198,12 +169,9 @@ Task({
 
 After @pm completes:
 - Read `.agents/outputs/pm.md` to confirm it exists
-- Update workflow-state.json: `agents.pm.status: 'completed'`, `agents.pm.output: '.agents/outputs/pm.md'`
-- If @pm fails: update `agents.pm.status: 'failed'`, report error to user, stop
+- If @pm fails or output is missing: report error to user, stop
 
 ### Step 6: Dispatch @arch (Autonomous Mode)
-
-Update workflow-state.json: `phase: 'arch'`, `agents.arch.status: 'running'`.
 
 Dispatch @arch using Task tool:
 
@@ -241,11 +209,13 @@ Task({
     Section 3: Technical Decisions with rationale
       - Mark trade-offs with [DECISION NEEDED] tag
 
-    Section 4: Stage Plan with Change Budgets
-      - Each stage: scope, files (max 5), change budget (max 300 impl lines), NOT in scope
+    Section 4: ACS Quality Gate
+
+    Section 5: Stage Plan (L1)
+      - Each stage: scope, files (max 5), completion gate, NOT in scope
       - Use vertical slice strategy (each stage = end-to-end functional slice)
 
-    Section 5: Pseudocode for complex functions (auto-approved in hive mode)
+    Section 6: Pseudocode for complex functions (auto-approved in hive mode)
 
     Also include: File plan (files to create/modify)
 
@@ -256,12 +226,9 @@ Task({
 
 After @arch completes:
 - Read `.agents/outputs/arch.md` to confirm it exists
-- Update workflow-state.json: `agents.arch.status: 'completed'`, `agents.arch.output: '.agents/outputs/arch.md'`
-- If @arch fails: update `agents.arch.status: 'failed'`, report error to user, stop
+- If @arch fails or output is missing: report error to user, stop
 
 ### Step 7: Consensus Gate (Single Human Interaction)
-
-Update workflow-state.json: `phase: 'consensus'`.
 
 This is the **only point where the human is involved** (besides resume detection and escalation).
 
@@ -309,7 +276,7 @@ Options:
 
 #### Step 7.3: Handle Consensus Response
 
-**Approve**: Update workflow-state.json `consensus.status: 'approved'`. Proceed to Step 8.
+**Approve**: Proceed to Step 8.
 
 **Modify**:
 - Read user's modification feedback
@@ -318,15 +285,13 @@ Options:
 - Re-dispatch @hive for updated consensus analysis
 - Return to Step 7.2 to present updated consensus
 
-**Abort**: Update workflow-state.json `phase: 'aborted'`, `consensus.status: 'aborted'`. Write abort reason to `.agents/outputs/hive.md`. Stop.
+**Abort**: Stop execution.
 
 ### Step 8: Per-Stage Execution Loop
 
-Update workflow-state.json: `phase: 'execution'`.
-
 #### Step 8.1: Extract Stages
 
-Read `.agents/outputs/hive-consensus.md` and extract the Stage Execution Plan JSON block. Each stage has: id, scope, files, budget, contract_tests, not_in_scope.
+Read `.agents/outputs/hive-consensus.md` and extract the Stage Execution Plan JSON block. Each stage has: id, scope, files, contract_tests, not_in_scope.
 
 Also extract the contract artifact file list — these are FROZEN files that @dev cannot modify.
 
@@ -355,7 +320,6 @@ Task({
     Stage ID: ${stageId}
     Stage Scope: ${stage.scope}
     Files: ${stage.files.join(', ')}
-    Change Budget: ${stage.budget} implementation lines (max)
     Contract Tests to make GREEN: ${stage.contract_tests}
     NOT in Scope: ${stage.not_in_scope}
 
@@ -381,7 +345,7 @@ Task({
 
     Stage ID: ${stageId}
     Stage Scope: ${stage.scope}
-    Change Budget: ${stage.budget} implementation lines
+    Stage Files: ${stage.files.join(', ')}
     Contract Artifact Files (must be UNCHANGED):
     ${contractFiles.join('\n')}
 
@@ -389,10 +353,10 @@ Task({
     - Requirements in .agents/outputs/pm.md
     - Architecture in .agents/outputs/arch.md
     - Contract integrity (git diff on contract files must be empty)
-    - Change budget compliance
+    - Scope adherence (only stage-plan files modified)
     - Test coverage >= 80%
 
-    Dev Report: Read .agents/outputs/dev/${stageId}.md for contract concerns and budget actuals.
+    Dev Report: Read .agents/outputs/dev/${stageId}.md for context, decisions, and contract concerns.
     Output path: Write review report to .agents/outputs/reviews/${stageId}.md
     If review passes, create a git commit with Stage: ${stageId} trailer.
     Do NOT hand off to @pm — report back directly.
@@ -402,19 +366,15 @@ Task({
 
 After successful stage completion:
 - Reset `failureCount = 0`
-- Add to `completedStages`
-- Update workflow-state.json: `execution.tasks_completed`, `execution.failure_count: 0`
-- Append task record to `execution.tasks[]`
+- Add to `completedStages` (in-memory tracking)
+- Verify `.agents/outputs/reviews/{stageId}.md` exists
 
 On stage failure:
 - Increment `failureCount`
-- Update workflow-state.json: `execution.failure_count`
 - If `failureCount >= 3`: proceed to Step 8.4 (Escalation)
 - Otherwise: retry the same stage
 
 #### Step 8.4: Escalation (After 3 Consecutive Failures)
-
-Update workflow-state.json: `phase: 'escalated'`.
 
 Present escalation summary to the user using AskUserQuestion:
 
@@ -444,12 +404,10 @@ Options:
 
 Handle response:
 - **View Details**: Read and display relevant dev/review reports, then re-ask
-- **Fix and Retry**: Update `phase: 'execution'`, `execution.failure_count: 0`, resume at failed stage
-- **Abort**: Update `phase: 'aborted'`, stop
+- **Fix and Retry**: Reset `failureCount = 0`, resume at failed stage
+- **Abort**: Stop execution
 
 ### Step 9: Completion
-
-Update workflow-state.json: `phase: 'completed'`.
 
 Generate completion report and write to `.agents/outputs/hive.md`:
 
@@ -472,10 +430,10 @@ All {N} stages implemented and committed.
 
 ## Execution Phase
 
-| Stage | Scope | Budget | Actual | Status | Commit |
-|-------|-------|--------|--------|--------|--------|
-| stage-1 | {scope} | {budget} | {actual} | Committed | {sha} |
-| stage-2 | {scope} | {budget} | {actual} | Committed | {sha} |
+| Stage | Scope | Status | Commit |
+|-------|-------|--------|--------|
+| stage-1 | {scope} | Committed | {sha} |
+| stage-2 | {scope} | Committed | {sha} |
 ...
 
 ## Artifacts
@@ -529,7 +487,7 @@ If @pm, @arch, or @hive fails to produce output:
 
 - **Single Human Interaction**: Only the consensus gate (Step 7) requires user input, plus resume detection and escalation
 - **No Agent File Modifications**: @pm and @arch behavior is overridden via dispatch prompts, not by editing their .md files
-- **Unified State**: Uses `.agents/.state/workflow-state.json` for all phases
+- **File-Based Progress**: Tracks progress by output file existence, not state files
 - **3-Failure Escalation**: After 3 consecutive stage failures, /omt stops and asks the human
 - **@reviewer Does NOT Hand Off to @pm**: In hive mode, @reviewer reports back to /omt, not to @pm
 - **@hive Is Analysis Only**: @hive reads outputs and writes hive-consensus.md — it does not dispatch agents or interact with the user

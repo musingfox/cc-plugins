@@ -43,7 +43,7 @@ if grep -q "## Section 5: Stage Plan" "$ARCH_FILE"; then
   if [ "$stage_count" -eq 0 ]; then
     ERRORS="$ERRORS\n  MISSING: No stages found in Section 5"
   else
-    for field in "Scope" "Files" "Change Budget" "Contract Tests" "NOT in Scope"; do
+    for field in "Scope" "Files" "Completion Gate" "Contract Tests" "NOT in Scope"; do
       field_count=$(grep -c "\*\*$field\*\*" "$ARCH_FILE" || true)
       if [ "$field_count" -lt "$stage_count" ]; then
         ERRORS="$ERRORS\n  INCOMPLETE: Stage field '$field' found $field_count times (expected $stage_count for $stage_count stages)"

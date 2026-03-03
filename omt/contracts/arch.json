@@ -9,7 +9,7 @@
       "Define API interfaces and types",
       "Create contract artifact files (type defs + test stubs)",
       "Generate pseudocode for complex functions",
-      "Generate stage plan with change budgets",
+      "Generate stage plan",
       "Create architecture diagram",
       "Document technical decisions",
       "List files to create/modify"
@@ -42,7 +42,7 @@
         "description": "Requirements from PM (if available)"
       },
       {
-        "location": ".agents/.state/workflow-state.json:task.description",
+        "location": ".agents/goal.md",
         "description": "Direct task description"
       },
       {
@@ -83,7 +83,7 @@
       },
       {
         "field_name": "pseudocode_steps",
-        "description": "L2 pseudocode for functions with ≥3 logic branches",
+        "description": "L2 pseudocode for functions with >=2 logic branches or >20 lines",
         "type": "array",
         "items": {
           "function_name": "string",
@@ -105,27 +105,25 @@
       },
       {
         "field_name": "stage_plan",
-        "description": "Per-stage implementation plan with change budgets",
+        "description": "Per-stage implementation plan",
         "type": "array",
         "items": {
           "stage_id": "string",
           "scope": "string",
           "files": ["string"],
-          "change_budget": "number",
           "contract_tests": ["string"],
           "not_in_scope": "string"
         }
       }
     ],
     "destination": [
-      ".agents/outputs/arch.md",
-      ".agents/.state/workflow-state.json:planning.architecture"
+      ".agents/outputs/arch.md"
     ]
   },
   "validation": [
     "all APIs must have interface definitions",
     "files_to_create + files_to_modify <= 15 (otherwise split task)",
-    "each stage max 5 files, max 300 implementation lines"
+    "each stage max 5 files"
   ],
   "complexity_range": [5, 13]
 }

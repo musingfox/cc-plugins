@@ -50,6 +50,31 @@ Read arch_output_path (.agents/outputs/arch.md):
   - Extract pseudocode summaries (Section 5)
 ```
 
+## Phase 1.5: Contract Validation (Agent Output Verification)
+
+After reading pm.md and arch.md, validate their outputs against the contract definitions:
+
+```
+1. Load contract definitions:
+   - ${CLAUDE_PLUGIN_ROOT}/contracts/pm.json
+   - ${CLAUDE_PLUGIN_ROOT}/contracts/arch.json
+
+2. Validate @pm output:
+   - Has user_stories (non-empty array or section)
+   - Has acceptance_criteria (testable items)
+   - Has scope definition (what's in, what's out)
+   - Report any missing or insufficient fields
+
+3. Validate @arch output:
+   - Has api_contracts (interface definitions)
+   - Has architecture_diagram (Mermaid block)
+   - Has stage_plan (with stages)
+   - Has contract_artifact_files (file paths listed)
+   - Report any missing or insufficient fields
+```
+
+Record validation results for inclusion in the consensus summary.
+
 ## Phase 2: Verify Contract Artifacts (Interface Lock)
 
 Verify that @arch's contract artifacts are valid before including them in the consensus.
@@ -81,7 +106,26 @@ Record verification results:
 - Type definitions: compile OK / compile FAIL
 - If any verification fails: report in consensus, do NOT suppress
 
-## Phase 3: Build Consensus Summary
+## Phase 3: Build Consensus Summary (with Cross-Agent Consistency)
+
+Before building the summary, perform cross-agent consistency analysis:
+
+```
+Cross-Agent Consistency Check:
+1. Compare @pm scope boundaries vs @arch file plan:
+   - Are all requirements covered by at least one stage?
+   - Does every user story have a corresponding implementation path?
+
+2. Identify coverage gaps:
+   - @pm requirements with no @arch coverage
+   - @arch stages with no corresponding @pm requirement
+
+3. Check priority alignment:
+   - Do requirements priorities align with stage ordering?
+   - Are high-priority requirements in earlier stages?
+
+4. Flag inconsistencies for human attention in the consensus summary
+```
 
 Create a structured summary covering all information needed for human decision-making.
 
@@ -119,12 +163,25 @@ These files were created by @arch and will be FROZEN after approval:
 
 Approving = these contract files are FROZEN. @dev implements to make tests GREEN but CANNOT modify contract files.
 
+## Contract Validation
+
+| Agent | Output Valid | Details |
+|-------|-------------|---------|
+| @pm | YES/NO | {field-level results} |
+| @arch | YES/NO | {field-level results} |
+
+## Cross-Agent Consistency
+
+- Requirements coverage: {X}/{Y} user stories have implementation paths
+- Gaps identified: {list any @pm requirements with no @arch coverage, or "None"}
+- Priority alignment: {aligned / misaligned — details}
+
 ## Stage Plan
 
-| Stage | Scope | Files | Budget |
-|-------|-------|-------|--------|
-| 1 | {scope} | {count} | {N} lines |
-| 2 | {scope} | {count} | {N} lines |
+| Stage | Scope | Files | Completion Gate |
+|-------|-------|-------|-----------------|
+| 1 | {scope} | {count} | Contract tests GREEN + stage tests pass |
+| 2 | {scope} | {count} | Contract tests GREEN + stage tests pass |
 | ... | ... | ... | ... |
 
 ## Decision Points
@@ -152,7 +209,7 @@ The following functions have auto-approved pseudocode (review now if needed):
 
 ## Phase 4: Build Stage Execution Plan
 
-Parse arch.md Section 4 (Stage Plan) and Section 5 (Pseudocode) to extract a structured execution plan. For each stage, extract:
+Parse arch.md Section 4/5 (Stage Plan) and Section 6 (Pseudocode) to extract a structured execution plan. For each stage, extract:
 
 ```json
 {
@@ -161,7 +218,6 @@ Parse arch.md Section 4 (Stage Plan) and Section 5 (Pseudocode) to extract a str
       "id": "stage-1",
       "scope": "description of what this stage covers",
       "files": ["file1.ts", "file2.ts"],
-      "budget": 200,
       "contract_tests": "tests/contracts/feature.test.ts",
       "not_in_scope": "what to explicitly avoid"
     }
@@ -208,6 +264,8 @@ arch_output: {arch_output_path}
 ## Success Criteria
 
 - pm.md and arch.md fully parsed
+- Agent outputs validated against contract definitions (Phase 1.5)
+- Cross-agent consistency checked (requirements coverage, priority alignment)
 - All [DECISION NEEDED] items extracted
 - Contract artifacts verified (existence, RED tests, type compilation)
 - Structured consensus summary written to hive-consensus.md

@@ -66,7 +66,6 @@ optional:
 source:
   - .agents/outputs/pm.md (requirements)
   - .agents/outputs/arch.md (architecture)
-  - .agents/.state/workflow-state.json:planning.architecture.files_to_modify
 ```
 
 ### Output Contract
@@ -85,34 +84,16 @@ destination:
   - src/ (implementation files)
   - .agents/outputs/dev/{stage-id}.md (per-stage, when dispatched by @hive)
   - .agents/outputs/dev.md (standalone mode)
-  - .agents/.state/workflow-state.json:execution.dev_result
 ```
 
-## Hive State Protocol (Check-in / Check-out)
+## Delivery
 
-When operating within the OMT lifecycle (dispatched by @hive or `/omt`), update workflow-state.json to keep execution tracking current. This is **best-effort** — if the file doesn't exist (standalone usage), skip silently and proceed with core work.
-
-### Check-in (first action before Phase 1)
-
-```
-Read .agents/.state/workflow-state.json
-If file exists AND execution block exists:
-  Note current tasks_completed count for later
-  Set updated_at = current ISO timestamp
-  Write back to .agents/.state/workflow-state.json
-If file does not exist → skip (non-fatal)
-```
-
-### Check-out (after Phase 8 state update)
-
-```
-Read .agents/.state/workflow-state.json
-If file exists AND execution block exists:
-  Increment execution.tasks_completed by 1
-  Set updated_at = current ISO timestamp
-  Write back to .agents/.state/workflow-state.json
-If file does not exist → skip (non-fatal)
-```
+After completing your work:
+1. Write output files to the designated path
+2. If in a jj repository (`jj root` succeeds):
+   - `jj describe -m "omt/dev: {brief summary}"`
+   - `jj new` (create clean change for next agent)
+3. If git-only: output files are sufficient — /omt tracks progress by file existence
 
 ## Agent Workflow
 
@@ -125,11 +106,9 @@ Validate all required inputs before starting:
 const contract = JSON.parse(await Read('${CLAUDE_PLUGIN_ROOT}/contracts/dev.json'));
 
 // 2. Gather input data
-const state = JSON.parse(await Read('.agents/.state/workflow-state.json'));
 const inputData = {
-  requirements: await Read('.agents/outputs/pm.md') || state.task.description,
+  requirements: await Read('.agents/outputs/pm.md') || await Read('.agents/goal.md'),
   architecture: await Read('.agents/outputs/arch.md'),
-  files_to_modify: state.planning?.architecture?.files_to_modify || [],
   existing_tests: await Glob('tests/**/*.{test,spec}.{ts,js,py}')
 };
 
@@ -138,7 +117,6 @@ import { ContractValidator } from '${CLAUDE_PLUGIN_ROOT}/lib/contract-validator.
 
 const inputValidation = ContractValidator.validateInput(contract, {
   agent: 'dev',
-  task_id: state.task_id,
   phase: 'execution',
   input_data: inputData
 });
@@ -173,7 +151,6 @@ When dispatched by @hive with per-stage context, load the contract artifacts:
 3. **Extract Stage Context** from dispatch prompt:
    - Stage ID (e.g., `stage-1`)
    - Stage scope and file list
-   - Change budget (max implementation lines)
    - Contract artifact file paths
    - Output path for stage report
 
@@ -445,88 +422,29 @@ console.log('✓ Output validation passed');
 - **Per-stage mode** (dispatched by @hive): Write to `.agents/outputs/dev/{stage-id}.md`
 - **Standalone mode** (no stage context): Write to `.agents/outputs/dev.md` (backwards compatible)
 
-Create the report with this template:
+Create the report with this template. Focus on decisions, trade-offs, and what @reviewer needs to verify. Don't describe obvious implementations.
 
 ```markdown
-# Dev Execution: [Task Title / Stage Scope]
-
-**Stage ID**: {stage-id or "standalone"}
-**Agent**: @dev
-**Completion Time**: 2026-01-23T15:30:00Z
+# Dev: {stage-id} — {scope}
 
 ## Summary
+{What was implemented, key decisions made}
 
-Implemented {scope} using TDD methodology with {N} test cases and {X}% coverage.
-
-## Change Budget
-
-- **Budgeted**: {budget from dispatch} impl lines
-- **Actual**: {actual from git diff --stat} impl lines
-- **Status**: {WITHIN BUDGET / ⚠️ WARNING: exceeds by N%}
-
-## Contract Compliance
-
-- **Contract test stubs unmodified**: YES / NO
-- **Contract tests now GREEN**: {X}/{Y}
-- **Additional tests written**: {N}
-
-## Deviations from Stage Plan
-
-- {list any scope creep or files touched outside stage plan}
-- {or "None — all changes within stage scope"}
+## Tests
+{passed}/{total} passing, {assertions} assertions
+Contract tests: {X}/{Y} GREEN
 
 ## TDD Iterations
 
 | # | Feature | Tests | Status |
 |---|---------|-------|--------|
-| 1 | login() valid | 1 | ✓ Pass |
-| 2 | login() invalid | 1 | ✓ Pass |
-| 3 | validateToken() | 2 | ✓ Pass |
-| 4 | refreshToken() | 3 | ✓ Pass |
+| 1 | ... | 1 | Pass |
 
-**Total**: {N} iterations, {M} tests, all passing
+## Deviations
+{Deviations from stage plan or pseudocode — "None" if none}
 
-## Test Results
-
-Tests:  {passed} passed, {total} total
-Coverage: {X}% (target: 80%)
-
-## Files Created/Modified
-
-1. `path/to/file.ts` ({N} lines)
-2. ...
-
-## Debugging Sessions (if any)
-
-[Include 5 Whys analysis if debugging was performed]
-
-## Contract Concerns (if any)
-
-[Document any contract test stubs that seemed incorrect — do NOT modify them]
-
-## Next Steps
-
-Ready for code review by @reviewer
-```
-
-**Change Budget Warning**: If actual implementation lines exceed the budget by >20%, add a prominent warning:
-```
-⚠️ CHANGE BUDGET WARNING: Actual ({actual}) exceeds budget ({budget}) by {percentage}%.
-Consider splitting remaining work or discussing with @hive.
-```
-
-### Phase 8: Update State
-
-```typescript
-import { WorkflowStateManager } from '${CLAUDE_PLUGIN_ROOT}/lib/state-manager.js';
-
-const stateManager = new WorkflowStateManager(process.cwd());
-
-// Record execution completion
-await stateManager.recordExecutionAgent('dev', outputValidation);
-
-// Ready for review
-console.log('✅ Development complete. Ready for @reviewer');
+## Contract Concerns
+{Only include if concerns exist — omit entirely if none}
 ```
 
 ## Error Handling
@@ -583,7 +501,6 @@ if (retryCount >= maxRetries) {
 - **One Feature at a Time**: Complete full TDD cycle before next feature
 - **All Tests Must Pass**: Cannot complete with failing tests
 - **Coverage Target**: Minimum 80% test coverage
-- **Change Budget**: Stay within stage's line budget (warn if >20% over)
 - **3 Retry Limit**: Escalate after 3 failed debugging attempts
 
 ## Success Criteria
@@ -595,13 +512,10 @@ if (retryCount >= maxRetries) {
 - ✓ All tests passing (X/X passed)
 - ✓ Coverage ≥ 80%
 - ✓ No linting errors
-- ✓ Change budget respected (or warning documented)
 - ✓ Per-stage report generated (or standalone report)
 - ✓ Output contract validated
-- ✓ State updated
 
 ## References
 
 - Contract Definition: `${CLAUDE_PLUGIN_ROOT}/contracts/dev.json`
 - Contract Validation Skill: `${CLAUDE_PLUGIN_ROOT}/skills/contract-validation/SKILL.md`
-- State Manager: `${CLAUDE_PLUGIN_ROOT}/lib/state-manager.ts`
