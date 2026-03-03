@@ -306,13 +306,34 @@ The generated HTML includes these CDN libraries (all loaded client-side, zero se
                     el.setAttribute('data-aos', 'fade-up');
                 });
 
-                // 7. Initialize Mermaid
+                // 7. Initialize Mermaid (visibility-aware lazy rendering)
+                // Mermaid needs visible DOM to compute SVG layout dimensions.
+                // When multiple files open simultaneously, background tabs have
+                // visibilityState === "hidden" and mermaid.run() silently fails.
                 mermaid.initialize({
                     startOnLoad: false,
                     theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default',
                     securityLevel: 'strict'
                 });
-                mermaid.run();
+
+                var mermaidNodes = document.querySelectorAll('.mermaid');
+                function renderMermaid() {
+                    if (mermaidNodes.length === 0) return;
+                    requestAnimationFrame(function() {
+                        mermaid.run({ nodes: mermaidNodes });
+                    });
+                }
+
+                if (document.visibilityState === 'visible') {
+                    renderMermaid();
+                } else {
+                    document.addEventListener('visibilitychange', function onVisible() {
+                        if (document.visibilityState === 'visible') {
+                            document.removeEventListener('visibilitychange', onVisible);
+                            renderMermaid();
+                        }
+                    });
+                }
 
                 // 8. Initialize AOS scroll animations
                 AOS.init({ duration: 600, once: true, offset: 50 });
