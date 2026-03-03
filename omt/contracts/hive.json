@@ -1,144 +1,71 @@
 {
   "agent": "hive",
-  "description": "Full lifecycle coordinator that autonomously orchestrates planning and execution phases",
+  "description": "Consensus builder that analyzes agent outputs and produces structured consensus summary with execution plan",
   "method": {
-    "name": "Autonomous Lifecycle Coordination",
-    "description": "Dispatch @pm and @arch autonomously, collect consensus, execute @dev/@reviewer loop",
+    "name": "Consensus Analysis",
+    "description": "Read @pm/@arch outputs, verify contract artifacts, extract decision points, produce consensus summary and stage execution plan",
     "steps": [
-      "Initialize workspace and goal",
-      "Dispatch @pm (autonomous mode)",
-      "Dispatch @arch (autonomous mode, pseudocode auto-approved)",
-      "Present consensus summary with decision points",
-      "Execute @dev → @reviewer loop per task",
-      "Generate completion report"
+      "Read and parse pm.md and arch.md",
+      "Verify contract artifacts (file existence, RED tests, type compilation)",
+      "Build structured consensus summary",
+      "Build stage execution plan",
+      "Write hive-consensus.md"
     ]
   },
   "input_contract": {
     "required": [
       {
         "field_name": "goal",
-        "description": "Human-provided goal description for what to build",
+        "description": "Human-provided goal description",
         "type": "string",
         "validation": ["minLength:10"]
       },
       {
-        "field_name": "workspace_initialized",
-        "description": "Whether .agents/ directory exists (from /init-agents)",
-        "type": "boolean"
-      }
-    ],
-    "optional": [
+        "field_name": "pm_output_path",
+        "description": "Path to @pm's output file (e.g., .agents/outputs/pm.md)",
+        "type": "string"
+      },
       {
-        "field_name": "constraints",
-        "description": "Additional constraints or preferences from user",
+        "field_name": "arch_output_path",
+        "description": "Path to @arch's output file (e.g., .agents/outputs/arch.md)",
         "type": "string"
       }
     ],
     "source": [
       {
-        "location": "/omt command argument",
-        "description": "Goal passed via /omt command"
-      },
-      {
-        "location": ".agents/",
-        "description": "Workspace directory from /init-agents"
+        "location": "/omt dispatch prompt",
+        "description": "Goal and output paths passed via Task dispatch"
       }
     ]
   },
   "output_contract": {
     "required": [
       {
-        "field_name": "goal_file",
-        "description": "Goal document written to .agents/goal.md",
+        "field_name": "consensus_summary",
+        "description": "Structured consensus summary covering requirements, architecture, decision points, and risks",
         "type": "string",
-        "validation": ["minLength:10"]
+        "validation": ["minLength:100"]
       },
       {
-        "field_name": "pm_output",
-        "description": "Requirements produced by @pm in autonomous mode",
-        "type": "string",
-        "validation": ["minLength:20"]
+        "field_name": "stage_execution_plan",
+        "description": "JSON array of stages with id, scope, files, budget, contract_tests, not_in_scope",
+        "type": "array"
       },
       {
-        "field_name": "arch_output",
-        "description": "Architecture produced by @arch in autonomous mode",
-        "type": "string",
-        "validation": ["minLength:20"]
-      },
-      {
-        "field_name": "consensus_status",
-        "description": "User consensus decision: approved, modified, or aborted",
-        "type": "string",
-        "validation": ["pattern:^(approved|modified|aborted)$"]
-      },
-      {
-        "field_name": "execution_summary",
-        "description": "Summary of execution phase results",
-        "type": "string"
+        "field_name": "contract_verification",
+        "description": "Results of contract artifact verification (file existence, test status, type compilation)",
+        "type": "object"
       }
     ],
     "destination": [
-      ".agents/goal.md",
-      ".agents/outputs/pm.md",
-      ".agents/outputs/arch.md",
-      ".agents/.state/workflow-state.json",
-      ".agents/outputs/hive.md"
+      ".agents/outputs/hive-consensus.md"
     ]
   },
-  "hive_state_schema": {
-    "phase": {
-      "type": "string",
-      "enum": ["init", "pm", "arch", "consensus", "execution", "completed", "aborted", "escalated"]
-    },
-    "goal": {
-      "type": "string"
-    },
-    "agents": {
-      "pm": {
-        "status": "pending | running | completed | failed",
-        "output": "string | null"
-      },
-      "arch": {
-        "status": "pending | running | completed | failed",
-        "output": "string | null"
-      },
-      "dev": [{ "status": "AgentStatus", "output": "string | null" }],
-      "reviewer": [{ "status": "AgentStatus", "output": "string | null" }]
-    },
-    "consensus": {
-      "status": "pending | approved | modified | aborted",
-      "decision_points": "array",
-      "user_decisions": "object | null"
-    },
-    "execution": {
-      "tasks_total": "number",
-      "tasks_completed": "number",
-      "current_task": "number",
-      "failure_count": "number",
-      "max_failures": 3,
-      "tasks": [{
-        "id": "string",
-        "description": "string",
-        "status": "string",
-        "dev_report": "string",
-        "review_report": "string",
-        "started_at": "string",
-        "completed_at": "string"
-      }]
-    },
-    "event_log": [{
-      "timestamp": "string",
-      "agent": "string",
-      "type": "check_in | check_out | status_change | error | milestone",
-      "stage_id": "string | undefined",
-      "detail": "string | undefined"
-    }]
-  },
   "validation": [
-    "workspace must be initialized before starting",
-    "goal must be at least 10 characters",
-    "consensus must be reached before execution phase",
-    "execution escalates after 3 consecutive failures"
+    "pm output file must exist before analysis",
+    "arch output file must exist before analysis",
+    "all [DECISION NEEDED] items must be extracted",
+    "contract verification results must be included even if failures found"
   ],
-  "complexity_range": [13, 34]
+  "complexity_range": [5, 13]
 }

@@ -50,14 +50,14 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 
 **Key Components**:
 - **5 Core Agents** (`agents/`):
-  - `hive.md` - Full lifecycle coordinator (Sonnet) — dispatched by `/omt`
+  - `hive.md` - Consensus builder and analysis (Sonnet) — dispatched by `/omt`
   - `pm.md` - Requirements management (Haiku)
   - `arch.md` - API-First architecture design (Sonnet)
   - `dev.md` - TDD implementation (Sonnet)
   - `reviewer.md` - Code review + git commit authority (Sonnet)
 
 - **Commands** (`commands/`):
-  - `/omt` - Launch autonomous lifecycle (primary entry point)
+  - `/omt` - Full orchestration — dispatches all agents, presents consensus, executes lifecycle (primary entry point)
   - `/init-agents` - Initialize agent workspace
   - `/approve` - Review important changes
   - `/git-commit` - Emergency manual commit
@@ -78,7 +78,7 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 - **CLI** (`bin/`):
   - `cli.ts` - Bun CLI for workspace management (init, validate, status)
 
-**Workflow**: `/omt "goal"` → @hive dispatches @pm → @arch → Consensus Gate (single human interaction) → @dev/@reviewer execution loop → Completion/Escalation
+**Workflow**: `/omt "goal"` → @pm (requirements) → @arch (architecture) → @hive (consensus analysis) → Human approves → @dev/@reviewer execution loop → Completion/Escalation
 
 ### 2. Mermaid Visualization
 **Location**: `mermaid-viz/`
@@ -182,8 +182,8 @@ Priority order: `mmdc` (global) → `npx -y @mermaid-js/mermaid-cli` (fallback)
 ### OMT Agent Workspace
 `.agents/` is the clean development workspace. Infrastructure lives in `.agents/.state/` (gitignored):
 - `goal.md` — Human goal
-- `outputs/` — Agent output files (pm.md, arch.md, dev.md, hive.md)
-- `.state/` — config.json, state.json, hive-state.json, tasks/
+- `outputs/` — Agent output files (pm.md, arch.md, hive-consensus.md, hive.md, dev/, reviews/)
+- `.state/` — config.json, workflow-state.json, tasks/
 
 CLI management: `bun run omt/bin/cli.ts <init|validate|status>`
 
@@ -192,7 +192,7 @@ Agent contracts are defined in `omt/contracts/`:
 - `pm.json` - @pm input/output contract
 - `arch.json` - @arch input/output contract
 - `dev.json` - @dev → @reviewer execution contract
-- `hive.json` - @hive lifecycle contract
+- `hive.json` - @hive consensus analysis contract
 
 State synchronization is handled by `hooks/state-sync.sh` triggered on Write/Edit operations.
 
