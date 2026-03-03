@@ -205,6 +205,50 @@ Create a sequence diagram with a white background for printing.
 Create three diagrams: 1) system architecture flowchart, 2) authentication sequence diagram, 3) database ER diagram.
 ```
 
+## Beauty Variant: `/diagram-beauty`
+
+An alternative rendering mode using [`beautiful-mermaid`](https://github.com/nicholasgasior/beautiful-mermaid) for synchronous, server-side SVG rendering — no Puppeteer or browser needed.
+
+### Quick Start
+
+```bash
+# Install dependencies (one-time)
+cd mermaid-viz && bun install
+
+# Use the command
+/diagram-beauty
+```
+
+### How It Differs from `/diagram`
+
+| Feature | `/diagram` | `/diagram-beauty` |
+|---------|-----------|-------------------|
+| Renderer | mmdc / npx mermaid-cli | beautiful-mermaid |
+| Output | PNG or SVG | SVG only |
+| Themes | 8 schemes | 15 schemes |
+| Requires | Node.js + Puppeteer | Bun only |
+| Diagram types | All (incl. Gantt, Pie) | Flowchart, Sequence, Class, State, ER, XY |
+| Speed | ~300ms (cached) | Synchronous, near-instant |
+
+### Additional Themes (beauty only)
+
+The beauty variant supports 7 additional themes beyond the standard 8:
+
+`zinc-light`, `zinc-dark`, `tokyo-night-storm`, `tokyo-night-light`, `nord-light`, `solarized-light`, `one-dark`
+
+### Diagram Type Limitations
+
+beautiful-mermaid does **not** support:
+- Gantt charts
+- Pie charts
+- Mindmap diagrams
+
+For these, use the standard `/diagram` command.
+
+### Skill: `mermaid-display-beauty`
+
+The `mermaid-display-beauty` skill triggers automatically when diagrams are requested and conditions favor the beauty variant (SVG preference, no Puppeteer available, etc.).
+
 ## Configuration
 
 ### Quick Setup: Interactive Theme Selection
@@ -704,6 +748,14 @@ MIT License - see LICENSE file for details
 - GitHub: [@musingfox](https://github.com/musingfox)
 
 ## Changelog
+
+### Version 2.1.0
+
+- Added `/diagram-beauty` command using beautiful-mermaid for server-side SVG rendering
+- Added `mermaid-display-beauty` skill for automatic triggering
+- 15 built-in themes (7 additional over standard variant)
+- No Puppeteer or browser dependency — Bun only
+- Synchronous rendering for near-instant output
 
 ### Version 2.0.0 (2026-01-30)
 

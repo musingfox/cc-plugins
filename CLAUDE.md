@@ -92,7 +92,7 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 - Environment variables: `MERMAID_THEME`, `MERMAID_BG`, `MERMAID_WIDTH`, `MERMAID_COLOR_SCHEME`, etc.
 
 ### 3. Document Visualizer
-**Location**: `plan-viz/`
+**Location**: `doc-viz/`
 **Purpose**: Render any markdown document as formatted HTML with syntax highlighting, math, diagrams, and animations
 
 **Key Components**:
@@ -156,14 +156,14 @@ Agents are tested via Task tool or agent-specific workflows (e.g., OMT's `/init-
 
 ## File Locations
 
-- **Plan files**: `~/.claude/plans/*.md` (read by plan-viz)
+- **Plan files**: `~/.claude/plans/*.md` (read by doc-viz)
 - **Mermaid output**: `/tmp/mermaid-diagram-{timestamp}.png`
 - **Document HTML output**: `/tmp/doc-{name}-{timestamp}.html`
 - **Agent workspace** (OMT): `.agents/` directory
 
 ## Critical Implementation Details
 
-### plan-viz UTF-8 Handling
+### doc-viz UTF-8 Handling
 Uses Base64 encoding + TextDecoder to handle multi-byte characters (Chinese, etc.):
 ```javascript
 function base64DecodeUTF8(base64) {
@@ -207,7 +207,7 @@ Then install individual plugins:
 ```bash
 /plugin install omt
 /plugin install mermaid-viz
-/plugin install plan-viz
+/plugin install doc-viz
 /plugin install readability
 /plugin install thinking
 ```
@@ -239,6 +239,6 @@ git config core.hooksPath .githooks
 ## Design Philosophy
 
 - **Single Responsibility**: Each plugin focuses on one specific capability
-- **Zero Dependencies**: Prefer CDN libraries (plan-viz) or universal tools (npx for mermaid-viz)
+- **Zero Dependencies**: Prefer CDN libraries (doc-viz) or universal tools (npx for mermaid-viz)
 - **Composability**: Plugins work independently but complement each other
 - **Minimal Friction**: Commands and skills integrate seamlessly into natural workflows

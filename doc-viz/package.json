@@ -1,0 +1,8 @@
+{
+  "name": "@cc-plugins/doc-viz",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "beautiful-mermaid": "latest"
+  }
+}

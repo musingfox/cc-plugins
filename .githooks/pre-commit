@@ -11,7 +11,7 @@
 #   - plugin.json does not exist
 #
 
-PLUGINS="omt mermaid-viz plan-viz readability thinking"
+PLUGINS="omt mermaid-viz doc-viz readability thinking"
 
 staged_files=$(git diff --cached --name-only --diff-filter=d)
 

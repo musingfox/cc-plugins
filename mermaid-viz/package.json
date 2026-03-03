@@ -1,0 +1,8 @@
+{
+  "name": "@cc-plugins/mermaid-viz",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "beautiful-mermaid": "latest"
+  }
+}

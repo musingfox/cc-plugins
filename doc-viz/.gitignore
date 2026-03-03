@@ -1,0 +1,7 @@
+# Temporary files
+*.html
+.DS_Store
+
+# Dependencies
+node_modules/
+bun.lockb

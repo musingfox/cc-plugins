@@ -24,7 +24,7 @@ Originally built to view Claude Code plan files, this plugin now works with **an
 
 ```bash
 /plugin marketplace add musingfox/cc-plugins
-/plugin install plan-viz
+/plugin install doc-viz
 ```
 
 ### Manual Installation
@@ -56,6 +56,44 @@ The `doc-render` skill automatically triggers when you ask Claude to:
 - "Preview this document"
 - Present complex content with tables, diagrams, or math formulas
 
+## Beauty Variant: `/view-doc-beauty`
+
+An alternative rendering mode that pre-renders Mermaid diagrams to inline SVGs using [`beautiful-mermaid`](https://github.com/nicholasgasior/beautiful-mermaid) — no browser-side Mermaid.js needed.
+
+### Quick Start
+
+```bash
+# Install dependencies (one-time)
+cd doc-viz && bun install
+
+# Use the command
+/view-doc-beauty /path/to/file.md
+```
+
+### How It Differs from `/view-doc`
+
+| Feature | `/view-doc` | `/view-doc-beauty` |
+|---------|------------|-------------------|
+| Mermaid rendering | Browser-side (CDN mermaid.js) | Server-side (beautiful-mermaid) |
+| Diagram format | Dynamic SVG in browser | Pre-rendered inline SVG |
+| Dependencies | None (all CDN) | Bun + beautiful-mermaid |
+| Themes | Browser default/dark | 15 built-in themes |
+| Background tabs | Deferred rendering | Instant (pre-rendered) |
+| Diagram types | All Mermaid types | Flowchart, Sequence, Class, State, ER, XY |
+
+### Diagram Type Limitations
+
+beautiful-mermaid does **not** support:
+- Gantt charts
+- Pie charts
+- Mindmap diagrams
+
+Unsupported diagram types will be left as code blocks. For full Mermaid support, use the standard `/view-doc` command.
+
+### Skill: `doc-render-beauty`
+
+The `doc-render-beauty` skill triggers automatically when documents with diagrams are requested and conditions favor the beauty variant.
+
 ## How It Works
 
 1. **Reads** the target markdown file
@@ -77,14 +115,20 @@ All processing happens client-side using:
 ## Architecture
 
 ```
-plan-viz/
+doc-viz/
 ├── .claude-plugin/
 │   └── plugin.json          # Plugin manifest
 ├── commands/
-│   └── view-doc.md          # /view-doc command
+│   ├── view-doc.md          # /view-doc command
+│   └── view-doc-beauty.md   # /view-doc-beauty command (beautiful-mermaid)
+├── lib/
+│   └── render-beauty.ts     # Mermaid pre-renderer for beauty variant
 ├── skills/
-│   └── doc-render/
-│       └── SKILL.md         # Auto-trigger skill
+│   ├── doc-render/
+│   │   └── SKILL.md         # Auto-trigger skill
+│   └── doc-render-beauty/
+│       └── SKILL.md         # Auto-trigger skill (beautiful-mermaid)
+├── package.json             # Dependencies for beauty variant
 └── README.md
 ```
 
@@ -112,6 +156,14 @@ MIT
 Nick Huang (nick12703990@gmail.com)
 
 ## Changelog
+
+### Version 0.3.0
+
+- Added `/view-doc-beauty` command with server-side Mermaid rendering via beautiful-mermaid
+- Added `doc-render-beauty` auto-trigger skill
+- Pre-rendered SVG diagrams — no browser-side Mermaid.js needed
+- 15 built-in color themes for diagrams
+- Graceful fallback: unsupported diagram types kept as code blocks
 
 ### Version 0.2.0
 

@@ -48,4 +48,4 @@ Automatically render markdown documents as beautifully formatted HTML pages with
 
 ## HTML Template Reference
 
-Use the exact same HTML template defined in the `/view-doc` command (`plan-viz/commands/view-doc.md`, Step 4). This ensures consistent rendering between the command and skill.
+Use the exact same HTML template defined in the `/view-doc` command (`doc-viz/commands/view-doc.md`, Step 4). This ensures consistent rendering between the command and skill.

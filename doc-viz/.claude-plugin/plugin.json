@@ -1,12 +1,12 @@
 {
-  "name": "plan-viz",
-  "version": "0.2.1",
+  "name": "doc-viz",
+  "version": "1.0.0",
   "description": "Render markdown documents as formatted HTML with syntax highlighting, Mermaid diagrams, KaTeX math, and animations",
   "author": {
     "name": "Nick Huang",
     "email": "nick12703990@gmail.com"
   },
-  "homepage": "https://github.com/musingfox/cc-plugins/tree/main/plan-viz",
+  "homepage": "https://github.com/musingfox/cc-plugins/tree/main/doc-viz",
   "license": "MIT",
   "commands": "./commands/",
   "skills": "./skills/"

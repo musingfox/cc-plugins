@@ -79,7 +79,7 @@ Render any markdown document as beautifully formatted HTML:
 
 **Installation:**
 ```bash
-/plugin install plan-viz
+/plugin install doc-viz
 ```
 
 ## Plugin Development
@@ -110,7 +110,7 @@ cc-plugins/
 │   │   └── diagram.md
 │   ├── skills/                   # mermaid-display, mermaid-theme
 │   └── README.md
-├── plan-viz/                     # Document Visualizer plugin
+├── doc-viz/                     # Document Visualizer plugin
 │   ├── .claude-plugin/
 │   │   └── plugin.json
 │   ├── commands/
