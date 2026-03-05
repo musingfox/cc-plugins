@@ -16,11 +16,6 @@
       "description": "Readability Formatting: Enhances AI-generated text readability through proper alignment and formatting of markdown tables, ASCII art, and text-based diagrams"
     },
     {
-      "name": "thinking",
-      "source": "./thinking",
-      "description": "Thinking frameworks for better decision-making: scenario-driven design, dimensional analysis, and explicit trade-offs"
-    },
-    {
       "name": "mermaid-viz",
       "source": "./mermaid-viz",
       "description": "Mermaid Visualization: Display Mermaid diagrams as high-quality PNG/SVG images with 8 beautiful color schemes - flowcharts, sequence diagrams, and more"

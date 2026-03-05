@@ -102,19 +102,39 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 - Base64 encoding for content safety
 - UTF-8 support via TextDecoder API
 
-### 4. Readability
+### 4. Jujutsu (jj) VCS Helper
+**Location**: `jj/`
+**Purpose**: Workflow commands, natural language VCS operations, and Git-to-jj mental model translation
+
+**Key Components**:
+- **Commands** (`commands/`):
+  - `/jj-status` - Rich status overview — working copy, log, bookmarks, conflicts
+  - `/jj-sync` - Sync workflow — fetch all remotes, rebase onto trunk, report conflicts
+  - `/jj-submit [message]` - Submit workflow — describe, new, bookmark, push
+  - `/jj-clean` - Clean up empty/abandoned changes with confirmation
+  - `/jj-undo` - Undo with preview — browse operation log, undo or restore
+
+- **Skills** (`skills/`):
+  - `jj-workflow` - Natural language VCS operations (split, squash, rebase, etc.)
+  - `git-to-jj` - Translates Git terminology to jj equivalents in jj repos
+
+**Auto-Detection**: Detects colocated (`.jj` + `.git`) vs native jj (`.jj` only) repositories automatically.
+
+### 5. Apple Podcasts
+**Location**: `apple-podcasts/`
+**Purpose**: Fetch Apple Podcasts episode audio download URLs via iTunes API and RSS feeds
+
+**Key Components**:
+- `apple-podcasts-fetch` skill — Auto-triggered on Apple Podcasts URLs or download requests
+- Three-step pipeline: Parse URL → iTunes Lookup API → RSS feed `<enclosure>` extraction
+- No browser or scraping required — pure HTTP API workflow
+
+### 6. Readability
 **Location**: `readability/`
 **Purpose**: Terminal text formatting enhancement
 
 **Key Components**:
 - `readable-text-formatting` skill - Automatic markdown table/ASCII art alignment
-
-### 5. Thinking
-**Location**: `thinking/`
-**Purpose**: Decision-making frameworks
-
-**Key Components**:
-- `scenario-thinking` skill - Scenario-driven design methodology
 
 ## Development Workflows
 
@@ -209,7 +229,8 @@ Then install individual plugins:
 /plugin install mermaid-viz
 /plugin install doc-viz
 /plugin install readability
-/plugin install thinking
+/plugin install jj
+/plugin install apple-podcasts
 ```
 
 ## Version Management

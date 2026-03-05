@@ -26,18 +26,6 @@ Your personal development squad powered by Agent-First workflow:
 /plugin install omt
 ```
 
-### Thinking
-
-Thinking frameworks for better decision-making:
-- **Scenario-Driven Design**: Always start with future usage scenarios before proposing solutions
-- **Dimensional Analysis**: Evaluate performance, maintainability, scalability, cost, and more
-- **Explicit Trade-offs**: Clearly communicate what each solution optimizes and sacrifices
-
-**Installation:**
-```bash
-/plugin install thinking
-```
-
 ### Mermaid Visualization
 
 Generate and display high-quality diagrams instantly:
@@ -51,6 +39,31 @@ Generate and display high-quality diagrams instantly:
 **Installation:**
 ```bash
 /plugin install mermaid-viz
+```
+
+### Jujutsu (jj) VCS Helper
+
+Workflow commands and Git-to-jj translation for [Jujutsu](https://github.com/martinvonz/jj):
+- **5 Workflow Commands**: `/jj-status`, `/jj-sync`, `/jj-submit`, `/jj-clean`, `/jj-undo`
+- **Natural Language VCS**: Describe operations like "split this change" or "squash the last two changes"
+- **Git Translation**: Automatically translates Git terminology to jj equivalents in jj repos
+- **Auto-Detection**: Supports both colocated (jj + git) and native jj repositories
+
+**Installation:**
+```bash
+/plugin install jj
+```
+
+### Apple Podcasts
+
+Fetch Apple Podcasts episode audio download URLs:
+- **iTunes API Pipeline**: Resolves episode audio URLs via iTunes Lookup API + RSS feed parsing
+- **Zero Browser**: No scraping needed — pure HTTP API workflow
+- **Auto-Triggered**: Activated when you share an Apple Podcasts URL or ask to download podcast audio
+
+**Installation:**
+```bash
+/plugin install apple-podcasts
 ```
 
 ### Readability
@@ -119,15 +132,21 @@ cc-plugins/
 │   │   └── doc-render/
 │   │       └── SKILL.md
 │   └── README.md
+├── jj/                           # Jujutsu VCS plugin
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   ├── commands/                 # jj-status, jj-sync, jj-submit, jj-clean, jj-undo
+│   ├── skills/                   # jj-workflow, git-to-jj
+│   └── README.md
+├── apple-podcasts/               # Apple Podcasts audio fetcher
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   └── skills/                   # apple-podcasts-fetch
 ├── readability/                  # Text formatting plugin
 │   ├── .claude-plugin/
 │   │   └── plugin.json
 │   ├── skills/                   # readable-text-formatting
 │   └── README.md
-├── thinking/                     # Thinking frameworks plugin
-│   ├── .claude-plugin/
-│   │   └── plugin.json
-│   └── skills/                   # scenario-thinking
 └── README.md
 ```
 
