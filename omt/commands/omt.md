@@ -55,6 +55,16 @@ Run /init-agents first to set up the workspace, then run /omt again.
 
 Stop execution here if workspace is missing.
 
+#### VCS Detection
+
+Detect the VCS environment (one-time check):
+
+```bash
+jj root 2>/dev/null && echo "USE_JJ=true" || echo "USE_JJ=false"
+```
+
+Store the result as `$USE_JJ` for use throughout the session. This determines how milestone commits are created.
+
 ### Step 2.5: Resume Detection
 
 Check for existing output files to detect an interrupted session:
@@ -132,6 +142,10 @@ Write the goal file:
 Write .agents/goal.md with the goal text.
 ```
 
+**Milestone Commit**: Execute the Milestone Commit Protocol with:
+- Message: `plan: initialize omt workspace for {goal summary}`
+- Files: `.agents/goal.md`
+
 ### Step 5: Dispatch @pm (Autonomous Mode)
 
 Dispatch @pm using Task tool:
@@ -170,6 +184,10 @@ Task({
 After @pm completes:
 - Read `.agents/outputs/pm.md` to confirm it exists
 - If @pm fails or output is missing: report error to user, stop
+
+**Milestone Commit**: Execute the Milestone Commit Protocol with:
+- Message: `plan: define requirements for {goal summary}`
+- Files: `.agents/outputs/pm.md`
 
 ### Step 6: Dispatch @arch (Autonomous Mode)
 
@@ -228,6 +246,10 @@ After @arch completes:
 - Read `.agents/outputs/arch.md` to confirm it exists
 - If @arch fails or output is missing: report error to user, stop
 
+**Milestone Commit**: Execute the Milestone Commit Protocol with:
+- Message: `plan: design architecture for {goal summary}`
+- Files: `.agents/outputs/arch.md` + any contract artifact files created by @arch (type defs, test stubs listed in arch.md Section 1)
+
 ### Step 7: Consensus Gate (Single Human Interaction)
 
 This is the **only point where the human is involved** (besides resume detection and escalation).
@@ -257,6 +279,10 @@ Task({
 })
 ```
 
+**Milestone Commit**: Execute the Milestone Commit Protocol with:
+- Message: `plan: consensus analysis for {goal summary}`
+- Files: `.agents/outputs/hive-consensus.md`
+
 #### Step 7.2: Read and Present Consensus
 
 Read `.agents/outputs/hive-consensus.md`. Present the consensus summary to the user.
@@ -276,13 +302,20 @@ Options:
 
 #### Step 7.3: Handle Consensus Response
 
-**Approve**: Proceed to Step 8.
+**Approve**:
+- **Milestone Commit**: Execute the Milestone Commit Protocol with:
+  - Message: `plan: approved execution plan for {goal summary}`
+  - Files: Use `git commit --allow-empty` (git) or `jj describe` on current change (jj) — this is an approval marker, no new files
+- Proceed to Step 8.
 
 **Modify**:
 - Read user's modification feedback
 - Determine which agent(s) need re-running (@pm and/or @arch)
 - Re-dispatch affected agent(s) with modifications included in the prompt
 - Re-dispatch @hive for updated consensus analysis
+- **Milestone Commit**: Execute the Milestone Commit Protocol with:
+  - Message: `plan: revise {pm|arch|both} — {modification summary}`
+  - Files: Affected output files (`.agents/outputs/pm.md`, `.agents/outputs/arch.md`, `.agents/outputs/hive-consensus.md`)
 - Return to Step 7.2 to present updated consensus
 
 **Abort**: Stop execution.
@@ -358,16 +391,20 @@ Task({
 
     Dev Report: Read .agents/outputs/dev/${stageId}.md for context, decisions, and contract concerns.
     Output path: Write review report to .agents/outputs/reviews/${stageId}.md
-    If review passes, create a git commit with Stage: ${stageId} trailer.
+    Do NOT create git commits — /omt orchestrator handles milestone commits.
     Do NOT hand off to @pm — report back directly.
   `
 })
 ```
 
-After successful stage completion:
+After @reviewer completes with APPROVE verdict:
+- Verify `.agents/outputs/reviews/{stageId}.md` exists and contains "APPROVE"
+- **Milestone Commit**: Execute the Milestone Commit Protocol with:
+  - Message: `feat|fix|refactor(scope): {stage description}` (choose type based on stage content)
+  - Files: Stage implementation files + `.agents/outputs/dev/${stageId}.md` + `.agents/outputs/reviews/${stageId}.md`
+  - Additional trailers: `Stage: {stage-id}`, `Reviewed-By: @reviewer`
 - Reset `failureCount = 0`
 - Add to `completedStages` (in-memory tracking)
-- Verify `.agents/outputs/reviews/{stageId}.md` exists
 
 On stage failure:
 - Increment `failureCount`
@@ -456,6 +493,45 @@ Summarize the outcome to the user:
 - If aborted: Confirm abortion and explain what was produced
 - If escalated: Show the escalation summary and suggested next steps
 
+## Milestone Commit Protocol
+
+Every milestone step produces a git-visible commit (or jj equivalent). This protocol is referenced by each step below.
+
+**Input**: `commit_message` (conventional commit format), `files_to_include` (list of paths)
+
+```
+If USE_JJ:
+  1. jj squash                     # Collapse changes since last milestone
+  2. jj describe -m "{commit_message}"
+  3. jj new                        # Clean change for next phase
+Else (git):
+  1. git add {files_to_include}
+  2. git commit using HEREDOC:
+     {commit_message}
+
+     Co-Authored-By: Claude <noreply@anthropic.com>
+     Agent-Workflow: omt
+  3. Verify: git status
+```
+
+**Commit Schedule**:
+
+| Commit | After Step | Message Format | Files |
+|--------|-----------|---------------|-------|
+| 1 | Step 4 | `plan: initialize omt workspace for {goal summary}` | `.agents/goal.md` |
+| 2 | Step 5 | `plan: define requirements for {goal summary}` | `.agents/outputs/pm.md` |
+| 3 | Step 6 | `plan: design architecture for {goal summary}` | `.agents/outputs/arch.md` + contract artifact files |
+| 4 | Step 7.1 | `plan: consensus analysis for {goal summary}` | `.agents/outputs/hive-consensus.md` |
+| 5 | Step 7.3 Approve | `plan: approved execution plan for {goal summary}` | Empty commit (approval marker) — use `git commit --allow-empty` or `jj describe` on current change |
+| 5+N | Step 7.3 Modify | `plan: revise {pm\|arch\|both} — {modification summary}` | Affected output files |
+| 6+ | Step 8 per stage | `feat\|fix\|refactor(scope): {stage description}` | Stage files + `.agents/outputs/dev/{stageId}.md` + `.agents/outputs/reviews/{stageId}.md` |
+
+**Stage commit trailers** (Step 8 only):
+```
+Stage: {stage-id}
+Reviewed-By: @reviewer
+```
+
 ## Error Handling
 
 ### Workspace Not Initialized
@@ -489,5 +565,7 @@ If @pm, @arch, or @hive fails to produce output:
 - **No Agent File Modifications**: @pm and @arch behavior is overridden via dispatch prompts, not by editing their .md files
 - **File-Based Progress**: Tracks progress by output file existence, not state files
 - **3-Failure Escalation**: After 3 consecutive stage failures, /omt stops and asks the human
-- **@reviewer Does NOT Hand Off to @pm**: In hive mode, @reviewer reports back to /omt, not to @pm
+- **@reviewer Does NOT Hand Off to @pm**: @reviewer reports back to /omt, not to @pm
+- **@reviewer Does NOT Create Git Commits**: /omt orchestrator handles all milestone commits after review approval
 - **@hive Is Analysis Only**: @hive reads outputs and writes hive-consensus.md — it does not dispatch agents or interact with the user
+- **Dual-Track VCS**: In jj repos, agents create fine-grained jj changes (describe + new); /omt creates milestone commits via jj squash. In git-only repos, /omt creates git commits at each milestone.

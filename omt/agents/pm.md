@@ -20,7 +20,7 @@ After completing your work:
 2. If in a jj repository (`jj root` succeeds):
    - `jj describe -m "omt/pm: {brief summary}"`
    - `jj new` (create clean change for next agent)
-3. If git-only: output files are sufficient — /omt tracks progress by file existence
+3. Do NOT create git commits — /omt orchestrator handles milestone commits
 
 ## Core Identity: Your Personal Project Assistant
 
