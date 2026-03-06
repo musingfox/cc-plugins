@@ -1,0 +1,11 @@
+{
+  "name": "markitdown",
+  "version": "0.1.0",
+  "description": "Convert PDF, Office documents, images, and more to Markdown using Microsoft's MarkItDown",
+  "author": {
+    "name": "musingfox"
+  },
+  "repository": "https://github.com/musingfox/cc-plugins",
+  "license": "MIT",
+  "keywords": ["markitdown", "pdf", "docx", "pptx", "xlsx", "converter", "markdown"]
+}

@@ -34,6 +34,11 @@
       "name": "apple-podcasts",
       "source": "./apple-podcasts",
       "description": "Fetch Apple Podcasts episode audio download URLs via iTunes API and RSS feeds"
+    },
+    {
+      "name": "markitdown",
+      "source": "./markitdown",
+      "description": "Convert PDF, Office documents, images, audio, and more to Markdown using Microsoft's MarkItDown"
     }
   ]
 }
