@@ -129,7 +129,34 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 - Three-step pipeline: Parse URL → iTunes Lookup API → RSS feed `<enclosure>` extraction
 - No browser or scraping required — pure HTTP API workflow
 
-### 6. Readability
+### 6. Context Flow (Experimental)
+**Location**: `context-flow/`
+**Purpose**: Experimental agentic workflow based on the Context + Goal + Tools principle
+
+**Design Philosophy**: Agents are NOT defined by roles (architect, PM, developer). Each agent is defined by three things:
+- **Context**: What information it receives (and what it does NOT receive)
+- **Goal**: What output it must produce (one clear sentence)
+- **Tools**: What actions it can take (structural boundary via frontmatter)
+
+**Key Components**:
+- **Command** (`commands/`):
+  - `/cf "goal"` - Orchestrator that manages the 4-phase context-flow pipeline
+
+- **4 Agents** (`agents/`):
+  - `research.md` - Context: goal + working directory → Output: capability inventory
+  - `plan.md` - Context: compressed goal + research output → Output: contracts + test cases
+  - `implement.md` - Context: contracts + test cases only → Output: passing implementation
+  - `review.md` - Context: contracts + git diff → Output: pass/fail verdict
+
+**Workflow**: `/cf "goal"` → [research] → validate output → [plan] → validate contracts → HUMAN GATE → [implement] → validate tests pass → [review] → verdict
+
+**Key Differences from OMT**:
+- Agent definitions are 1-16 lines (vs 100+ lines in OMT) — constraints come from context isolation, not prompt instructions
+- Orchestrator controls context flow: what each agent sees is explicitly specified, not implicit
+- Contract validation between phases: each phase's output must meet structural requirements before flowing to the next
+- Contracts are passed AS context to agents (binding constraint), not described in prompts (suggestion)
+
+### 7. Readability
 **Location**: `readability/`
 **Purpose**: Terminal text formatting enhancement
 
@@ -180,6 +207,7 @@ Agents are tested via Task tool or agent-specific workflows (e.g., OMT's `/init-
 - **Mermaid output**: `/tmp/mermaid-diagram-{timestamp}.png`
 - **Document HTML output**: `/tmp/doc-{name}-{timestamp}.html`
 - **Agent workspace** (OMT): `.agents/` directory
+- **Context-flow session**: `/tmp/context-flow-{timestamp}/` (goal.md, research.md, plan.md, review.md)
 
 ## Critical Implementation Details
 
@@ -231,6 +259,7 @@ Then install individual plugins:
 /plugin install readability
 /plugin install jj
 /plugin install apple-podcasts
+/plugin install context-flow
 ```
 
 ## Version Management

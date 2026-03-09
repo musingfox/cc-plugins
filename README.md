@@ -66,6 +66,21 @@ Fetch Apple Podcasts episode audio download URLs:
 /plugin install apple-podcasts
 ```
 
+### Context Flow (Experimental)
+
+Experimental agentic workflow based on the **Context + Goal + Tools** principle:
+- **Core Idea**: Agents are defined by what context they see and what tools they have — not by role-based personas
+- **4-Phase Pipeline**: Research → Plan → Implement → Review, with contract validation between phases
+- **Contract as Context**: Each phase's output schema serves as binding constraints for the next phase, enforced structurally (not via prompt)
+- **Minimal Agent Definitions**: Agent prompts are 1-16 lines; constraints come from context isolation and tool restrictions
+- **Human Gate**: Plan review before implementation — the highest-leverage review point
+- **Single Command**: `/cf "goal"` runs the full pipeline
+
+**Installation:**
+```bash
+/plugin install context-flow
+```
+
 ### Readability
 
 Enhances AI-generated text readability:
@@ -142,6 +157,12 @@ cc-plugins/
 │   ├── .claude-plugin/
 │   │   └── plugin.json
 │   └── skills/                   # apple-podcasts-fetch
+├── context-flow/                 # [Experimental] Context-flow pipeline
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   ├── commands/
+│   │   └── cf.md                 # Orchestrator — context flow + contract validation
+│   └── agents/                   # research, plan, implement, review
 ├── readability/                  # Text formatting plugin
 │   ├── .claude-plugin/
 │   │   └── plugin.json
