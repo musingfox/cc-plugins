@@ -39,6 +39,11 @@
       "name": "markitdown",
       "source": "./markitdown",
       "description": "Convert PDF, Office documents, images, audio, and more to Markdown using Microsoft's MarkItDown"
+    },
+    {
+      "name": "context-flow",
+      "source": "./context-flow",
+      "description": "[Experimental] Context-flow pipeline — agents defined by Context + Goal + Tools, not roles"
     }
   ]
 }
