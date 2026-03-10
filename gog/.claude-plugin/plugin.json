@@ -1,0 +1,10 @@
+{
+  "name": "gog",
+  "version": "0.1.0",
+  "description": "Skills for using Google Workspace via gogcli (gog) CLI — Gmail, Calendar, Drive",
+  "author": {
+    "name": "musingfox"
+  },
+  "repository": "https://github.com/musingfox/cc-plugins",
+  "keywords": ["google", "gmail", "calendar", "drive", "gogcli"]
+}

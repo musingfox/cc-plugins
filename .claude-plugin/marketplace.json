@@ -44,6 +44,11 @@
       "name": "context-flow",
       "source": "./context-flow",
       "description": "[Experimental] Context-flow pipeline — agents defined by Context + Goal + Tools, not roles"
+    },
+    {
+      "name": "gog",
+      "source": "./gog",
+      "description": "Google Workspace CLI skills — Gmail, Calendar, and Drive via gogcli (gog)"
     }
   ]
 }

@@ -81,6 +81,21 @@ Experimental agentic workflow based on the **Context + Goal + Tools** principle:
 /plugin install context-flow
 ```
 
+### gog (Google Workspace)
+
+Interact with Google Workspace services via the [gogcli](https://github.com/steipete/gogcli) CLI:
+- **3 Specialized Skills**: Gmail, Calendar, Drive — each triggered by natural language
+- **Gmail**: Search, send, reply, threads, labels, drafts, attachments
+- **Calendar**: Events, create, update, delete, freebusy, conflicts, RSVP, focus-time, OOO
+- **Drive**: List, search, upload, download, export, share, copy, move, permissions
+- **Safety-First**: All destructive operations require `--dry-run` preview before execution
+- **Prerequisites**: `brew install gogcli` + `gog auth add <email>`
+
+**Installation:**
+```bash
+/plugin install gog
+```
+
 ### Readability
 
 Enhances AI-generated text readability:
@@ -163,6 +178,10 @@ cc-plugins/
 │   ├── commands/
 │   │   └── cf.md                 # Orchestrator — context flow + contract validation
 │   └── agents/                   # research, plan, implement, review
+├── gog/                             # Google Workspace CLI skills
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   └── skills/                   # gog-gmail, gog-calendar, gog-drive
 ├── readability/                  # Text formatting plugin
 │   ├── .claude-plugin/
 │   │   └── plugin.json

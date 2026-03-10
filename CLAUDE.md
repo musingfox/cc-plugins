@@ -156,7 +156,21 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 - Contract validation between phases: each phase's output must meet structural requirements before flowing to the next
 - Contracts are passed AS context to agents (binding constraint), not described in prompts (suggestion)
 
-### 7. Readability
+### 8. gog (Google Workspace)
+**Location**: `gog/`
+**Purpose**: Skills for interacting with Google Workspace services via the `gog` CLI (gogcli)
+
+**Key Components**:
+- **Skills** (`skills/`):
+  - `gog-gmail` - Gmail operations: search, send, reply, threads, labels, drafts, attachments
+  - `gog-calendar` - Calendar operations: events, create, update, delete, freebusy, conflicts, RSVP, focus-time
+  - `gog-drive` - Drive operations: list, search, upload, download, share, copy, move, permissions
+
+**Prerequisites**: `gog` CLI installed (`brew install gogcli`) and authenticated (`gog auth add <email>`)
+
+**Safety Pattern**: All destructive operations (send, delete, share) require `--dry-run` preview before execution.
+
+### 9. Readability
 **Location**: `readability/`
 **Purpose**: Terminal text formatting enhancement
 
@@ -260,6 +274,7 @@ Then install individual plugins:
 /plugin install jj
 /plugin install apple-podcasts
 /plugin install context-flow
+/plugin install gog
 ```
 
 ## Version Management
