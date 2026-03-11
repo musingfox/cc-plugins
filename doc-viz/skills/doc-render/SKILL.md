@@ -5,11 +5,14 @@ description: >-
   Triggers when user asks to view, render, or preview a document as HTML,
   or when presenting lengthy structured content (tables, diagrams, plans)
   that would be more readable as a web page than terminal output.
+  Also triggers proactively when about to render a table with 4+ rows
+  or 3+ columns, structured comparisons, audits, or any output exceeding
+  50 lines of formatted content in the terminal.
 ---
 
 # Document Render Skill
 
-Automatically render markdown documents as beautifully formatted HTML pages with syntax highlighting, math formulas, Mermaid diagrams, and scroll animations.
+Automatically render markdown documents as beautifully formatted HTML pages with syntax highlighting, math formulas, Mermaid diagrams, and scroll animations. Features sticky TOC navigation, zoom/pan Mermaid controls, enhanced tables, and collapsible code blocks.
 
 ## When to Use
 
@@ -17,6 +20,9 @@ Automatically render markdown documents as beautifully formatted HTML pages with
 - Content contains complex tables, Mermaid diagrams, or math formulas that render poorly in terminal
 - Presenting plans, specs, or documentation for review where visual formatting matters
 - User says "make this readable" or "format this nicely" for long structured content
+- **Proactive**: About to output a table with 4+ rows or 3+ columns in the terminal
+- **Proactive**: About to output a comparison, audit, feature matrix, or status report as ASCII
+- **Proactive**: Conversation output would exceed ~50 lines of structured content (lists, tables, code blocks)
 
 ## When NOT to Use
 

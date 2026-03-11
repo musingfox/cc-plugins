@@ -1,6 +1,6 @@
 {
   "name": "doc-viz",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Render markdown documents as formatted HTML with syntax highlighting, Mermaid diagrams, KaTeX math, and animations",
   "author": {
     "name": "Nick Huang",

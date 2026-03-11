@@ -114,6 +114,9 @@ The generated HTML includes these CDN libraries (all loaded client-side, zero se
     <!-- AOS scroll animations -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css">
 
+    <!-- Fonts: Noto Sans TC + Fira Code -->
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -121,7 +124,7 @@ The generated HTML includes these CDN libraries (all loaded client-side, zero se
             max-width: 900px;
             margin: 40px auto;
             padding: 0 20px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", Roboto, sans-serif;
+            font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             line-height: 1.7;
             color: #333;
             background: #fff;
@@ -146,7 +149,7 @@ The generated HTML includes these CDN libraries (all loaded client-side, zero se
             background: #f5f5f5;
             padding: 2px 6px;
             border-radius: 3px;
-            font-family: "SF Mono", Monaco, Consolas, "Liberation Mono", monospace;
+            font-family: 'Fira Code', "SF Mono", Monaco, Consolas, monospace;
             font-size: 0.9em;
         }
 
@@ -167,10 +170,13 @@ The generated HTML includes these CDN libraries (all loaded client-side, zero se
             line-height: 1.5;
         }
 
-        table { border-collapse: collapse; width: 100%; margin: 1em 0; }
-        th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
-        th { background: #f5f5f5; font-weight: 600; }
+        .table-wrap { overflow-x: auto; margin: 1em 0; border-radius: 6px; }
+        table { border-collapse: collapse; width: 100%; margin: 0; }
+        th, td { border-bottom: 1px solid #ddd; padding: 10px 14px; text-align: left; }
+        th { background: #f5f5f5; font-weight: 600; position: sticky; top: 0; z-index: 1; }
         tr:nth-child(even) { background: #fafafa; }
+        tr:hover td { background: rgba(0, 100, 200, 0.04); }
+        td { font-variant-numeric: tabular-nums; }
 
         blockquote {
             border-left: 4px solid #ddd;
@@ -185,19 +191,118 @@ The generated HTML includes these CDN libraries (all loaded client-side, zero se
         hr { border: none; border-top: 1px solid #eee; margin: 2em 0; }
         img { max-width: 100%; height: auto; border-radius: 4px; }
 
-        .mermaid {
-            background: white;
-            padding: 20px;
-            border-radius: 6px;
+        .mermaid-shell {
+            position: relative;
             margin: 1em 0;
             border: 1px solid #e1e1e1;
+            border-radius: 6px;
+            overflow: hidden;
+            background: white;
+        }
+        .zoom-controls {
+            position: absolute; top: 8px; right: 8px;
+            display: flex; gap: 4px; z-index: 10;
+            opacity: 0; transition: opacity 0.2s;
+        }
+        .mermaid-shell:hover .zoom-controls { opacity: 1; }
+        .zoom-controls button {
+            width: 28px; height: 28px;
+            border: 1px solid #ddd; border-radius: 4px;
+            background: rgba(255,255,255,0.9);
+            cursor: pointer; font-size: 14px;
+            display: flex; align-items: center; justify-content: center;
+            color: #555; backdrop-filter: blur(4px);
+        }
+        .zoom-controls button:hover { background: #f0f0f0; border-color: #bbb; }
+        .mermaid-viewport {
+            overflow: hidden; cursor: grab;
+            min-height: 100px; padding: 20px;
+        }
+        .mermaid-viewport:active { cursor: grabbing; }
+        .mermaid-viewport .mermaid {
             text-align: center;
+            transform-origin: 0 0;
+            transition: transform 0.15s ease-out;
         }
 
         .katex-display {
             overflow-x: auto;
             overflow-y: hidden;
             padding: 0.5em 0;
+        }
+
+        /* TOC navigation */
+        body.has-toc { max-width: none; margin: 0; padding: 0; }
+        .doc-layout {
+            display: flex;
+            max-width: 900px; margin: 40px auto; padding: 0 20px;
+        }
+        .toc {
+            display: none; position: sticky; top: 40px;
+            max-height: calc(100vh - 80px); overflow-y: auto;
+            font-size: 0.85em; padding-right: 1em;
+            border-right: 1px solid #eee;
+        }
+        .toc a {
+            display: block; padding: 4px 8px;
+            color: #666; text-decoration: none;
+            border-left: 2px solid transparent;
+            transition: all 0.15s; line-height: 1.4;
+        }
+        .toc a:hover { color: #333; }
+        .toc a.active { color: #0366d6; border-left-color: #0366d6; font-weight: 500; }
+        .toc a.toc-h3 { padding-left: 20px; font-size: 0.92em; }
+        @media (min-width: 1200px) {
+            .doc-layout { max-width: 1200px; gap: 3em; }
+            .toc { display: block; width: 220px; min-width: 220px; }
+            .doc-layout #content { min-width: 0; flex: 1; }
+        }
+        .toc-mobile {
+            display: none; overflow-x: auto; padding: 8px 0;
+            margin-bottom: 1em; border-bottom: 1px solid #eee;
+            -webkit-overflow-scrolling: touch;
+        }
+        .toc-mobile a {
+            white-space: nowrap; padding: 4px 12px;
+            color: #666; text-decoration: none; font-size: 0.82em;
+            border-bottom: 2px solid transparent;
+        }
+        .toc-mobile a.active { color: #0366d6; border-bottom-color: #0366d6; }
+        @media (max-width: 1199px) {
+            .toc-mobile.has-items { display: flex; }
+        }
+
+        /* Collapsible code blocks */
+        details.code-collapse { margin: 1em 0; }
+        details.code-collapse summary {
+            cursor: pointer; padding: 8px 16px;
+            background: #282c34; border-radius: 6px;
+            color: #abb2bf; font-family: 'Fira Code', monospace;
+            font-size: 0.82em; list-style: none;
+            display: flex; align-items: center; gap: 6px;
+            border: 1px solid #e1e1e1;
+        }
+        details.code-collapse summary::-webkit-details-marker { display: none; }
+        details.code-collapse summary::before { content: '\25b6'; font-size: 0.7em; transition: transform 0.2s; }
+        details.code-collapse[open] summary::before { transform: rotate(90deg); }
+        details.code-collapse[open] summary { border-radius: 6px 6px 0 0; border-bottom: none; }
+        details.code-collapse pre { margin-top: 0 !important; border-radius: 0 0 6px 6px !important; }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            body { margin: 16px auto; padding: 0 14px; font-size: 15px; }
+            body.has-toc { padding: 0; }
+            .doc-layout { margin: 16px auto; padding: 0 14px; }
+            h1 { font-size: 1.5em; }
+            h2 { font-size: 1.25em; }
+            h3 { font-size: 1.1em; }
+            pre { padding: 12px; font-size: 0.82em; }
+            code { font-size: 0.85em; }
+            th, td { padding: 8px 10px; font-size: 0.9em; }
+            .mermaid-viewport { padding: 10px; }
+            .zoom-controls { opacity: 1; }
+            .zoom-controls button { width: 32px; height: 32px; font-size: 16px; }
+            details.code-collapse summary { padding: 8px 12px; }
         }
 
         /* Dark mode */
@@ -207,12 +312,23 @@ The generated HTML includes these CDN libraries (all loaded client-side, zero se
             h1, h2 { border-bottom-color: #333; }
             code { background: #2d2d2d; }
             pre { background: #282c34; border-color: #444; }
-            th, td { border-color: #444; }
+            th, td { border-bottom-color: #444; }
             th { background: #2d2d2d; }
             tr:nth-child(even) { background: #222; }
+            tr:hover td { background: rgba(100, 160, 255, 0.06); }
             blockquote { border-left-color: #555; background: #252525; color: #aaa; }
             hr { border-top-color: #333; }
-            .mermaid { background: #2d2d2d; border-color: #444; }
+            .mermaid-shell { background: #2d2d2d; border-color: #444; }
+            .zoom-controls button { background: rgba(45,45,45,0.9); border-color: #555; color: #ccc; }
+            .zoom-controls button:hover { background: #444; }
+            .toc { border-right-color: #333; }
+            .toc a { color: #888; }
+            .toc a:hover { color: #ccc; }
+            .toc a.active { color: #58a6ff; border-left-color: #58a6ff; }
+            .toc-mobile { border-bottom-color: #333; }
+            .toc-mobile a { color: #888; }
+            .toc-mobile a.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+            details.code-collapse summary { border-color: #444; }
         }
     </style>
 </head>
@@ -292,38 +408,134 @@ The generated HTML includes these CDN libraries (all loaded client-side, zero se
                     });
                 });
 
-                // 5. Convert mermaid code blocks to mermaid divs
+                // 5. Helper: create zoom control buttons
+                function createZoomControls() {
+                    var controls = document.createElement('div');
+                    controls.className = 'zoom-controls';
+                    var actions = [
+                        { action: 'zoom-in', title: 'Zoom in', label: '+' },
+                        { action: 'zoom-out', title: 'Zoom out', label: '\u2212' },
+                        { action: 'zoom-reset', title: 'Reset', label: '1:1' },
+                        { action: 'expand', title: 'Open in new tab', label: '\u26F6' }
+                    ];
+                    actions.forEach(function(item) {
+                        var btn = document.createElement('button');
+                        btn.dataset.action = item.action;
+                        btn.title = item.title;
+                        btn.textContent = item.label;
+                        controls.appendChild(btn);
+                    });
+                    return controls;
+                }
+
+                // 6. Convert mermaid code blocks to shells with zoom/pan
                 document.querySelectorAll('code.language-mermaid').forEach(function(codeBlock) {
                     var pre = codeBlock.parentElement;
+                    var shell = document.createElement('div');
+                    shell.className = 'mermaid-shell';
+                    shell.appendChild(createZoomControls());
+                    var viewport = document.createElement('div');
+                    viewport.className = 'mermaid-viewport';
                     var mermaidDiv = document.createElement('div');
                     mermaidDiv.className = 'mermaid';
                     mermaidDiv.textContent = codeBlock.textContent;
-                    pre.replaceWith(mermaidDiv);
+                    viewport.appendChild(mermaidDiv);
+                    shell.appendChild(viewport);
+                    pre.replaceWith(shell);
                 });
 
-                // 6. Add AOS scroll animations to content sections
-                document.querySelectorAll('h1, h2, h3, table, pre, blockquote, .mermaid, .katex-display').forEach(function(el) {
+                // 7. Wrap tables in scrollable containers
+                document.querySelectorAll('#content table').forEach(function(table) {
+                    if (table.parentElement.classList.contains('table-wrap')) return;
+                    var wrap = document.createElement('div');
+                    wrap.className = 'table-wrap';
+                    table.parentNode.insertBefore(wrap, table);
+                    wrap.appendChild(table);
+                });
+
+                // 8. Collapse long code blocks (30+ lines)
+                document.querySelectorAll('#content pre').forEach(function(pre) {
+                    if (pre.closest('.mermaid-shell')) return;
+                    var lines = pre.textContent.split('\n').length;
+                    if (lines < 30) return;
+                    var details = document.createElement('details');
+                    details.className = 'code-collapse';
+                    var summary = document.createElement('summary');
+                    var lang = '';
+                    var code = pre.querySelector('code');
+                    if (code) {
+                        var m = code.className.match(/language-(\w+)/);
+                        if (m) lang = m[1];
+                    }
+                    summary.textContent = lang ? lang + ' \u2014 ' + lines + ' lines' : lines + ' lines';
+                    details.appendChild(summary);
+                    pre.parentNode.insertBefore(details, pre);
+                    details.appendChild(pre);
+                });
+
+                // 9. Generate TOC from headings (4+ sections)
+                var headings = document.querySelectorAll('#content h2, #content h3');
+                if (headings.length >= 4) {
+                    var toc = document.createElement('nav');
+                    toc.className = 'toc';
+                    var tocMobile = document.createElement('nav');
+                    tocMobile.className = 'toc-mobile has-items';
+                    headings.forEach(function(h, i) {
+                        if (!h.id) h.id = 'heading-' + i;
+                        var a = document.createElement('a');
+                        a.href = '#' + h.id;
+                        a.textContent = h.textContent;
+                        if (h.tagName === 'H3') a.className = 'toc-h3';
+                        toc.appendChild(a);
+                        if (h.tagName === 'H2') tocMobile.appendChild(a.cloneNode(true));
+                    });
+                    var content = document.getElementById('content');
+                    var layout = document.createElement('div');
+                    layout.className = 'doc-layout';
+                    content.parentNode.insertBefore(layout, content);
+                    layout.appendChild(toc);
+                    layout.appendChild(content);
+                    content.insertBefore(tocMobile, content.firstChild);
+                    document.body.classList.add('has-toc');
+                    var tocLinks = toc.querySelectorAll('a');
+                    var mobileLinks = tocMobile.querySelectorAll('a');
+                    var observer = new IntersectionObserver(function(entries) {
+                        entries.forEach(function(entry) {
+                            if (entry.isIntersecting) {
+                                tocLinks.forEach(function(l) { l.classList.remove('active'); });
+                                mobileLinks.forEach(function(l) { l.classList.remove('active'); });
+                                var id = entry.target.id;
+                                var hit = toc.querySelector('a[href="#' + id + '"]');
+                                if (hit) hit.classList.add('active');
+                                var hitM = tocMobile.querySelector('a[href="#' + id + '"]');
+                                if (hitM) hitM.classList.add('active');
+                            }
+                        });
+                    }, { rootMargin: '-10% 0px -80% 0px' });
+                    headings.forEach(function(h) { observer.observe(h); });
+                }
+
+                // 10. Add AOS scroll animations
+                document.querySelectorAll('h1, h2, h3, .table-wrap, blockquote, .mermaid-shell, .katex-display, details.code-collapse').forEach(function(el) {
                     el.setAttribute('data-aos', 'fade-up');
                 });
+                document.querySelectorAll('#content pre').forEach(function(pre) {
+                    if (!pre.closest('.mermaid-shell') && !pre.closest('details')) {
+                        pre.setAttribute('data-aos', 'fade-up');
+                    }
+                });
 
-                // 7. Initialize Mermaid (visibility-aware lazy rendering)
-                // Mermaid needs visible DOM to compute SVG layout dimensions.
-                // When multiple files open simultaneously, background tabs have
-                // visibilityState === "hidden" and mermaid.run() silently fails.
+                // 11. Initialize Mermaid (visibility-aware lazy rendering)
                 mermaid.initialize({
                     startOnLoad: false,
                     theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default',
                     securityLevel: 'strict'
                 });
-
                 var mermaidNodes = document.querySelectorAll('.mermaid');
                 function renderMermaid() {
                     if (mermaidNodes.length === 0) return;
-                    requestAnimationFrame(function() {
-                        mermaid.run({ nodes: mermaidNodes });
-                    });
+                    requestAnimationFrame(function() { mermaid.run({ nodes: mermaidNodes }); });
                 }
-
                 if (document.visibilityState === 'visible') {
                     renderMermaid();
                 } else {
@@ -335,7 +547,98 @@ The generated HTML includes these CDN libraries (all loaded client-side, zero se
                     });
                 }
 
-                // 8. Initialize AOS scroll animations
+                // 12. Mermaid zoom/pan controls
+                function openDiagramTab(svgEl) {
+                    var page = document.implementation.createHTMLDocument('Diagram');
+                    page.body.setAttribute('style', 'margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#fff');
+                    var style = page.createElement('style');
+                    style.textContent = '@media(prefers-color-scheme:dark){body{background:#1a1a1a}}svg{max-width:95vw;max-height:95vh}';
+                    page.head.appendChild(style);
+                    page.body.appendChild(page.importNode(svgEl, true));
+                    var blob = new Blob([page.documentElement.outerHTML], { type: 'text/html' });
+                    window.open(URL.createObjectURL(blob), '_blank');
+                }
+                document.querySelectorAll('.mermaid-shell').forEach(function(shell) {
+                    var viewport = shell.querySelector('.mermaid-viewport');
+                    var canvas = viewport.querySelector('.mermaid') || viewport.querySelector('.mermaid-rendered');
+                    if (!canvas) return;
+                    var scale = 1, panX = 0, panY = 0, startX, startY;
+                    function apply() {
+                        canvas.style.transform = 'translate(' + panX + 'px,' + panY + 'px) scale(' + scale + ')';
+                    }
+                    shell.querySelectorAll('.zoom-controls button').forEach(function(btn) {
+                        btn.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            var act = btn.dataset.action;
+                            if (act === 'zoom-in') scale = Math.min(scale * 1.3, 5);
+                            else if (act === 'zoom-out') scale = Math.max(scale / 1.3, 0.2);
+                            else if (act === 'zoom-reset') { scale = 1; panX = 0; panY = 0; }
+                            else if (act === 'expand') {
+                                var svg = canvas.querySelector('svg');
+                                if (svg) openDiagramTab(svg);
+                            }
+                            apply();
+                        });
+                    });
+                    viewport.addEventListener('wheel', function(e) {
+                        if (e.ctrlKey || e.metaKey) {
+                            e.preventDefault();
+                            scale = Math.max(0.2, Math.min(5, scale * (e.deltaY > 0 ? 0.9 : 1.1)));
+                            apply();
+                        }
+                    }, { passive: false });
+                    viewport.addEventListener('mousedown', function(e) {
+                        if (e.button !== 0) return;
+                        startX = e.clientX - panX;
+                        startY = e.clientY - panY;
+                        function onMove(ev) {
+                            panX = ev.clientX - startX;
+                            panY = ev.clientY - startY;
+                            canvas.style.transition = 'none';
+                            apply();
+                        }
+                        function onUp() {
+                            canvas.style.transition = '';
+                            document.removeEventListener('mousemove', onMove);
+                            document.removeEventListener('mouseup', onUp);
+                        }
+                        document.addEventListener('mousemove', onMove);
+                        document.addEventListener('mouseup', onUp);
+                    });
+                    // Touch: single finger pan
+                    viewport.addEventListener('touchstart', function(e) {
+                        if (e.touches.length === 1) {
+                            startX = e.touches[0].clientX - panX;
+                            startY = e.touches[0].clientY - panY;
+                        }
+                    }, { passive: true });
+                    viewport.addEventListener('touchmove', function(e) {
+                        if (e.touches.length === 1) {
+                            e.preventDefault();
+                            panX = e.touches[0].clientX - startX;
+                            panY = e.touches[0].clientY - startY;
+                            canvas.style.transition = 'none';
+                            apply();
+                        } else if (e.touches.length === 2) {
+                            e.preventDefault();
+                            var dx = e.touches[0].clientX - e.touches[1].clientX;
+                            var dy = e.touches[0].clientY - e.touches[1].clientY;
+                            var dist = Math.sqrt(dx * dx + dy * dy);
+                            if (viewport._lastPinchDist) {
+                                var delta = dist / viewport._lastPinchDist;
+                                scale = Math.max(0.2, Math.min(5, scale * delta));
+                                apply();
+                            }
+                            viewport._lastPinchDist = dist;
+                        }
+                    }, { passive: false });
+                    viewport.addEventListener('touchend', function() {
+                        canvas.style.transition = '';
+                        viewport._lastPinchDist = null;
+                    }, { passive: true });
+                });
+
+                // 13. Initialize AOS scroll animations
                 AOS.init({ duration: 600, once: true, offset: 50 });
 
             } catch (error) {
@@ -368,7 +671,11 @@ echo "✅ Opened in browser"
 2. **UTF-8 Support**: TextDecoder properly handles multi-byte characters (中文, etc.)
 3. **Syntax Highlighting**: highlight.js integrated via marked's `highlight` callback
 4. **Math Rendering**: KaTeX processes `$...$` (inline) and `$$...$$` (block) after DOM insertion
-5. **Mermaid Integration**: Converts `<code class="language-mermaid">` to `<div class="mermaid">`
+5. **Mermaid Integration**: Converts code blocks to `.mermaid-shell` containers with zoom/pan controls (+/−/reset/expand buttons, Ctrl+scroll zoom, drag to pan)
 6. **Animations**: CSS page-load fade-in + AOS scroll-triggered fade-up on sections
 7. **XSS Protection**: DOMPurify sanitizes all HTML before insertion
 8. **Dark Mode**: Auto-detects system preference via `matchMedia`
+9. **Typography**: Noto Sans TC (body) + Fira Code (code) via Google Fonts CDN
+10. **Table Enhancement**: Scrollable wrapper, sticky headers, row hover, tabular-nums
+11. **Sticky TOC**: Auto-generated from h2/h3 headings (4+ sections); desktop sidebar + mobile horizontal bar with scroll spy
+12. **Collapsible Code**: Code blocks with 30+ lines auto-wrapped in `<details>` with language label

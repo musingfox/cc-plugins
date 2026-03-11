@@ -139,10 +139,8 @@ The HTML template CSS should include these additional styles for pre-rendered di
 ```css
 .mermaid-rendered {
     text-align: center;
-    margin: 1em 0;
-    padding: 20px;
-    border-radius: 6px;
-    border: 1px solid #e1e1e1;
+    transform-origin: 0 0;
+    transition: transform 0.15s ease-out;
 }
 
 .mermaid-rendered svg {
@@ -151,17 +149,32 @@ The HTML template CSS should include these additional styles for pre-rendered di
 }
 ```
 
-And in dark mode:
-```css
-.mermaid-rendered { border-color: #444; }
+No additional dark mode CSS needed for `.mermaid-rendered` — the `.mermaid-shell` styles from view-doc.md handle the container.
+
+**JavaScript differences from view-doc.md:**
+
+The template includes ALL steps from view-doc.md (table wrapping, collapsible code, TOC, zoom/pan controls, AOS) EXCEPT:
+
+1. **Replace step 6** (mermaid code block conversion) with: wrap `.mermaid-rendered` divs in `.mermaid-shell` containers:
+
+```javascript
+// 6. Wrap pre-rendered mermaid SVGs in zoom/pan shells
+document.querySelectorAll('.mermaid-rendered').forEach(function(div) {
+    var shell = document.createElement('div');
+    shell.className = 'mermaid-shell';
+    shell.appendChild(createZoomControls());
+    var viewport = document.createElement('div');
+    viewport.className = 'mermaid-viewport';
+    div.parentNode.insertBefore(shell, div);
+    viewport.appendChild(div);
+    shell.appendChild(viewport);
+});
 ```
 
-The JavaScript should NOT include:
-- Step 5 from view-doc.md (mermaid code block conversion)
-- Step 7 from view-doc.md (mermaid initialization + visibility-aware rendering)
-- The mermaid.js CDN script tag
+2. **Skip step 11** (mermaid initialize) — no Mermaid.js needed since diagrams are pre-rendered SVGs.
+3. **Skip** the mermaid.js CDN script tag.
 
-Use `.mermaid-rendered` instead of `.mermaid` in the AOS animation selector.
+Step 5 (`createZoomControls` helper) and step 12 (zoom/pan controls) work unchanged — they handle both `.mermaid` and `.mermaid-rendered` elements.
 
 Otherwise, the template is identical to `view-doc.md` Step 4.
 

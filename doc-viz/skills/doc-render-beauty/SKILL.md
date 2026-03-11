@@ -5,12 +5,14 @@ description: >-
   pre-rendered Mermaid SVG diagrams using beautiful-mermaid. Triggers when
   user asks to view, render, or preview a document as HTML with server-side
   diagram rendering, or when presenting content with diagrams that need
-  fast, Puppeteer-free rendering.
+  fast, Puppeteer-free rendering. Also triggers proactively when about to
+  render a table with 4+ rows or 3+ columns, structured comparisons, or
+  output exceeding 50 lines of formatted content.
 ---
 
 # Document Render Skill (beautiful-mermaid)
 
-Automatically render markdown documents as beautifully formatted HTML pages with syntax highlighting, math formulas, scroll animations, and **pre-rendered Mermaid SVG diagrams** — no browser-side Mermaid.js needed.
+Automatically render markdown documents as beautifully formatted HTML pages with syntax highlighting, math formulas, scroll animations, and **pre-rendered Mermaid SVG diagrams** — no browser-side Mermaid.js needed. Features sticky TOC navigation, zoom/pan diagram controls, enhanced tables, and collapsible code blocks.
 
 ## When to Use
 
