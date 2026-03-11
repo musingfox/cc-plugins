@@ -179,13 +179,22 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 
 ## Development Workflows
 
+### Documentation Sync Rule
+
+When adding or modifying any plugin, always check whether the following files need updating:
+- **`README.md`** (root) — Plugin listing, features, installation, structure tree
+- **`CLAUDE.md`** (root) — Plugin Categories section, install commands, file locations
+
+Both files must stay in sync with actual plugin state. This applies to new plugins, renamed/removed components, and significant feature changes.
+
 ### Adding a New Plugin
 
 1. Create plugin directory with canonical structure (see "Plugin Structure Pattern")
 2. Write `plugin.json` manifest with metadata
 3. Add entry to `.claude-plugin/marketplace.json`
 4. Document in root `README.md` (following existing format)
-5. Test installation: `/plugin install plugin-name`
+5. Add plugin section to `CLAUDE.md` under "Plugin Categories"
+6. Test installation: `/plugin install plugin-name`
 
 ### Modifying Plugin Components
 
