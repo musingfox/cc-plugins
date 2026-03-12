@@ -2,6 +2,6 @@
   "name": "context-flow",
   "version": "0.1.0",
   "description": "Experimental workflow based on Context + Goal + Tools principle — agents defined by what they see, not who they are",
-  "commands": ["commands"],
-  "agents": ["agents"]
+  "commands": "./commands/",
+  "agents": "./agents/"
 }
