@@ -16,14 +16,9 @@
       "description": "Readability Formatting: Enhances AI-generated text readability through proper alignment and formatting of markdown tables, ASCII art, and text-based diagrams"
     },
     {
-      "name": "mermaid-viz",
-      "source": "./mermaid-viz",
-      "description": "Mermaid Visualization: Display Mermaid diagrams as high-quality PNG/SVG images with 8 beautiful color schemes - flowcharts, sequence diagrams, and more"
-    },
-    {
-      "name": "doc-viz",
-      "source": "./doc-viz",
-      "description": "Document Visualizer: Render any markdown as formatted HTML with syntax highlighting, Mermaid diagrams, KaTeX math, and animations"
+      "name": "viz",
+      "source": "./viz",
+      "description": "Render markdown and Mermaid diagrams as formatted HTML with syntax highlighting, math, interactive diagrams, and dark mode"
     },
     {
       "name": "jj",

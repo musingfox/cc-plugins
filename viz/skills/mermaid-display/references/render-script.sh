@@ -11,10 +11,10 @@
 # === Tool Selection ===
 if command -v mmdc > /dev/null 2>&1; then
     MERMAID_CMD="mmdc"
-elif command -v npx > /dev/null 2>&1; then
-    MERMAID_CMD="npx -y @mermaid-js/mermaid-cli"
+elif command -v bunx > /dev/null 2>&1; then
+    MERMAID_CMD="bunx @mermaid-js/mermaid-cli"
 else
-    echo "Error: No mermaid renderer available. Install Node.js or mermaid-cli."
+    echo "Error: No mermaid renderer available. Install mmdc or bun."
     exit 1
 fi
 

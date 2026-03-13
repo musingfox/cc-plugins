@@ -34,24 +34,16 @@ Automatically render markdown documents as beautifully formatted HTML pages with
 
 ## Workflow
 
-1. **Determine source**: Either read a file path the user specified, or capture inline content from the conversation
-2. **Base64 encode** the content using Python:
-   ```python
-   import base64
-   content_base64 = base64.b64encode(content.encode('utf-8')).decode('ascii')
-   ```
-3. **Write HTML** to `/tmp/doc-{name}-{timestamp}.html` using the same enhanced HTML template as `/view-doc`:
-   - marked.js for markdown rendering
-   - DOMPurify for XSS protection (sanitize ALL HTML before DOM insertion)
-   - highlight.js for syntax highlighting
-   - KaTeX for math formulas (`$...$` inline, `$$...$$` block)
-   - Mermaid for diagrams
-   - AOS for scroll animations
-   - CSS page-load fade-in animation
-   - Dark mode auto-detection
-4. **Open** in browser using `open` command
-5. **Report** the file path to the user
+1. **Determine source**: Either a file path the user specified, or inline content from the conversation
+2. **If file path**: Run the render script directly with that path
+3. **If inline content**: Write the content to a temp file `/tmp/doc-render-{timestamp}.md` using the Write tool, then run the render script with that temp file path
 
-## HTML Template Reference
+### Rendering
 
-Use the exact same HTML template defined in the `/view-doc` command (`doc-viz/commands/view-doc.md`, Step 4). This ensures consistent rendering between the command and skill.
+Run the render script via Bash:
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/lib/render.sh" "{file_path}" "doc-{name}"
+```
+
+The script handles base64 encoding, HTML generation, and opening in the browser.

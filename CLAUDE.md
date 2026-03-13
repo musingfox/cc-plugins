@@ -80,29 +80,20 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 
 **Workflow**: `/omt "goal"` → @pm (requirements) → @arch (architecture) → @hive (consensus analysis) → Human approves → @dev/@reviewer execution loop → Completion/Escalation
 
-### 2. Mermaid Visualization
-**Location**: `mermaid-viz/`
-**Purpose**: Interactive diagram generation as PNG/SVG images with theme support
+### 2. Viz (Markdown & Mermaid Renderer)
+**Location**: `viz/`
+**Purpose**: Render markdown documents and Mermaid diagrams as formatted HTML pages
 
 **Key Components**:
-- `/diagram` command - Interactive diagram creation wizard
-- `mermaid-display` skill - Automatic rendering when diagrams requested
-- `mermaid-theme` skill - Configure color themes (8 built-in schemes: Tokyo Night, Nord, Catppuccin, Dracula, etc.)
-- Uses `mmdc` (if installed) or `npx @mermaid-js/mermaid-cli` as fallback
-- Environment variables: `MERMAID_THEME`, `MERMAID_BG`, `MERMAID_WIDTH`, `MERMAID_COLOR_SCHEME`, etc.
-
-### 3. Document Visualizer
-**Location**: `doc-viz/`
-**Purpose**: Render any markdown document as formatted HTML with syntax highlighting, math, diagrams, and animations
-
-**Key Components**:
-- `/view-doc [file-path or plan-name]` command — accepts any file path or plan name (backward compatible)
+- `/view-doc [file]` command — render any markdown file as HTML with syntax highlighting, math, diagrams
+- `/diagram` command — interactive diagram generator, outputs HTML by default
 - `doc-render` skill — auto-triggers when content needs HTML rendering
-- Zero dependencies (CDN libraries: marked.js, DOMPurify, Mermaid.js, Highlight.js, KaTeX, AOS)
-- Base64 encoding for content safety
-- UTF-8 support via TextDecoder API
+- `mermaid-display` skill — auto-triggers when diagrams requested (HTML default, PNG/SVG on explicit request)
+- `mermaid-theme` skill — configure diagram color schemes (8 built-in: Tokyo Night, Nord, Catppuccin, etc.)
+- Zero runtime dependencies for HTML output (CDN libraries: marked.js, DOMPurify, Mermaid.js, Highlight.js, KaTeX, AOS)
+- PNG/SVG fallback via `mmdc` or `bunx @mermaid-js/mermaid-cli`
 
-### 4. Jujutsu (jj) VCS Helper
+### 3. Jujutsu (jj) VCS Helper
 **Location**: `jj/`
 **Purpose**: Workflow commands, natural language VCS operations, and Git-to-jj mental model translation
 
@@ -120,7 +111,7 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 
 **Auto-Detection**: Detects colocated (`.jj` + `.git`) vs native jj (`.jj` only) repositories automatically.
 
-### 5. Apple Podcasts
+### 4. Apple Podcasts
 **Location**: `apple-podcasts/`
 **Purpose**: Fetch Apple Podcasts episode audio download URLs via iTunes API and RSS feeds
 
@@ -129,7 +120,7 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 - Three-step pipeline: Parse URL → iTunes Lookup API → RSS feed `<enclosure>` extraction
 - No browser or scraping required — pure HTTP API workflow
 
-### 6. Context Flow (Experimental)
+### 5. Context Flow (Experimental)
 **Location**: `context-flow/`
 **Purpose**: Experimental agentic workflow based on the Context + Goal + Tools principle
 
@@ -156,7 +147,7 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 - Contract validation between phases: each phase's output must meet structural requirements before flowing to the next
 - Contracts are passed AS context to agents (binding constraint), not described in prompts (suggestion)
 
-### 8. gog (Google Workspace)
+### 6. gog (Google Workspace)
 **Location**: `gog/`
 **Purpose**: Skills for interacting with Google Workspace services via the `gog` CLI (gogcli)
 
@@ -170,7 +161,7 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 
 **Safety Pattern**: All destructive operations (send, delete, share) require `--dry-run` preview before execution.
 
-### 9. MarkItDown
+### 7. MarkItDown
 **Location**: `markitdown/`
 **Purpose**: Convert non-plain-text files to Markdown using Microsoft's MarkItDown
 
@@ -181,7 +172,7 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 
 **Prerequisites**: `pip install markitdown` or `uv tool install markitdown`
 
-### 10. Readability
+### 8. Readability
 **Location**: `readability/`
 **Purpose**: Terminal text formatting enhancement
 
@@ -237,15 +228,15 @@ Agents are tested via Task tool or agent-specific workflows (e.g., OMT's `/init-
 
 ## File Locations
 
-- **Plan files**: `~/.claude/plans/*.md` (read by doc-viz)
-- **Mermaid output**: `/tmp/mermaid-diagram-{timestamp}.png`
+- **Plan files**: `~/.claude/plans/*.md` (read by viz)
+- **Diagram HTML output**: `/tmp/diagram-{name}-{timestamp}.html`
 - **Document HTML output**: `/tmp/doc-{name}-{timestamp}.html`
 - **Agent workspace** (OMT): `.agents/` directory
 - **Context-flow session**: `/tmp/context-flow-{timestamp}/` (goal.md, research.md, plan.md, review.md)
 
 ## Critical Implementation Details
 
-### doc-viz UTF-8 Handling
+### viz UTF-8 Handling
 Uses Base64 encoding + TextDecoder to handle multi-byte characters (Chinese, etc.):
 ```javascript
 function base64DecodeUTF8(base64) {
@@ -258,8 +249,8 @@ function base64DecodeUTF8(base64) {
 }
 ```
 
-### mermaid-viz Tool Detection
-Priority order: `mmdc` (global) → `npx -y @mermaid-js/mermaid-cli` (fallback)
+### viz Mermaid CLI Detection (PNG/SVG)
+Priority order: `mmdc` (global) → `bunx @mermaid-js/mermaid-cli` (fallback)
 
 ### OMT Agent Workspace
 `.agents/` is the clean development workspace. Infrastructure lives in `.agents/.state/` (gitignored):
@@ -288,8 +279,7 @@ Users install the marketplace via:
 Then install individual plugins:
 ```bash
 /plugin install omt
-/plugin install mermaid-viz
-/plugin install doc-viz
+/plugin install viz
 /plugin install readability
 /plugin install jj
 /plugin install apple-podcasts
@@ -325,6 +315,6 @@ git config core.hooksPath .githooks
 ## Design Philosophy
 
 - **Single Responsibility**: Each plugin focuses on one specific capability
-- **Zero Dependencies**: Prefer CDN libraries (doc-viz) or universal tools (npx for mermaid-viz)
+- **Zero Dependencies**: Prefer CDN libraries (viz) or universal tools (bunx for mermaid-cli)
 - **Composability**: Plugins work independently but complement each other
 - **Minimal Friction**: Commands and skills integrate seamlessly into natural workflows

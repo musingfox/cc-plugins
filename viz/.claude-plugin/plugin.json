@@ -1,0 +1,17 @@
+{
+  "name": "viz",
+  "version": "1.0.0",
+  "description": "Render markdown and Mermaid diagrams as formatted HTML with syntax highlighting, math, and interactive controls",
+  "author": {
+    "name": "Nick Huang",
+    "email": "nick12703990@gmail.com"
+  },
+  "keywords": [
+    "markdown", "mermaid", "visualization", "html", "diagram",
+    "flowchart", "sequence-diagram", "class-diagram", "state-diagram", "er-diagram"
+  ],
+  "homepage": "https://github.com/musingfox/cc-plugins/tree/main/viz",
+  "license": "MIT",
+  "commands": "./commands/",
+  "skills": "./skills/"
+}
