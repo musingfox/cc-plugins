@@ -1,6 +1,7 @@
 #!/bin/bash
-# render.sh — Render a markdown file as formatted HTML and open in browser
+# render.sh — Render a markdown file as formatted HTML
 # Usage: render.sh <markdown-file> <output-name>
+# Output: /tmp/viz/{project-name}/{output-name}-{timestamp}.html
 
 set -euo pipefail
 
@@ -20,13 +21,18 @@ if [ ! -f "$TEMPLATE" ]; then
     exit 1
 fi
 
+# Determine project name from working directory
+PROJECT_NAME="$(basename "$PWD")"
+OUTPUT_DIR="/tmp/viz/${PROJECT_NAME}"
+mkdir -p "$OUTPUT_DIR"
+
 # Base64 encode the markdown content (macOS compatible)
 B64_FILE=$(mktemp)
 base64 -i "$INPUT_FILE" > "$B64_FILE"
 
 # Generate timestamp and output path
 TIMESTAMP=$(date +%y%m%d%H%M%S)
-OUTPUT_FILE="/tmp/${OUTPUT_NAME}-${TIMESTAMP}.html"
+OUTPUT_FILE="${OUTPUT_DIR}/${OUTPUT_NAME}-${TIMESTAMP}.html"
 
 # Use Python for placeholder replacement (handles long base64 strings safely)
 python3 -c "
@@ -40,7 +46,20 @@ print(tmpl.replace('DOC_BASE64_PLACEHOLDER', b64).replace('DOC_NAME_PLACEHOLDER'
 # Clean up temp file
 rm -f "$B64_FILE"
 
-# Open in browser
-open "$OUTPUT_FILE"
+SERVE_PATH="/${PROJECT_NAME}/${OUTPUT_NAME}-${TIMESTAMP}.html"
+VIZ_PORT=18080
 
-echo "$OUTPUT_FILE"
+if [ -n "${SSH_CLIENT:-}" ] || [ -n "${SSH_CONNECTION:-}" ]; then
+    # Remote session: start server if not running, print URL
+    if ! lsof -i :"$VIZ_PORT" -sTCP:LISTEN &>/dev/null; then
+        python3 -m http.server "$VIZ_PORT" -d /tmp/viz/ -b 0.0.0.0 &>/dev/null &
+        echo $! > /tmp/viz/.server.pid
+    fi
+    TS_IP=$(tailscale ip -4 2>/dev/null || echo "localhost")
+    echo "$OUTPUT_FILE"
+    echo "URL: http://${TS_IP}:${VIZ_PORT}${SERVE_PATH}"
+else
+    # Local session: open in browser
+    open "$OUTPUT_FILE" 2>/dev/null || true
+    echo "$OUTPUT_FILE"
+fi

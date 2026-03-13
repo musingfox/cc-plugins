@@ -229,10 +229,19 @@ Agents are tested via Task tool or agent-specific workflows (e.g., OMT's `/init-
 ## File Locations
 
 - **Plan files**: `~/.claude/plans/*.md` (read by viz)
-- **Diagram HTML output**: `/tmp/diagram-{name}-{timestamp}.html`
-- **Document HTML output**: `/tmp/doc-{name}-{timestamp}.html`
+- **Viz HTML output**: `/tmp/viz/{project-name}/{name}-{timestamp}.html` (per-project subdirectory)
 - **Agent workspace** (OMT): `.agents/` directory
 - **Context-flow session**: `/tmp/context-flow-{timestamp}/` (goal.md, research.md, plan.md, review.md)
+
+### Remote Access (Viz)
+
+All viz output goes to `/tmp/viz/`, organized by project name. For remote access from Tailnet devices:
+
+```bash
+python3 -m http.server 18080 -d /tmp/viz/ -b 0.0.0.0 &
+```
+
+Access at `http://{tailscale-ip}:18080/{project-name}/{file}.html`.
 
 ## Critical Implementation Details
 

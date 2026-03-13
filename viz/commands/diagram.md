@@ -61,29 +61,23 @@ Wrap the generated Mermaid code as a markdown document:
 `` `
 ```
 
-Write this markdown content to a temp file `/tmp/diagram-{name}.md` using the Write tool.
+Write this markdown content to a temp file `/tmp/viz-diagram-{name}.md` using the Write tool.
 
 Then run the render script via Bash:
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/lib/render.sh" "/tmp/diagram-{name}.md" "diagram-{name}"
+bash "${CLAUDE_PLUGIN_ROOT}/lib/render.sh" "/tmp/viz-diagram-{name}.md" "diagram-{name}"
 ```
 
 ### Step 4: Inform User
 
-```
-I've created your [diagram type] and opened it in your browser.
-
-[Brief description of what the diagram shows]
-
-File saved to: /tmp/diagram-{name}-{timestamp}.html
-```
+Report what was created and the output path printed by the render script.
 
 ## Handling Explicit Image Requests
 
 If the user explicitly asks for a PNG or SVG file (not HTML), use the render script instead:
 
-1. Save Mermaid code to `/tmp/diagram-{timestamp}.mmd`
+1. Save Mermaid code to `/tmp/viz-diagram-{timestamp}.mmd`
 2. Run `../skills/mermaid-display/references/render-script.sh` with `INPUT_FILE` set to the .mmd path
 3. This produces a PNG/SVG file and opens it in the default image viewer
 

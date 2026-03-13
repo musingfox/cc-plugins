@@ -36,7 +36,7 @@ Automatically render markdown documents as beautifully formatted HTML pages with
 
 1. **Determine source**: Either a file path the user specified, or inline content from the conversation
 2. **If file path**: Run the render script directly with that path
-3. **If inline content**: Write the content to a temp file `/tmp/doc-render-{timestamp}.md` using the Write tool, then run the render script with that temp file path
+3. **If inline content**: Write the content to a temp file `/tmp/viz-doc-{timestamp}.md` using the Write tool, then run the render script with that temp file path
 
 ### Rendering
 

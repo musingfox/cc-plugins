@@ -41,21 +41,17 @@ Wrap the Mermaid code as a markdown document:
 `` `
 ```
 
-Write this markdown content to a temp file `/tmp/diagram-{name}.md` using the Write tool.
+Write this markdown content to a temp file `/tmp/viz-diagram-{name}.md` using the Write tool.
 
 Then run the render script via Bash:
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/lib/render.sh" "/tmp/diagram-{name}.md" "diagram-{name}"
+bash "${CLAUDE_PLUGIN_ROOT}/lib/render.sh" "/tmp/viz-diagram-{name}.md" "diagram-{name}"
 ```
 
 ### Step 3: Inform User
 
-Report what was created and the file path:
-```
-I've generated and opened the [diagram type].
-Diagram saved to: /tmp/diagram-{name}-{timestamp}.html
-```
+Report what was created and the output path printed by the render script.
 
 ## Explicit Image Output (PNG/SVG)
 
