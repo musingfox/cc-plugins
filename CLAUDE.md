@@ -170,7 +170,18 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 
 **Safety Pattern**: All destructive operations (send, delete, share) require `--dry-run` preview before execution.
 
-### 9. Readability
+### 9. MarkItDown
+**Location**: `markitdown/`
+**Purpose**: Convert non-plain-text files to Markdown using Microsoft's MarkItDown
+
+**Key Components**:
+- **Skills** (`skills/`):
+  - `markitdown-read` - Auto-triggered when reading PDF, Word, PowerPoint, Excel, images, audio, HTML, EPUB, CSV, JSON, XML, ZIP files
+  - `convert` - Explicit file-to-markdown conversion skill
+
+**Prerequisites**: `pip install markitdown` or `uv tool install markitdown`
+
+### 10. Readability
 **Location**: `readability/`
 **Purpose**: Terminal text formatting enhancement
 
@@ -284,6 +295,7 @@ Then install individual plugins:
 /plugin install apple-podcasts
 /plugin install context-flow
 /plugin install gog
+/plugin install markitdown
 ```
 
 ## Version Management

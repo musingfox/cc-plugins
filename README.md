@@ -96,6 +96,19 @@ Interact with Google Workspace services via the [gogcli](https://github.com/stei
 /plugin install gog
 ```
 
+### MarkItDown
+
+Convert non-plain-text files to Markdown using [MarkItDown](https://github.com/microsoft/markitdown):
+- **Wide Format Support**: PDF, Word, PowerPoint, Excel, images, audio, HTML, EPUB, CSV, JSON, XML, ZIP
+- **Auto-Triggered**: Activates when you ask to read, analyze, or summarize non-text files
+- **Explicit Conversion**: `/convert` skill for direct file-to-markdown conversion
+- **Prerequisite**: `pip install markitdown` or `uv tool install markitdown`
+
+**Installation:**
+```bash
+/plugin install markitdown
+```
+
 ### Readability
 
 Enhances AI-generated text readability:
@@ -178,10 +191,14 @@ cc-plugins/
 │   ├── commands/
 │   │   └── cf.md                 # Orchestrator — context flow + contract validation
 │   └── agents/                   # research, plan, implement, review
-├── gog/                             # Google Workspace CLI skills
+├── gog/                          # Google Workspace CLI skills
 │   ├── .claude-plugin/
 │   │   └── plugin.json
 │   └── skills/                   # gog-gmail, gog-calendar, gog-drive
+├── markitdown/                   # File-to-Markdown converter
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   └── skills/                   # markitdown-read, convert
 ├── readability/                  # Text formatting plugin
 │   ├── .claude-plugin/
 │   │   └── plugin.json
