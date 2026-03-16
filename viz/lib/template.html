@@ -21,81 +21,162 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            max-width: 900px;
-            margin: 40px auto;
-            padding: 0 20px;
+            max-width: 860px;
+            margin: 48px auto;
+            padding: 0 24px;
             font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             line-height: 1.7;
-            color: #333;
+            color: #2c2c2c;
             background: #fff;
-            animation: pageLoad 0.6s ease-out;
+            animation: pageLoad 0.5s ease-out;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         @keyframes pageLoad {
-            from { opacity: 0; transform: translateY(20px); }
+            from { opacity: 0; transform: translateY(12px); }
             to   { opacity: 1; transform: translateY(0); }
         }
 
-        h1, h2, h3, h4, h5, h6 { margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
-        h1 { font-size: 2em; border-bottom: 2px solid #eee; padding-bottom: 0.3em; }
-        h2 { font-size: 1.5em; border-bottom: 1px solid #eee; padding-bottom: 0.3em; }
-        h3 { font-size: 1.25em; }
+        /* -- Typography -- */
+        h1, h2, h3, h4, h5, h6 {
+            margin-top: 1.6em;
+            margin-bottom: 0.6em;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            line-height: 1.35;
+        }
+        h1 { font-size: 1.85em; border-bottom: 1px solid #e0e0e0; padding-bottom: 0.35em; }
+        h2 { font-size: 1.4em; border-bottom: 1px solid #eee; padding-bottom: 0.25em; }
+        h3 { font-size: 1.15em; }
 
-        p { margin: 0.8em 0; }
-        a { color: #0366d6; text-decoration: none; }
+        p { margin: 0.75em 0; }
+        a { color: #2563eb; text-decoration: none; }
         a:hover { text-decoration: underline; }
 
+        /* -- Inline code -- */
         code {
-            background: #f5f5f5;
+            background: #f0f1f3;
             padding: 2px 6px;
-            border-radius: 3px;
-            font-family: 'Fira Code', "SF Mono", Monaco, Consolas, monospace;
-            font-size: 0.9em;
+            border-radius: 4px;
+            font-family: 'Fira Code', "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.875em;
+            font-variant-ligatures: none;
         }
+
+        /* -- Code blocks -- */
+        .code-block {
+            margin: 1.25em 0;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #e0e0e0;
+        }
+        .code-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 16px;
+            background: #21252b;
+            font-family: 'Fira Code', "SFMono-Regular", Consolas, monospace;
+            font-size: 0.75em;
+            color: #7f848e;
+            letter-spacing: 0.02em;
+            text-transform: lowercase;
+            border-bottom: 1px solid #181a1f;
+            user-select: none;
+        }
+        .code-header .copy-btn {
+            background: none;
+            border: 1px solid #3e4451;
+            border-radius: 4px;
+            color: #7f848e;
+            font-size: 11px;
+            padding: 2px 8px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .code-header .copy-btn:hover { color: #abb2bf; border-color: #5c6370; }
 
         pre {
             background: #282c34;
             padding: 16px;
-            border-radius: 6px;
             overflow-x: auto;
-            margin: 1em 0;
-            border: 1px solid #e1e1e1;
+            margin: 0;
         }
 
         pre code {
             background: none;
             padding: 0;
             color: #abb2bf;
-            font-size: 0.85em;
-            line-height: 1.5;
+            font-size: 0.8125em;
+            line-height: 1.6;
+            border-radius: 0;
         }
 
-        .table-wrap { overflow-x: auto; margin: 1em 0; border-radius: 6px; }
+        /* Standalone pre (no code-block wrapper yet) */
+        #content > pre,
+        #content > details > pre {
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            margin: 1.25em 0;
+            padding: 16px;
+        }
+
+        /* -- Tables -- */
+        .table-wrap {
+            overflow-x: auto;
+            margin: 1.25em 0;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
         table { border-collapse: collapse; width: 100%; margin: 0; }
-        th, td { border-bottom: 1px solid #ddd; padding: 10px 14px; text-align: left; }
-        th { background: #f5f5f5; font-weight: 600; position: sticky; top: 0; z-index: 1; }
-        tr:nth-child(even) { background: #fafafa; }
-        tr:hover td { background: rgba(0, 100, 200, 0.04); }
+        th, td { padding: 10px 14px; text-align: left; font-size: 0.9em; }
+        th {
+            font-weight: 600;
+            border-bottom: 2px solid #d0d0d0;
+            background: #f8f9fa;
+            position: sticky; top: 0; z-index: 1;
+            white-space: nowrap;
+        }
+        td { border-bottom: 1px solid #eee; }
         td { font-variant-numeric: tabular-nums; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: rgba(37, 99, 235, 0.03); }
 
+        /* -- Blockquote -- */
         blockquote {
-            border-left: 4px solid #ddd;
-            margin: 1em 0;
-            padding: 0.5em 1em;
-            background: #f9f9f9;
-            color: #555;
+            border-left: 3px solid #d0d0d0;
+            margin: 1.25em 0;
+            padding: 0.6em 1.2em;
+            background: #f8f9fa;
+            color: #4a4a4a;
+            border-radius: 0 6px 6px 0;
+        }
+        blockquote p:first-child { margin-top: 0; }
+        blockquote p:last-child { margin-bottom: 0; }
+
+        /* -- Lists -- */
+        ul, ol { padding-left: 1.5em; margin: 0.6em 0; }
+        li { margin: 0.35em 0; }
+        li > ul, li > ol { margin: 0.2em 0; }
+
+        /* -- Other elements -- */
+        hr { border: none; border-top: 1px solid #e0e0e0; margin: 2.5em 0; }
+        img { max-width: 100%; height: auto; border-radius: 6px; }
+
+        /* Checkbox styling */
+        input[type="checkbox"] {
+            margin-right: 6px;
+            accent-color: #2563eb;
         }
 
-        ul, ol { padding-left: 1.5em; margin: 0.5em 0; }
-        li { margin: 0.3em 0; }
-        hr { border: none; border-top: 1px solid #eee; margin: 2em 0; }
-        img { max-width: 100%; height: auto; border-radius: 4px; }
-
+        /* -- Mermaid diagrams -- */
         .mermaid-shell {
             position: relative;
-            margin: 1em 0;
-            border: 1px solid #e1e1e1;
-            border-radius: 6px;
+            margin: 1.25em 0;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
             overflow: hidden;
             background: white;
         }
@@ -107,16 +188,17 @@
         .mermaid-shell:hover .zoom-controls { opacity: 1; }
         .zoom-controls button {
             width: 28px; height: 28px;
-            border: 1px solid #ddd; border-radius: 4px;
-            background: rgba(255,255,255,0.9);
-            cursor: pointer; font-size: 14px;
+            border: 1px solid #d0d0d0; border-radius: 6px;
+            background: rgba(255,255,255,0.92);
+            cursor: pointer; font-size: 13px;
             display: flex; align-items: center; justify-content: center;
-            color: #555; backdrop-filter: blur(4px);
+            color: #555; backdrop-filter: blur(8px);
+            transition: all 0.15s;
         }
-        .zoom-controls button:hover { background: #f0f0f0; border-color: #bbb; }
+        .zoom-controls button:hover { background: #f0f0f0; border-color: #aaa; }
         .mermaid-viewport {
             overflow: hidden; cursor: grab;
-            min-height: 100px; padding: 20px;
+            min-height: 100px; padding: 24px;
         }
         .mermaid-viewport:active { cursor: grabbing; }
         .mermaid-viewport .mermaid {
@@ -131,29 +213,30 @@
             padding: 0.5em 0;
         }
 
-        /* TOC navigation */
+        /* -- TOC navigation -- */
         body.has-toc { max-width: none; margin: 0; padding: 0; }
         .doc-layout {
             display: flex;
-            max-width: 900px; margin: 40px auto; padding: 0 20px;
+            max-width: 860px; margin: 48px auto; padding: 0 24px;
         }
         .toc {
             display: none; position: sticky; top: 40px;
             max-height: calc(100vh - 80px); overflow-y: auto;
-            font-size: 0.85em; padding-right: 1em;
+            font-size: 0.82em; padding-right: 1.25em;
             border-right: 1px solid #eee;
         }
         .toc a {
-            display: block; padding: 4px 8px;
-            color: #666; text-decoration: none;
+            display: block; padding: 4px 10px;
+            color: #888; text-decoration: none;
             border-left: 2px solid transparent;
             transition: all 0.15s; line-height: 1.4;
+            border-radius: 0 3px 3px 0;
         }
-        .toc a:hover { color: #333; }
-        .toc a.active { color: #0366d6; border-left-color: #0366d6; font-weight: 500; }
-        .toc a.toc-h3 { padding-left: 20px; font-size: 0.92em; }
+        .toc a:hover { color: #444; background: #f8f9fa; }
+        .toc a.active { color: #2563eb; border-left-color: #2563eb; font-weight: 500; }
+        .toc a.toc-h3 { padding-left: 22px; font-size: 0.92em; }
         @media (min-width: 1200px) {
-            .doc-layout { max-width: 1200px; gap: 3em; }
+            .doc-layout { max-width: 1160px; gap: 3em; }
             .toc { display: block; width: 220px; min-width: 220px; }
             .doc-layout #content { min-width: 0; flex: 1; }
         }
@@ -164,71 +247,81 @@
         }
         .toc-mobile a {
             white-space: nowrap; padding: 4px 12px;
-            color: #666; text-decoration: none; font-size: 0.82em;
+            color: #888; text-decoration: none; font-size: 0.82em;
             border-bottom: 2px solid transparent;
         }
-        .toc-mobile a.active { color: #0366d6; border-bottom-color: #0366d6; }
+        .toc-mobile a.active { color: #2563eb; border-bottom-color: #2563eb; }
         @media (max-width: 1199px) {
             .toc-mobile.has-items { display: flex; }
         }
 
-        /* Collapsible code blocks */
-        details.code-collapse { margin: 1em 0; }
+        /* -- Collapsible code blocks -- */
+        details.code-collapse { margin: 1.25em 0; }
         details.code-collapse summary {
             cursor: pointer; padding: 8px 16px;
-            background: #282c34; border-radius: 6px;
-            color: #abb2bf; font-family: 'Fira Code', monospace;
-            font-size: 0.82em; list-style: none;
+            background: #21252b; border-radius: 8px;
+            color: #7f848e; font-family: 'Fira Code', monospace;
+            font-size: 0.8em; list-style: none;
             display: flex; align-items: center; gap: 6px;
-            border: 1px solid #e1e1e1;
+            border: 1px solid #e0e0e0;
         }
         details.code-collapse summary::-webkit-details-marker { display: none; }
         details.code-collapse summary::before { content: '\25b6'; font-size: 0.7em; transition: transform 0.2s; }
         details.code-collapse[open] summary::before { transform: rotate(90deg); }
-        details.code-collapse[open] summary { border-radius: 6px 6px 0 0; border-bottom: none; }
-        details.code-collapse pre { margin-top: 0 !important; border-radius: 0 0 6px 6px !important; }
+        details.code-collapse[open] summary { border-radius: 8px 8px 0 0; border-bottom: none; }
+        details.code-collapse pre { margin-top: 0 !important; border-radius: 0 0 8px 8px !important; }
+        details.code-collapse .code-block { margin-top: 0; border-radius: 0 0 8px 8px; }
+        details.code-collapse .code-block .code-header { display: none; }
 
-        /* Mobile responsive */
-        @media (max-width: 768px) {
-            body { margin: 16px auto; padding: 0 14px; font-size: 15px; }
+        /* -- Mobile responsive -- */
+        @media (max-width: 600px) {
+            body { margin: 24px auto; padding: 0 16px; font-size: 15px; }
             body.has-toc { padding: 0; }
-            .doc-layout { margin: 16px auto; padding: 0 14px; }
+            .doc-layout { margin: 24px auto; padding: 0 16px; }
             h1 { font-size: 1.5em; }
-            h2 { font-size: 1.25em; }
-            h3 { font-size: 1.1em; }
-            pre { padding: 12px; font-size: 0.82em; }
-            code { font-size: 0.85em; }
-            th, td { padding: 8px 10px; font-size: 0.9em; }
-            .mermaid-viewport { padding: 10px; }
+            h2 { font-size: 1.2em; }
+            h3 { font-size: 1.05em; }
+            pre { padding: 12px; }
+            pre code { font-size: 0.8em; }
+            .code-header { padding: 5px 12px; font-size: 0.7em; }
+            th, td { padding: 8px 10px; font-size: 0.85em; }
+            .mermaid-viewport { padding: 12px; }
             .zoom-controls { opacity: 1; }
-            .zoom-controls button { width: 32px; height: 32px; font-size: 16px; }
+            .zoom-controls button { width: 32px; height: 32px; font-size: 15px; }
             details.code-collapse summary { padding: 8px 12px; }
+            blockquote { padding: 0.5em 1em; }
         }
 
-        /* Dark mode */
+        /* -- Dark mode -- */
         @media (prefers-color-scheme: dark) {
-            body { background: #1a1a1a; color: #e1e1e1; }
-            a { color: #58a6ff; }
-            h1, h2 { border-bottom-color: #333; }
-            code { background: #2d2d2d; }
-            pre { background: #282c34; border-color: #444; }
-            th, td { border-bottom-color: #444; }
-            th { background: #2d2d2d; }
-            tr:nth-child(even) { background: #222; }
-            tr:hover td { background: rgba(100, 160, 255, 0.06); }
-            blockquote { border-left-color: #555; background: #252525; color: #aaa; }
-            hr { border-top-color: #333; }
-            .mermaid-shell { background: #2d2d2d; border-color: #444; }
-            .zoom-controls button { background: rgba(45,45,45,0.9); border-color: #555; color: #ccc; }
-            .zoom-controls button:hover { background: #444; }
-            .toc { border-right-color: #333; }
-            .toc a { color: #888; }
-            .toc a:hover { color: #ccc; }
-            .toc a.active { color: #58a6ff; border-left-color: #58a6ff; }
-            .toc-mobile { border-bottom-color: #333; }
-            .toc-mobile a { color: #888; }
-            .toc-mobile a.active { color: #58a6ff; border-bottom-color: #58a6ff; }
-            details.code-collapse summary { border-color: #444; }
+            body { background: #1b1b1f; color: #d4d4d8; }
+            a { color: #60a5fa; }
+            h1 { border-bottom-color: #2e2e33; }
+            h2 { border-bottom-color: #2e2e33; }
+            code { background: #27272a; color: #d4d4d8; }
+            pre { background: #282c34; }
+            .code-block { border-color: #2e2e33; }
+            .code-header { background: #21252b; border-bottom-color: #181a1f; }
+            .code-header .copy-btn { border-color: #3e4451; }
+            #content > pre, #content > details > pre { border-color: #2e2e33; }
+            .table-wrap { border-color: #2e2e33; }
+            th { background: #27272a; border-bottom-color: #3e3e44; }
+            td { border-bottom-color: #2e2e33; }
+            tr:hover td { background: rgba(96, 165, 250, 0.05); }
+            blockquote { border-left-color: #3e3e44; background: #222226; color: #a1a1aa; }
+            hr { border-top-color: #2e2e33; }
+            .mermaid-shell { background: #27272a; border-color: #2e2e33; }
+            .zoom-controls button { background: rgba(39,39,42,0.92); border-color: #3e3e44; color: #a1a1aa; }
+            .zoom-controls button:hover { background: #3e3e44; }
+            .toc { border-right-color: #2e2e33; }
+            .toc a { color: #71717a; }
+            .toc a:hover { color: #d4d4d8; background: #27272a; }
+            .toc a.active { color: #60a5fa; border-left-color: #60a5fa; }
+            .toc-mobile { border-bottom-color: #2e2e33; }
+            .toc-mobile a { color: #71717a; }
+            .toc-mobile a.active { color: #60a5fa; border-bottom-color: #60a5fa; }
+            details.code-collapse summary { border-color: #2e2e33; }
+            input[type="checkbox"] { accent-color: #60a5fa; }
         }
     </style>
 </head>
@@ -280,9 +373,8 @@
                     breaks: false
                 });
 
-                // 3. Render markdown, sanitize with DOMPurify, insert into DOM
-                // NOTE: DOMPurify.sanitize() is called on ALL rendered HTML before
-                // DOM insertion to prevent XSS. This is safe and intentional.
+                // 3. Render markdown to HTML, sanitize with DOMPurify to prevent XSS,
+                //    then insert the sanitized result into the DOM
                 var html = marked.parse(docMarkdown);
                 var cleanHtml = DOMPurify.sanitize(html, {
                     ADD_TAGS: ['pre', 'span'],
@@ -310,7 +402,42 @@
                     });
                 });
 
-                // 5. Helper: create zoom control buttons
+                // 5. Wrap code blocks with language header and copy button
+                document.querySelectorAll('#content pre').forEach(function(pre) {
+                    if (pre.closest('.mermaid-shell')) return;
+                    if (pre.parentElement.classList.contains('code-block')) return;
+                    var code = pre.querySelector('code');
+                    var lang = '';
+                    if (code) {
+                        var m = code.className.match(/language-(\w+)/);
+                        if (m) lang = m[1];
+                    }
+                    if (lang && lang !== 'mermaid') {
+                        var wrapper = document.createElement('div');
+                        wrapper.className = 'code-block';
+                        var header = document.createElement('div');
+                        header.className = 'code-header';
+                        var langSpan = document.createElement('span');
+                        langSpan.textContent = lang;
+                        header.appendChild(langSpan);
+                        var copyBtn = document.createElement('button');
+                        copyBtn.className = 'copy-btn';
+                        copyBtn.textContent = 'copy';
+                        copyBtn.addEventListener('click', function() {
+                            var text = code ? code.textContent : pre.textContent;
+                            navigator.clipboard.writeText(text).then(function() {
+                                copyBtn.textContent = 'copied!';
+                                setTimeout(function() { copyBtn.textContent = 'copy'; }, 1500);
+                            });
+                        });
+                        header.appendChild(copyBtn);
+                        wrapper.appendChild(header);
+                        pre.parentNode.insertBefore(wrapper, pre);
+                        wrapper.appendChild(pre);
+                    }
+                });
+
+                // 6. Helper: create zoom control buttons
                 function createZoomControls() {
                     var controls = document.createElement('div');
                     controls.className = 'zoom-controls';
@@ -330,9 +457,10 @@
                     return controls;
                 }
 
-                // 6. Convert mermaid code blocks to shells with zoom/pan
+                // 7. Convert mermaid code blocks to shells with zoom/pan
                 document.querySelectorAll('code.language-mermaid').forEach(function(codeBlock) {
                     var pre = codeBlock.parentElement;
+                    var wrapper = pre.closest('.code-block');
                     var shell = document.createElement('div');
                     shell.className = 'mermaid-shell';
                     shell.appendChild(createZoomControls());
@@ -343,10 +471,14 @@
                     mermaidDiv.textContent = codeBlock.textContent;
                     viewport.appendChild(mermaidDiv);
                     shell.appendChild(viewport);
-                    pre.replaceWith(shell);
+                    if (wrapper) {
+                        wrapper.replaceWith(shell);
+                    } else {
+                        pre.replaceWith(shell);
+                    }
                 });
 
-                // 7. Wrap tables in scrollable containers
+                // 8. Wrap tables in scrollable containers
                 document.querySelectorAll('#content table').forEach(function(table) {
                     if (table.parentElement.classList.contains('table-wrap')) return;
                     var wrap = document.createElement('div');
@@ -355,11 +487,13 @@
                     wrap.appendChild(table);
                 });
 
-                // 8. Collapse long code blocks (30+ lines)
+                // 9. Collapse long code blocks (30+ lines)
                 document.querySelectorAll('#content pre').forEach(function(pre) {
                     if (pre.closest('.mermaid-shell')) return;
                     var lines = pre.textContent.split('\n').length;
                     if (lines < 30) return;
+                    var codeBlockWrapper = pre.closest('.code-block');
+                    var target = codeBlockWrapper || pre;
                     var details = document.createElement('details');
                     details.className = 'code-collapse';
                     var summary = document.createElement('summary');
@@ -371,11 +505,11 @@
                     }
                     summary.textContent = lang ? lang + ' \u2014 ' + lines + ' lines' : lines + ' lines';
                     details.appendChild(summary);
-                    pre.parentNode.insertBefore(details, pre);
-                    details.appendChild(pre);
+                    target.parentNode.insertBefore(details, target);
+                    details.appendChild(target);
                 });
 
-                // 9. Generate TOC from headings (4+ sections)
+                // 10. Generate TOC from headings (4+ sections)
                 var headings = document.querySelectorAll('#content h2, #content h3');
                 if (headings.length >= 4) {
                     var toc = document.createElement('nav');
@@ -417,17 +551,17 @@
                     headings.forEach(function(h) { observer.observe(h); });
                 }
 
-                // 10. Add AOS scroll animations
+                // 11. Add AOS scroll animations
                 document.querySelectorAll('h1, h2, h3, .table-wrap, blockquote, .mermaid-shell, .katex-display, details.code-collapse').forEach(function(el) {
                     el.setAttribute('data-aos', 'fade-up');
                 });
-                document.querySelectorAll('#content pre').forEach(function(pre) {
-                    if (!pre.closest('.mermaid-shell') && !pre.closest('details')) {
-                        pre.setAttribute('data-aos', 'fade-up');
+                document.querySelectorAll('#content pre, #content .code-block').forEach(function(el) {
+                    if (!el.closest('.mermaid-shell') && !el.closest('details')) {
+                        el.setAttribute('data-aos', 'fade-up');
                     }
                 });
 
-                // 11. Initialize Mermaid (visibility-aware lazy rendering)
+                // 12. Initialize Mermaid (visibility-aware lazy rendering)
                 mermaid.initialize({
                     startOnLoad: false,
                     theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default',
@@ -449,12 +583,12 @@
                     });
                 }
 
-                // 12. Mermaid zoom/pan controls
+                // 13. Mermaid zoom/pan controls
                 function openDiagramTab(svgEl) {
                     var page = document.implementation.createHTMLDocument('Diagram');
                     page.body.setAttribute('style', 'margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#fff');
                     var style = page.createElement('style');
-                    style.textContent = '@media(prefers-color-scheme:dark){body{background:#1a1a1a}}svg{max-width:95vw;max-height:95vh}';
+                    style.textContent = '@media(prefers-color-scheme:dark){body{background:#1b1b1f}}svg{max-width:95vw;max-height:95vh}';
                     page.head.appendChild(style);
                     page.body.appendChild(page.importNode(svgEl, true));
                     var blob = new Blob([page.documentElement.outerHTML], { type: 'text/html' });
@@ -540,8 +674,8 @@
                     }, { passive: true });
                 });
 
-                // 13. Initialize AOS scroll animations
-                AOS.init({ duration: 600, once: true, offset: 50 });
+                // 14. Initialize AOS scroll animations
+                AOS.init({ duration: 500, once: true, offset: 40 });
 
             } catch (error) {
                 document.getElementById('content').textContent = 'Error: ' + error.message;
