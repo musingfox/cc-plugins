@@ -38,7 +38,18 @@ Generate and display high-quality diagrams instantly:
 
 **Installation:**
 ```bash
-/plugin install mermaid-viz
+/plugin install viz
+```
+
+**Sandbox configuration:** The viz plugin writes HTML output to `/tmp/viz/`. If you have sandbox enabled, add this to your `.claude/settings.json` or `~/.claude/settings.json`:
+```json
+{
+  "sandbox": {
+    "filesystem": {
+      "allowWrite": ["//tmp/viz"]
+    }
+  }
+}
 ```
 
 ### Jujutsu (jj) VCS Helper
