@@ -179,6 +179,19 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 **Key Components**:
 - `readable-text-formatting` skill - Automatic markdown table/ASCII art alignment
 
+### 9. ADR (Architecture Decision Records)
+**Location**: `adr/`
+**Purpose**: ADR lifecycle management with MADR 4.0 format and cross-reference consistency enforcement
+
+**Key Components**:
+- **Skills** (`skills/`):
+  - `adr` - Full lifecycle management: create, list, supersede, deprecate, check consistency. Auto-detects ADR directory, auto-numbers with 4-digit zero-padding, uses MADR 4.0 template. Core feature: supersession with 4-layer repo-wide cross-reference scan and categorized update strategy.
+  - `adr-ref-guard` - Advisory skill that warns when editing `.md` files that reference superseded or deprecated ADRs. Never auto-replaces.
+
+**Supersession 4-Layer Search**: filename reference, ADR-N marker, markdown link, title substring — with per-category update strategy (auto-update ADRs/docs, add marker to source code, skip config).
+
+**No External Dependencies**: Pure markdown instruction files.
+
 ## Development Workflows
 
 ### Documentation Sync Rule
@@ -295,6 +308,7 @@ Then install individual plugins:
 /plugin install context-flow
 /plugin install gog
 /plugin install markitdown
+/plugin install adr
 ```
 
 ## Version Management

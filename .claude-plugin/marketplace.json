@@ -44,6 +44,11 @@
       "name": "gog",
       "source": "./gog",
       "description": "Google Workspace CLI skills — Gmail, Calendar, and Drive via gogcli (gog)"
+    },
+    {
+      "name": "adr",
+      "source": "./adr",
+      "description": "Architecture Decision Records lifecycle management with MADR 4.0 and cross-reference consistency enforcement"
     }
   ]
 }

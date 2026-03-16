@@ -109,6 +109,21 @@ Convert non-plain-text files to Markdown using [MarkItDown](https://github.com/m
 /plugin install markitdown
 ```
 
+### ADR (Architecture Decision Records)
+
+Lifecycle management for [MADR 4.0](https://adr.github.io/madr/) Architecture Decision Records with cross-reference consistency enforcement:
+- **Full Lifecycle**: Create, list, supersede, deprecate, check — all via natural language
+- **Core Differentiator**: Supersession updates ALL cross-references across the entire repo, not just the old-new ADR pair
+- **4-Layer Search**: Filename, ADR-N marker, markdown link, title substring — catches every reference
+- **Categorized Updates**: Auto-update ADR/doc files, add markers to source code, skip config (user choice per category)
+- **Reference Guard**: Advisory skill warns when editing `.md` files that reference superseded ADRs
+- **Zero Dependencies**: Pure markdown instruction files, no CLI tools to install
+
+**Installation:**
+```bash
+/plugin install adr
+```
+
 ### Readability
 
 Enhances AI-generated text readability:
@@ -203,6 +218,11 @@ cc-plugins/
 │   ├── .claude-plugin/
 │   │   └── plugin.json
 │   ├── skills/                   # readable-text-formatting
+│   └── README.md
+├── adr/                          # ADR lifecycle management
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   ├── skills/                   # adr (lifecycle), adr-ref-guard (advisory)
 │   └── README.md
 └── README.md
 ```
