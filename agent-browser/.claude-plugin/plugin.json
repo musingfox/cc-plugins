@@ -1,0 +1,11 @@
+{
+  "name": "agent-browser",
+  "version": "0.1.0",
+  "description": "Skills for browser automation with agent-browser CLI, Playwright test generation, and web debugging workflows",
+  "author": {
+    "name": "musingfox"
+  },
+  "repository": "https://github.com/musingfox/cc-plugins",
+  "license": "MIT",
+  "keywords": ["browser", "testing", "playwright", "agent-browser", "e2e", "automation"]
+}

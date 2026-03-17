@@ -49,6 +49,11 @@
       "name": "adr",
       "source": "./adr",
       "description": "Architecture Decision Records lifecycle management with MADR 4.0 and cross-reference consistency enforcement"
+    },
+    {
+      "name": "agent-browser",
+      "source": "./agent-browser",
+      "description": "Browser automation with agent-browser CLI, Playwright test generation, and debug-to-test workflows"
     }
   ]
 }
