@@ -1,6 +1,10 @@
 {
   "name": "context-flow",
   "version": "0.1.0",
-  "description": "Experimental workflow based on Context + Goal + Tools principle — agents defined by what they see, not who they are",
-  "commands": "./commands/"
+  "description": "Contract-driven development pipeline with human-in-the-loop decision gating — agents defined by what they see, not who they are",
+  "author": {
+    "name": "Nick Huang"
+  },
+  "commands": "./commands/",
+  "agents": "./agents/"
 }
