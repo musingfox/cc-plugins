@@ -153,26 +153,44 @@ Save output to `$SESSION/plan.md`.
 
 ### Human Gate
 
-Present **only High and Medium decisions** to the human. For each decision, provide:
+Present **only High and Medium decisions** to the human. The goal is to give the human enough context to make an informed judgment **without reading research.md or plan.md**.
 
-1. What the plan proposes
-2. What alternatives were considered (brief)
-3. **Your assessment and recommendation** — not just listing, but your opinion on whether to approve
+#### Per-Decision Format
 
-Format:
+For each decision, present in this order:
 
 > **[Impact] Decision Title**
-> Plan proposes: {choice}
-> Alternatives: {brief list}
-> *My take*: {your recommendation and reasoning}
+>
+> **Stakes**: What goes wrong if this choice is incorrect — concrete consequences, not abstract risk labels. Name the affected component, data, or user-facing behavior.
+>
+> **Evidence**: 1-3 key findings from research that constrain this choice. Include file paths or interface signatures where relevant. This is WHY the options are what they are.
+>
+> **Options**:
+> | | Option A: {name} | Option B: {name} | Option C (if any) |
+> |---|---|---|---|
+> | Approach | {what it does} | {what it does} | {what it does} |
+> | Upside | {concrete benefit} | {concrete benefit} | {concrete benefit} |
+> | Downside | {concrete cost} | {concrete cost} | {concrete cost} |
+> | Reversibility | {easy/hard to undo} | {easy/hard to undo} | {easy/hard to undo} |
+>
+> *{Optional: additional observation that doesn't fit the fixed dimensions — e.g., performance implication, migration complexity, team familiarity. Omit if nothing to add.}*
+>
+> **Recommendation**: {which option and why — reference the evidence}
 
 If any decisions were auto-upgraded, note this:
 
 > **[High ↑ auto-upgraded from Medium] Decision Title**
 > *Auto-upgrade reason*: {which structural rule triggered it}
 
-End with: summary of contracts count and test case count, then ask:
-**Approve all / Revise specific decisions / Request more research / Abort**
+#### Gate Summary
+
+After all decisions, present:
+
+> **Scope**: {number} contracts, {number} test cases
+> **Estimated change surface**: {which files/modules will be touched}
+> **Decisions requiring your input**: {count} of {total}
+>
+> **Approve all / Revise specific decisions (by number) / Request more research / Abort**
 
 The plan phase is **iterative**. If the human revises decisions, re-run the plan agent with the revision as additional context. Repeat until all High/Medium decisions are approved.
 
