@@ -54,6 +54,11 @@
       "name": "agent-browser",
       "source": "./agent-browser",
       "description": "Browser automation with agent-browser CLI, Playwright test generation, and debug-to-test workflows"
+    },
+    {
+      "name": "hook-guard",
+      "source": "./hook-guard",
+      "description": "One-stop hook setup — detect project environment, generate Claude Code hooks and git pre-commit scripts with security checks and CLAUDECODE skip logic"
     }
   ]
 }

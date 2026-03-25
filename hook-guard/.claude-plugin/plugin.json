@@ -1,0 +1,22 @@
+{
+  "name": "hook-guard",
+  "version": "0.1.0",
+  "description": "One-stop hook setup assistant — detect project environment, generate Claude Code hooks and git pre-commit scripts with security checks, code quality gates, and CLAUDECODE skip logic",
+  "author": {
+    "name": "Nick Huang",
+    "email": "nick12703990@gmail.com"
+  },
+  "repository": "https://github.com/musingfox/cc-plugins",
+  "homepage": "https://github.com/musingfox/cc-plugins/tree/main/hook-guard",
+  "keywords": [
+    "hooks",
+    "pre-commit",
+    "lint",
+    "format",
+    "security",
+    "code-quality",
+    "git-hooks",
+    "claude-code-hooks"
+  ],
+  "license": "MIT"
+}

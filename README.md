@@ -135,6 +135,22 @@ Lifecycle management for [MADR 4.0](https://adr.github.io/madr/) Architecture De
 /plugin install adr
 ```
 
+### Hook Guard
+
+One-stop hook setup assistant for Claude Code projects:
+- **Auto-Detection**: Detects project language, toolchain (ruff/eslint/clippy/prettier/rustfmt/pytest/vitest...), VCS type, and existing hooks
+- **Claude Code Hooks**: Generates PostToolUse lint/format (soft feedback) and PreToolUse test gate (hard gate) into `.claude/settings.local.json`
+- **Pre-commit Scripts**: Generates `.githooks/pre-commit` with security checks (secrets, private keys, sensitive files), file integrity checks (large files, merge conflicts, line endings), and structure checks (no-commit markers, syntax validation, lock sync)
+- **CLAUDECODE Skip Logic**: Pre-commit skips lint/format/test when Claude Code is running (already handled by CC hooks)
+- **Conventional Commits**: Optional `.githooks/commit-msg` validation
+- **Team-Shareable**: Uses `core.hooksPath` pointing to `.githooks/` (committed to repo)
+- **3 Skills**: `setup` (detect + generate), `doctor` (health check), `update` (diff + refresh)
+
+**Installation:**
+```bash
+/plugin install hook-guard
+```
+
 ### Readability
 
 Enhances AI-generated text readability:
@@ -225,6 +241,11 @@ cc-plugins/
 │   ├── .claude-plugin/
 │   │   └── plugin.json
 │   └── skills/                   # markitdown-read, convert
+├── hook-guard/                   # Hook setup assistant
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   ├── skills/                   # setup, doctor, update
+│   └── README.md
 ├── readability/                  # Text formatting plugin
 │   ├── .claude-plugin/
 │   │   └── plugin.json

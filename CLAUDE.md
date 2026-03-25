@@ -194,6 +194,25 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 
 **No External Dependencies**: Pure markdown instruction files.
 
+### 10. Hook Guard
+**Location**: `hook-guard/`
+**Purpose**: One-stop hook setup assistant — detect project environment, generate Claude Code hooks and git pre-commit scripts
+
+**Key Components**:
+- **Skills** (`skills/`):
+  - `setup` - Main workflow: detect language/toolchain/VCS → recommend configuration → generate all hook files (`.githooks/`, `.claude/settings.local.json`)
+  - `doctor` - Health check: verify hook files, permissions, tool availability, configuration integrity
+  - `update` - Update installed hooks: re-detect environment, diff with existing, apply changes
+
+**Generated Output**:
+- `.githooks/pre-commit` — Shell script with security checks (secrets, large files, merge conflicts, etc.), file integrity checks, structure/convention checks, and CLAUDECODE skip logic for lint/format/test
+- `.githooks/commit-msg` — Conventional commits format validation
+- `.claude/settings.local.json` — Claude Code hooks (PostToolUse lint/format, PreToolUse test gate) + `CLAUDECODE=1` env var
+
+**Supported Languages**: Python (ruff/flake8/pytest), JS/TS (eslint/prettier/vitest), Rust (clippy/rustfmt/cargo test), Go (golangci-lint/gofmt/go test)
+
+**Key Design**: Uses `core.hooksPath` pointing to `.githooks/` for team-shareable hooks. CLAUDECODE env var enables skip logic so pre-commit doesn't duplicate what Claude Code hooks already handle.
+
 ## Development Workflows
 
 ### Documentation Sync Rule
@@ -311,6 +330,7 @@ Then install individual plugins:
 /plugin install gog
 /plugin install markitdown
 /plugin install adr
+/plugin install hook-guard
 ```
 
 ## Version Management
