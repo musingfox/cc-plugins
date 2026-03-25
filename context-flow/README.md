@@ -14,23 +14,29 @@ Agents are NOT defined by roles. Each agent is defined by what information it re
 /cf "Add CSV export for transaction history"
 ```
 
-The orchestrator manages a 4-phase pipeline:
+The orchestrator manages a unified pipeline with adaptive research:
 
 ```
-[research] → validate → [plan] → validate → HUMAN GATE → [implement] → validate → [review]
+[research] → (complexity check) → (optional Agent Teams) → validate → [plan] → validate → HUMAN GATE → [implement] → validate → [review]
 ```
+
+When research detects high complexity via the **Agent Complexity Score (ACS)** heuristic, the orchestrator spawns Agent Teams for multi-perspective exploration before planning.
 
 ## Phases
 
 | Phase | Agent | Purpose |
 |-------|-------|---------|
-| **Research** | Explore codebase | Produce capability inventory with constraints and evidence |
+| **Research** | Explore codebase | Produce capability inventory with constraints and evidence; flag ACS complexity |
+| **Agent Teams** *(conditional)* | Multi-perspective exploration | When ACS is high: spawn parallel agents to explore trade-offs, then synthesize consensus |
 | **Plan** | Define contracts | Design behavioral contracts with decision tiering (High/Medium/Low) |
-| **Implement** | Fulfill contracts | Write code and tests; all tests must pass |
+| **Implement** | Fulfill contracts | Write code and tests; all tests must pass (supports parallel dispatch for independent contracts) |
 | **Review** | Verify contracts | Confirm implementation satisfies contracts; flag advisories |
 
 ## Key Features
 
+- **Adaptive research**: ACS heuristics (Agent Complexity Score) detect complexity and trigger Agent Teams when needed — no upfront commitment.
+- **Multi-perspective exploration**: Agent Teams mode spawns parallel agents with different expertise lenses to explore trade-offs, then synthesizes consensus before planning.
+- **Parallel implementation**: When contracts are independent, the orchestrator can dispatch multiple implement agents concurrently for faster execution.
 - **Decision tiering**: Plan classifies decisions as High/Medium/Low impact. Human gate only blocks on High/Medium. Structural minimum rules prevent under-classification.
 - **Behavioral contracts**: Contracts define input/output/errors, not file paths. Implementation plan is separate guidance.
 - **Opinionated orchestrator**: At every human interaction, the orchestrator provides its own analysis and recommendation — not just a list to approve.

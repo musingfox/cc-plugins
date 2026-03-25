@@ -59,9 +59,22 @@ The goal is that each agent receives the **minimum sufficient context** to do it
 This is NOT a linear pipeline. It is a flow graph where every transition is guarded by the orchestrator.
 
 ```
-[research] ⟶ orch ⟶ [plan] ⟶ orch ⟶ human gate ⟶ [implement] ⟶ orch ⟶ [review]
-                ↕              ↕         (H/M only)        ↕              ↕
-            human/redo     human/redo                   human/redo     human/redo
+                                                    ┌─ No ──> [plan]
+                                                    │
+[research] ⟶ orch ⟶ complexity check ─── Yes ──> [agent teams] ⟶ human co-decision ──┐
+                ↕         (ACS)                        ↕                              │
+            human/redo                            human/redo                          │
+                                                                                      ↓
+                                                                               [plan (synthesis input)]
+                                                                                      ↓
+                                          human gate ⟵──── orch ⟵────────────────────┘
+                                          (H/M only)
+                                              ↓
+                                          [implement (parallel dispatch if independent)]
+                                              ↓
+                                          orch ⟶ [review]
+                                              ↕        ↕
+                                          human/redo  human/redo
 ```
 
 At each transition, the orchestrator evaluates:
@@ -72,6 +85,103 @@ At each transition, the orchestrator evaluates:
 - Insufficient (needs codebase investigation) → loop back to research with enriched goal
 - Insufficient (needs human input) → present the gap with analysis and recommendation, then re-route after human responds
 - Structurally invalid → feedback to the same agent, re-run
+
+---
+
+## Complexity Assessment (ACS)
+
+After research completes, the orchestrator evaluates whether the goal is sufficiently complex to benefit from Agent Teams mode. The evaluation uses **heuristic rules**, not LLM judgment.
+
+### Trigger Rules
+
+| Signal | Threshold | Rationale |
+|--------|-----------|-----------|
+| **Unresolved items** | ≥ 3 | Multiple unknowns indicate the problem space is not well-understood; parallel exploration of alternatives benefits from discussion |
+| **Medium-confidence items** | ≥ 3 | Multiple defensible assumptions suggest the design space is ambiguous; surfacing trade-offs requires multi-angle synthesis |
+| **Key Files affected** | ≥ 5 | Broad scope increases risk of overlooking interactions; deliberate coverage check reduces blind spots |
+| **Viable approaches** | ≥ 2 | Explicit alternative approaches indicate the research agent already identified a strategic fork; team discussion helps co-decide |
+
+### Always-Trigger Keywords
+
+If research output contains any of these patterns in Unresolved or Completed sections, Agent Teams triggers regardless of thresholds:
+
+- "multiple valid approaches"
+- "trade-offs between"
+- "needs architectural decision"
+- "conflicting patterns observed"
+- "no clear precedent"
+
+### Skip Override
+
+The orchestrator can skip Agent Teams even when triggered if:
+- Research agent explicitly marks `Agent Teams: skip` in its output (agent determined complexity is already resolved)
+- Human explicitly requested a simple/fast path in the goal
+- Goal is clearly a bugfix or documentation-only change
+- Research output already provides high-confidence answers to all questions
+
+### Why Heuristics, Not LLM Judgment?
+
+Agent Teams is expensive (multiple sub-agents, discussion synthesis, human co-decision). A false positive wastes time but a false negative loses quality on complex goals. Heuristic rules are:
+
+1. **Auditable** — humans can see exactly why Agent Teams triggered
+2. **Consistent** — same research output always produces same decision
+3. **Conservative** — thresholds are set to favor triggering on borderline cases (better to over-discuss than under-explore)
+
+LLM-based "is this complex?" judgment would be opaque, variable across runs, and prone to under-triggering when the orchestrator model is optimistic.
+
+---
+
+## Agent Teams (Adaptive Research Upgrade)
+
+When complexity assessment triggers Agent Teams, the flow **does not go directly to Plan**. Instead, it enters a two-layer collaborative research mode:
+
+### Layer 1: Subagent Mode (Default)
+
+The orchestrator spawns **2–3 specialized subagents** in parallel, each assigned a different angle (selected from the table below based on research signals):
+
+| Angle | Focus | Typical Trigger |
+|-------|-------|----------------|
+| **Feasibility** | Can the goal be implemented in the current codebase? | High Unresolved count, "needs architectural decision" |
+| **Alternatives** | What are the viable design approaches? | ≥ 2 approaches in research, conflicting patterns |
+| **Risk** | What failure modes, edge cases, and scaling cliffs exist? | High complexity, cross-module scope |
+| **Integration** | How does this interact with existing systems? | ≥ 5 key files, "no clear precedent" |
+
+Each subagent receives:
+- **Context**: compressed research output (facts only, no interpretation)
+- **Goal**: "Analyze [angle] for [original goal]"
+- **Tools**: Read, Grep, Glob (same as research agent)
+
+Subagents produce standard agent output (Completed/Unresolved format). The orchestrator then:
+
+1. **Synthesizes** all subagent outputs into a unified analysis:
+   - Consolidates overlapping findings
+   - Highlights contradictions (e.g., Feasibility says "straightforward", Risk says "high coupling")
+   - Generates strategic recommendations with trade-off matrix
+2. **Human co-decision**: presents synthesis with the orchestrator's own recommendation, human chooses direction or requests re-investigation
+3. **Outputs direction document** — this becomes input to Plan (alongside compressed research)
+
+### Layer 2: Native Agent Teams Mode (Upgrade)
+
+If the **Claude Code session has Agent Teams enabled** (detected via environment variable `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), the orchestrator upgrades to native mode:
+
+- Instead of spawning isolated subagents, the orchestrator uses Claude Code's Agent Teams feature to spawn **teammates**
+- Teammates can **communicate with each other** (not just parallel dispatch)
+- Teammates use the same angle assignment and synthesis format as subagent mode
+- Output format is identical: synthesized direction document
+
+**Detection**: The orchestrator checks `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` at runtime. If set, it uses native Agent Teams; otherwise, it falls back to subagent mode (parallel Agent invocations).
+
+### Re-run Budget
+
+Agent Teams is expensive. If the synthesis output is still insufficient (e.g., human requests deeper investigation on a specific angle), the orchestrator allows **1 re-run** with the enriched focus area. After that, it escalates to the human with options (proceed with current understanding / simplify goal / abort).
+
+### How This Feeds into Plan
+
+The Plan agent receives:
+- **Compressed research** (factual inventory from Phase 1)
+- **Direction document** (strategic guidance from Agent Teams, including human co-decision outcome)
+
+The direction document does NOT dictate contracts — it provides context for the Plan agent to make informed architectural decisions. The Plan agent is still responsible for defining the complete contracts; the direction document reduces the chance of overlooking key constraints or viable alternatives.
 
 ---
 
@@ -292,6 +402,45 @@ The plan phase is **iterative**. The human may approve some decisions, reject ot
 The context summary provides directional awareness without exposing decision rationale or alternatives. It exists so the implement agent can make reasonable micro-decisions (naming, error messages, code organization) without needing to report Unresolved for every trivial ambiguity.
 
 The implement agent does NOT receive: full research output, decision alternatives, planning rationale, or rejected approaches. These are deliberately withheld to prevent the implement agent from second-guessing approved contracts.
+
+#### Contract Independence and Parallel Dispatch
+
+Before dispatching implement agents, the orchestrator **analyzes contract dependencies** to determine if parallel execution is viable.
+
+**Dependency Graph Construction**:
+
+For each behavioral contract, the orchestrator checks:
+1. **Explicit dependencies**: the `depends` field in the contract definition
+2. **File overlap**: whether two contracts target the same file in their implementation plan steps
+3. **Test interdependency**: whether one contract's test cases import or invoke another contract's output
+
+Contracts are grouped into **independent execution groups** if:
+- No explicit dependency between them
+- No file path overlap (or overlapping files are marked as append-only/non-conflicting by the plan)
+- Test cases are self-contained (mocks/stubs for external dependencies)
+
+**Parallel Dispatch Rules**:
+
+- **Independent groups** → spawn separate implement agents in parallel, each with their own worktree (git worktree mechanism to avoid conflicts)
+- **Sequential groups** → queue for serial execution (dependencies must be satisfied first)
+- **Maximum concurrency**: 3 implement agents (budget constraint to avoid exponential token usage)
+
+Each parallel implement agent receives:
+- Only the contracts in its group
+- Only the test cases for its group
+- Implementation plan filtered to its group's steps
+- Shared context summary (same for all agents)
+
+After all parallel agents complete, the orchestrator:
+1. **Merges worktrees** back to main working tree
+2. **Runs integration tests** (if the plan defined any cross-contract tests)
+3. **Proceeds to review** with the merged diff
+
+**When Parallel Dispatch is NOT Used**:
+
+- Fewer than 2 independent contract groups → no parallelization benefit
+- Plan explicitly marks contracts as "must be sequential" (e.g., database migration must precede schema-dependent code)
+- Human overrides with `--no-parallel` flag (debugging, prefer simpler flow)
 
 **Output Contract**:
 ```markdown
@@ -821,6 +970,215 @@ After 2 cross-phase loops on the implement phase, the streaming approach still f
 
 ---
 
+### Example 4: Agent Teams Flow — "Rewrite Auth Middleware for OAuth2"
+
+This example demonstrates how a complex, ambiguous goal triggers Agent Teams mode.
+
+#### Phase 1: Research
+
+**Orchestrator assembles input**:
+```markdown
+## Goal
+Rewrite authentication middleware to support OAuth2 with PKCE flow for the API gateway
+
+## Scope
+Working directory: /app
+```
+
+**Research agent output**:
+```markdown
+## Existing Capabilities
+- `src/auth/middleware.ts`: JWT-based auth, validates `Authorization: Bearer <token>` — no OAuth2 support
+- `src/auth/jwt.ts`: Issues JWT tokens after password login — short-lived (1h), no refresh mechanism
+- `src/gateway/router.ts`: All routes protected by auth middleware
+
+## Relevant Patterns
+- No OAuth2 precedent in the codebase
+- External auth provider pattern: payment webhook uses HMAC signature validation (different paradigm)
+
+## Constraints
+- Existing auth uses synchronous JWT verification (jsonwebtoken.verify) — OAuth2 introspection is async
+- 12 routes currently depend on `req.user` object populated by middleware — interface contract unclear
+- Frontend expects `Set-Cookie` for session management — OAuth2 tokens typically use Authorization header
+
+## Key Files
+- `src/auth/middleware.ts`: Current auth middleware
+- `src/auth/jwt.ts`: Token issuance
+- `src/gateway/router.ts`: Route definitions
+- `src/types/express.d.ts`: Express Request type extension
+- `src/config.ts`: Where OAuth2 client config would go
+
+## Completed
+- Existing auth architecture documented [confidence: high]
+- Identified async compatibility issue [confidence: high]
+
+## Unresolved
+- **OAuth2 provider not specified** — determines token endpoint, introspection API, scopes
+  - Suggested resolution: ask human which provider (Auth0, Okta, custom)
+- **Session persistence strategy unclear** — OAuth2 tokens are typically opaque; do we store them server-side or client-side?
+  - Suggested resolution: investigate session store (Redis?) vs stateless design
+- **Multiple valid approaches for token validation**:
+  1. Introspection endpoint (real-time validation, extra latency)
+  2. JWT-based OAuth2 tokens (offline validation, assumes provider issues JWTs)
+  3. Hybrid (introspection on first request, cache for TTL)
+  - Suggested resolution: requires architectural decision based on latency vs security trade-offs
+- **Frontend migration path unknown** — 8 frontend components import `useAuth()` hook expecting JWT
+  - Suggested resolution: investigate whether frontend can adopt OAuth2 flow or needs adapter layer
+- **Backward compatibility requirement unclear** — can we drop JWT entirely or need dual support during migration?
+  - Suggested resolution: ask human about migration timeline and rollback plan
+```
+
+#### Complexity Assessment (ACS Check)
+
+**Orchestrator evaluates**:
+- Unresolved items: **5** (≥ 3 threshold) ✓
+- Medium-confidence items: 0
+- Key Files: 5 (meets threshold) ✓
+- Viable approaches: **3** explicitly listed in Unresolved ✓
+- Keywords: "**multiple valid approaches**", "architectural decision" ✓
+
+**Verdict**: Triggers Agent Teams — multiple unknowns, 3 explicit approaches, strategic decision needed.
+
+---
+
+#### Agent Teams Phase
+
+**Orchestrator spawns 3 subagents** (assume subagent mode, not native Agent Teams):
+
+| Subagent | Angle | Input |
+|----------|-------|-------|
+| **Feasibility** | Can OAuth2 be integrated without rewriting the entire auth layer? | Compressed research (facts only) |
+| **Alternatives** | What are the trade-offs between the 3 token validation approaches? | Same |
+| **Integration** | How does this affect the frontend and existing routes? | Same |
+
+**Subagent outputs** (abbreviated):
+
+**Feasibility Subagent**:
+```markdown
+## Completed
+- OAuth2 can be integrated incrementally [confidence: high]
+  - Existing middleware.ts has a plugin-style design (L45-60) — new auth strategies can be added without rewriting
+  - JWT issuance can coexist with OAuth2 during migration (check `Authorization` header format to route to correct validator)
+
+## Unresolved
+- Provider-specific: If the provider doesn't issue JWT-format tokens, introspection is mandatory (adds 50–200ms latency per request)
+```
+
+**Alternatives Subagent**:
+```markdown
+## Completed
+- **Introspection**: Works with any OAuth2 provider, adds ~100ms latency, requires caching to avoid rate limits [confidence: high]
+- **JWT-based OAuth2**: Zero latency if provider issues JWTs (Auth0/Okta do), validates offline like current auth [confidence: medium — assumes provider issues JWTs]
+- **Hybrid**: First request introspects, caches for token TTL. Complexity vs latency trade-off [confidence: medium — caching logic is nontrivial]
+
+## Unresolved
+- Latency impact on high-traffic routes (e.g., /api/health called 1k/min) — introspection may require bypass for public endpoints
+```
+
+**Integration Subagent**:
+```markdown
+## Completed
+- Frontend migration is **not required** if we maintain the same `req.user` interface [confidence: high]
+  - OAuth2 middleware can populate `req.user` identically to JWT middleware
+  - Frontend `useAuth()` hook works with any backend auth as long as cookie/token semantics are preserved
+
+## Unresolved
+- OAuth2 PKCE flow requires frontend changes (code exchange) — but that's separate from middleware rewrite; migration can be phased
+- 3 routes (`/admin/*`) have role-based checks that assume JWT claims structure — OAuth2 token may have different claim names (need mapping)
+```
+
+**Orchestrator synthesizes**:
+
+```markdown
+## Synthesis: OAuth2 Middleware Rewrite
+
+### Findings
+
+1. **Incremental migration is viable** — existing middleware architecture supports plugin-style auth strategies; JWT and OAuth2 can coexist during transition [Feasibility + Integration agreement]
+
+2. **Provider choice dictates token validation approach**:
+   - If provider issues JWT-format tokens (Auth0, Okta, Keycloak) → offline validation is possible, zero latency added
+   - If provider issues opaque tokens → introspection required, ~100ms latency per request [Alternatives + Feasibility]
+
+3. **Frontend does NOT need immediate changes** — as long as `req.user` interface stays stable; OAuth2 PKCE flow is a separate frontend task [Integration]
+
+4. **High-traffic routes need special handling** — `/api/health` and similar should bypass token validation or use cached validation [Alternatives → Integration conflict: latency on public endpoints is unacceptable]
+
+### Trade-Off Matrix
+
+| Approach | Latency | Provider Compatibility | Complexity |
+|----------|---------|----------------------|-----------|
+| **Offline JWT validation** | +0ms | Requires JWT-issuing provider | Low (mirrors existing) |
+| **Introspection** | +50–200ms | Universal | Medium (caching + rate limits) |
+| **Hybrid** | +0ms (cached), +100ms (cold) | Universal | High (cache invalidation, TTL sync) |
+
+### Strategic Recommendations
+
+1. **Ask human to specify OAuth2 provider** — this determines whether offline JWT validation is available (preferred) or introspection is required.
+
+2. **If JWT-based tokens available**: Recommend offline validation with incremental rollout (dual auth support → migrate frontend → deprecate old JWT).
+
+3. **If introspection required**: Recommend hybrid approach with Redis caching (complexity justified by latency needs on high-traffic routes).
+
+4. **Backward compatibility**: Support both auth schemes during migration — low risk, already compatible with current middleware design.
+
+### Contradictions to Resolve
+
+- **Alternatives subagent** highlighted latency risk on high-traffic routes
+- **Integration subagent** noted `/admin/*` role checks assume JWT claim structure
+- **Feasibility subagent** said incremental is possible, but didn't address how to handle claim mapping
+
+**Recommended next step**: Human co-decision on provider + validation approach, then Plan phase defines claim mapping contract as part of middleware rewrite.
+```
+
+#### Human Co-Decision
+
+**Orchestrator to human**:
+
+> Agent Teams synthesis complete. Three angles analyzed (Feasibility, Alternatives, Integration). Key decision needed:
+>
+> **Which OAuth2 provider?**
+> - If Auth0/Okta/Keycloak → they issue JWT-format tokens, we can validate offline (zero latency added)
+> - If custom provider or opaque tokens → introspection required (~100ms per request), needs caching
+>
+> **My recommendation**: If you're not locked into a provider yet, choose one that issues JWTs (Auth0 or Okta). The latency difference matters at your scale (1k req/min on /api/health). Offline validation also simplifies caching and reduces external dependency risk.
+>
+> What's the provider, or should I research provider comparison first?
+
+**Human**: Use Auth0, JWT-based tokens.
+
+**Orchestrator**: Noted. Proceeding to Plan with this direction.
+
+---
+
+#### Phase 2: Plan (with Direction Input)
+
+**Orchestrator assembles input**:
+```markdown
+## Goal
+Rewrite auth middleware for OAuth2 (Auth0, JWT-based tokens)
+
+## Codebase Research
+[Compressed research output — facts only]
+
+## Direction (from Agent Teams)
+- Provider: Auth0, issues JWT-format tokens
+- Validation approach: offline (same latency as current JWT auth)
+- Backward compatibility: dual auth support during migration
+- Frontend: no immediate changes required (maintain req.user interface)
+- Claim mapping: Auth0 claims differ from current JWT structure, needs mapping layer
+```
+
+Plan agent produces contracts for:
+1. OAuth2JwtValidator (offline validation, Auth0 public keys)
+2. ClaimMapper (Auth0 claims → req.user interface)
+3. DualAuthMiddleware (routes to JWT or OAuth2 validator based on token format)
+4. Migration plan (phased rollout)
+
+Human gate reviews High decisions (dual auth strategy, claim mapping interface) → approves → implement.
+
+---
+
 ## Design Constraints and Known Limitations
 
 ### What This Design Does NOT Handle
@@ -855,3 +1213,6 @@ But the design does NOT optimize for minimum token usage. If a goal requires 3 r
 10. **Loop-backs are budgeted** — 2 re-runs per phase, 2 cross-phase loops; limits trigger escalation, not hard stops
 11. **Graceful degradation** — structured escalation with re-entry points; agents always provide analysis and options when stuck
 12. **Agents are pluggable** — the flow defines contracts, not agents; the orchestrator matches agent capabilities to phase requirements
+13. **Complexity assessment uses heuristic triggers** — ≥3 Unresolved, ≥3 medium confidence, ≥5 key files, ≥2 approaches, or keyword patterns; rules are auditable and conservative (favor triggering over missing complexity)
+14. **Agent Teams is adaptive research upgrade** — two-layer design (subagent mode by default, native Agent Teams if env var detected); spawns 2–4 specialized angles, synthesizes findings, outputs direction document for Plan; 1 re-run budget
+15. **Parallel implement for independent contracts** — orchestrator builds dependency graph, identifies independent groups, spawns up to 3 parallel implement agents with separate worktrees, merges and runs integration tests before review

@@ -40,9 +40,12 @@ When in doubt, use the default. State which agent you selected and why.
 ## Pipeline Overview
 
 ```
-[research] ⟶ VALIDATE ⟶ [plan] ⟶ VALIDATE ⟶ HUMAN GATE ⟶ [implement] ⟶ VALIDATE ⟶ [review] ⟶ PRESENT
-                ↕                     ↕            (H/M)            ↕                      ↕
-           human/redo            human/redo                    human/redo              human/redo
+[research] → VALIDATE → ACS check
+  → high complexity → [agent teams] → human co-decision ─┐
+  → low complexity ──────────────────────────────────────┐│
+                                                         ↓↓
+[plan] → VALIDATE → HUMAN GATE (H/M) → [implement] → VALIDATE → [review] → PRESENT
+                                          ↑ parallel dispatch if independent contracts
 ```
 
 Every arrow between phases passes through you. At each transition you perform a **Transition Validation** (see below). The flow is NOT linear — any phase can loop back.
@@ -53,6 +56,7 @@ Track loop counts throughout the session:
 
 - **Phase re-runs** (same phase re-run with feedback): max **2 per phase**
 - **Cross-phase loops** (return to an earlier phase): max **2 total**
+- **Agent Teams re-runs**: max **1 total** (this is a heavy operation)
 
 When a limit is reached, you MUST escalate to the human (see Escalation section). The human can override limits — they exist to force a check-in, not to hard-stop.
 
@@ -99,6 +103,47 @@ Save output to `$SESSION/research.md`.
 
 5. **Once sufficient** → compress research output for plan input (see Context Compression).
 
+### Complexity Assessment
+
+After research validation passes, evaluate whether this goal would benefit from multi-perspective exploration using the **Agent Complexity Score (ACS) heuristic**:
+
+| Research Signal | Trigger Threshold |
+|----------------|-------------------|
+| Unresolved items count | ≥ 3 |
+| Completed items with `medium` confidence | ≥ 3 |
+| Key files/modules identified | ≥ 5 |
+| Viable approaches mentioned | ≥ 2 |
+
+**Always trigger Agent Teams if**:
+- Goal contains keywords: migration, rewrite, redesign, replace, overhaul
+- Research output contains any of: "multiple valid approaches", "trade-offs between", "needs architectural decision", "conflicting patterns observed", "no clear precedent"
+
+**Skip Agent Teams if**:
+- Research agent explicitly marks `Agent Teams: skip` in its output (agent determined complexity is resolved)
+- Human explicitly requested a simple/fast path in the goal
+- Goal is clearly a bugfix or documentation-only change
+- Research output already provides high-confidence answers to all questions
+
+If ACS threshold is met, proceed to **Phase 1.5: Agent Teams**. Otherwise, proceed to Phase 2: Plan.
+
+---
+
+## Phase 1.5: Agent Teams (Conditional)
+
+**This phase only runs when Complexity Assessment triggers it.**
+
+Read the full protocol from `docs/agent-teams-protocol.md` (relative to plugin root) and execute it. Key points:
+
+- **Detect mode**: check `$CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` — if set, use native Agent Teams; otherwise, use subagent parallel exploration
+- **Identify 2-3 angles** from research output (different assumptions/priorities)
+- **Dispatch parallel agents**, each exploring one angle
+- **Synthesize** results into convergence/divergence/recommendation
+- **Human co-decision**: present synthesis, human chooses direction
+- **Re-run budget**: max 1 re-run of this phase
+- Save output to `$SESSION/agent-teams.md`
+
+After human decision, proceed to Phase 2: Plan with the selected direction.
+
 ---
 
 ## Phase 2: Plan
@@ -114,6 +159,10 @@ Save output to `$SESSION/research.md`.
 
 ## Human Clarifications
 {any answers from human during research validation, if applicable}
+
+## Multi-Perspective Direction
+{If Agent Teams was triggered: include the synthesis and human's chosen direction.
+ If Agent Teams was skipped: omit this section entirely.}
 
 ## Contract Requirements
 Your output MUST:
@@ -212,6 +261,12 @@ Do NOT proceed to implement without explicit human approval.
 - **Key constraints**: {constraints from research that affect implementation}
 ```
 
+### Contract Independence Check
+
+Check if contracts can be parallelized: examine `depends` fields, file overlaps in implementation plan, and test interdependencies. If contracts form 2+ independent groups with no coupling, use parallel dispatch.
+
+### Single Agent Dispatch (Default)
+
 **Dispatch agent** with:
 
 ```markdown
@@ -231,6 +286,15 @@ Implement these contracts. Write the tests. All tests must pass.
 ```
 
 **Do NOT pass**: full research output, decision alternatives, planning rationale, rejected approaches.
+
+### Parallel Agent Dispatch
+
+If 2+ independent contract groups detected, read `docs/parallel-implement-protocol.md` (relative to plugin root) and follow it. Key points:
+
+- Dispatch each group to a separate agent with `isolation: "worktree"`
+- Max 3 parallel agents
+- Inform human before dispatching
+- Run integration test after merging all worktrees
 
 ### Transition Validation: Implement → Review
 
@@ -337,38 +401,7 @@ The research agent doesn't know it's in a loop — it just sees a more specific 
 
 ## Escalation
 
-When you cannot proceed (loop limit reached, all contracts unresolved, fundamental blocker), escalate to the human using this format:
-
-> ## Situation
-> {what happened — factual, concise}
->
-> ## What Was Attempted
-> {which phases ran, what they produced, what went wrong}
->
-> ## Analysis
-> {your assessment of why this is stuck}
->
-> ## Options
-> 1. **{Option A}**: {description, trade-offs}
->    - **Re-entry**: {where the flow resumes}
-> 2. **{Option B}**: {description, trade-offs}
->    - **Re-entry**: {where the flow resumes}
-> 3. **Abort**: {what has been accomplished so far}
->
-> ## Recommendation
-> {your suggested path and reasoning}
-
-### Re-entry Rules
-
-After the human chooses an option, re-enter at the **earliest phase invalidated by the change**:
-
-| Type of Change | Re-entry Point |
-|---------------|---------------|
-| Human provides missing information (no design change) | Re-run the stuck phase with new info |
-| Human revises a Low-impact decision | Re-run from implement with updated contracts |
-| Human revises a Medium/High-impact decision | Re-run from plan → human gate again |
-| Human changes the goal or scope | Re-run from research |
-| Human provides a new approach | Re-run from plan (skip research if codebase facts unchanged) |
+When you cannot proceed (loop limit reached, all contracts unresolved, fundamental blocker), read `docs/escalation-protocol.md` (relative to plugin root) and follow it. Key principle: re-enter at the **earliest phase invalidated by the change**.
 
 ---
 

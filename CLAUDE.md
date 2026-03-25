@@ -131,18 +131,20 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 
 **Key Components**:
 - **Command** (`commands/`):
-  - `/cf "goal"` - Orchestrator that manages the 4-phase context-flow pipeline
+  - `/cf "goal"` - Orchestrator that manages the unified pipeline with adaptive research
 
 - **4 Agents** (`agents/`):
   - `research.md` - Context: goal + working directory → Output: capability inventory
-  - `plan.md` - Context: compressed goal + research output → Output: contracts + test cases
+  - `plan.md` - Context: compressed goal + research output + optional direction → Output: contracts + test cases
   - `implement.md` - Context: contracts + test cases only → Output: passing implementation
   - `review.md` - Context: contracts + git diff → Output: pass/fail verdict
 
-**Workflow**: `/cf "goal"` → [research] → validate output → [plan] → validate contracts → HUMAN GATE → [implement] → validate tests pass → [review] → verdict
+**Workflow**: `/cf "goal"` → [research] → validate → complexity check → (optional [agent teams] → human co-decision) → [plan] → validate → HUMAN GATE → [implement] (parallel if independent) → validate → [review] → verdict
 
-**Key Differences from OMT**:
-- Agent definitions are 1-16 lines (vs 100+ lines in OMT) — constraints come from context isolation, not prompt instructions
+**Key Features**:
+- **Adaptive research**: ACS heuristic detects complexity; triggers Agent Teams (multi-perspective exploration) when needed
+- **Two-layer Agent Teams**: subagent parallel exploration by default; upgrades to native Agent Teams when experimental flag is available
+- **Parallel implement**: independent contracts dispatched to separate agents with worktree isolation
 - Orchestrator controls context flow: what each agent sees is explicitly specified, not implicit
 - Contract validation between phases: each phase's output must meet structural requirements before flowing to the next
 - Contracts are passed AS context to agents (binding constraint), not described in prompts (suggestion)
