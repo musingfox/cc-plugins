@@ -26,7 +26,7 @@ Before making any decision, run this command to collect environment signals:
 echo "TERM_PROGRAM=${TERM_PROGRAM:-unknown}"
 echo "GHOSTTY=$([ "${TERM_PROGRAM}" = "ghostty" ] && echo "yes" || echo "no")"
 echo "SSH=$([ -n "${SSH_CLIENT:-}${SSH_CONNECTION:-}" ] && echo "yes" || echo "no")"
-echo "EDITOR_MCP=$(command -v node >/dev/null 2>&1 && [ -f "${CLAUDE_PLUGIN_ROOT}/../../viz-editor/dist/index.js" ] && echo "available" || echo "unavailable")"
+echo "EDITOR_MCP=$(command -v node >/dev/null 2>&1 && [ -f "${CLAUDE_PLUGIN_ROOT}/mcp-editor/dist/index.js" ] && echo "available" || echo "unavailable")"
 ```
 
 Record the output. Do NOT skip this step.
