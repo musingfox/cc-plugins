@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "viz-editor": {
+      "command": "node",
+      "args": ["dist/index.js"],
+      "cwd": "."
+    }
+  }
+}
