@@ -131,7 +131,7 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 
 **Key Components**:
 - **Command** (`commands/`):
-  - `/cf "goal"` - Orchestrator that manages the unified pipeline with adaptive research
+  - `/cf "goal"` - Orchestrator that manages the pipeline with Agent Teams default for research & review
 
 - **4 Agents** (`agents/`):
   - `research.md` - Context: goal + working directory → Output: capability inventory
@@ -139,11 +139,11 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
   - `implement.md` - Context: contracts + test cases only → Output: passing implementation
   - `review.md` - Context: contracts + git diff → Output: pass/fail verdict
 
-**Workflow**: `/cf "goal"` → [research] → validate → complexity check → (optional [agent teams] → human co-decision) → [plan] → validate → HUMAN GATE → [implement] (parallel if independent) → validate → [review] → verdict
+**Workflow**: `/cf "goal"` → [research — Agent Teams] → validate → [plan] → validate → HUMAN GATE → [implement] (parallel if independent) → validate → [review — Agent Teams] → verdict
 
 **Key Features**:
-- **Adaptive research**: ACS heuristic detects complexity; triggers Agent Teams (multi-perspective exploration) when needed
-- **Two-layer Agent Teams**: subagent parallel exploration by default; upgrades to native Agent Teams when experimental flag is available
+- **Agent Teams by default**: Research and Review phases use multi-perspective Agent Teams by default; skip to single agent only for trivially simple goals (bugfix, typo, docs-only)
+- **Native + fallback**: native Agent Teams when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is set; subagent parallel exploration as fallback
 - **Parallel implement**: independent contracts dispatched to separate agents with worktree isolation
 - Orchestrator controls context flow: what each agent sees is explicitly specified, not implicit
 - Contract validation between phases: each phase's output must meet structural requirements before flowing to the next

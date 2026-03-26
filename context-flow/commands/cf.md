@@ -40,15 +40,27 @@ When in doubt, use the default. State which agent you selected and why.
 ## Pipeline Overview
 
 ```
-[research] → VALIDATE → ACS check
-  → high complexity → [agent teams] → human co-decision ─┐
-  → low complexity ──────────────────────────────────────┐│
-                                                         ↓↓
-[plan] → VALIDATE → HUMAN GATE (H/M) → [implement] → VALIDATE → [review] → PRESENT
-                                          ↑ parallel dispatch if independent contracts
+[research — Agent Teams] → VALIDATE → [plan] → VALIDATE → HUMAN GATE (H/M)
+    → [implement] → VALIDATE → [review — Agent Teams] → PRESENT
+         ↑ parallel dispatch if independent contracts
 ```
 
 Every arrow between phases passes through you. At each transition you perform a **Transition Validation** (see below). The flow is NOT linear — any phase can loop back.
+
+### Agent Teams Default
+
+Research and Review phases use **Agent Teams by default**. This provides multi-perspective exploration (research) and multi-angle code review (review).
+
+**Mode selection** (applies to both research and review):
+- If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is set → use **native Agent Teams** (teammates communicate directly, challenge each other's findings)
+- Otherwise → use **subagent parallel exploration** (parallel dispatch, orchestrator synthesizes)
+
+**Skip to single agent** when ANY of these apply:
+- User explicitly requested a fast path in the goal
+- Goal is clearly a single-file bugfix, typo fix, or documentation-only change
+- Goal can be fully described in one sentence with no ambiguity
+
+When skipping, use a single research/review agent as in the default agent registry.
 
 ### Loop Budget
 
@@ -56,15 +68,26 @@ Track loop counts throughout the session:
 
 - **Phase re-runs** (same phase re-run with feedback): max **2 per phase**
 - **Cross-phase loops** (return to an earlier phase): max **2 total**
-- **Agent Teams re-runs**: max **1 total** (this is a heavy operation)
+- **Agent Teams re-runs** (re-run research or review teams): max **1 per phase**
 
 When a limit is reached, you MUST escalate to the human (see Escalation section). The human can override limits — they exist to force a check-in, not to hard-stop.
 
 ---
 
-## Phase 1: Research
+## Phase 1: Research (Agent Teams)
 
-**Dispatch agent** with this context:
+Research uses Agent Teams by default. Read the full protocol from `docs/agent-teams-protocol.md` (relative to plugin root), section **Research Teams**.
+
+### Team Composition
+
+Identify 2-3 exploration angles based on the goal. Common patterns:
+- **Breadth vs depth**: one teammate maps overall architecture, another drills into the most relevant module
+- **Different subsystems**: for cross-cutting goals, one teammate per affected layer (e.g., API, data, UI)
+- **Existing vs greenfield**: one teammate investigates existing patterns, another explores what's needed that doesn't exist yet
+
+### Dispatch
+
+Each teammate receives:
 
 ```markdown
 ## Goal
@@ -72,13 +95,28 @@ When a limit is reached, you MUST escalate to the human (see Escalation section)
 
 ## Scope
 Working directory: {cwd}
+
+## Your Angle
+{description of this teammate's exploration focus}
 ```
 
 If this is a loop-back, use the enriched goal instead (see Loop Back section).
 
-**Nothing else.** The agent explores from scratch.
+**Nothing else.** Each teammate explores from scratch within their angle.
 
-Save output to `$SESSION/research.md`.
+### Synthesis
+
+After all teammates complete, synthesize their findings into a unified research output following the research agent's Output Schema (Existing Capabilities, Constraints, Key Files, Completed, Unresolved). Additionally include:
+
+```markdown
+## Convergence
+{where teammates' findings agree — high-confidence facts}
+
+## Divergence
+{where findings conflict or reveal trade-offs — decision points for planning}
+```
+
+Save synthesized output to `$SESSION/research.md`.
 
 ### Transition Validation: Research → Plan
 
@@ -101,48 +139,11 @@ Save output to `$SESSION/research.md`.
 4. **Confidence check** — examine Completed items marked `medium`:
    - Is the assumption defensible? If too risky, treat as Unresolved and consult human.
 
-5. **Once sufficient** → compress research output for plan input (see Context Compression).
+5. **Divergence check** — if research teammates produced conflicting findings:
+   - Present the divergence to the human with your recommendation
+   - Human chooses direction before proceeding to Plan
 
-### Complexity Assessment
-
-After research validation passes, evaluate whether this goal would benefit from multi-perspective exploration using the **Agent Complexity Score (ACS) heuristic**:
-
-| Research Signal | Trigger Threshold |
-|----------------|-------------------|
-| Unresolved items count | ≥ 3 |
-| Completed items with `medium` confidence | ≥ 3 |
-| Key files/modules identified | ≥ 5 |
-| Viable approaches mentioned | ≥ 2 |
-
-**Always trigger Agent Teams if**:
-- Goal contains keywords: migration, rewrite, redesign, replace, overhaul
-- Research output contains any of: "multiple valid approaches", "trade-offs between", "needs architectural decision", "conflicting patterns observed", "no clear precedent"
-
-**Skip Agent Teams if**:
-- Research agent explicitly marks `Agent Teams: skip` in its output (agent determined complexity is resolved)
-- Human explicitly requested a simple/fast path in the goal
-- Goal is clearly a bugfix or documentation-only change
-- Research output already provides high-confidence answers to all questions
-
-If ACS threshold is met, proceed to **Phase 1.5: Agent Teams**. Otherwise, proceed to Phase 2: Plan.
-
----
-
-## Phase 1.5: Agent Teams (Conditional)
-
-**This phase only runs when Complexity Assessment triggers it.**
-
-Read the full protocol from `docs/agent-teams-protocol.md` (relative to plugin root) and execute it. Key points:
-
-- **Detect mode**: check `$CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` — if set, use native Agent Teams; otherwise, use subagent parallel exploration
-- **Identify 2-3 angles** from research output (different assumptions/priorities)
-- **Dispatch parallel agents**, each exploring one angle
-- **Synthesize** results into convergence/divergence/recommendation
-- **Human co-decision**: present synthesis, human chooses direction
-- **Re-run budget**: max 1 re-run of this phase
-- Save output to `$SESSION/agent-teams.md`
-
-After human decision, proceed to Phase 2: Plan with the selected direction.
+6. **Once sufficient** → compress research output for plan input (see Context Compression).
 
 ---
 
@@ -160,9 +161,9 @@ After human decision, proceed to Phase 2: Plan with the selected direction.
 ## Human Clarifications
 {any answers from human during research validation, if applicable}
 
-## Multi-Perspective Direction
-{If Agent Teams was triggered: include the synthesis and human's chosen direction.
- If Agent Teams was skipped: omit this section entirely.}
+## Research Divergence
+{If research teammates produced conflicting findings: include the divergence and human's chosen direction.
+ If no divergence or single-agent research: omit this section entirely.}
 
 ## Contract Requirements
 Your output MUST:
@@ -317,15 +318,29 @@ If 2+ independent contract groups detected, read `docs/parallel-implement-protoc
 
 ---
 
-## Phase 4: Review
+## Phase 4: Review (Agent Teams)
+
+Review uses Agent Teams by default. Read the full protocol from `docs/agent-teams-protocol.md` (relative to plugin root), section **Review Teams**.
 
 ```bash
 DIFF=$(git diff)
 ```
 
-**Dispatch agent** with:
+### Team Composition
+
+Dispatch 2-3 review teammates with different review lenses:
+- **Contract compliance**: verify each behavioral contract is satisfied by the changes (binding — determines verdict)
+- **Security & performance**: review for injection risks, auth gaps, O(n²) patterns, resource leaks
+- **Code quality & correctness**: review for race conditions, edge cases, maintainability, dead code
+
+### Dispatch
+
+Each teammate receives:
 
 ```markdown
+## Your Review Focus
+{description of this teammate's review lens}
+
 ## Behavioral Contracts
 {same contracts from Phase 3}
 
@@ -337,11 +352,16 @@ DIFF=$(git diff)
 
 ## Changes
 {git diff output}
-
-Verify each contract is satisfied by the changes. Flag any non-contract concerns as advisories.
 ```
 
 **Do NOT pass**: research constraints (those should have been captured as test cases by plan).
+
+### Synthesis
+
+After all teammates complete, synthesize into a unified review output:
+- **Contract verification**: merge all contract PASS/FAIL results (contract compliance teammate is authoritative)
+- **Advisories**: merge advisories from all teammates, deduplicate, assign severity
+- **Verdict**: based on contract compliance results only
 
 Save output to `$SESSION/review.md`.
 

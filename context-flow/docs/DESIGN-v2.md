@@ -59,22 +59,13 @@ The goal is that each agent receives the **minimum sufficient context** to do it
 This is NOT a linear pipeline. It is a flow graph where every transition is guarded by the orchestrator.
 
 ```
-                                                    ┌─ No ──> [plan]
-                                                    │
-[research] ⟶ orch ⟶ complexity check ─── Yes ──> [agent teams] ⟶ human co-decision ──┐
-                ↕         (ACS)                        ↕                              │
-            human/redo                            human/redo                          │
-                                                                                      ↓
-                                                                               [plan (synthesis input)]
-                                                                                      ↓
-                                          human gate ⟵──── orch ⟵────────────────────┘
-                                          (H/M only)
-                                              ↓
-                                          [implement (parallel dispatch if independent)]
-                                              ↓
-                                          orch ⟶ [review]
-                                              ↕        ↕
-                                          human/redo  human/redo
+[research — Agent Teams] ⟶ orch ⟶ [plan] ⟶ orch ⟶ human gate (H/M only)
+        ↕                     ↕                          ↓
+    human/redo            human/redo              [implement (parallel if independent)]
+                                                         ↓
+                                                 orch ⟶ [review — Agent Teams]
+                                                     ↕        ↕
+                                                 human/redo  human/redo
 ```
 
 At each transition, the orchestrator evaluates:
@@ -88,98 +79,43 @@ At each transition, the orchestrator evaluates:
 
 ---
 
-## Complexity Assessment (ACS)
+## Agent Teams as Default
 
-After research completes, the orchestrator evaluates whether the goal is sufficiently complex to benefit from Agent Teams mode. The evaluation uses **heuristic rules**, not LLM judgment.
+Research and Review phases use **Agent Teams by default**. This replaces the previous ACS complexity gating.
 
-### Trigger Rules
+### Rationale
 
-| Signal | Threshold | Rationale |
-|--------|-----------|-----------|
-| **Unresolved items** | ≥ 3 | Multiple unknowns indicate the problem space is not well-understood; parallel exploration of alternatives benefits from discussion |
-| **Medium-confidence items** | ≥ 3 | Multiple defensible assumptions suggest the design space is ambiguous; surfacing trade-offs requires multi-angle synthesis |
-| **Key Files affected** | ≥ 5 | Broad scope increases risk of overlooking interactions; deliberate coverage check reduces blind spots |
-| **Viable approaches** | ≥ 2 | Explicit alternative approaches indicate the research agent already identified a strategic fork; team discussion helps co-decide |
+The previous design used heuristic rules (ACS) to decide whether to trigger Agent Teams after research. This added a decision layer that was often wrong in both directions — missing complexity on subtle goals, triggering unnecessarily on keyword-heavy simple goals. Making Agent Teams the default for research and review:
 
-### Always-Trigger Keywords
+1. **Eliminates a decision point** — no ACS heuristic to maintain or debug
+2. **Multi-perspective exploration is almost always valuable** — even for moderate goals, a second angle catches blind spots
+3. **Matches official guidance** — Agent Teams docs recommend starting with research and review use cases
+4. **Cost is bounded** — 2-3 teammates per phase, not open-ended
 
-If research output contains any of these patterns in Unresolved or Completed sections, Agent Teams triggers regardless of thresholds:
+### Skip Conditions
 
-- "multiple valid approaches"
-- "trade-offs between"
-- "needs architectural decision"
-- "conflicting patterns observed"
-- "no clear precedent"
+Agent Teams is skipped (single agent used instead) when:
+- User explicitly requested a fast path in the goal
+- Goal is clearly a single-file bugfix, typo fix, or documentation-only change
+- Goal can be fully described in one sentence with no ambiguity
 
-### Skip Override
+### Mode Selection
 
-The orchestrator can skip Agent Teams even when triggered if:
-- Research agent explicitly marks `Agent Teams: skip` in its output (agent determined complexity is already resolved)
-- Human explicitly requested a simple/fast path in the goal
-- Goal is clearly a bugfix or documentation-only change
-- Research output already provides high-confidence answers to all questions
+- If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is set → **native Agent Teams** (teammates communicate directly, challenge findings, converge on shared conclusions)
+- Otherwise → **subagent parallel exploration** (parallel Agent dispatch, orchestrator synthesizes)
 
-### Why Heuristics, Not LLM Judgment?
-
-Agent Teams is expensive (multiple sub-agents, discussion synthesis, human co-decision). A false positive wastes time but a false negative loses quality on complex goals. Heuristic rules are:
-
-1. **Auditable** — humans can see exactly why Agent Teams triggered
-2. **Consistent** — same research output always produces same decision
-3. **Conservative** — thresholds are set to favor triggering on borderline cases (better to over-discuss than under-explore)
-
-LLM-based "is this complex?" judgment would be opaque, variable across runs, and prone to under-triggering when the orchestrator model is optimistic.
-
----
-
-## Agent Teams (Adaptive Research Upgrade)
-
-When complexity assessment triggers Agent Teams, the flow **does not go directly to Plan**. Instead, it enters a two-layer collaborative research mode:
-
-### Layer 1: Subagent Mode (Default)
-
-The orchestrator spawns **2–3 specialized subagents** in parallel, each assigned a different angle (selected from the table below based on research signals):
-
-| Angle | Focus | Typical Trigger |
-|-------|-------|----------------|
-| **Feasibility** | Can the goal be implemented in the current codebase? | High Unresolved count, "needs architectural decision" |
-| **Alternatives** | What are the viable design approaches? | ≥ 2 approaches in research, conflicting patterns |
-| **Risk** | What failure modes, edge cases, and scaling cliffs exist? | High complexity, cross-module scope |
-| **Integration** | How does this interact with existing systems? | ≥ 5 key files, "no clear precedent" |
-
-Each subagent receives:
-- **Context**: compressed research output (facts only, no interpretation)
-- **Goal**: "Analyze [angle] for [original goal]"
-- **Tools**: Read, Grep, Glob (same as research agent)
-
-Subagents produce standard agent output (Completed/Unresolved format). The orchestrator then:
-
-1. **Synthesizes** all subagent outputs into a unified analysis:
-   - Consolidates overlapping findings
-   - Highlights contradictions (e.g., Feasibility says "straightforward", Risk says "high coupling")
-   - Generates strategic recommendations with trade-off matrix
-2. **Human co-decision**: presents synthesis with the orchestrator's own recommendation, human chooses direction or requests re-investigation
-3. **Outputs direction document** — this becomes input to Plan (alongside compressed research)
-
-### Layer 2: Native Agent Teams Mode (Upgrade)
-
-If the **Claude Code session has Agent Teams enabled** (detected via environment variable `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), the orchestrator upgrades to native mode:
-
-- Instead of spawning isolated subagents, the orchestrator uses Claude Code's Agent Teams feature to spawn **teammates**
-- Teammates can **communicate with each other** (not just parallel dispatch)
-- Teammates use the same angle assignment and synthesis format as subagent mode
-- Output format is identical: synthesized direction document
-
-**Detection**: The orchestrator checks `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` at runtime. If set, it uses native Agent Teams; otherwise, it falls back to subagent mode (parallel Agent invocations).
+Native mode produces higher-quality results because teammates can cross-reference findings and debate. Subagent mode is the fallback when the experimental feature is not available.
 
 ### Re-run Budget
 
-Agent Teams is expensive. If the synthesis output is still insufficient (e.g., human requests deeper investigation on a specific angle), the orchestrator allows **1 re-run** with the enriched focus area. After that, it escalates to the human with options (proceed with current understanding / simplify goal / abort).
+- Max **1 re-run** per Agent Teams phase (research or review)
+- After limit → escalate to human
 
-### How This Feeds into Plan
+### How Research Feeds into Plan
 
 The Plan agent receives:
-- **Compressed research** (factual inventory from Phase 1)
-- **Direction document** (strategic guidance from Agent Teams, including human co-decision outcome)
+- **Compressed research** (synthesized capability inventory from research team)
+- **Divergence and human direction** (if research teammates found conflicting facts and human chose a direction)
 
 The direction document does NOT dictate contracts — it provides context for the Plan agent to make informed architectural decisions. The Plan agent is still responsible for defining the complete contracts; the direction document reduces the chance of overlooking key constraints or viable alternatives.
 
@@ -972,7 +908,7 @@ After 2 cross-phase loops on the implement phase, the streaming approach still f
 
 ### Example 4: Agent Teams Flow — "Rewrite Auth Middleware for OAuth2"
 
-This example demonstrates how a complex, ambiguous goal triggers Agent Teams mode.
+This example demonstrates Agent Teams in research phase for a complex, ambiguous goal.
 
 #### Phase 1: Research
 
@@ -1028,22 +964,11 @@ Working directory: /app
   - Suggested resolution: ask human about migration timeline and rollback plan
 ```
 
-#### Complexity Assessment (ACS Check)
+#### Research Phase (Agent Teams)
 
-**Orchestrator evaluates**:
-- Unresolved items: **5** (≥ 3 threshold) ✓
-- Medium-confidence items: 0
-- Key Files: 5 (meets threshold) ✓
-- Viable approaches: **3** explicitly listed in Unresolved ✓
-- Keywords: "**multiple valid approaches**", "architectural decision" ✓
+**This goal is not a trivial bugfix or docs change, so Agent Teams is used by default.**
 
-**Verdict**: Triggers Agent Teams — multiple unknowns, 3 explicit approaches, strategic decision needed.
-
----
-
-#### Agent Teams Phase
-
-**Orchestrator spawns 3 subagents** (assume subagent mode, not native Agent Teams):
+**Orchestrator identifies 3 research angles and spawns teammates** (assume subagent mode, not native Agent Teams):
 
 | Subagent | Angle | Input |
 |----------|-------|-------|
@@ -1213,6 +1138,6 @@ But the design does NOT optimize for minimum token usage. If a goal requires 3 r
 10. **Loop-backs are budgeted** — 2 re-runs per phase, 2 cross-phase loops; limits trigger escalation, not hard stops
 11. **Graceful degradation** — structured escalation with re-entry points; agents always provide analysis and options when stuck
 12. **Agents are pluggable** — the flow defines contracts, not agents; the orchestrator matches agent capabilities to phase requirements
-13. **Complexity assessment uses heuristic triggers** — ≥3 Unresolved, ≥3 medium confidence, ≥5 key files, ≥2 approaches, or keyword patterns; rules are auditable and conservative (favor triggering over missing complexity)
-14. **Agent Teams is adaptive research upgrade** — two-layer design (subagent mode by default, native Agent Teams if env var detected); spawns 2–4 specialized angles, synthesizes findings, outputs direction document for Plan; 1 re-run budget
+13. **Agent Teams default for research and review** — multi-perspective exploration (research) and multi-angle code review (review) by default; native Agent Teams when env var set, subagent parallel as fallback; skip to single agent only for trivially simple goals
+14. **Simple-task skip, not complex-task trigger** — the previous ACS heuristic gating is replaced by skip conditions (single-file bugfix, typo, docs-only, user fast-path request); default is to use Agent Teams, not to avoid them
 15. **Parallel implement for independent contracts** — orchestrator builds dependency graph, identifies independent groups, spawns up to 3 parallel implement agents with separate worktrees, merges and runs integration tests before review
