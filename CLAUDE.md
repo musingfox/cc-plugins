@@ -213,6 +213,16 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 
 **Key Design**: Uses `core.hooksPath` pointing to `.githooks/` for team-shareable hooks. CLAUDECODE env var enables skip logic so pre-commit doesn't duplicate what Claude Code hooks already handle.
 
+### 11. Fizzy
+**Location**: `fizzy/`
+**Purpose**: Interact with Fizzy via the Fizzy CLI for project management
+
+**Key Components**:
+- **Skills** (`skills/`):
+  - `fizzy` - Full CLI wrapper: boards, cards (20 subcommands), columns, comments, steps, reactions, tags, users, notifications, pins, webhooks, account settings, search, file uploads, board migration
+
+**Prerequisites**: `fizzy` CLI installed and authenticated (`fizzy setup`)
+
 ## Development Workflows
 
 ### Documentation Sync Rule
@@ -331,6 +341,7 @@ Then install individual plugins:
 /plugin install markitdown
 /plugin install adr
 /plugin install hook-guard
+/plugin install fizzy
 ```
 
 ## Version Management

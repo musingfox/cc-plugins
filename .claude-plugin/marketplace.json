@@ -59,6 +59,11 @@
       "name": "hook-guard",
       "source": "./hook-guard",
       "description": "One-stop hook setup — detect project environment, generate Claude Code hooks and git pre-commit scripts with security checks and CLAUDECODE skip logic"
+    },
+    {
+      "name": "fizzy",
+      "source": "./fizzy",
+      "description": "Interact with Fizzy via the Fizzy CLI — manage boards, cards, columns, comments, steps, reactions, tags, users, notifications, pins, webhooks, and account settings"
     }
   ]
 }

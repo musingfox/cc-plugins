@@ -1,0 +1,10 @@
+{
+  "name": "fizzy",
+  "version": "0.1.0",
+  "description": "Interact with Fizzy via the Fizzy CLI — manage boards, cards, columns, comments, steps, reactions, tags, users, notifications, pins, webhooks, and account settings",
+  "author": {
+    "name": "musingfox"
+  },
+  "repository": "https://github.com/musingfox/cc-plugins",
+  "keywords": ["fizzy", "project-management", "kanban", "boards", "cards", "tasks"]
+}

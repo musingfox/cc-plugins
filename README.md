@@ -151,6 +151,20 @@ One-stop hook setup assistant for Claude Code projects:
 /plugin install hook-guard
 ```
 
+### Fizzy
+
+Interact with [Fizzy](https://fizzy.do) via the Fizzy CLI for project management:
+- **Full CLI Coverage**: Boards, cards (20 subcommands), columns, comments, steps, reactions, tags, users, notifications, pins, webhooks, account settings
+- **Search & Filter**: Full-text search, time-based filters, assignee/tag/column filtering
+- **File Uploads**: Inline images and background images via signed uploads
+- **Board Migration**: Copy boards across accounts with `--dry-run` support
+- **Prerequisites**: `fizzy` CLI installed and authenticated (`fizzy setup`)
+
+**Installation:**
+```bash
+/plugin install fizzy
+```
+
 ### Readability
 
 Enhances AI-generated text readability:
@@ -255,6 +269,11 @@ cc-plugins/
 │   ├── .claude-plugin/
 │   │   └── plugin.json
 │   ├── skills/                   # adr (lifecycle), adr-ref-guard (advisory)
+│   └── README.md
+├── fizzy/                        # Fizzy project management
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   ├── skills/                   # fizzy CLI wrapper
 │   └── README.md
 └── README.md
 ```
