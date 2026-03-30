@@ -44,6 +44,19 @@ If the implement agent logged Concerns (forwarded to you by the orchestrator), r
 ## Output Schema
 
 ```markdown
+## What Changed
+
+### Added
+- [new capability or behavior, described functionally — what the user/system can now do]
+
+### Changed
+- [existing behavior that now works differently — before→after description]
+
+### Fixed
+- [bug or issue resolved — described by symptom, not by file]
+
+(omit empty sections; describe WHAT changed functionally, not WHICH files were edited)
+
 ## Contract Verification
 
 ### [Contract Name]

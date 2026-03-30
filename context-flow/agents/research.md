@@ -40,6 +40,14 @@ Produce a capability inventory relevant to the given goal. Your output will be u
 ## Key Files
 - `[file path]`: [why it matters for this goal]
 
+## Decision Points
+- [decision needed]: [why multiple valid approaches exist]
+  - Option A: [approach] — upside: [benefit], downside: [cost], reversibility: [easy/hard]
+  - Option B: [approach] — upside: [benefit], downside: [cost], reversibility: [easy/hard]
+  - Recommendation: [which option and why, based on evidence]
+
+(Decision points ≠ Unresolved. Unresolved = missing information. Decision points = information exists but human must choose between valid paths.)
+
 ## Completed
 - [What aspects of the goal were fully investigated] [confidence: high | medium]
   - high: verified against code evidence

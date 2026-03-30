@@ -114,7 +114,18 @@ After all teammates complete, synthesize their findings into a unified research 
 
 ## Divergence
 {where findings conflict or reveal trade-offs — decision points for planning}
+
+## Decision Points Requiring Human Input
+For each decision point discovered during research, present it clearly:
+- **What needs deciding**: {the specific choice}
+- **Why it matters now**: {concrete consequence of getting it wrong — name the component, data, or behavior affected}
+- **Options with trade-offs**:
+  - Option A: {approach} — upside: {benefit}, downside: {cost}, reversibility: {easy/hard}
+  - Option B: {approach} — upside: {benefit}, downside: {cost}, reversibility: {easy/hard}
+- **Your recommendation**: {which option and why, based on evidence}
 ```
+
+**Important**: Decision points are not the same as Unresolved items. Unresolved = missing information. Decision points = sufficient information exists but multiple valid paths forward — the human must choose.
 
 Save synthesized output to `$SESSION/research.md`.
 
@@ -205,13 +216,15 @@ Save output to `$SESSION/plan.md`.
 
 Present **only High and Medium decisions** to the human. The goal is to give the human enough context to make an informed judgment **without reading research.md or plan.md**.
 
+**Prioritize irreversible and architectural decisions.** The Human Gate exists to catch choices that are expensive to change later — new dependencies, public API shapes, data models, migration strategies. If a decision is easily reversible (rename later, swap implementation), it can be Low impact and skip the gate entirely.
+
 #### Per-Decision Format
 
 For each decision, present in this order:
 
 > **[Impact] Decision Title**
 >
-> **Stakes**: What goes wrong if this choice is incorrect — concrete consequences, not abstract risk labels. Name the affected component, data, or user-facing behavior.
+> **Stakes**: What goes wrong if this choice is incorrect — concrete consequences, not abstract risk labels. Name the affected component, data, or user-facing behavior. **Explicitly state what becomes hard to change once this is implemented.**
 >
 > **Evidence**: 1-3 key findings from research that constrain this choice. Include file paths or interface signatures where relevant. This is WHY the options are what they are.
 >
@@ -365,10 +378,41 @@ After all teammates complete, synthesize into a unified review output:
 
 Save output to `$SESSION/review.md`.
 
+### Presenting Results to Human
+
+When presenting review results, use a **changelog format** that emphasizes functional outcomes — what changed from the user's perspective — not a list of modified files.
+
+#### Changelog Format
+
+```markdown
+## What Changed
+
+### Added
+- {new capability or behavior, described functionally}
+
+### Changed
+- {existing behavior that now works differently, with before→after}
+
+### Fixed
+- {bug or issue that was resolved, described by symptom}
+
+## Contract Status
+{N}/{M} contracts passed — {one-line summary if all passed, or list failures}
+
+## Advisories
+{only critical/warning advisories — omit info-level unless specifically relevant}
+```
+
+**Rules for changelog entries**:
+- Describe WHAT the user/system can now do, not WHICH files were edited
+- Use concrete language: "API now returns paginated results" not "Modified api.ts to add pagination"
+- Group related changes into single entries rather than one entry per file
+- If a contract maps cleanly to a user-visible feature, use the feature name, not the contract name
+
 ### Handling the Verdict
 
-- **APPROVE, no critical advisories** → present summary to human. Done.
-- **APPROVE with advisories** → present advisories to human with severity. Ask: address now or accept as-is?
+- **APPROVE, no critical advisories** → present changelog to human. Done.
+- **APPROVE with advisories** → present changelog + advisories to human. Ask: address now or accept as-is?
 - **REQUEST_CHANGES with contract failures** → re-run implement with the failure details as additional context (phase re-run)
 - **REQUEST_CHANGES with fundamental design issues** → this means a contract is wrong, not just the implementation. Loop back to plan (cross-phase loop).
 
