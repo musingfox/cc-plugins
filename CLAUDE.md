@@ -235,7 +235,7 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 
 **Configuration**: `.obsidian-pm.yaml` with `vault` (vault name) and `project` (project identifier)
 
-**Vault Structure**: `pm/{tasks,archive,docs}/{project}/` with templates at `pm/templates/`
+**Vault Structure**: `pm/{project}/{tasks,archive,docs}/` with templates at `pm/templates/`
 
 ## Development Workflows
 

@@ -49,9 +49,9 @@ When a project connects to a vault for the first time, ensure the folder structu
 VAULT_PATH=$(cat ~/Library/Application\ Support/obsidian/obsidian.json | jq -r '.vaults | to_entries[] | select(.value.path | contains("'"$VAULT_NAME"'")) | .value.path')
 
 # Create required folders
-mkdir -p "$VAULT_PATH/pm/tasks/{project}"
-mkdir -p "$VAULT_PATH/pm/archive/{project}"
-mkdir -p "$VAULT_PATH/pm/docs/{project}"
+mkdir -p "$VAULT_PATH/pm/{project}/tasks"
+mkdir -p "$VAULT_PATH/pm/{project}/archive"
+mkdir -p "$VAULT_PATH/pm/{project}/docs"
 ```
 
 Also verify that templates exist at `pm/templates/` in the vault. If not, inform the user that task/doc/adr templates need to be created. Template definitions are available in `references/templates.md`.
@@ -60,9 +60,10 @@ Also verify that templates exist at `pm/templates/` in the vault. If not, inform
 
 ```
 pm/
-├── tasks/{project}/       # Active tasks
-├── archive/{project}/     # Completed tasks
-├── docs/{project}/        # Project documents (design docs, specs, ADRs, etc.)
+├── {project}/
+│   ├── tasks/             # Active tasks
+│   ├── archive/           # Completed tasks
+│   └── docs/              # Project documents (design docs, specs, ADRs, etc.)
 └── templates/
     ├── task.md            # Task template
     ├── doc.md             # Document template
@@ -86,13 +87,13 @@ All commands require `vault=<vault>` as the first parameter.
 | List ADRs | `search query="[type:adr] [project:{project}]" format=json` |
 | Search content | `search query="{keyword}" format=json` |
 | Search with context | `search:context query="{keyword}" format=json` |
-| List files in folder | `files folder="pm/tasks/{project}"` |
+| List files in folder | `files folder="pm/{project}/tasks"` |
 
 ### Write Operations
 
 **Create task:**
 ```bash
-obsidian vault={vault} create path="pm/tasks/{project}/{task-name}.md" template=task silent
+obsidian vault={vault} create path="pm/{project}/tasks/{task-name}.md" template=task silent
 obsidian vault={vault} property:set file="{task-name}" name=project value="{project}"
 obsidian vault={vault} property:set file="{task-name}" name=priority value="{high|medium|low}"
 obsidian vault={vault} property:set file="{task-name}" name=due value="{YYYY-MM-DD}" type=date
@@ -105,13 +106,13 @@ obsidian vault={vault} append file="{task-name}" content="{description text}"
 
 **Create document:**
 ```bash
-obsidian vault={vault} create path="pm/docs/{project}/{doc-name}.md" template=doc silent
+obsidian vault={vault} create path="pm/{project}/docs/{doc-name}.md" template=doc silent
 obsidian vault={vault} property:set file="{doc-name}" name=project value="{project}"
 ```
 
 **Create ADR:**
 ```bash
-obsidian vault={vault} create path="pm/docs/{project}/adr-{number}-{title}.md" template=adr silent
+obsidian vault={vault} create path="pm/{project}/docs/adr-{number}-{title}.md" template=adr silent
 obsidian vault={vault} property:set file="adr-{number}-{title}" name=project value="{project}"
 obsidian vault={vault} property:set file="adr-{number}-{title}" name=status value="{proposed|accepted|deprecated|superseded}"
 ```
@@ -138,10 +139,10 @@ obsidian vault={vault} property:set file="{task-name}" name=status value=done
 obsidian vault={vault} property:set file="{task-name}" name=completed value="{YYYY-MM-DD}" type=date
 
 # 2. Ensure archive folder exists
-mkdir -p "{vault-path}/pm/archive/{project}"
+mkdir -p "{vault-path}/pm/{project}/archive"
 
 # 3. Move to archive
-obsidian vault={vault} move file="{task-name}" to="pm/archive/{project}"
+obsidian vault={vault} move file="{task-name}" to="pm/{project}/archive"
 ```
 
 **Note:** The `move` command requires the target folder to already exist. Get the vault path from Obsidian's config at `~/Library/Application Support/obsidian/obsidian.json`.

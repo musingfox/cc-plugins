@@ -37,9 +37,10 @@ If the config file doesn't exist, the skill will list available vaults and help 
 
 ```
 pm/
-├── tasks/{project}/       # Active tasks
-├── archive/{project}/     # Completed/archived tasks
-├── docs/{project}/        # Project documents (design docs, specs, ADRs)
+├── {project}/
+│   ├── tasks/             # Active tasks
+│   ├── archive/           # Completed/archived tasks
+│   └── docs/              # Project documents (design docs, specs, ADRs)
 └── templates/
     ├── task.md            # Task template
     ├── doc.md             # Document template
@@ -68,7 +69,7 @@ Natural language triggers:
 - **Create**: Creates from template, sets properties (project, priority, due date), appends description
 - **Query**: Filter by status (`todo`, `in-progress`, `blocked`, `done`), priority, or project
 - **Update**: Change status, priority, due date, or append notes
-- **Archive**: Mark as done, set completion date, move to `pm/archive/{project}/`
+- **Archive**: Mark as done, set completion date, move to `pm/{project}/archive/`
 
 ### Document Operations
 
