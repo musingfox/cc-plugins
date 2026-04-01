@@ -64,6 +64,11 @@
       "name": "fizzy",
       "source": "./fizzy",
       "description": "Interact with Fizzy via the Fizzy CLI — manage boards, cards, columns, comments, steps, reactions, tags, users, notifications, pins, webhooks, and account settings"
+    },
+    {
+      "name": "obsidian-pm",
+      "source": "./obsidian-pm",
+      "description": "Project management via Obsidian vault — tasks, documents, and ADRs managed through Obsidian CLI"
     }
   ]
 }

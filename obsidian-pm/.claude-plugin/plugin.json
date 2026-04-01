@@ -1,0 +1,10 @@
+{
+  "name": "obsidian-pm",
+  "version": "0.1.0",
+  "description": "Project management via Obsidian vault — tasks, documents, and ADRs managed through Obsidian CLI",
+  "author": {
+    "name": "musingfox"
+  },
+  "repository": "https://github.com/musingfox/cc-plugins",
+  "keywords": ["obsidian", "project-management", "tasks", "adr", "documents"]
+}

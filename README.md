@@ -165,6 +165,20 @@ Interact with [Fizzy](https://fizzy.do) via the Fizzy CLI for project management
 /plugin install fizzy
 ```
 
+### Obsidian PM
+
+Project management via Obsidian vault — tasks, documents, and ADRs through Obsidian CLI:
+- **Task Lifecycle**: Create, query, update status, archive completed tasks with property-based filtering
+- **Document Management**: Design docs, specs, and project documents from templates
+- **ADR Lifecycle**: Propose, accept, deprecate, supersede with auto-numbering (4-digit zero-padded)
+- **Wikilinks**: Cross-reference tasks, docs, and ADRs with Obsidian-native links
+- **Prerequisites**: Obsidian app + CLI enabled, `.obsidian-pm.yaml` config in project root
+
+**Installation:**
+```bash
+/plugin install obsidian-pm
+```
+
 ### Readability
 
 Enhances AI-generated text readability:
@@ -274,6 +288,11 @@ cc-plugins/
 │   ├── .claude-plugin/
 │   │   └── plugin.json
 │   ├── skills/                   # fizzy CLI wrapper
+│   └── README.md
+├── obsidian-pm/                  # Obsidian vault project management
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   ├── skills/                   # obsidian-pm (tasks, docs, ADRs)
 │   └── README.md
 └── README.md
 ```

@@ -223,6 +223,20 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 
 **Prerequisites**: `fizzy` CLI installed and authenticated (`fizzy setup`)
 
+### 12. Obsidian PM
+**Location**: `obsidian-pm/`
+**Purpose**: Project management via Obsidian vault — tasks, documents, and ADRs through Obsidian CLI
+
+**Key Components**:
+- **Skills** (`skills/`):
+  - `obsidian-pm` - Task lifecycle (create, query, update, archive), document management, ADR lifecycle. Auto-triggered on task/doc/ADR mentions.
+
+**Prerequisites**: Obsidian app running + CLI enabled, `.obsidian-pm.yaml` config in project root
+
+**Configuration**: `.obsidian-pm.yaml` with `vault` (vault name) and `project` (project identifier)
+
+**Vault Structure**: `pm/{tasks,archive,docs}/{project}/` with templates at `pm/templates/`
+
 ## Development Workflows
 
 ### Documentation Sync Rule
@@ -342,6 +356,7 @@ Then install individual plugins:
 /plugin install adr
 /plugin install hook-guard
 /plugin install fizzy
+/plugin install obsidian-pm
 ```
 
 ## Version Management
