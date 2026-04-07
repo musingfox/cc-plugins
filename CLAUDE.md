@@ -229,13 +229,13 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 
 **Key Components**:
 - **Skills** (`skills/`):
-  - `obsidian-pm` - Task lifecycle (create, query, update, archive), document management, ADR lifecycle. Auto-triggered on task/doc/ADR mentions.
+  - `obsidian-pm` - Task lifecycle (create, query, update, archive), document management, ADR lifecycle, Dataview dashboards. Auto-triggered on task/doc/ADR/dashboard mentions.
 
 **Prerequisites**: Obsidian app running + CLI enabled, `.obsidian-pm.yaml` config in project root
 
 **Configuration**: `.obsidian-pm.yaml` with `vault` (vault name) and `project` (project identifier)
 
-**Vault Structure**: `pm/{project}/{tasks,archive,docs}/` with templates at `pm/templates/`
+**Vault Structure**: `pm/{project}/{tasks,archive,docs}/` with dashboards (Dataview) and templates at `pm/templates/`
 
 ## Development Workflows
 

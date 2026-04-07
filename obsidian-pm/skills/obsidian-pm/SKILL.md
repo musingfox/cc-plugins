@@ -7,7 +7,8 @@ description: |
   writing design docs, specs, and ADR lifecycle (propose, accept, deprecate, supersede).
   Common triggers: "create a task", "list my tasks", "what am I working on",
   "write a design doc", "create an ADR", "show project status", "what's in my backlog",
-  "mark task as done", "record this decision", "archive completed tasks", "task priorities".
+  "mark task as done", "record this decision", "archive completed tasks", "task priorities",
+  "show dashboard", "專案狀況", "project status", "cross-project status", "跨專案".
   All operations use the Obsidian CLI against a configured vault.
 ---
 
@@ -20,6 +21,7 @@ Manage tasks, documents, and ADRs for the current project through an Obsidian va
 - Obsidian must be running (or use headless CLI)
 - The `obsidian` CLI must be installed and enabled
 - Note: Vault config path is macOS-specific (`~/Library/Application Support/obsidian/`). Adjust for Linux/Windows.
+- Dataview plugin must be installed and enabled in the vault
 - A `.obsidian-pm.yaml` config file must exist in the project root
 
 ## Configuration
@@ -56,6 +58,8 @@ mkdir -p "$VAULT_PATH/pm/{project}/docs"
 
 Also verify that templates exist at `pm/templates/` in the vault. If not, inform the user that task/doc/adr templates need to be created. Template definitions are available in `references/templates.md`.
 
+Also verify that the **Dataview** community plugin is installed and enabled in the vault. Dashboards require Dataview to render queries. If not installed, inform the user.
+
 ## Vault Structure
 
 ```
@@ -87,6 +91,7 @@ All commands require `vault=<vault>` as the first parameter.
 | List ADRs | `search query="[type:adr] [project:{project}]" format=json` |
 | Search content | `search query="{keyword}" format=json` |
 | Search with context | `search:context query="{keyword}" format=json` |
+| Search by tag | `search query="[type:task] [tags:{tag}]" format=json` |
 | List files in folder | `files folder="pm/{project}/tasks"` |
 
 ### Write Operations
@@ -97,6 +102,7 @@ obsidian vault={vault} create path="pm/{project}/tasks/{task-name}.md" template=
 obsidian vault={vault} property:set file="{task-name}" name=project value="{project}"
 obsidian vault={vault} property:set file="{task-name}" name=priority value="{high|medium|low}"
 obsidian vault={vault} property:set file="{task-name}" name=due value="{YYYY-MM-DD}" type=date
+obsidian vault={vault} property:set file="{task-name}" name=tags value="{tag1,tag2}" type=list
 ```
 
 After creation, append the task description and acceptance criteria to the note body:
@@ -184,6 +190,7 @@ When creating notes, use Obsidian wikilinks to connect related items:
 | `due` | date | `YYYY-MM-DD` |
 | `created` | date | Auto-filled by template |
 | `completed` | date | Set when archiving |
+| `tags` | list | Free-form tags for filtering (e.g., `backend`, `auth`) |
 
 ### Document Properties
 
@@ -203,6 +210,139 @@ When creating notes, use Obsidian wikilinks to connect related items:
 | `status` | text | `proposed`, `accepted`, `deprecated`, `superseded` |
 | `created` | date | Auto-filled by template |
 | `deciders` | text | Who made the decision |
+
+## Dashboard
+
+The skill generates two types of dashboards as Dataview-powered markdown notes in the vault. Dashboards are generated on first request and can be refreshed by overwriting the file.
+
+### Cross-Project Dashboard
+
+**Location**: `pm/dashboard.md` in the vault root (under pm/)
+
+Generate this file with the following content:
+
+~~~markdown
+---
+type: dashboard
+created: {YYYY-MM-DD}
+---
+
+# Project Dashboard
+
+## Overview
+
+```dataview
+TABLE
+  length(filter(rows, (r) => r.status = "todo")) as "Todo",
+  length(filter(rows, (r) => r.status = "in-progress")) as "In Progress",
+  length(filter(rows, (r) => r.status = "blocked")) as "Blocked",
+  length(filter(rows, (r) => r.status = "done" AND r.completed >= date(today) - dur(7d))) as "Done (7d)",
+  length(rows) as "Total"
+FROM "pm"
+WHERE type = "task" AND project
+GROUP BY project
+SORT project ASC
+```
+
+## Recently Completed
+
+```dataview
+TABLE project, completed, tags
+FROM "pm"
+WHERE type = "task" AND project AND status = "done" AND completed >= date(today) - dur(7d)
+SORT completed DESC
+```
+~~~
+
+**CLI command to create:**
+```bash
+# Get vault path
+VAULT_PATH=$(cat ~/Library/Application\ Support/obsidian/obsidian.json | jq -r '.vaults | to_entries[] | select(.value.path | contains("'"$VAULT_NAME"'")) | .value.path')
+
+# Write dashboard file directly
+# Use the Write tool to write the dashboard content to "$VAULT_PATH/pm/dashboard.md"
+```
+
+### Per-Project Dashboard
+
+**Location**: `pm/{project}/dashboard.md`
+
+Generate this file with the following content:
+
+~~~markdown
+---
+type: dashboard
+project: {project}
+created: {YYYY-MM-DD}
+---
+
+# {project} Dashboard
+
+## Tasks by Status
+
+```dataview
+TABLE WITHOUT ID
+  length(filter(rows, (r) => r.status = "todo")) as "Todo",
+  length(filter(rows, (r) => r.status = "in-progress")) as "In Progress",
+  length(filter(rows, (r) => r.status = "blocked")) as "Blocked",
+  length(filter(rows, (r) => r.status = "done")) as "Done",
+  length(rows) as "Total"
+FROM "pm/{project}"
+WHERE type = "task"
+GROUP BY true
+```
+
+## Active Tasks
+
+```dataview
+TABLE status, priority, due, tags
+FROM "pm/{project}/tasks"
+WHERE type = "task"
+SORT choice(status = "in-progress", 0, choice(status = "blocked", 1, choice(status = "todo", 2, 3))) ASC, choice(priority = "high", 0, choice(priority = "medium", 1, 2)) ASC
+```
+
+## Recently Completed
+
+```dataview
+TABLE completed, tags
+FROM "pm/{project}/archive"
+WHERE type = "task" AND status = "done"
+SORT completed DESC
+LIMIT 10
+```
+
+## Tags
+
+```dataview
+TABLE WITHOUT ID
+  tags as "Tag",
+  length(rows) as "Count"
+FROM "pm/{project}"
+WHERE type = "task" AND tags
+FLATTEN tags
+GROUP BY tags
+SORT length(rows) DESC
+```
+~~~
+
+**CLI command to create:**
+```bash
+# Write dashboard file directly using Write tool to "$VAULT_PATH/pm/{project}/dashboard.md"
+```
+
+### Dashboard in Claude Code
+
+When the user asks for dashboard/status in the conversation (not in Obsidian), query via CLI and format the results:
+
+```bash
+# Cross-project: get all tasks
+obsidian vault={vault} search query="[type:task]" format=json
+
+# Per-project: get project tasks  
+obsidian vault={vault} search query="[type:task] [project:{project}]" format=json
+```
+
+Parse the JSON results and present a formatted summary table in the conversation.
 
 ## Decision Trees
 
@@ -243,6 +383,22 @@ Agent is working on implementation?
 ├── Made an architectural decision → Suggest creating an ADR
 ├── Need to record design context → Suggest creating a doc
 └── Hit a blocker → property:set status=blocked + append blocker description
+```
+
+### User asks for dashboard or status
+
+```
+Dashboard request?
+├── "dashboard" / "status" / "專案狀況" / "project status"
+│   ├── In conversation → CLI search + format summary table
+│   └── In Obsidian → Check if dashboard.md exists, create if not, tell user to open it
+├── "cross-project" / "all projects" / "跨專案"
+│   ├── In conversation → Search all [type:task], group by project, format table
+│   └── In Obsidian → Create/refresh pm/dashboard.md
+├── "project dashboard" / "{project} status"
+│   ├── In conversation → Search [type:task] [project:{project}], format table
+│   └── In Obsidian → Create/refresh pm/{project}/dashboard.md
+└── "refresh dashboard" → Regenerate the dashboard .md file(s)
 ```
 
 ## Important Notes

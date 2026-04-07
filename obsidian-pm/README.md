@@ -10,11 +10,14 @@ Project management via Obsidian vault — tasks, documents, and ADRs managed thr
 - Property-based search and filtering via Obsidian's `[property:value]` syntax
 - Wikilink cross-references between tasks, docs, and ADRs
 - Templates with auto-filled `{{date}}` and `{{title}}` variables
+- Dashboard: cross-project overview and per-project status via Dataview queries
+- Tag-based filtering with native Obsidian `tags` property
 
 ## Prerequisites
 
 - [Obsidian](https://obsidian.md) app running (or headless CLI mode)
 - Obsidian CLI installed and enabled (via the `obsidian-cli` plugin)
+- [Dataview](https://github.com/blacksmithgu/obsidian-dataview) community plugin installed and enabled
 
 ## Installation
 
@@ -37,14 +40,16 @@ If the config file doesn't exist, the skill will list available vaults and help 
 
 ```
 pm/
+├── dashboard.md               # Cross-project dashboard (Dataview)
 ├── {project}/
-│   ├── tasks/             # Active tasks
-│   ├── archive/           # Completed/archived tasks
-│   └── docs/              # Project documents (design docs, specs, ADRs)
+│   ├── dashboard.md           # Project dashboard (Dataview)
+│   ├── tasks/                 # Active tasks
+│   ├── archive/               # Completed/archived tasks
+│   └── docs/                  # Project documents (design docs, specs, ADRs)
 └── templates/
-    ├── task.md            # Task template
-    ├── doc.md             # Document template
-    └── adr.md             # ADR template
+    ├── task.md                # Task template
+    ├── doc.md                 # Document template
+    └── adr.md                 # ADR template
 ```
 
 Templates use Obsidian's core Templates plugin. Set **Settings > Templates > Template folder location** to `pm/templates/`.
@@ -81,6 +86,13 @@ Natural language triggers:
 - **Create**: Auto-numbers with 4-digit zero-padding (e.g., `adr-0001-use-postgres.md`)
 - **Lifecycle**: Set status to `proposed`, `accepted`, `deprecated`, or `superseded`
 
+### Dashboard
+
+- **Cross-project**: Overview of all projects — task counts by status, recent completions
+- **Per-project**: Task breakdown, active tasks, tag summary
+- Dashboards are Dataview-powered markdown notes generated in the vault
+- Also queryable in Claude Code conversation via "show dashboard" / "project status"
+
 ## Property Schema
 
 ### Task Properties
@@ -94,6 +106,7 @@ Natural language triggers:
 | `due` | date | `YYYY-MM-DD` |
 | `created` | date | Auto-filled by template |
 | `completed` | date | Set when archiving |
+| `tags` | list | Free-form tags for filtering |
 
 ### Document Properties
 

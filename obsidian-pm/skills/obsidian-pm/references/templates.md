@@ -17,6 +17,7 @@ priority: medium
 project: 
 type: task
 due: 
+tags: []
 created: {{date}}
 ---
 
