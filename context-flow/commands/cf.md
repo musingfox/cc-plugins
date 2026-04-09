@@ -214,13 +214,31 @@ Save output to `$SESSION/plan.md`.
 
 ### Human Gate
 
-Present **only High and Medium decisions** to the human. The goal is to give the human enough context to make an informed judgment **without reading research.md or plan.md**.
+The Human Gate gives the human enough context to make an informed judgment **without reading research.md or plan.md**. It always presents a Scope Review, and additionally presents decisions when High/Medium ones exist.
 
-**Prioritize irreversible and architectural decisions.** The Human Gate exists to catch choices that are expensive to change later — new dependencies, public API shapes, data models, migration strategies. If a decision is easily reversible (rename later, swap implementation), it can be Low impact and skip the gate entirely.
+**Prioritize irreversible and architectural decisions.** The Human Gate exists to catch choices that are expensive to change later — new dependencies, public API shapes, data models, migration strategies. If a decision is easily reversible (rename later, swap implementation), it can be Low impact and skip the decision section entirely.
 
-#### Per-Decision Format
+#### Scope Review (always present)
 
-For each decision, present in this order:
+Every Human Gate starts with scope review. Do NOT simply list contracts and ask for approval — the human needs to know what to look for.
+
+> **What will change** (functional summary, not file list):
+> - {each contract described as a user-visible behavior change, one line each}
+>
+> **Design assumptions made** (choices the plan agent already made — flag any you disagree with):
+> - {assumption}: {why this was chosen over alternatives, one line}
+> - {assumption}: {why this was chosen over alternatives, one line}
+>
+> **Review checklist**:
+> - [ ] **Scope**: Are these changes sufficient for the goal? Anything missing or unnecessary?
+> - [ ] **Assumptions**: Do the design assumptions above match your intent?
+> - [ ] **Test coverage**: Do the test cases cover the edge cases you care about?
+
+Extract "design assumptions" from: constraint mappings (research constraint → plan decision), Low-impact decisions from the plan, and any implicit choices the plan agent made without presenting alternatives.
+
+#### Decisions (only when High/Medium decisions exist)
+
+When ≥1 High or Medium decisions exist, present them **after** the Scope Review. For each decision:
 
 > **[Impact] Decision Title**
 >
@@ -247,15 +265,15 @@ If any decisions were auto-upgraded, note this:
 
 #### Gate Summary
 
-After all decisions, present:
+Present at the end:
 
 > **Scope**: {number} contracts, {number} test cases
 > **Estimated change surface**: {which files/modules will be touched}
 > **Decisions requiring your input**: {count} of {total}
 >
-> **Approve all / Revise specific decisions (by number) / Request more research / Abort**
+> **Approve / Revise (describe what to change) / Request more research / Abort**
 
-The plan phase is **iterative**. If the human revises decisions, re-run the plan agent with the revision as additional context. Repeat until all High/Medium decisions are approved.
+The plan phase is **iterative**. If the human revises decisions or scope, re-run the plan agent with the revision as additional context. Repeat until approved.
 
 Do NOT proceed to implement without explicit human approval.
 
