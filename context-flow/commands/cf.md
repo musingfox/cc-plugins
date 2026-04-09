@@ -222,8 +222,8 @@ The Human Gate gives the human enough context to make an informed judgment **wit
 
 Every Human Gate starts with scope review. Do NOT simply list contracts and ask for approval — the human needs to know what to look for.
 
-> **What will change** (functional summary, not file list):
-> - {each contract described as a user-visible behavior change, one line each}
+> **What will change and why** (goal → contract mapping):
+> - **{contract name}**: {purpose from contract — why this is needed for the goal} → {what it does, one line}
 >
 > **Design assumptions made** (choices the plan agent already made — flag any you disagree with):
 > - {assumption}: {why this was chosen over alternatives, one line}
