@@ -1,5 +1,4 @@
 ---
-name: discord-notify
 description: Send a plain text or rich Embed message to a Discord channel via webhook. Supports named webhook targets and color presets.
 argument-hint: "<message>" or --embed "<title>" "<description>"
 allowed-tools:
@@ -15,11 +14,11 @@ Send a notification to a Discord channel via webhook.
 
 Parse the user's arguments to determine message format:
 
-- **Plain text**: `/discord-notify "Deploy complete"` → send as `content`
-- **Embed with title**: `/discord-notify --embed "Title" "Description"` → send as Embed
-- **Named target**: `/discord-notify --to deploy "message"` → send to `DISCORD_WEBHOOK_DEPLOY`
-- **Embed with fields**: `/discord-notify --embed "Title" "Desc" --field "Key" "Value"` → Embed with fields
-- **Color override**: `/discord-notify --color success "message"` → apply color preset
+- **Plain text**: `/dc-ntfy "Deploy complete"` → send as `content`
+- **Embed with title**: `/dc-ntfy --embed "Title" "Description"` → send as Embed
+- **Named target**: `/dc-ntfy --to deploy "message"` → send to `DISCORD_WEBHOOK_DEPLOY`
+- **Embed with fields**: `/dc-ntfy --embed "Title" "Desc" --field "Key" "Value"` → Embed with fields
+- **Color override**: `/dc-ntfy --color success "message"` → apply color preset
 
 If no arguments are provided, ask the user what message to send.
 
@@ -27,7 +26,7 @@ If no arguments are provided, ask the user what message to send.
 
 Follow the **discord-webhook** skill workflow for webhook URL resolution, payload formatting, and sending:
 
-1. **Resolve webhook URL** — if `--to {name}` is specified, resolve the named webhook; otherwise use default. See the discord-webhook skill for the full priority chain (env var → settings file).
+1. **Resolve webhook URL** — source `.env` if it exists (`[ -f .env ] && source .env`), then resolve the named webhook if `--to {name}` is specified, otherwise use default. See the discord-webhook skill for details.
 
 2. **Build payload** — based on parsed arguments:
    - No `--embed` flag → plain text `content` payload

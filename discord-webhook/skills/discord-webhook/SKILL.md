@@ -23,7 +23,13 @@ Discord webhooks accept JSON payloads via HTTP POST. This skill handles:
 
 ## Step 1: Resolve Webhook URL
 
-Check sources in this priority order:
+Before resolving, source the project `.env` file if it exists:
+
+```bash
+[ -f .env ] && source .env
+```
+
+Then check environment variables:
 
 ### 1a: Named Webhook (when a target name is specified)
 
@@ -39,27 +45,15 @@ Look for environment variable `DISCORD_WEBHOOK_{NAME}` where `{NAME}` is the upp
 
 Look for environment variable `DISCORD_WEBHOOK_URL`.
 
-### 1c: Settings File Fallback
-
-If no environment variable is set, read `.claude/discord-webhook.local.md` in the project root. Parse YAML frontmatter for webhook URLs:
-
-```yaml
----
-default: https://discord.com/api/webhooks/1234567890/abcdefg
-deploy: https://discord.com/api/webhooks/9876543210/hijklmn
-alerts: https://discord.com/api/webhooks/1111111111/opqrstu
----
-```
-
-Use the named key if a target is specified, otherwise use `default`.
-
 ### Error Handling
 
-If no webhook URL is found after checking all sources, inform the user:
+If no webhook URL is found, inform the user:
 
-> No Discord webhook URL configured. Set one of:
-> - Environment variable `DISCORD_WEBHOOK_URL` (or `DISCORD_WEBHOOK_{NAME}` for named targets)
-> - `.claude/discord-webhook.local.md` with webhook URLs in YAML frontmatter
+> No Discord webhook URL configured. Add to your `.env` file:
+> ```
+> DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your/webhook
+> ```
+> For named targets, use `DISCORD_WEBHOOK_{NAME}` (e.g., `DISCORD_WEBHOOK_DEPLOY`).
 
 Do NOT proceed without a valid webhook URL.
 
@@ -148,7 +142,7 @@ Discord webhooks have a rate limit of ~30 requests per minute. If sending multip
 ## Security Notes
 
 - Never log or echo the full webhook URL — it contains the authentication token
-- Store webhook URLs in environment variables or `.local.md` files (gitignored)
+- Store webhook URLs in `.env` (gitignored)
 - Sanitize user-provided content before embedding in JSON to prevent injection
 - Use `jq -Rs .` to safely escape strings for JSON embedding:
   ```bash

@@ -6,7 +6,7 @@ Send Discord webhook notifications from Claude Code. Supports plain text and ric
 
 - **Plain text & Embed** — auto-select or explicit format choice
 - **Multi-webhook** — route to named channels via `DISCORD_WEBHOOK_{NAME}` env vars
-- **Flexible config** — environment variables or `.claude/discord-webhook.local.md` settings file
+- **Flexible config** — environment variables via `.env` file
 - **Composable** — designed as a tool for other plugins, hooks, and agents to call
 
 ## Installation
@@ -17,40 +17,28 @@ Send Discord webhook notifications from Claude Code. Supports plain text and ric
 
 ## Configuration
 
-### Option 1: Environment Variables (Recommended)
+Add webhook URLs to your project's `.env` file:
 
 ```bash
 # Default webhook
-export DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/..."
+DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/..."
 
 # Named webhooks for specific channels
-export DISCORD_WEBHOOK_DEPLOY="https://discord.com/api/webhooks/..."
-export DISCORD_WEBHOOK_ALERTS="https://discord.com/api/webhooks/..."
+DISCORD_WEBHOOK_DEPLOY="https://discord.com/api/webhooks/..."
+DISCORD_WEBHOOK_ALERTS="https://discord.com/api/webhooks/..."
 ```
 
-### Option 2: Settings File
-
-Create `.claude/discord-webhook.local.md` in your project root:
-
-```yaml
----
-default: https://discord.com/api/webhooks/1234567890/abcdefg
-deploy: https://discord.com/api/webhooks/9876543210/hijklmn
-alerts: https://discord.com/api/webhooks/1111111111/opqrstu
----
-```
-
-Add `.claude/*.local.md` to `.gitignore` to keep webhook URLs out of version control.
+Make sure `.env` is in your `.gitignore` to keep webhook URLs out of version control.
 
 ## Usage
 
 ### Slash Command
 
 ```
-/discord-notify "Deploy v1.2.3 completed"
-/discord-notify --embed "Deploy Complete" "Version v1.2.3 deployed to production"
-/discord-notify --to deploy "Build finished"
-/discord-notify --embed "Error" "Build failed" --color error --field "Exit Code" "1"
+/dc-ntfy "Deploy v1.2.3 completed"
+/dc-ntfy --embed "Deploy Complete" "Version v1.2.3 deployed to production"
+/dc-ntfy --to deploy "Build finished"
+/dc-ntfy --embed "Error" "Build failed" --color error --field "Exit Code" "1"
 ```
 
 ### Natural Language (Auto-triggered)
@@ -70,7 +58,7 @@ Other plugins, hooks, or agents can trigger the skill by including Discord notif
 | Component | Type | Description |
 |-----------|------|-------------|
 | `discord-webhook` | Skill (auto) | Core sending capability — webhook resolution, formatting, HTTP POST |
-| `discord-notify` | Skill (user-invoked) | `/discord-notify` slash command for direct usage |
+| `dc-ntfy` | Command | `/dc-ntfy` slash command for direct usage |
 
 ## Prerequisites
 

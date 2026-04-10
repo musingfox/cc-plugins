@@ -243,12 +243,11 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 
 **Key Components**:
 - **Skills** (`skills/`):
-  - `discord-webhook` - Core sending capability: webhook URL resolution (env var → settings file), message formatting (plain text or Embed), HTTP POST via curl. Auto-triggered on Discord notification requests.
-  - `discord-notify` - User-invoked slash command (`/discord-notify "message"`) for direct usage and testing. Supports `--embed`, `--to`, `--color`, `--field` flags.
+  - `discord-webhook` - Core sending capability: sources `.env`, resolves webhook URL from env vars, formats message (plain text or Embed), HTTP POST via curl. Auto-triggered on Discord notification requests.
+- **Commands** (`commands/`):
+  - `dc-ntfy` - Slash command (`/dc-ntfy "message"`) for direct usage. Supports `--embed`, `--to`, `--color`, `--field` flags.
 
-**Configuration**:
-- Environment variables: `DISCORD_WEBHOOK_URL` (default), `DISCORD_WEBHOOK_{NAME}` (named targets)
-- Settings file: `.claude/discord-webhook.local.md` with webhook URLs in YAML frontmatter
+**Configuration**: `.env` file with `DISCORD_WEBHOOK_URL` (default) and/or `DISCORD_WEBHOOK_{NAME}` (named targets)
 
 **Prerequisites**: `curl`, `jq`
 
