@@ -237,6 +237,21 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 
 **Vault Structure**: `pm/{project}/{tasks,archive,docs}/` with dashboards (Dataview) and templates at `pm/templates/`
 
+### 13. Discord Webhook
+**Location**: `discord-webhook/`
+**Purpose**: Send Discord webhook notifications with plain text or rich Embed format
+
+**Key Components**:
+- **Skills** (`skills/`):
+  - `discord-webhook` - Core sending capability: webhook URL resolution (env var → settings file), message formatting (plain text or Embed), HTTP POST via curl. Auto-triggered on Discord notification requests.
+  - `discord-notify` - User-invoked slash command (`/discord-notify "message"`) for direct usage and testing. Supports `--embed`, `--to`, `--color`, `--field` flags.
+
+**Configuration**:
+- Environment variables: `DISCORD_WEBHOOK_URL` (default), `DISCORD_WEBHOOK_{NAME}` (named targets)
+- Settings file: `.claude/discord-webhook.local.md` with webhook URLs in YAML frontmatter
+
+**Prerequisites**: `curl`, `jq`
+
 ## Development Workflows
 
 ### Documentation Sync Rule
@@ -357,6 +372,7 @@ Then install individual plugins:
 /plugin install hook-guard
 /plugin install fizzy
 /plugin install obsidian-pm
+/plugin install discord-webhook
 ```
 
 ## Version Management

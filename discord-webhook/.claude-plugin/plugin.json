@@ -1,0 +1,8 @@
+{
+  "name": "discord-webhook",
+  "version": "0.1.0",
+  "description": "Send Discord webhook notifications with plain text or rich Embed format",
+  "author": {
+    "name": "musingfox"
+  }
+}

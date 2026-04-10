@@ -69,6 +69,11 @@
       "name": "obsidian-pm",
       "source": "./obsidian-pm",
       "description": "Project management via Obsidian vault — tasks, documents, and ADRs managed through Obsidian CLI"
+    },
+    {
+      "name": "discord-webhook",
+      "source": "./discord-webhook",
+      "description": "Send Discord webhook notifications with plain text or rich Embed format, multi-webhook routing"
     }
   ]
 }

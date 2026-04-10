@@ -179,6 +179,20 @@ Project management via Obsidian vault — tasks, documents, and ADRs through Obs
 /plugin install obsidian-pm
 ```
 
+### Discord Webhook
+
+Send Discord webhook notifications from Claude Code:
+- **Dual Format**: Plain text `content` and rich Embed (title, description, color, fields, footer)
+- **Multi-Webhook**: Route to named channels via `DISCORD_WEBHOOK_{NAME}` env vars
+- **Flexible Config**: Environment variables or `.claude/discord-webhook.local.md` settings file
+- **Composable**: Designed as a tool for other plugins, hooks, and agents to call
+- **Slash Command**: `/discord-notify "message"` for direct usage and testing
+
+**Installation:**
+```bash
+/plugin install discord-webhook
+```
+
 ### Readability
 
 Enhances AI-generated text readability:
@@ -293,6 +307,11 @@ cc-plugins/
 │   ├── .claude-plugin/
 │   │   └── plugin.json
 │   ├── skills/                   # obsidian-pm (tasks, docs, ADRs)
+│   └── README.md
+├── discord-webhook/              # Discord webhook notifications
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   ├── skills/                   # discord-webhook (auto), discord-notify (slash cmd)
 │   └── README.md
 └── README.md
 ```
