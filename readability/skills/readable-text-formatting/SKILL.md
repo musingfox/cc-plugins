@@ -1,9 +1,10 @@
 ---
 name: readable-text-formatting
 description: >-
-  Activated when generating markdown tables, ASCII art, text-based diagrams, box-drawing layouts,
-  or any formatted text that will be read in raw monospace form. Ensures column alignment, border
-  consistency, and proper padding in all text output.
+  This skill should be used whenever generating markdown tables, ASCII art,
+  text-based diagrams, box-drawing layouts, or any formatted text intended for
+  raw monospace reading. Applies automatically — no user trigger needed.
+  Ensures column alignment, border consistency, and proper padding.
 ---
 
 # Readable Text Formatting

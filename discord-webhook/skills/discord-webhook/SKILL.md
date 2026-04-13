@@ -152,5 +152,4 @@ Discord webhooks have a rate limit of ~30 requests per minute. If sending multip
 ## Tool Selection
 
 - Use **Bash** with `curl` for sending webhook requests (most reliable for JSON payloads)
-- Use **Read** to parse `.claude/discord-webhook.local.md` settings file
 - Use **Bash** with `jq` for JSON construction with dynamic values

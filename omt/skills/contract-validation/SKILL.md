@@ -1,9 +1,11 @@
 ---
 name: contract-validation
 description: >-
-  Activated when an OMT agent starts or finishes execution, when debugging a failed agent run,
-  or when verifying workflow-state.json updates. Validates input/output contracts using the Contract-First
-  pattern defined in contracts/*.json and lib/contract-validator.ts.
+  This skill should be used when the user asks to "validate agent contracts",
+  "check contract compliance", "verify agent input/output", "pre-flight check",
+  "debug agent failure", "why did the agent fail", or "check workflow state".
+  Also triggered during OMT workflow when an agent starts or finishes execution.
+  Validates input/output contracts for OMT agents using the Contract-First pattern.
 ---
 
 # Contract Validation Skill
@@ -56,7 +58,7 @@ Before starting agent work:
    - Apply validation rules (e.g., `fileExists`, `minLength:N`)
    - If any required field fails: **stop and report errors**
 
-3. **Record validation** — Use `ContractValidator.validateInput()` from `lib/contract-validator.ts` and log the result.
+3. **Record validation** — Read `lib/contract-validator.ts` for validation logic, then perform equivalent checks using Read/Glob tools. Log the result.
 
 ### Step 3: Validate Output After Execution
 
@@ -71,7 +73,7 @@ After completing agent work:
    - Check arrays have minimum items (`minItems:N`)
    - Check strings match patterns (`pattern:REGEX`)
 
-3. **Update state** — Use `WorkflowStateManager.recordExecutionAgent()` from `lib/state-manager.ts` to record results in `.agents/.state/workflow-state.json`.
+3. **Update state** — Read `lib/state-manager.ts` for the state structure, then use Write tool to update `.agents/.state/workflow-state.json` with execution results.
 
 ## Example: Dev Agent Contract
 

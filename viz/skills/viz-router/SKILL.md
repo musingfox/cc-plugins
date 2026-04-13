@@ -1,17 +1,12 @@
 ---
 name: viz-router
 description: >-
-  Routes collaborative document editing to the optimal method based on the
-  user's environment. Activated when the user wants to EDIT content (not just
-  view it), or when Claude wants the user to review and modify a draft.
-  Checks terminal type and available tools to choose between browser editor,
-  terminal split editor, or fallback.
-when-to-use: >-
-  Activate when the user asks to edit, revise, modify, or collaboratively
-  work on a document — any scenario where the user should directly change
-  the content, not just read it. Also activate when you (Claude) want to
-  hand off a draft for the user to refine. Do NOT activate for view-only
-  rendering — let doc-render or mermaid-display handle those directly.
+  This skill should be used when the user wants to EDIT content (not just view it),
+  asks to "edit this document", "revise the draft", "modify this content",
+  "collaboratively edit", "let me edit", or when Claude wants the user to
+  review and modify a draft. Routes to the best editing method based on terminal
+  environment (browser editor, Ghostty split, or fallback).
+  Do NOT use for view-only rendering — let doc-render or mermaid-display handle those.
 ---
 
 # Viz Router

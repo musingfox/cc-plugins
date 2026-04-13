@@ -1,14 +1,12 @@
 ---
 name: collab-edit
 description: >-
-  Collaborate with the user by opening a shared markdown file in their terminal editor.
-  Triggers when asking the user to review/edit content, or when user requests collaborative editing.
-  Detects completion signals in both English and Traditional Chinese.
-when-to-use: >-
-  Use when you want the user to directly edit content you've generated, when requesting user input
-  on a document, or when the user asks to collaboratively edit something. After the user signals
-  completion (via phrases like "check my changes", "done editing", "我改好了", "看一下修改", etc.),
-  show a diff and incorporate their changes.
+  Internal skill invoked by viz-router for Ghostty terminal split editing.
+  Opens a markdown file in a neovim split pane for the user to edit directly.
+  Not directly triggered by user requests — use viz-router instead, which
+  detects the terminal environment and routes to this skill when appropriate.
+  Only use directly when the user explicitly asks to "open in neovim",
+  "split terminal editor", or "ghostty split".
 ---
 
 # Collaborative Edit Skill

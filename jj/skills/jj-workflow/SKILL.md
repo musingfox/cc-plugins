@@ -1,11 +1,13 @@
 ---
 name: jj-workflow
 description: >-
-  Activated when the user is in a Jujutsu (jj) repository and describes VCS operations
-  in natural language — such as splitting a change, squashing changes together, rebasing,
-  creating new changes, editing past changes, setting bookmarks, resolving conflicts,
-  duplicating changes, backing out changes, managing workspaces, or any version control
-  task in a jj repository. Detects .jj directory presence to confirm jj context.
+  This skill should be used when the user is in a Jujutsu (jj) repository and describes
+  VCS operations using jj terminology or neutral language — such as splitting a change,
+  squashing changes together, rebasing, creating new changes, editing past changes,
+  setting bookmarks, resolving conflicts, duplicating changes, backing out changes,
+  or managing workspaces. Assumes the user is already thinking in jj terms.
+  Do NOT use when the user uses Git-specific vocabulary (commit, branch, checkout, stash) —
+  use git-to-jj instead for translation. Detects .jj directory presence to confirm jj context.
 ---
 
 # jj-workflow — Natural Language to jj Operations

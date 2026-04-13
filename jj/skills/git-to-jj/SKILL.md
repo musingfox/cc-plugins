@@ -1,11 +1,14 @@
 ---
 name: git-to-jj
 description: >-
-  Activated when the user is in a Jujutsu (jj) repository and uses Git terminology —
-  such as "commit", "branch", "checkout", "stash", "cherry-pick", "rebase -i",
-  "reset", "push", "pull", "merge", "add", "stage", "log", "diff", "amend", "revert",
-  "tag", "fetch", or "clone". Detects .jj directory presence combined with git vocabulary
-  to translate Git mental models into correct jj equivalents.
+  This skill should be used when the user is in a Jujutsu (jj) repository and uses
+  Git-specific terminology — such as "commit", "branch", "checkout", "stash",
+  "cherry-pick", "rebase -i", "reset", "push", "pull", "merge", "add", "stage",
+  "log", "diff", "amend", "revert", "tag", "fetch", or "clone". Focuses on explaining
+  conceptual differences between Git and jj, not just command mapping. Translates Git
+  mental models into correct jj equivalents. Do NOT use when the user is already using
+  jj terminology correctly — use jj-workflow instead. Detects .jj directory presence
+  combined with git vocabulary.
 ---
 
 # git-to-jj — Git Mental Model Translation

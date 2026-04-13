@@ -1,6 +1,14 @@
 ---
 name: web-test
-description: This skill should be used when the user asks to "debug a web page", "find what's wrong with this page", "investigate a UI bug", "figure out why this page is broken", "generate tests from debugging", "create regression tests for a page", "write E2E tests after exploring", "debug and write tests", "turn browser exploration into test cases", or when combining agent-browser exploration with Playwright test generation. Orchestrates the debug-to-test workflow.
+description: >-
+  This skill should be used when the user asks to "debug a web page", "find what's wrong with
+  this page", "investigate a UI bug", "figure out why this page is broken", "why is this button
+  not working", "generate tests from debugging", "create regression tests for a page",
+  "write E2E tests after exploring", "debug and write tests", "fix a flaky test",
+  "debug a failing Playwright test", or when combining agent-browser exploration with Playwright
+  test generation. Orchestrates the debug-to-test workflow.
+  Do NOT use for writing standalone Playwright tests without a debugging/exploration phase —
+  use the playwright skill instead.
 ---
 
 # Web Test: Debug-to-Test Workflow

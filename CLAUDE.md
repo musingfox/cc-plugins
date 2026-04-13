@@ -170,7 +170,6 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 **Key Components**:
 - **Skills** (`skills/`):
   - `markitdown-read` - Auto-triggered when reading PDF, Word, PowerPoint, Excel, images, audio, HTML, EPUB, CSV, JSON, XML, ZIP files
-  - `convert` - Explicit file-to-markdown conversion skill
 
 **Prerequisites**: `pip install markitdown` or `uv tool install markitdown`
 
@@ -188,7 +187,7 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 **Key Components**:
 - **Skills** (`skills/`):
   - `adr` - Full lifecycle management: create, list, supersede, deprecate, check consistency. Auto-detects ADR directory, auto-numbers with 4-digit zero-padding, uses MADR 4.0 template. Core feature: supersession with 4-layer repo-wide cross-reference scan and categorized update strategy.
-  - `adr-ref-guard` - Advisory skill that warns when editing `.md` files that reference superseded or deprecated ADRs. Never auto-replaces.
+  - `adr-ref-guard` - Manual check skill to audit markdown files for references to superseded or deprecated ADRs. Never auto-replaces.
 
 **Supersession 4-Layer Search**: filename reference, ADR-N marker, markdown link, title substring — with per-category update strategy (auto-update ADRs/docs, add marker to source code, skip config).
 
