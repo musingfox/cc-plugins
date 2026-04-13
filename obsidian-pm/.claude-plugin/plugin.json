@@ -7,6 +7,6 @@
   },
   "repository": "https://github.com/musingfox/cc-plugins",
   "keywords": ["obsidian", "project-management", "tasks", "adr", "documents"],
-  "commands": ["commands/*.md"],
-  "skills": ["skills/*/SKILL.md"]
+  "commands": "./commands/",
+  "skills": "./skills/"
 }
