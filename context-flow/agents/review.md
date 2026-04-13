@@ -1,7 +1,7 @@
 ---
 name: review
 description: "Verify implementation against contracts"
-model: claude-sonnet-4-5
+model: claude-opus-4-6
 color: "#9C27B0"
 tools: Read, Grep, Glob, Bash
 ---

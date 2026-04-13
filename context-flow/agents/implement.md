@@ -1,7 +1,7 @@
 ---
 name: implement
 description: "Implement contracts and pass all test cases"
-model: claude-sonnet-4-5
+model: claude-opus-4-6
 color: "#FF9800"
 tools: Read, Edit, Write, Bash, Glob, Grep
 ---

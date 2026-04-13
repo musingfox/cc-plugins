@@ -1,7 +1,7 @@
 ---
 name: research
 description: "Explore codebase and produce capability inventory"
-model: claude-sonnet-4-5
+model: claude-opus-4-6
 color: "#4CAF50"
 tools: Read, Grep, Glob, Bash
 ---
