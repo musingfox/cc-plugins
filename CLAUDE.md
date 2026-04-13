@@ -54,7 +54,7 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
   - `pm.md` - Requirements management (Haiku)
   - `arch.md` - API-First architecture design (Sonnet)
   - `dev.md` - TDD implementation (Sonnet)
-  - `reviewer.md` - Code review + git commit authority (Sonnet)
+  - `reviewer.md` - Code review and quality validation (Sonnet)
 
 - **Commands** (`commands/`):
   - `/omt` - Full orchestration — dispatches all agents, presents consensus, executes lifecycle (primary entry point)
@@ -359,7 +359,7 @@ Agent contracts are defined in `omt/contracts/`:
 - `dev.json` - @dev → @reviewer execution contract
 - `hive.json` - @hive consensus analysis contract
 
-State synchronization is handled by `hooks/state-sync.sh` triggered on Write/Edit operations.
+State synchronization is managed by the `/omt` orchestrator during workflow execution.
 
 ## Marketplace Installation
 
