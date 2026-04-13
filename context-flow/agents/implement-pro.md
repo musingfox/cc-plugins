@@ -1,7 +1,7 @@
 ---
-name: implement
-description: "Implement contracts and pass all test cases"
-model: claude-sonnet-4-5
+name: implement-pro
+description: "Implement contracts and pass all test cases (deep reasoning)"
+model: claude-opus-4-6
 color: yellow
 tools: Read, Edit, Write, Bash, Glob, Grep
 ---

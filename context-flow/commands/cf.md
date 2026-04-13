@@ -1,6 +1,6 @@
 ---
 description: "Context-flow pipeline — contract-driven development with human-in-the-loop decision gating"
-argument-hint: "<goal>"
+argument-hint: "[--fast|--deep] [--research=lite|standard|pro] [--plan=lite|standard|pro] [--implement=lite|standard|pro] [--review=lite|standard|pro] <goal>"
 allowed-tools: [Agent, Read, Write, Bash, Glob, Grep, AskUserQuestion]
 ---
 
@@ -15,25 +15,77 @@ SESSION="/tmp/context-flow-$(date +%s)"
 mkdir -p "$SESSION"
 ```
 
-Write the user's goal to `$SESSION/goal.md`.
+### Argument Parsing
+
+Parse the user's input to extract mode, per-stage overrides, and goal:
+
+1. **Mode flags**: `--fast` or `--deep`. If neither is present, use `default` mode. If both are present, use the last one.
+2. **Per-stage overrides**: `--research=<tier>`, `--plan=<tier>`, `--implement=<tier>`, `--review=<tier>` where tier is `lite`, `standard`, or `pro`. Invalid tier or stage names are silently ignored.
+3. **Goal**: Everything remaining after stripping flags.
+
+Write the goal (flags stripped) to `$SESSION/goal.md`. Log the resolved mode and any overrides.
+
+---
+
+## Model Tier System
+
+Three model tiers map to Claude model families:
+
+| Tier | Model | Use Case |
+|------|-------|----------|
+| `lite` | `claude-haiku-4-5` | Speed-optimized, simple tasks |
+| `standard` | `claude-sonnet-4-5` | Balanced cost/quality |
+| `pro` | `claude-opus-4-6` | Maximum reasoning depth |
+
+### Mode Presets
+
+Each mode defines a default tier for every stage. Per-stage overrides take precedence over mode defaults.
+
+| Stage | `fast` | `default` | `deep` |
+|-------|--------|-----------|--------|
+| research | lite | standard | pro |
+| plan | standard | pro | pro |
+| implement | lite | standard | standard |
+| review | standard | pro | pro |
+
+### Tier Resolution
+
+For each stage dispatch, resolve the tier in this order:
+1. **Per-stage override** (e.g., `--plan=pro`) → use the override
+2. **Mode default** → look up the mode preset table above
+3. If no mode flag and no override → use `default` mode
+
+### Complexity-Based Mode Selection
+
+When no mode flag is provided (`default` mode), the orchestrator may **upgrade to `deep` mode** if the goal exhibits high complexity signals during initial assessment:
+- Multi-module architectural changes
+- New system design or major refactoring
+- Cross-cutting concerns affecting 5+ files
+- Goals that require significant design decisions
+
+This upgrade happens before Phase 1 dispatch. Log the decision and reasoning.
+
+The orchestrator should NOT downgrade from the user's explicit mode choice. `--fast` and `--deep` are always respected.
 
 ## Agent Registry
 
-Default agents for each phase:
+Each stage has three agent variants corresponding to model tiers:
 
-| Phase | Default Agent | Type |
-|-------|--------------|------|
-| Research | `context-flow:research` | Explore codebase, produce capability inventory |
-| Plan | `context-flow:plan` | Define contracts and decisions |
-| Implement | `context-flow:implement` | Fulfill contracts, pass tests |
-| Review | `context-flow:review` | Verify contracts, flag advisories |
+| Stage | lite | standard | pro |
+|-------|------|----------|-----|
+| Research | `context-flow:research-lite` | `context-flow:research` | `context-flow:research-pro` |
+| Plan | `context-flow:plan-lite` | `context-flow:plan` | `context-flow:plan-pro` |
+| Implement | `context-flow:implement-lite` | `context-flow:implement` | `context-flow:implement-pro` |
+| Review | `context-flow:review-lite` | `context-flow:review` | `context-flow:review-pro` |
 
-Before dispatching, check if a more specialized agent is available. Query available agents and match by capability:
-- If the goal is clearly frontend-focused and a frontend-dev agent exists, prefer it for implement
-- If the goal involves database schema and a migration-specific agent exists, prefer it
-- If no better match is found, use the default
+### Agent Selection
 
-When in doubt, use the default. State which agent you selected and why.
+When dispatching an agent:
+1. Resolve the tier for this stage (see Tier Resolution above)
+2. Look up the agent name from the registry table
+3. If a more specialized agent exists for the goal (e.g., a frontend-dev agent for UI work), prefer it — but still apply the resolved model tier via the `model` parameter override
+
+When in doubt, use the registry default. State which agent you selected and why.
 
 ---
 
@@ -56,11 +108,18 @@ Research and Review phases use **Agent Teams by default**. This provides multi-p
 - Otherwise → use **subagent parallel exploration** (parallel dispatch, orchestrator synthesizes)
 
 **Skip to single agent** when ANY of these apply:
+- `--fast` mode is active
 - User explicitly requested a fast path in the goal
 - Goal is clearly a single-file bugfix, typo fix, or documentation-only change
 - Goal can be fully described in one sentence with no ambiguity
 
-When skipping, use a single research/review agent as in the default agent registry.
+When skipping, dispatch a single agent using the resolved tier for that stage.
+
+### Agent Teams Model Mixing
+
+When using Agent Teams, teammates can use different model tiers. The resolved tier for the stage determines the **lead teammate's** model. Additional teammates use one tier lower (e.g., if lead is `pro`, teammates use `standard`; if lead is `standard`, teammates use `standard` too — never below `standard` for teammates).
+
+To dispatch a teammate with a specific model, reference the corresponding agent variant by name (e.g., `context-flow:research-pro` for the lead, `context-flow:research` for a standard teammate).
 
 ### Loop Budget
 

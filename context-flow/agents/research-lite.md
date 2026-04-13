@@ -1,7 +1,7 @@
 ---
-name: research
-description: "Explore codebase and produce capability inventory"
-model: claude-sonnet-4-5
+name: research-lite
+description: "Explore codebase and produce capability inventory (speed-optimized)"
+model: claude-haiku-4-5
 color: green
 tools: Read, Grep, Glob, Bash
 ---

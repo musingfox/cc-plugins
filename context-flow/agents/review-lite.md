@@ -1,7 +1,7 @@
 ---
-name: review
-description: "Verify implementation against contracts"
-model: claude-sonnet-4-5
+name: review-lite
+description: "Verify implementation against contracts (speed-optimized)"
+model: claude-haiku-4-5
 color: magenta
 tools: Read, Grep, Glob, Bash
 ---

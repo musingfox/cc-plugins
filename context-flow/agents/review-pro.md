@@ -1,7 +1,7 @@
 ---
-name: review
-description: "Verify implementation against contracts"
-model: claude-sonnet-4-5
+name: review-pro
+description: "Verify implementation against contracts (deep reasoning)"
+model: claude-opus-4-6
 color: magenta
 tools: Read, Grep, Glob, Bash
 ---

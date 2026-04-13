@@ -1,7 +1,7 @@
 ---
-name: implement
-description: "Implement contracts and pass all test cases"
-model: claude-sonnet-4-5
+name: implement-lite
+description: "Implement contracts and pass all test cases (speed-optimized)"
+model: claude-haiku-4-5
 color: yellow
 tools: Read, Edit, Write, Bash, Glob, Grep
 ---

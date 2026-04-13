@@ -12,31 +12,74 @@ Agents are NOT defined by roles. Each agent is defined by what information it re
 
 ```
 /cf "Add CSV export for transaction history"
+/cf --deep "Redesign auth middleware for OAuth2"
+/cf --fast "Fix typo in README"
+/cf --fast --plan=pro "Quick fix but careful planning"
 ```
 
-The orchestrator manages a unified pipeline with adaptive research:
+### Mode Flags
+
+| Flag | Behavior |
+|------|----------|
+| *(none)* | Default mode — balanced cost/quality |
+| `--fast` | Speed-optimized — uses lighter models, skips Agent Teams |
+| `--deep` | Maximum quality — uses strongest models throughout |
+
+### Per-Stage Overrides
+
+Override the model tier for any individual stage:
 
 ```
-[research] → (complexity check) → (optional Agent Teams) → validate → [plan] → validate → HUMAN GATE → [implement] → validate → [review]
+/cf --fast --plan=pro "goal"       # fast mode, but plan uses Opus
+/cf --deep --implement=lite "goal" # deep mode, but implement uses Haiku
 ```
 
-When research detects high complexity via the **Agent Complexity Score (ACS)** heuristic, the orchestrator spawns Agent Teams for multi-perspective exploration before planning.
+Valid stages: `research`, `plan`, `implement`, `review`
+Valid tiers: `lite`, `standard`, `pro`
+
+## Model Tier System
+
+Each stage has 3 agent variants mapped to model tiers:
+
+| Tier | Model | Use Case |
+|------|-------|----------|
+| `lite` | Haiku | Speed-optimized, simple tasks |
+| `standard` | Sonnet | Balanced cost/quality (default) |
+| `pro` | Opus | Maximum reasoning depth |
+
+### Mode Presets
+
+| Stage | fast | default | deep |
+|-------|------|---------|------|
+| research | lite | standard | pro |
+| plan | standard | pro | pro |
+| implement | lite | standard | standard |
+| review | standard | pro | pro |
+
+Plan and review default to `pro` because decision quality and verification quality are the pipeline's bottleneck. Implement caps at `standard` because faithful execution doesn't require deep reasoning.
+
+## Pipeline
+
+```
+[research — Agent Teams] → validate → [plan] → validate → HUMAN GATE
+    → [implement] → validate → [review — Agent Teams] → verdict
+```
 
 ## Phases
 
-| Phase | Agent | Purpose |
-|-------|-------|---------|
-| **Research** | Explore codebase | Produce capability inventory with constraints and evidence; flag ACS complexity |
-| **Agent Teams** *(conditional)* | Multi-perspective exploration | When ACS is high: spawn parallel agents to explore trade-offs, then synthesize consensus |
-| **Plan** | Define contracts | Design behavioral contracts with decision tiering (High/Medium/Low) |
-| **Implement** | Fulfill contracts | Write code and tests; all tests must pass (supports parallel dispatch for independent contracts) |
-| **Review** | Verify contracts | Confirm implementation satisfies contracts; flag advisories |
+| Phase | Purpose |
+|-------|---------|
+| **Research** | Explore codebase, produce capability inventory with constraints and evidence |
+| **Plan** | Design behavioral contracts with decision tiering (High/Medium/Low) |
+| **Implement** | Fulfill contracts, write code and tests; all tests must pass |
+| **Review** | Verify implementation satisfies contracts; flag advisories |
 
 ## Key Features
 
-- **Adaptive research**: ACS heuristics (Agent Complexity Score) detect complexity and trigger Agent Teams when needed — no upfront commitment.
-- **Multi-perspective exploration**: Agent Teams mode spawns parallel agents with different expertise lenses to explore trade-offs, then synthesizes consensus before planning.
-- **Parallel implementation**: When contracts are independent, the orchestrator can dispatch multiple implement agents concurrently for faster execution.
+- **Dynamic model selection**: Orchestrator selects agent model tier per stage based on mode, per-stage overrides, and complexity assessment.
+- **Agent Teams by default**: Research and Review use multi-perspective Agent Teams by default; skip to single agent for trivially simple goals or `--fast` mode.
+- **Agent Teams model mixing**: Lead teammate uses resolved tier, additional teammates use one tier lower (minimum standard).
+- **Parallel implementation**: When contracts are independent, the orchestrator dispatches multiple implement agents concurrently with worktree isolation.
 - **Decision tiering**: Plan classifies decisions as High/Medium/Low impact. Human gate only blocks on High/Medium. Structural minimum rules prevent under-classification.
 - **Behavioral contracts**: Contracts define input/output/errors, not file paths. Implementation plan is separate guidance.
 - **Opinionated orchestrator**: At every human interaction, the orchestrator provides its own analysis and recommendation — not just a list to approve.

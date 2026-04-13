@@ -1,7 +1,7 @@
 ---
-name: plan
-description: "Design implementation plan with interface contracts and test cases"
-model: claude-sonnet-4-5
+name: plan-lite
+description: "Design implementation plan with interface contracts and test cases (speed-optimized)"
+model: claude-haiku-4-5
 color: blue
 tools: Read, Grep, Glob
 ---

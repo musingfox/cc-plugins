@@ -130,17 +130,34 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 **Key Components**:
 - **Command** (`commands/`):
   - `/cf "goal"` - Orchestrator that manages the pipeline with Agent Teams default for research & review
+  - Supports `--fast` (speed-optimized), `--deep` (maximum quality), and per-stage overrides (`--plan=pro`)
 
-- **4 Agents** (`agents/`):
-  - `research.md` - Context: goal + working directory → Output: capability inventory
-  - `plan.md` - Context: compressed goal + research output + optional direction → Output: contracts + test cases
-  - `implement.md` - Context: contracts + test cases only → Output: passing implementation
-  - `review.md` - Context: contracts + git diff → Output: pass/fail verdict
+- **12 Agents** (`agents/`), 4 stages × 3 model tiers (lite/standard/pro):
+  - `research[-lite|-pro].md` - Context: goal + working directory → Output: capability inventory
+  - `plan[-lite|-pro].md` - Context: compressed goal + research output + optional direction → Output: contracts + test cases
+  - `implement[-lite|-pro].md` - Context: contracts + test cases only → Output: passing implementation
+  - `review[-lite|-pro].md` - Context: contracts + git diff → Output: pass/fail verdict
+
+**Model Tier System**:
+- `lite` = Haiku (speed), `standard` = Sonnet (balanced, default), `pro` = Opus (deep reasoning)
+- Three modes with preset tier mappings per stage:
+
+| Stage | fast | default | deep |
+|-------|------|---------|------|
+| research | lite | standard | pro |
+| plan | standard | pro | pro |
+| implement | lite | standard | standard |
+| review | standard | pro | pro |
+
+- Per-stage overrides: `/cf --fast --plan=pro "goal"` (fast mode but plan uses opus)
+- Orchestrator may auto-upgrade to `deep` when goal complexity warrants it
 
 **Workflow**: `/cf "goal"` → [research — Agent Teams] → validate → [plan] → validate → HUMAN GATE → [implement] (parallel if independent) → validate → [review — Agent Teams] → verdict
 
 **Key Features**:
-- **Agent Teams by default**: Research and Review phases use multi-perspective Agent Teams by default; skip to single agent only for trivially simple goals (bugfix, typo, docs-only)
+- **Dynamic model selection**: Orchestrator selects agent model tier per stage based on mode, overrides, and complexity assessment
+- **Agent Teams by default**: Research and Review phases use multi-perspective Agent Teams by default; skip to single agent only for trivially simple goals or `--fast` mode
+- **Agent Teams model mixing**: Lead teammate uses resolved tier, additional teammates use one tier lower (minimum standard)
 - **Native + fallback**: native Agent Teams when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is set; subagent parallel exploration as fallback
 - **Parallel implement**: independent contracts dispatched to separate agents with worktree isolation
 - Orchestrator controls context flow: what each agent sees is explicitly specified, not implicit
