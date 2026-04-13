@@ -2,7 +2,7 @@
 name: research
 description: "Explore codebase and produce capability inventory"
 model: claude-opus-4-6
-color: "#4CAF50"
+color: green
 tools: Read, Grep, Glob, Bash
 ---
 

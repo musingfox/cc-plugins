@@ -2,7 +2,7 @@
 name: plan
 description: "Design implementation plan with interface contracts and test cases"
 model: claude-opus-4-6
-color: "#2196F3"
+color: blue
 tools: Read, Grep, Glob
 ---
 

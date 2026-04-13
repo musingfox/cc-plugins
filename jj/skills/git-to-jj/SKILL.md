@@ -66,7 +66,7 @@ Do NOT use when:
 | `git rebase -i` (edit) | `jj edit <rev>` | Go back and modify any change |
 | `git rebase -i` (split) | `jj split` | Split a change into pieces |
 | `git rebase <branch>` | `jj rebase -d <rev>` | Rebase onto a destination |
-| `git reset --soft HEAD~1` | `jj squash --from @ --into @-` or just `jj edit @-` | Move work back to parent |
+| `git reset --soft HEAD~1` | `jj unsquash` | Moves diff from parent into current change (un-commits parent's work into your working copy) |
 | `git reset --hard` | `jj restore` | Discard working copy changes |
 | `git revert <commit>` | `jj backout -r <rev>` | Create an inverse change |
 

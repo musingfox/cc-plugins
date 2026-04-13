@@ -65,31 +65,16 @@ For diagnostic code templates and the full fallback scenario reference, consult 
 
 ## Phase 3: Map Refs to Playwright Locators
 
-Convert agent-browser snapshot information to Playwright locators using strict precision order:
+Convert agent-browser snapshot information to Playwright locators. Apply the locator precision order from the playwright skill (getByTestId > getByRole > getByLabel > getByPlaceholder > getByText > data attributes > CSS).
 
-| agent-browser Snapshot Info | Playwright Locator | Priority |
-|----------------------------|-------------------|----------|
-| Element has `data-testid` attribute | `getByTestId('value')` | 1 (highest) |
-| Role + accessible name: `button "Submit"` | `getByRole('button', { name: 'Submit' })` | 2 |
-| Input with label: `textbox "Email"` | `getByLabel('Email')` | 3 |
-| Input with placeholder | `getByPlaceholder('Enter email')` | 4 |
-| Visible text content | `getByText('text', { exact: true })` | 5 |
-| Custom data attribute | `page.locator('[data-attr="value"]')` | 6 |
-| CSS selector (last resort) | `page.locator('css')` | 7 |
+### Snapshot-to-Locator Mapping
 
-### Mapping Rules
-
-1. **Read snapshot roles carefully** — agent-browser reports element roles from the accessibility tree (`button`, `textbox`, `link`, `heading`, `checkbox`, `combobox`). These map directly to Playwright's `getByRole()` first parameter.
-
-2. **Check for test IDs** — Run `snapshot` (full mode, not `-i`) to reveal element attributes. If `data-testid` exists, use `getByTestId()`.
-
-3. **Prefer role + name** — The snapshot format `@e1: button "Sign In"` maps directly to `getByRole('button', { name: 'Sign In' })`.
-
-4. **Use exact matching** — Always pass `{ exact: true }` to text-based locators: `getByText('Submit', { exact: true })`.
-
-5. **Validate uniqueness** — Each locator must identify exactly one element. If ambiguous, narrow with:
-   - `.filter({ hasText: 'unique context' })`
-   - Scope to parent: `page.locator('.section').getByRole(...)`
+agent-browser reports element roles from the accessibility tree. Map them directly to Playwright locators:
+- `data-testid` attribute → `getByTestId()` (always preferred)
+- Role + accessible name (e.g., `button "Submit"`) → `getByRole('button', { name: 'Submit' })`
+- Input with label (e.g., `textbox "Email"`) → `getByLabel('Email')`
+- Always pass `{ exact: true }` to text-based locators
+- If ambiguous, narrow with `.filter({ hasText: 'unique' })` or scope to parent
 
 ### Snapshot-to-Locator Examples
 

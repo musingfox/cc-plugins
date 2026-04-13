@@ -59,7 +59,6 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 - **Commands** (`commands/`):
   - `/omt` - Full orchestration — dispatches all agents, presents consensus, executes lifecycle (primary entry point)
   - `/init-agents` - Initialize agent workspace
-  - `/approve` - Review important changes
   - `/git-commit` - Emergency manual commit
   - `/help` - Command reference
 
@@ -67,10 +66,7 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
   - `contract-validation` - Validate agent input/output contracts
 
 - **Contracts** (`contracts/`):
-  - `hive.json`, `pm.json`, `arch.json`, `dev.json` - Agent contract definitions
-
-- **Hooks** (`hooks/`):
-  - `hooks.json` - PostToolUse hook on Write/Edit triggers `state-sync.sh`
+  - `hive.json`, `pm.json`, `arch.json`, `dev.json`, `reviewer.json` - Agent contract definitions
 
 - **Library** (`lib/`):
   - `contract-validator.ts`, `state-manager.ts` - Runtime utilities
@@ -90,6 +86,8 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 - `doc-render` skill — auto-triggers when content needs HTML rendering
 - `mermaid-display` skill — auto-triggers when diagrams requested (HTML default, PNG/SVG on explicit request)
 - `mermaid-theme` skill — configure diagram color schemes (8 built-in: Tokyo Night, Nord, Catppuccin, etc.)
+- `viz-router` skill — routes editing requests to optimal method based on terminal environment
+- `collab-edit` skill — internal skill for Ghostty terminal split editing (invoked by viz-router)
 - Zero runtime dependencies for HTML output (CDN libraries: marked.js, DOMPurify, Mermaid.js, Highlight.js, KaTeX, AOS)
 - PNG/SVG fallback via `mmdc` or `bunx @mermaid-js/mermaid-cli`
 
@@ -170,6 +168,8 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 **Key Components**:
 - **Skills** (`skills/`):
   - `markitdown-read` - Auto-triggered when reading PDF, Word, PowerPoint, Excel, images, audio, HTML, EPUB, CSV, JSON, XML, ZIP files
+- **Commands** (`commands/`):
+  - `convert` - Explicit file-to-markdown conversion with output file support
 
 **Prerequisites**: `pip install markitdown` or `uv tool install markitdown`
 
@@ -249,6 +249,18 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 **Configuration**: `.env` file with `DISCORD_WEBHOOK_URL` (default) and/or `DISCORD_WEBHOOK_{NAME}` (named targets)
 
 **Prerequisites**: `curl`, `jq`
+
+### 14. Agent Browser
+**Location**: `agent-browser/`
+**Purpose**: Browser automation, Playwright test writing, and debug-to-test workflows
+
+**Key Components**:
+- **Skills** (`skills/`):
+  - `agent-browser` - Ref-based browser automation for AI agents via agent-browser CLI (browse, click, fill, screenshot)
+  - `playwright` - Write and structure Playwright E2E tests with high-precision locator strategies
+  - `web-test` - Debug-to-test workflow: explore pages with agent-browser, diagnose issues, generate Playwright regression tests
+
+**Prerequisites**: `agent-browser` CLI (`npm install -g agent-browser`), `@playwright/test` for test generation
 
 ## Development Workflows
 

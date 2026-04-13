@@ -2,7 +2,7 @@
 name: review
 description: "Verify implementation against contracts"
 model: claude-opus-4-6
-color: "#9C27B0"
+color: magenta
 tools: Read, Grep, Glob, Bash
 ---
 

@@ -1,12 +1,11 @@
 ---
 name: adr-ref-guard
 description: >-
-  This skill should be used when the user asks to "check ADR references",
-  "verify ADR references are current", "find stale ADR references",
-  "audit ADR links", "check for superseded ADRs in docs",
-  "scan for deprecated ADR references", or wants to validate that markdown
-  files reference up-to-date ADRs. Checks whether referenced ADRs are
-  superseded or deprecated and presents an advisory warning.
+  This skill should be used when the user asks to "check ADR references in this file",
+  "verify ADR references are current", "scan this doc for stale ADR links",
+  "audit ADR links in docs", "check for superseded ADRs in my markdown",
+  or wants a quick scan of specific markdown files for outdated ADR references.
+  Lightweight advisory check — not a full consistency audit (use the adr skill for that).
   Does not apply when no ADR directory exists in the project.
 ---
 

@@ -2,7 +2,7 @@
 name: implement
 description: "Implement contracts and pass all test cases"
 model: claude-opus-4-6
-color: "#FF9800"
+color: yellow
 tools: Read, Edit, Write, Bash, Glob, Grep
 ---
 
