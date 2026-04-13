@@ -1,15 +1,18 @@
 ---
 name: obsidian-pm
 description: |
-  This skill should be used when the user mentions tasks, project documents, ADRs,
-  architecture decisions, or project management in the context of development work.
-  Covers creating, listing, updating, completing, and archiving tasks. Also handles
-  writing design docs, specs, and ADR lifecycle (propose, accept, deprecate, supersede).
-  Common triggers: "create a task", "list my tasks", "what am I working on",
-  "write a design doc", "create an ADR", "show project status", "what's in my backlog",
-  "mark task as done", "record this decision", "archive completed tasks", "task priorities",
-  "show dashboard", "專案狀況", "project status", "cross-project status", "跨專案".
-  All operations use the Obsidian CLI against a configured vault.
+  Project management via Obsidian vault — manage tasks, documents, and ADRs using the Obsidian CLI.
+  Covers task lifecycle (create, list, update, complete, archive), design docs, specs,
+  ADR lifecycle (propose, accept, deprecate, supersede), and Dataview dashboards.
+when-to-use: |
+  This skill should be used when the user asks to interact with their Obsidian vault for project management,
+  mentions "obsidian task", "vault task", "obsidian 任務", "obsidian 文件", "vault 文件", or references `.obsidian-pm.yaml`.
+  Also triggers on: "建立任務到 vault", "查 vault 裡的任務", "寫到 obsidian", "記到 vault",
+  "vault 裡有什麼任務", "obsidian dashboard", "vault dashboard", "專案看板",
+  "create task in vault", "list vault tasks", "write to obsidian", "save to vault",
+  "vault status", "obsidian 看板", "obsidian ADR", "vault ADR".
+  NOT triggered by generic "create a task" or "project status" without Obsidian/vault context —
+  those are too ambiguous and may refer to Claude Code tasks or other systems.
 ---
 
 # Obsidian PM — Project Management via Obsidian Vault
@@ -20,9 +23,20 @@ Manage tasks, documents, and ADRs for the current project through an Obsidian va
 
 - Obsidian must be running (or use headless CLI)
 - The `obsidian` CLI must be installed and enabled
-- Note: Vault config path is macOS-specific (`~/Library/Application Support/obsidian/`). Adjust for Linux/Windows.
 - Dataview plugin must be installed and enabled in the vault
 - A `.obsidian-pm.yaml` config file must exist in the project root
+
+## Platform Note
+
+Obsidian config path: `~/Library/Application Support/obsidian/obsidian.json` (macOS). Adjust for Linux/Windows.
+
+To resolve vault path from vault name:
+
+```bash
+VAULT_PATH=$(cat ~/Library/Application\ Support/obsidian/obsidian.json | jq -r '.vaults | to_entries[] | select(.value.path | contains("'"$VAULT_NAME"'")) | .value.path')
+```
+
+Use `$VAULT_PATH` throughout this skill wherever the vault's filesystem path is needed.
 
 ## Configuration
 
@@ -35,7 +49,7 @@ project: cc-plugins       # Project identifier (used as subfolder name)
 
 **MUST read this file before any operation.** If it does not exist:
 
-1. List available vaults from `~/Library/Application Support/obsidian/obsidian.json` — the `vaults` object contains vault IDs mapped to `{ path, ts }`.
+1. List available vaults from `obsidian.json` (see Platform Note above) — the `vaults` object contains vault IDs mapped to `{ path, ts }`.
 2. Ask the user which vault to use and what project name to set.
 3. Create `.obsidian-pm.yaml` in the project root with the chosen values.
 4. Remind the user to add `.obsidian-pm.yaml` to `.gitignore` if they don't want it tracked.
@@ -47,10 +61,7 @@ Use the `vault` value as the first parameter in all CLI commands: `obsidian vaul
 When a project connects to a vault for the first time, ensure the folder structure exists:
 
 ```bash
-# Get vault path from obsidian.json
-VAULT_PATH=$(cat ~/Library/Application\ Support/obsidian/obsidian.json | jq -r '.vaults | to_entries[] | select(.value.path | contains("'"$VAULT_NAME"'")) | .value.path')
-
-# Create required folders
+# Create required folders (resolve $VAULT_PATH per Platform Note)
 mkdir -p "$VAULT_PATH/pm/{project}/tasks"
 mkdir -p "$VAULT_PATH/pm/{project}/archive"
 mkdir -p "$VAULT_PATH/pm/{project}/docs"
@@ -136,7 +147,7 @@ obsidian vault={vault} read file="{name}"          # Read current content
 obsidian vault={vault} append file="{name}" content="{new content}"
 ```
 
-For full content replacement, read the vault path from `~/Library/Application Support/obsidian/obsidian.json`, then use the Write tool to overwrite the file directly at `{vault-path}/{note-path}`. Re-read via CLI afterward to confirm.
+For full content replacement, use the Write tool to overwrite the file directly at `$VAULT_PATH/{note-path}`. Re-read via CLI afterward to confirm.
 
 **Archive a completed task:**
 ```bash
@@ -151,7 +162,7 @@ mkdir -p "{vault-path}/pm/{project}/archive"
 obsidian vault={vault} move file="{task-name}" to="pm/{project}/archive"
 ```
 
-**Note:** The `move` command requires the target folder to already exist. Get the vault path from Obsidian's config at `~/Library/Application Support/obsidian/obsidian.json`.
+**Note:** The `move` command requires the target folder to already exist. Resolve `$VAULT_PATH` per Platform Note above.
 
 ### Task Checkbox Operations
 
@@ -213,122 +224,12 @@ When creating notes, use Obsidian wikilinks to connect related items:
 
 ## Dashboard
 
-The skill generates two types of dashboards as Dataview-powered markdown notes in the vault. Dashboards are generated on first request and can be refreshed by overwriting the file.
+Two types of Dataview-powered dashboards can be generated in the vault:
 
-### Cross-Project Dashboard
+- **Cross-project**: `pm/dashboard.md` — overview of all projects
+- **Per-project**: `pm/{project}/dashboard.md` — single project detail
 
-**Location**: `pm/dashboard.md` in the vault root (under pm/)
-
-Generate this file with the following content:
-
-~~~markdown
----
-type: dashboard
-created: {YYYY-MM-DD}
----
-
-# Project Dashboard
-
-## Overview
-
-```dataview
-TABLE
-  length(filter(rows, (r) => r.status = "todo")) as "Todo",
-  length(filter(rows, (r) => r.status = "in-progress")) as "In Progress",
-  length(filter(rows, (r) => r.status = "blocked")) as "Blocked",
-  length(filter(rows, (r) => r.status = "done" AND r.completed >= date(today) - dur(7d))) as "Done (7d)",
-  length(rows) as "Total"
-FROM "pm"
-WHERE type = "task" AND project
-GROUP BY project
-SORT project ASC
-```
-
-## Recently Completed
-
-```dataview
-TABLE project, completed, tags
-FROM "pm"
-WHERE type = "task" AND project AND status = "done" AND completed >= date(today) - dur(7d)
-SORT completed DESC
-```
-~~~
-
-**CLI command to create:**
-```bash
-# Get vault path
-VAULT_PATH=$(cat ~/Library/Application\ Support/obsidian/obsidian.json | jq -r '.vaults | to_entries[] | select(.value.path | contains("'"$VAULT_NAME"'")) | .value.path')
-
-# Write dashboard file directly
-# Use the Write tool to write the dashboard content to "$VAULT_PATH/pm/dashboard.md"
-```
-
-### Per-Project Dashboard
-
-**Location**: `pm/{project}/dashboard.md`
-
-Generate this file with the following content:
-
-~~~markdown
----
-type: dashboard
-project: {project}
-created: {YYYY-MM-DD}
----
-
-# {project} Dashboard
-
-## Tasks by Status
-
-```dataview
-TABLE WITHOUT ID
-  length(filter(rows, (r) => r.status = "todo")) as "Todo",
-  length(filter(rows, (r) => r.status = "in-progress")) as "In Progress",
-  length(filter(rows, (r) => r.status = "blocked")) as "Blocked",
-  length(filter(rows, (r) => r.status = "done")) as "Done",
-  length(rows) as "Total"
-FROM "pm/{project}"
-WHERE type = "task"
-GROUP BY true
-```
-
-## Active Tasks
-
-```dataview
-TABLE status, priority, due, tags
-FROM "pm/{project}/tasks"
-WHERE type = "task"
-SORT choice(status = "in-progress", 0, choice(status = "blocked", 1, choice(status = "todo", 2, 3))) ASC, choice(priority = "high", 0, choice(priority = "medium", 1, 2)) ASC
-```
-
-## Recently Completed
-
-```dataview
-TABLE completed, tags
-FROM "pm/{project}/archive"
-WHERE type = "task" AND status = "done"
-SORT completed DESC
-LIMIT 10
-```
-
-## Tags
-
-```dataview
-TABLE WITHOUT ID
-  tags as "Tag",
-  length(rows) as "Count"
-FROM "pm/{project}"
-WHERE type = "task" AND tags
-FLATTEN tags
-GROUP BY tags
-SORT length(rows) DESC
-```
-~~~
-
-**CLI command to create:**
-```bash
-# Write dashboard file directly using Write tool to "$VAULT_PATH/pm/{project}/dashboard.md"
-```
+Dashboard Dataview templates are defined in `references/dashboards.md`. Use the Write tool to create/refresh the dashboard file at the appropriate vault path.
 
 ### Dashboard in Claude Code
 
@@ -378,11 +279,11 @@ These are suggestions only. Do NOT autonomously update task status or create ADR
 
 ```
 Agent is working on implementation?
-├── Starting a task → property:set status=in-progress
-├── Finished implementation → property:set status=done + archive
-├── Made an architectural decision → Suggest creating an ADR
-├── Need to record design context → Suggest creating a doc
-└── Hit a blocker → property:set status=blocked + append blocker description
+├── Starting a task → Suggest: update status to in-progress
+├── Finished implementation → Suggest: mark as done and archive
+├── Made an architectural decision → Suggest: create an ADR
+├── Need to record design context → Suggest: create a doc
+└── Hit a blocker → Suggest: mark as blocked and append blocker description
 ```
 
 ### User asks for dashboard or status
@@ -414,7 +315,7 @@ Dashboard request?
 ## Error Handling
 
 - **CLI not installed or not responding** → Tell the user to install the Obsidian CLI and ensure Obsidian is running
-- **Vault name not found** → List available vaults from `~/Library/Application Support/obsidian/obsidian.json` and ask the user to pick one
+- **Vault name not found** → List available vaults from `obsidian.json` (see Platform Note) and ask the user to pick one
 - **Note already exists on create** → Ask the user if they want to overwrite the existing note or choose a different name
 - **Search returns no results** → Inform the user that no matches were found and suggest a broader query
 - **Move fails (target folder missing)** → Run `mkdir -p` to create the target folder first, then retry the move
