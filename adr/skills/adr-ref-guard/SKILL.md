@@ -1,32 +1,27 @@
 ---
 name: adr-ref-guard
 description: >-
-  This skill should be used when Claude is about to write or edit a markdown
-  file and the content contains references to Architecture Decision Records
-  (ADRs). Look for patterns like "ADR-0003", "ADR-3", "as decided in ADR",
-  "per ADR", "see ADR", "according to ADR", links to NNNN-*.md files,
-  or mentions of specific ADR titles. When detected, check whether the
-  referenced ADRs are superseded or deprecated and present an advisory
-  warning. Does not apply when editing ADR files themselves or when no
-  ADR directory exists in the project.
+  This skill should be used when the user asks to "check ADR references",
+  "verify ADR references are current", "find stale ADR references",
+  "audit ADR links", "check for superseded ADRs in docs",
+  "scan for deprecated ADR references", or wants to validate that markdown
+  files reference up-to-date ADRs. Checks whether referenced ADRs are
+  superseded or deprecated and presents an advisory warning.
+  Does not apply when no ADR directory exists in the project.
 ---
 
 # ADR Reference Guard
 
-Warn when markdown content references a superseded or deprecated ADR. Advisory only — never auto-replace.
+Check markdown files for references to superseded or deprecated ADRs. Advisory only — never auto-replace.
 
-## Activation
+## When to Use
 
-Activate when ALL conditions are met:
-1. Claude is writing or editing a `.md` file that is NOT an ADR file itself (not inside the ADR directory matching `NNNN-*.md`)
-2. The content contains one or more ADR references (see Detection Patterns)
-3. An ADR directory exists in the project
+This is a **manual check skill** — invoke it when you want to audit ADR references:
+- Before a PR review, to catch stale ADR references
+- After an ADR supersession, to find docs that reference the old ADR
+- When the user asks to verify ADR references are current
 
-Do NOT activate when:
-- Editing ADR files themselves (files matching `NNNN-*.md` inside the ADR directory)
-- No ADR directory exists
-- The file is source code — only guard `.md` files
-- An ADR lifecycle operation (create, supersede, check, list) is already in progress
+This skill does NOT auto-activate on Write/Edit operations.
 
 ## Detection Patterns
 
