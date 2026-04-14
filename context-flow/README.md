@@ -54,9 +54,9 @@ Each stage has 3 agent variants mapped to model tiers:
 | research | lite | standard | pro |
 | plan | standard | pro | pro |
 | implement | lite | standard | standard |
-| review | standard | pro | pro |
+| review | lite | standard | standard |
 
-Plan and review default to `pro` because decision quality and verification quality are the pipeline's bottleneck. Implement caps at `standard` because faithful execution doesn't require deep reasoning.
+Plan defaults to `pro` because design decision quality is the pipeline's bottleneck. Review caps at `standard` because verification is a mechanical check against contracts — expensive models add little value (ref: AgentOpt Critic-role findings). Implement caps at `standard` because faithful execution doesn't require deep reasoning.
 
 ## Pipeline
 

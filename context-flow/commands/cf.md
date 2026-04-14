@@ -46,7 +46,7 @@ Each mode defines a default tier for every stage. Per-stage overrides take prece
 | research | lite | standard | pro |
 | plan | standard | pro | pro |
 | implement | lite | standard | standard |
-| review | standard | pro | pro |
+| review | lite | standard | standard |
 
 ### Tier Resolution
 

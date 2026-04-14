@@ -147,7 +147,7 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 | research | lite | standard | pro |
 | plan | standard | pro | pro |
 | implement | lite | standard | standard |
-| review | standard | pro | pro |
+| review | lite | standard | standard |
 
 - Per-stage overrides: `/cf --fast --plan=pro "goal"` (fast mode but plan uses opus)
 - Orchestrator may auto-upgrade to `deep` when goal complexity warrants it
