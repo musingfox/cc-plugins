@@ -165,18 +165,18 @@ Interact with [Fizzy](https://fizzy.do) via the Fizzy CLI for project management
 /plugin install fizzy
 ```
 
-### Obsidian PM
+### Obsidian Workspace
 
-Project management via Obsidian vault — tasks, documents, and ADRs through Obsidian CLI:
-- **Task Lifecycle**: Create, query, update status, archive completed tasks with property-based filtering
-- **Document Management**: Design docs, specs, and project documents from templates
-- **ADR Lifecycle**: Propose, accept, deprecate, supersede with auto-numbering (4-digit zero-padded)
-- **Wikilinks**: Cross-reference tasks, docs, and ADRs with Obsidian-native links
-- **Prerequisites**: Obsidian app + CLI enabled, `.obsidian-pm.yaml` config in project root
+Personal Obsidian vault productivity — capture, notes, and project management through the Obsidian CLI:
+- **Quick Capture** (`/obw:cap`): Append timestamped entries to today's journal; `#tag` extraction into frontmatter
+- **Long-form Notes** (`/obw:note`): Create notes in a configurable default folder with filename strategies (title / slug / timestamp-title); `--folder` overrides per-call
+- **Project Management** (`/obw:pm`): Task/doc/ADR lifecycle, Dataview dashboards, wikilink cross-references (formerly `/obm`)
+- **Interactive Init** (`/obw:init`): Guided setup of `.obsidian.yaml` — vault binding, journal/note/pm sections
+- **Prerequisites**: Obsidian app + CLI enabled, `.obsidian.yaml` config in project root
 
 **Installation:**
 ```bash
-/plugin install obsidian-pm
+/plugin install obsidian-workspace
 ```
 
 ### Discord Webhook
@@ -303,10 +303,11 @@ cc-plugins/
 │   │   └── plugin.json
 │   ├── skills/                   # fizzy CLI wrapper
 │   └── README.md
-├── obsidian-pm/                  # Obsidian vault project management
+├── obsidian-workspace/           # Obsidian vault: capture, notes, PM
 │   ├── .claude-plugin/
 │   │   └── plugin.json
-│   ├── skills/                   # obsidian-pm (tasks, docs, ADRs)
+│   ├── commands/                 # /obw:init, /obw:cap, /obw:note, /obw:pm
+│   ├── skills/                   # cap, note, pm
 │   └── README.md
 ├── discord-webhook/              # Discord webhook notifications
 │   ├── .claude-plugin/

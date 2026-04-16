@@ -106,7 +106,7 @@ SORT length(rows) DESC
 Get the vault path first, then write the file directly:
 
 ```bash
-VAULT_PATH=$(cat ~/Library/Application\ Support/obsidian/obsidian.json | jq -r '.vaults | to_entries[] | select(.value.path | contains("'"$VAULT_NAME"'")) | .value.path')
+VAULT_PATH=$(cat ~/Library/Application\ Support/obsidian/obsidian.json | jq -r '.vaults | to_entries[] | select(.value.path | endswith("/'"$VAULT_NAME"'")) | .value.path')
 ```
 
 - Cross-project: Write to `$VAULT_PATH/pm/dashboard.md`

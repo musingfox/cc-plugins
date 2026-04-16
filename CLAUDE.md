@@ -239,19 +239,32 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 
 **Prerequisites**: `fizzy` CLI installed and authenticated (`fizzy setup`)
 
-### 12. Obsidian PM
-**Location**: `obsidian-pm/`
-**Purpose**: Project management via Obsidian vault — tasks, documents, and ADRs through Obsidian CLI
+### 12. Obsidian Workspace
+**Location**: `obsidian-workspace/`
+**Purpose**: Personal Obsidian vault productivity — quick capture, long-form notes, and project management through Obsidian CLI
+
+**Plugin identifier**: `obw` (drives `/obw:*` commands and `obw:*` skill namespaces)
 
 **Key Components**:
+- **Commands** (`commands/`):
+  - `/obw:init` - Interactive `.obsidian.yaml` setup (vault picker, journal/note/pm sections)
+  - `/obw:cap <text>` - Quick capture to today's journal with timestamp; `#tag` extraction
+  - `/obw:note <title>` - Create long-form note; `--folder` override, filename strategies, `--tag` frontmatter
+  - `/obw:pm [action]` - Task/doc/ADR lifecycle (replaces legacy `/obm`)
 - **Skills** (`skills/`):
-  - `obsidian-pm` - Task lifecycle (create, query, update, archive), document management, ADR lifecycle, Dataview dashboards. Auto-triggered on task/doc/ADR/dashboard mentions.
+  - `cap` - Quick journal capture logic; natural-language triggered
+  - `note` - Long-form note creation; natural-language triggered
+  - `pm` - Task/doc/ADR lifecycle and Dataview dashboards
 
-**Prerequisites**: Obsidian app running + CLI enabled, `.obsidian-pm.yaml` config in project root
+**Prerequisites**: Obsidian app running + CLI enabled, `.obsidian.yaml` config in project root
 
-**Configuration**: `.obsidian-pm.yaml` with `vault` (vault name) and `project` (project identifier)
+**Configuration**: `.obsidian.yaml` unified schema:
+- Top-level `vault` (vault name, shared across all /obw commands)
+- `journal`: folder, filename pattern, section heading, timestamp, tag_frontmatter
+- `note`: default_folder, filename_strategy (`title` | `slug` | `timestamp-title`)
+- `pm`: project identifier (optional; omit to disable `/obw:pm`)
 
-**Vault Structure**: `pm/{project}/{tasks,archive,docs}/` with dashboards (Dataview) and templates at `pm/templates/`
+**Vault Structure** (PM only): `pm/{project}/{tasks,archive,docs}/` with dashboards (Dataview) and templates at `pm/templates/`
 
 ### 13. Discord Webhook
 **Location**: `discord-webhook/`
@@ -398,7 +411,7 @@ Then install individual plugins:
 /plugin install adr
 /plugin install hook-guard
 /plugin install fizzy
-/plugin install obsidian-pm
+/plugin install obsidian-workspace
 /plugin install discord-webhook
 ```
 

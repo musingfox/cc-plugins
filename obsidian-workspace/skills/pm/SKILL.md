@@ -1,18 +1,21 @@
 ---
-name: obsidian-pm
+name: pm
 description: |
   Project management via Obsidian vault — manage tasks, documents, and ADRs using the Obsidian CLI.
   Covers task lifecycle (create, list, update, complete, archive), design docs, specs,
   ADR lifecycle (propose, accept, deprecate, supersede), and Dataview dashboards.
 when-to-use: |
   This skill should be used when the user asks to interact with their Obsidian vault for project management,
-  mentions "obsidian task", "vault task", "obsidian 任務", "obsidian 文件", "vault 文件", or references `.obsidian-pm.yaml`.
+  mentions "obsidian task", "vault task", "obsidian 任務", "obsidian 文件", "vault 文件", or references `.obsidian.yaml`.
   Also triggers on: "建立任務到 vault", "查 vault 裡的任務", "寫到 obsidian", "記到 vault",
   "vault 裡有什麼任務", "obsidian dashboard", "vault dashboard", "專案看板",
   "create task in vault", "list vault tasks", "write to obsidian", "save to vault",
-  "vault status", "obsidian 看板", "obsidian ADR", "vault ADR".
+  "vault status", "obsidian 看板", "obsidian ADR", "vault ADR",
+  and the `/obw:pm` command.
+  Requires `.obsidian.yaml` with a `pm.project` field present in the project root.
   NOT triggered by generic "create a task" or "project status" without Obsidian/vault context —
   those are too ambiguous and may refer to Claude Code tasks or other systems.
+  For ad-hoc note creation in a vault outside a project context, use `obsidian:obsidian-cli` instead.
 ---
 
 # Obsidian PM — Project Management via Obsidian Vault
@@ -24,7 +27,7 @@ Manage tasks, documents, and ADRs for the current project through an Obsidian va
 - Obsidian must be running (or use headless CLI)
 - The `obsidian` CLI must be installed and enabled
 - Dataview plugin must be installed and enabled in the vault
-- A `.obsidian-pm.yaml` config file must exist in the project root
+- A `.obsidian.yaml` config file must exist in the project root (with a `pm` section)
 
 ## Platform Note
 
@@ -33,28 +36,24 @@ Obsidian config path: `~/Library/Application Support/obsidian/obsidian.json` (ma
 To resolve vault path from vault name:
 
 ```bash
-VAULT_PATH=$(cat ~/Library/Application\ Support/obsidian/obsidian.json | jq -r '.vaults | to_entries[] | select(.value.path | contains("'"$VAULT_NAME"'")) | .value.path')
+VAULT_PATH=$(cat ~/Library/Application\ Support/obsidian/obsidian.json | jq -r '.vaults | to_entries[] | select(.value.path | endswith("/'"$VAULT_NAME"'")) | .value.path')
 ```
 
 Use `$VAULT_PATH` throughout this skill wherever the vault's filesystem path is needed.
 
 ## Configuration
 
-Read `.obsidian-pm.yaml` from the project root to get vault and project context:
+Read `.obsidian.yaml` from the project root. This skill uses the top-level `vault` and the `pm` section:
 
 ```yaml
-vault: CyrisVault        # Obsidian vault name
-project: cc-plugins       # Project identifier (used as subfolder name)
+vault: CyrisVault           # Obsidian vault name (top-level, shared across /obw:*)
+pm:
+  project: cc-plugins       # Project identifier (used as subfolder name)
 ```
 
-**MUST read this file before any operation.** If it does not exist:
+**MUST read this file before any operation.** If the file does not exist, or the `pm.project` value is missing, instruct the user to run `/obw:init` to create/update the config. Do not proceed with PM operations without a project identifier.
 
-1. List available vaults from `obsidian.json` (see Platform Note above) — the `vaults` object contains vault IDs mapped to `{ path, ts }`.
-2. Ask the user which vault to use and what project name to set.
-3. Create `.obsidian-pm.yaml` in the project root with the chosen values.
-4. Remind the user to add `.obsidian-pm.yaml` to `.gitignore` if they don't want it tracked.
-
-Use the `vault` value as the first parameter in all CLI commands: `obsidian vault=<vault> ...`
+Use the top-level `vault` value as the first parameter in all CLI commands: `obsidian vault=<vault> ...` and the `pm.project` value wherever `{project}` appears below.
 
 ### First-Time Vault Setup
 
@@ -156,7 +155,7 @@ obsidian vault={vault} property:set file="{task-name}" name=status value=done
 obsidian vault={vault} property:set file="{task-name}" name=completed value="{YYYY-MM-DD}" type=date
 
 # 2. Ensure archive folder exists
-mkdir -p "{vault-path}/pm/{project}/archive"
+mkdir -p "$VAULT_PATH/pm/{project}/archive"
 
 # 3. Move to archive
 obsidian vault={vault} move file="{task-name}" to="pm/{project}/archive"
@@ -304,7 +303,7 @@ Dashboard request?
 
 ## Important Notes
 
-1. **Always read `.obsidian-pm.yaml` first** — every operation needs vault and project
+1. **Always read `.obsidian.yaml` first** — every operation needs `vault` and `pm.project`
 2. **Use `silent` flag on create** — prevents Obsidian from switching focus
 3. **Use `format=json` on search** — easier to parse results
 4. **Target folder must exist for `move`** — `mkdir -p` before moving

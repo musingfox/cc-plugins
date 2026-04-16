@@ -66,9 +66,9 @@
       "description": "Interact with Fizzy via the Fizzy CLI — manage boards, cards, columns, comments, steps, reactions, tags, users, notifications, pins, webhooks, and account settings"
     },
     {
-      "name": "obsidian-pm",
-      "source": "./obsidian-pm",
-      "description": "Project management via Obsidian vault — tasks, documents, and ADRs managed through Obsidian CLI"
+      "name": "obsidian-workspace",
+      "source": "./obsidian-workspace",
+      "description": "Obsidian Workspace — personal vault productivity: quick capture to journal, long-form notes, and project management via Obsidian CLI"
     },
     {
       "name": "discord-webhook",

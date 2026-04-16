@@ -17,3 +17,4 @@ yarn-error.log*
 
 # Claude Code
 .claude/*.local.*
+.obsidian.yaml
