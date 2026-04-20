@@ -18,7 +18,7 @@
     {
       "name": "viz",
       "source": "./viz",
-      "description": "Render markdown and Mermaid diagrams as formatted HTML with syntax highlighting, math, interactive diagrams, and dark mode"
+      "description": "Render markdown, Mermaid, and ~/.claude/plans/ files as formatted HTML — one skill, one script"
     },
     {
       "name": "jj",

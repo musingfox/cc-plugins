@@ -78,18 +78,17 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 
 ### 2. Viz (Markdown & Mermaid Renderer)
 **Location**: `viz/`
-**Purpose**: Render markdown documents and Mermaid diagrams as formatted HTML pages
+**Purpose**: Render markdown, Mermaid, or `~/.claude/plans/` files as formatted HTML — one skill, one script
 
 **Key Components**:
-- `/view-doc [file]` command — render any markdown file as HTML with syntax highlighting, math, diagrams
-- `/diagram` command — interactive diagram generator, outputs HTML by default
-- `doc-render` skill — auto-triggers when content needs HTML rendering
-- `mermaid-display` skill — auto-triggers when diagrams requested (HTML default, PNG/SVG on explicit request)
-- `mermaid-theme` skill — configure diagram color schemes (8 built-in: Tokyo Night, Nord, Catppuccin, etc.)
-- `viz-router` skill — routes editing requests to optimal method based on terminal environment
-- `collab-edit` skill — internal skill for Ghostty terminal split editing (invoked by viz-router)
-- Zero runtime dependencies for HTML output (CDN libraries: marked.js, DOMPurify, Mermaid.js, Highlight.js, KaTeX, AOS)
-- PNG/SVG fallback via `mmdc` or `bunx @mermaid-js/mermaid-cli`
+- `viz-render` skill — single skill handling three input shapes:
+  - **Shape A**: file path → render directly
+  - **Shape B**: bare plan name → resolve under `~/.claude/plans/`; empty arg lists available plans
+  - **Shape C**: inline markdown or Mermaid code → wrap in temp file → render
+- Auto-triggers on render/preview requests, diagram requests, and proactively when terminal output would be a 4+ row / 3+ column table, a comparison, audit, feature matrix, or 50+ lines of structured content
+- `lib/render.sh` + `lib/template.html` — shared rendering pipeline
+- `skills/viz-render/references/diagram-types.md` — on-demand Mermaid syntax reference
+- Zero runtime dependencies (CDN libraries: marked.js, DOMPurify, Mermaid.js, Highlight.js, KaTeX, AOS)
 
 ### 3. Jujutsu (jj) VCS Helper
 **Location**: `jj/`
@@ -334,7 +333,7 @@ Commands are tested by direct invocation:
 
 Skills are tested via natural language:
 ```
-"Create a flowchart showing..." (triggers mermaid-display)
+"Create a flowchart showing..." (triggers viz-render)
 ```
 
 Agents are tested via Task tool or agent-specific workflows (e.g., OMT's `/init-agents`).
@@ -370,9 +369,6 @@ function base64DecodeUTF8(base64) {
     return new TextDecoder('utf-8').decode(bytes);
 }
 ```
-
-### viz Mermaid CLI Detection (PNG/SVG)
-Priority order: `mmdc` (global) → `bunx @mermaid-js/mermaid-cli` (fallback)
 
 ### OMT Agent Workspace
 `.agents/` is the clean development workspace. Infrastructure lives in `.agents/.state/` (gitignored):
@@ -442,6 +438,6 @@ git config core.hooksPath .githooks
 ## Design Philosophy
 
 - **Single Responsibility**: Each plugin focuses on one specific capability
-- **Zero Dependencies**: Prefer CDN libraries (viz) or universal tools (bunx for mermaid-cli)
+- **Zero Dependencies**: Prefer CDN libraries (viz uses marked.js, Mermaid.js, KaTeX via CDN)
 - **Composability**: Plugins work independently but complement each other
 - **Minimal Friction**: Commands and skills integrate seamlessly into natural workflows

@@ -26,22 +26,21 @@ Your personal development squad powered by Agent-First workflow:
 /plugin install omt
 ```
 
-### Mermaid Visualization
+### Viz — Markdown & Mermaid HTML Renderer
 
-Generate and display high-quality diagrams instantly:
-- **Interactive Command**: `/diagram` asks what to visualize and creates it
-- **Universal Support**: Flowcharts, sequence diagrams, class diagrams, state machines, ER diagrams, Gantt charts, pie charts
-- **8 Color Schemes**: Tokyo Night, Nord, Catppuccin, Dracula, and more via `mermaid-theme` skill
-- **Zero Friction**: Automatically opens PNG/SVG in your viewer
-- **Configurable**: Environment variables for themes, background, resolution, color scheme
-- **Smart Detection**: Uses `mmdc` if installed, falls back to `npx` automatically
+One skill, one script. Render markdown, Mermaid, or `~/.claude/plans/` files as formatted HTML:
+- **Single Skill (`viz-render`)**: handles three input shapes — file path, plan name, or inline content (markdown/mermaid)
+- **Full Markdown**: syntax highlighting, KaTeX math, Mermaid, scroll animations, dark mode, TOC
+- **Plans Resolution**: bare name → looks up `~/.claude/plans/*.md`; no argument → lists available plans
+- **Proactive Triggers**: auto-renders when terminal would show a 4+ row / 3+ column table, a comparison, audit, feature matrix, or 50+ lines of structured content
+- **Zero Runtime Deps**: CDN libraries (marked.js, DOMPurify, Mermaid.js, Highlight.js, KaTeX, AOS)
 
 **Installation:**
 ```bash
 /plugin install viz
 ```
 
-**Sandbox configuration:** The viz plugin writes HTML output to `/tmp/viz/`. If you have sandbox enabled, add this to your `.claude/settings.json` or `~/.claude/settings.json`:
+**Sandbox configuration:** viz writes HTML output to `/tmp/viz/`. If sandbox is enabled, add to your `.claude/settings.json` or `~/.claude/settings.json`:
 ```json
 {
   "sandbox": {
@@ -205,23 +204,6 @@ Enhances AI-generated text readability:
 /plugin install readability
 ```
 
-### Document Visualizer
-
-Render any markdown document as beautifully formatted HTML:
-- **Any File**: `/view-doc` accepts any markdown file path, not just plan files
-- **Syntax Highlighting**: Language-aware code coloring via highlight.js
-- **Math Formulas**: Inline and block KaTeX rendering (`$E=mc^2$`, `$$\int_0^1$$`)
-- **Mermaid Diagrams**: Inline diagram rendering with auto dark mode
-- **Animations**: Page-load fade-in + scroll-triggered section reveals (AOS)
-- **Auto-Trigger**: `doc-render` skill activates when content needs HTML rendering
-- **UTF-8 Support**: Perfect handling of Chinese and other Unicode characters
-- **Secure**: XSS protection via DOMPurify sanitization
-
-**Installation:**
-```bash
-/plugin install doc-viz
-```
-
 ## Plugin Development
 
 This repository serves as both a marketplace and a development workspace for custom Claude Code plugins.
@@ -243,22 +225,15 @@ cc-plugins/
 │   ├── lib/                      # contract-validator, state-manager
 │   ├── skills/                   # contract-validation skill
 │   └── README.md
-├── mermaid-viz/                  # Mermaid Visualization plugin
+├── viz/                          # Markdown & Mermaid HTML renderer
 │   ├── .claude-plugin/
 │   │   └── plugin.json
-│   ├── commands/
-│   │   └── diagram.md
-│   ├── skills/                   # mermaid-display, mermaid-theme
-│   └── README.md
-├── doc-viz/                     # Document Visualizer plugin
-│   ├── .claude-plugin/
-│   │   └── plugin.json
-│   ├── commands/
-│   │   └── view-doc.md
-│   ├── skills/
-│   │   └── doc-render/
-│   │       └── SKILL.md
-│   └── README.md
+│   ├── lib/                      # render.sh, template.html
+│   └── skills/
+│       └── viz-render/           # single skill — handles all input shapes
+│           ├── SKILL.md
+│           └── references/
+│               └── diagram-types.md
 ├── jj/                           # Jujutsu VCS plugin
 │   ├── .claude-plugin/
 │   │   └── plugin.json
