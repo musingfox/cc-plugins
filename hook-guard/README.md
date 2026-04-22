@@ -43,13 +43,15 @@ One-stop hook setup assistant for Claude Code projects. Detects your project env
 | Rust | clippy | rustfmt | cargo test |
 | Go | golangci-lint | gofmt | go test |
 
-## Skills
+## Skill
 
-| Skill | Trigger | Purpose |
-|-------|---------|---------|
-| **setup** | "set up hooks", "configure pre-commit" | Detect → recommend → generate all hooks |
-| **doctor** | "check hooks", "hook health check" | Verify hook files, permissions, tools |
-| **update** | "update hooks", "refresh hook config" | Re-detect and apply changes |
+Single `hook-guard` skill dispatches by intent:
+
+| Mode | Trigger | Purpose |
+|---|---|---|
+| Setup | "set up hooks", "configure pre-commit" | Detect → recommend → generate all hooks |
+| Doctor | "check hooks", "hook health check" | Verify hook files, permissions, tools |
+| Update | "update hooks", "refresh hook config" | Re-detect and apply changes |
 
 ## Installation
 

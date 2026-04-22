@@ -1,6 +1,6 @@
 {
   "name": "hook-guard",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "One-stop hook setup assistant — detect project environment, generate Claude Code hooks and git pre-commit scripts with security checks, code quality gates, and CLAUDECODE skip logic",
   "author": {
     "name": "Nick Huang",

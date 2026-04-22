@@ -214,10 +214,10 @@ The root `.claude-plugin/marketplace.json` defines the marketplace catalog. Plug
 **Purpose**: One-stop hook setup assistant — detect project environment, generate Claude Code hooks and git pre-commit scripts
 
 **Key Components**:
-- **Skills** (`skills/`):
-  - `setup` - Main workflow: detect language/toolchain/VCS → recommend configuration → generate all hook files (`.githooks/`, `.claude/settings.local.json`)
-  - `doctor` - Health check: verify hook files, permissions, tool availability, configuration integrity
-  - `update` - Update installed hooks: re-detect environment, diff with existing, apply changes
+- **Skill** (`skills/hook-guard/`): Single skill dispatching by user intent into three modes:
+  - `Setup` - Detect language/toolchain/VCS → recommend → generate `.githooks/` + `.claude/settings.local.json`
+  - `Doctor` - Verify hook files, permissions, tool availability, configuration integrity
+  - `Update` - Re-detect environment, diff with existing, surgically apply changes
 
 **Generated Output**:
 - `.githooks/pre-commit` — Shell script with security checks (secrets, large files, merge conflicts, etc.), file integrity checks, structure/convention checks, and CLAUDECODE skip logic for lint/format/test
