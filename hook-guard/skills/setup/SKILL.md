@@ -1,131 +1,41 @@
 ---
 name: hook-guard-setup
 description: >-
-  This skill should be used when the user asks to "set up hooks",
-  "configure pre-commit", "add linting hooks", "set up code quality checks",
-  "initialize hook-guard", "add pre-commit hooks", "set up git hooks",
-  "configure Claude Code hooks", "add security checks to commits",
-  "set up conventional commits", "hook-guard setup", "hook guard setup",
-  "add commit checks", "protect my commits", "configure git hooks for this repo",
-  "I need a pre-commit hook", "help me set up code quality automation",
-  or mentions setting up commit hooks, pre-commit scripts, or code quality gates.
-  Detects project language/toolchain and generates Claude Code hooks, git pre-commit scripts,
-  and CLAUDECODE skip logic.
+  Set up hooks: detect project language/toolchain/VCS and generate git pre-commit,
+  commit-msg, and Claude Code hooks with CLAUDECODE skip logic. Triggers on "set up
+  hooks", "configure pre-commit", "add linting hooks", "initialize hook-guard",
+  "configure Claude Code hooks", "add security checks to commits", "set up
+  conventional commits", or similar requests to install commit hooks / code
+  quality gates.
 ---
 
 # Hook Guard Setup
 
-One-stop hook setup: detect project environment, recommend configuration, generate all hook files after user confirmation.
+Generate hook files after detecting project environment. Skip if user only wants to edit existing hooks or is asking about concepts — use doctor/update skills for those.
 
-Do NOT use when:
-- User is asking about hook concepts without wanting to set them up
-- User wants to manually edit existing hooks (just help them directly)
-- User is asking about hook-guard doctor or update (use those skills instead)
+## Phase 1 — Detect
 
-## Workflow
+Read `references/detection.md`. Detect: languages, toolchain, VCS (git / jj-colocated / jj-native), existing hooks, monorepo. If existing hooks found, ask merge/replace/abort. If jj-native, abort (no hook support).
 
-### Phase 1: Detect Environment
+## Phase 2 — Recommend
 
-Run detection commands to identify the project context. Read `references/detection.md` for the full detection matrix.
+Read `.claude/hook-guard.local.md` if present (schema in `references/settings.md`). Present summary grouped by:
 
-Detect all of the following:
-1. **Languages** — which languages are present (Python, JS/TS, Rust, Go, etc.)
-2. **Toolchain** — which lint/format/test tools are installed and configured
-3. **VCS** — git, jj (colocated), or jj (native)
-4. **Existing hooks** — `.githooks/`, `.git/hooks/`, `core.hooksPath`, `.pre-commit-config.yaml`, `.claude/settings.local.json` hooks
-5. **Project structure** — monorepo (multiple package manifests) or single project
+- **CC hooks** (`.claude/settings.local.json`): PostToolUse lint/format (soft), PreToolUse test gate (hard)
+- **Pre-commit always-run**: security, integrity, structure checks
+- **Pre-commit skippable when CLAUDECODE=1**: lint, format, test
+- **commit-msg**: conventional commits (if enabled)
 
-If existing hooks are found, warn the user and ask how to proceed (merge, replace, or abort).
+Ask user to confirm/adjust.
 
-### Phase 2: Recommend Configuration
+## Phase 3 — Generate
 
-Present a summary table to the user with all checks grouped by category:
+- `.githooks/pre-commit` — from `references/pre-commit-checks.md`. Include only enabled checks; substitute real tool commands for lint/format/test. `chmod +x`.
+- `.githooks/commit-msg` — from `references/commit-msg.md` if enabled. `chmod +x`.
+- `.claude/settings.local.json` — merge (not overwrite) hooks + `env.CLAUDECODE=1` using patterns from `references/cc-hooks.md`.
+- Run `git config core.hooksPath .githooks`.
+- Ensure `.claude/*.local.md` is gitignored.
 
-**A. Claude Code Hooks** (written to `.claude/settings.local.json`):
-| Hook | Trigger | Tools | Mode |
-|------|---------|-------|------|
-| Lint | PostToolUse (Edit/Write) | [detected tools] | Soft feedback |
-| Format | PostToolUse (Edit/Write) | [detected tools] | Soft feedback |
-| Test gate | PreToolUse (Bash: git commit) | [detected tools] | Hard gate |
+## Phase 4 — Summary
 
-**B. Pre-commit Hooks — Always Run** (security, integrity, structure):
-List each check with enabled/disabled status.
-
-**C. Pre-commit Hooks — Skip when CLAUDECODE=1** (redundant with CC hooks):
-- Lint, Format, Test
-
-**D. Commit Message Hook**:
-- Conventional commits validation (if enabled)
-
-Read `references/cc-hooks.md` for Claude Code hooks patterns.
-Read `references/pre-commit-checks.md` for all check implementations.
-Read `references/commit-msg.md` for conventional commits validation.
-
-Ask user to confirm or adjust the configuration before generating.
-
-### Phase 3: Generate Files
-
-After user confirmation, generate the following files:
-
-#### 1. `.githooks/pre-commit`
-
-Generate a self-contained bash script. Structure:
-```
-#!/usr/bin/env bash
-set -euo pipefail
-
-# CLAUDECODE skip logic
-# Configuration variables
-# Check functions (one per check)
-# Run checks, collect results
-# Summary and exit code
-```
-
-Use the check implementations from `references/pre-commit-checks.md`. Only include enabled checks.
-
-Make executable: `chmod +x .githooks/pre-commit`
-
-#### 2. `.githooks/commit-msg` (if conventional commits enabled)
-
-Generate from `references/commit-msg.md`.
-
-Make executable: `chmod +x .githooks/commit-msg`
-
-#### 3. `.claude/settings.local.json` — Claude Code hooks
-
-Read existing file if present and MERGE new hooks (do not overwrite existing settings).
-
-Add hooks following patterns from `references/cc-hooks.md`.
-
-Also add the environment variable for CLAUDECODE skip logic:
-```json
-{
-  "env": {
-    "CLAUDECODE": "1"
-  }
-}
-```
-
-#### 4. Git configuration
-
-Run: `git config core.hooksPath .githooks`
-
-If the project has a setup script or Makefile, suggest adding this command there for team onboarding.
-
-#### 5. `.gitignore` updates (if needed)
-
-Ensure `.claude/*.local.md` is gitignored if using hook-guard settings.
-
-### Phase 4: Post-Setup Summary
-
-After generation, display:
-1. Files created/modified (with paths)
-2. Team onboarding note: `git config core.hooksPath .githooks`
-3. How to check status: mention the doctor skill
-4. How to update later: mention the update skill
-
-## Settings File
-
-If `.claude/hook-guard.local.md` exists, read it for user overrides before Phase 2.
-
-Read `references/settings.md` for the full schema, defaults, and how to apply overrides.
+Report files touched, onboarding command (`git config core.hooksPath .githooks`), and point to doctor/update skills.
