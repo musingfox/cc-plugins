@@ -1,6 +1,6 @@
 {
   "name": "obw",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Obsidian Workspace — personal vault productivity: capture, notes, and project management via Obsidian CLI",
   "author": {
     "name": "musingfox"
