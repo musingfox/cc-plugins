@@ -88,6 +88,21 @@ pm/
 
 All commands require `vault=<vault>` as the first parameter.
 
+**All vault I/O MUST go through the `obsidian` CLI.** Do not use filesystem reads/writes against `$VAULT_PATH/...` as a substitute — the CLI resolves wikilinks, honors Obsidian's metadata cache, and keeps behavior consistent with Dataview and other plugins. Filesystem access is only acceptable in the few places this document explicitly calls it out (e.g. `mkdir -p` for archive folder, Write for full dashboard rewrite).
+
+### Direct Read (name known → one call)
+
+When the user references a note by name (`/obw:pm get <name>`, "read task xxx", "show doc yyy"), the path is fully determined by `.obsidian.yaml` + the known name. Go straight to a single CLI read:
+
+```bash
+obsidian vault={vault} read file="{name}"              # content
+obsidian vault={vault} properties file="{name}"       # frontmatter
+```
+
+`file=` uses wikilink resolution — no path, no `.md`. **Do not `search` first to "locate" the note when the name is already given.** That chain (`search` → `read` → `properties`) is the anti-pattern this section exists to prevent; it multiplies CLI round-trips without adding information.
+
+Use `search` only when the name is unknown, or when you need list/filter/aggregate results.
+
 ### Read Operations
 
 | Operation | Command |
@@ -95,7 +110,7 @@ All commands require `vault=<vault>` as the first parameter.
 | List active tasks | `search query="[type:task] [project:{project}] [status:todo]" format=json` |
 | List in-progress | `search query="[type:task] [project:{project}] [status:in-progress]" format=json` |
 | List all active | `search query="[type:task] [project:{project}]" format=json` then filter out archived |
-| Read a task | `read file="{task-name}"` |
+| Read a task (name known) | `read file="{task-name}"` — single call, no prior search |
 | Read properties | `properties file="{task-name}"` |
 | List documents | `search query="[type:doc] [project:{project}]" format=json` |
 | List ADRs | `search query="[type:adr] [project:{project}]" format=json` |
@@ -162,6 +177,13 @@ obsidian vault={vault} move file="{task-name}" to="pm/{project}/archive"
 ```
 
 **Note:** The `move` command requires the target folder to already exist. Resolve `$VAULT_PATH` per Platform Note above.
+
+**Delete a note (task / doc / adr):**
+```bash
+obsidian vault={vault} delete file="{name}"
+```
+
+Deletion is destructive — always confirm with the user first (show the target name and what it is). If the installed `obsidian` CLI build lacks a `delete` subcommand, fall back to `move file="{name}" to="pm/{project}/archive"` and tell the user it was archived rather than deleted.
 
 ### Task Checkbox Operations
 
@@ -310,6 +332,8 @@ Dashboard request?
 5. **Do not modify templates** — they are shared across all projects
 6. **Property names are case-sensitive** — always lowercase
 7. **`file=` uses wikilink resolution** — just the note name, no path or extension needed
+8. **Never `search` to locate a note whose name is already known** — go directly to `read`/`properties` (see "Direct Read" above)
+9. **Never bypass the CLI with filesystem reads** — even if `$VAULT_PATH/pm/{project}/tasks/{name}.md` is computable, use `obsidian ... read` instead
 
 ## Error Handling
 
