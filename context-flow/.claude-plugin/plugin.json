@@ -1,6 +1,6 @@
 {
   "name": "context-flow",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Contract-driven development pipeline with human-in-the-loop decision gating — agents defined by what they see, not who they are",
   "author": {
     "name": "Nick Huang"

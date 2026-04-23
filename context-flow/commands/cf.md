@@ -29,13 +29,13 @@ Write the goal (flags stripped) to `$SESSION/goal.md`. Log the resolved mode and
 
 ## Model Tier System
 
-Three model tiers map to Claude model families:
+Three user-facing tiers map to the Agent tool's `model` parameter:
 
-| Tier | Model | Use Case |
-|------|-------|----------|
-| `lite` | `claude-haiku-4-5` | Speed-optimized, simple tasks |
-| `standard` | `claude-sonnet-4-5` | Balanced cost/quality |
-| `pro` | `claude-opus-4-6` | Maximum reasoning depth |
+| Tier | `model` value | Use Case |
+|------|---------------|----------|
+| `lite` | `haiku` | Speed-optimized, simple tasks |
+| `standard` | `sonnet` | Balanced cost/quality |
+| `pro` | `opus` | Maximum reasoning depth |
 
 ### Mode Presets
 
@@ -69,23 +69,28 @@ The orchestrator should NOT downgrade from the user's explicit mode choice. `--f
 
 ## Agent Registry
 
-Each stage has three agent variants corresponding to model tiers:
+Each stage has a single agent. Model tier is controlled via the Agent tool's `model` parameter — no per-tier variants exist.
 
-| Stage | lite | standard | pro |
-|-------|------|----------|-----|
-| Research | `context-flow:research-lite` | `context-flow:research` | `context-flow:research-pro` |
-| Plan | `context-flow:plan-lite` | `context-flow:plan` | `context-flow:plan-pro` |
-| Implement | `context-flow:implement-lite` | `context-flow:implement` | `context-flow:implement-pro` |
-| Review | `context-flow:review-lite` | `context-flow:review` | `context-flow:review-pro` |
+| Stage | Agent | Tools |
+|-------|-------|-------|
+| Research | `context-flow:research` | Read, Grep, Glob, Bash |
+| Plan | `context-flow:plan` | Read, Grep, Glob |
+| Implement | `context-flow:implement` | Read, Edit, Write, Bash, Glob, Grep |
+| Review | `context-flow:review` | Read, Grep, Glob, Bash |
 
-### Agent Selection
+### Agent Dispatch
 
 When dispatching an agent:
-1. Resolve the tier for this stage (see Tier Resolution above)
-2. Look up the agent name from the registry table
-3. If a more specialized agent exists for the goal (e.g., a frontend-dev agent for UI work), prefer it — but still apply the resolved model tier via the `model` parameter override
+1. Resolve the tier for this stage (see Tier Resolution above) → map to `model` value via the Tier table (`lite`→`haiku`, `standard`→`sonnet`, `pro`→`opus`)
+2. Call the Agent tool with `subagent_type: "context-flow:<stage>"` and `model: "<resolved>"`
+3. If a more specialized agent exists for the goal (e.g., a frontend-dev agent for UI work), prefer it — still pass the resolved `model` parameter
 
-When in doubt, use the registry default. State which agent you selected and why.
+Example:
+```
+Agent(subagent_type: "context-flow:plan", model: "opus", prompt: "...")
+```
+
+State which agent and model you selected and why.
 
 ---
 
@@ -119,7 +124,7 @@ When skipping, dispatch a single agent using the resolved tier for that stage.
 
 When using Agent Teams, teammates can use different model tiers. The resolved tier for the stage determines the **lead teammate's** model. Additional teammates use one tier lower (e.g., if lead is `pro`, teammates use `standard`; if lead is `standard`, teammates use `standard` too — never below `standard` for teammates).
 
-To dispatch a teammate with a specific model, reference the corresponding agent variant by name (e.g., `context-flow:research-pro` for the lead, `context-flow:research` for a standard teammate).
+Dispatch teammates via the Agent tool with the same `subagent_type` (e.g., `context-flow:research`) but different `model` values — `opus` for the lead, `sonnet` for standard teammates, `haiku` only if explicitly appropriate.
 
 ### Loop Budget
 

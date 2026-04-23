@@ -1,7 +1,7 @@
 ---
 name: review
 description: "Verify implementation against contracts"
-model: claude-sonnet-4-5
+model: sonnet
 color: magenta
 tools: Read, Grep, Glob, Bash
 ---
