@@ -1,16 +1,9 @@
 ---
 name: adr
 description: >-
-  This skill should be used when the user asks to "create an ADR",
-  "new decision record", "record a decision", "add an ADR",
-  "supersede ADR", "replace ADR", "deprecate ADR",
-  "list ADRs", "show decision records", "what ADRs do we have",
-  "ADR status", "check ADR consistency", "full ADR audit",
-  or mentions Architecture Decision Records lifecycle management.
-  For quick scans of ADR references in markdown files, use adr-ref-guard instead.
-  Handles MADR 4.0 format with YAML frontmatter, auto-numbering,
-  auto-directory detection, and cross-reference consistency enforcement
-  during supersession and deprecation.
+  Create, list, supersede, deprecate, or audit Architecture Decision Records (MADR 4.0).
+  Handles auto-numbering, directory detection, and cross-reference consistency.
+  For quick stale-reference scans in markdown, use adr-ref-guard instead.
 ---
 
 # ADR Lifecycle Management
