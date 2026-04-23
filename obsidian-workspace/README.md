@@ -1,32 +1,33 @@
 # Obsidian Workspace
 
-Personal Obsidian vault productivity for Claude Code — quick capture, long-form notes, and project management, all backed by the Obsidian CLI. Every entry lives in your vault as plain markdown with structured properties.
+Project-scoped Obsidian vault productivity for Claude Code — quick capture, long-form notes, and project management. The plugin owns **folder layout + file templates + minimal glue**; all vault I/O delegates to the Obsidian CLI and the official `obsidian:obsidian-cli` skill. Each skill file is kept small so it doesn't burn your context budget.
 
-Plugin identifier: `obw` (commands are invoked as `/obw:<name>`).
+Plugin identifier: `obw` (commands invoked as `/obw:<name>`).
 
 ## Commands
 
 | Command | Purpose |
 |---------|---------|
-| `/obw:init` | Interactively create `.obsidian.yaml` (vault picker + journal/note/pm sections) |
-| `/obw:cap <text>` | Quick capture to today's journal — timestamped bullet, `#tag` extraction |
-| `/obw:note <title>` | Create a long-form note; `--folder <path>` override, `--tag <tag>` frontmatter |
-| `/obw:pm [action]` | Task / document / ADR lifecycle (replaces the legacy `/obm`) |
+| `/obw:init` | Pick a vault, write `.obsidian.yaml`, install starter templates into your vault's Templates folder |
+| `/obw:cap <text>` | Append a timestamped bullet to today's daily note (via `obsidian daily:append`) |
+| `/obw:note <title>` | Create a long-form note at your default folder with a chosen filename strategy |
+| `/obw:pm [intent]` | Task / document / ADR lifecycle, project-scoped; free-form natural language |
 
-Each command has a matching skill (`cap`, `note`, `pm`) so natural-language phrasing also works.
+Natural-language phrasing also works via the matching skills (`cap`, `note`, `pm`).
 
-## Features
+## How It Works
 
-- **Quick capture**: append thoughts / work-logs to today's daily note under a configurable section heading
-- **Tag-aware capture**: `/obw:cap #idea <text>` strips tags from the body and merges them into frontmatter
-- **Flexible notes**: default folder + override via `--folder`, with `title` / `slug` / `timestamp-title` filename strategies
-- **Project management**: task/doc/ADR lifecycle with Dataview dashboards and wikilink cross-references
-- **Unified config**: one `.obsidian.yaml` drives all three capabilities
+- **Vault I/O** goes through the `obsidian` CLI. This plugin does not duplicate CLI syntax; it defers to the official `obsidian:obsidian-cli` skill and `obsidian help`.
+- **Daily notes** use Obsidian's **Daily Notes** core plugin (folder / filename / template). `/obw:cap` calls `daily:append`.
+- **Templates** (`task`, `doc`, `adr`) live in your vault's Obsidian Templates folder. On `/obw:init` the plugin copies starter files from `templates/` only if the same name doesn't already exist — it never overwrites your edits.
+- **Dashboards** (optional) are generated from plugin-internal templates with shell substitution so the template contents never enter Claude's context.
 
 ## Prerequisites
 
-- [Obsidian](https://obsidian.md) app running (or headless CLI mode)
-- Obsidian CLI installed and enabled (via the `obsidian-cli` plugin)
+- [Obsidian](https://obsidian.md) app running (headless CLI also works)
+- Obsidian community plugin **`obsidian-cli`** installed and enabled. The plugin's name is `obsidian-cli` but the executable it installs is `obsidian` (invoked as `obsidian vault=<name> ...`). This is **not** the unrelated standalone `obsidian-cli` binary by Yakitrak.
+- **Templates** core plugin enabled (required for `/obw:pm` — `task` / `doc` / `adr` templates)
+- **Daily Notes** core plugin enabled (required for `/obw:cap`)
 - [Dataview](https://github.com/blacksmithgu/obsidian-dataview) community plugin — required only for `/obw:pm` dashboards
 
 ## Installation
@@ -37,133 +38,52 @@ Each command has a matching skill (`cap`, `note`, `pm`) so natural-language phra
 
 ## Configuration
 
-Run `/obw:init` once in a project root, or create `.obsidian.yaml` by hand:
+Run `/obw:init` in a project root. The generated `.obsidian.yaml`:
 
 ```yaml
 vault: MyVault
 
 journal:
-  folder: Journal
-  filename: "{{date}}"         # {{date}} → YYYY-MM-DD
-  section: "## Log"
-  timestamp: true
-  tag_frontmatter: true
+  timestamp: true          # Prepend HH:MM to /obw:cap bullets
+  tag_frontmatter: true    # Merge #tags into daily note frontmatter
 
 note:
   default_folder: Inbox
   filename_strategy: title     # title | slug | timestamp-title
 
 pm:
-  project: my-project          # Omit this whole section to disable /obw:pm
+  project: my-project          # Omit this section to disable /obw:pm
 ```
 
-Only the top-level `vault` field is mandatory; each section is required by its respective command.
+Daily note folder / filename / template are **not** in `.obsidian.yaml` — they come from Obsidian's Daily Notes settings.
 
-## Usage Examples
-
-### Capture
-
-```
-/obw:cap 發現 rebase 一直失敗是因為舊的 bookmark 還在 main
-/obw:cap #idea 做一個 skill 自動記錄每天的 commits
-/obw:cap #worklog 完成 API 重構 PR，等 review
-```
-
-Each capture appends to `Journal/<today>.md`:
-
-```markdown
-## Log
-
-- 14:32 — 完成 API 重構 PR，等 review #worklog
-```
-
-### Notes
-
-```
-/obw:note API Redesign Proposal
-/obw:note Weekend reading list --folder References
-/obw:note Retro 2026-Q1 --folder Retros --tag retro --tag quarterly
-```
-
-### Project Management
-
-```
-/obw:pm                       # Active tasks summary
-/obw:pm list                  # List tasks
-/obw:pm create task implement-auth
-/obw:pm create adr use-postgres
-/obw:pm done implement-auth   # Archive
-/obw:pm dashboard             # Refresh Dataview dashboard
-```
-
-## PM Vault Structure
+## Vault Layout (`/obw:pm`)
 
 ```
 pm/
-├── dashboard.md               # Cross-project dashboard (Dataview)
-├── {project}/
-│   ├── dashboard.md           # Project dashboard (Dataview)
-│   ├── tasks/                 # Active tasks
-│   ├── archive/               # Completed/archived tasks
-│   └── docs/                  # Design docs, specs, ADRs
-└── templates/
-    ├── task.md
-    ├── doc.md
-    └── adr.md
+├── dashboard.md          # Cross-project dashboard (optional, Dataview)
+└── {project}/
+    ├── dashboard.md      # Project dashboard (optional, Dataview)
+    ├── tasks/            # Active tasks
+    ├── archive/          # Completed tasks
+    └── docs/             # Docs + ADRs
 ```
 
-Templates use Obsidian's core Templates plugin. Set **Settings → Templates → Template folder location** to `pm/templates/`.
+## Property Schema
 
-## Property Schemas (PM)
+Dashboards and searches depend on these frontmatter fields. If you edit the installed templates, keep the field names.
 
-### Task Properties
+- **Task** — `type: task`, `status` (`todo` / `in-progress` / `blocked` / `done`), `priority` (`high` / `medium` / `low`), `project`, `due` (date), `tags` (list), `created`, `completed`
+- **Doc** — `type: doc`, `project`, `created`, `updated`
+- **ADR** — `type: adr`, `project`, `status` (`proposed` / `accepted` / `deprecated` / `superseded`), `created`, `deciders`
 
-| Property | Type | Values |
-|----------|------|--------|
-| `status` | text | `todo`, `in-progress`, `blocked`, `done` |
-| `priority` | text | `high`, `medium`, `low` |
-| `project` | text | From `pm.project` |
-| `type` | text | `task` |
-| `due` | date | `YYYY-MM-DD` |
-| `created` | date | Auto-filled by template |
-| `completed` | date | Set when archiving |
-| `tags` | list | Free-form tags |
+## Examples
 
-### Document Properties
-
-| Property | Type | Values |
-|----------|------|--------|
-| `type` | text | `doc` |
-| `project` | text | From `pm.project` |
-| `created` | date | Auto-filled by template |
-| `updated` | date | Update when content changes |
-
-### ADR Properties
-
-| Property | Type | Values |
-|----------|------|--------|
-| `type` | text | `adr` |
-| `project` | text | From `pm.project` |
-| `status` | text | `proposed`, `accepted`, `deprecated`, `superseded` |
-| `created` | date | Auto-filled by template |
-| `deciders` | text | Who made the decision |
-
-## Migration From `obsidian-pm`
-
-Previous plugin `obsidian-pm` is now `obsidian-workspace`. If you had `.obsidian-pm.yaml`:
-
-1. Rename `.obsidian-pm.yaml` → `.obsidian.yaml`
-2. Move `project` under a new `pm:` section:
-   ```yaml
-   # before
-   vault: MyVault
-   project: my-project
-   
-   # after
-   vault: MyVault
-   pm:
-     project: my-project
-   ```
-3. Replace `/obm` invocations with `/obw:pm`.
-
-Or just run `/obw:init` to regenerate the config from scratch.
+```
+/obw:cap #worklog 完成 API 重構 PR，等 review
+/obw:note API Redesign Proposal --folder Architecture --tag design
+/obw:pm add task implement-auth, high priority, due 2026-05-01
+/obw:pm create adr about switching to SQLite
+/obw:pm implement-auth is done, archive it
+/obw:pm refresh dashboard
+```

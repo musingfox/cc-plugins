@@ -1,344 +1,107 @@
 ---
 name: pm
 description: |
-  Project management via Obsidian vault — manage tasks, documents, and ADRs using the Obsidian CLI.
-  Covers task lifecycle (create, list, update, complete, archive), design docs, specs,
-  ADR lifecycle (propose, accept, deprecate, supersede), and Dataview dashboards.
+  Project management via Obsidian vault — tasks, documents, ADRs, and dashboards
+  scoped to a `.obsidian.yaml`-bound project. Owns folder layout and property schema;
+  delegates all vault I/O to the Obsidian CLI.
 when-to-use: |
-  This skill should be used when the user asks to interact with their Obsidian vault for project management,
-  mentions "obsidian task", "vault task", "obsidian 任務", "obsidian 文件", "vault 文件", or references `.obsidian.yaml`.
-  Also triggers on: "建立任務到 vault", "查 vault 裡的任務", "寫到 obsidian", "記到 vault",
-  "vault 裡有什麼任務", "obsidian dashboard", "vault dashboard", "專案看板",
-  "create task in vault", "list vault tasks", "write to obsidian", "save to vault",
-  "vault status", "obsidian 看板", "obsidian ADR", "vault ADR",
-  and the `/obw:pm` command.
-  Requires `.obsidian.yaml` with a `pm.project` field present in the project root.
-  NOT triggered by generic "create a task" or "project status" without Obsidian/vault context —
-  those are too ambiguous and may refer to Claude Code tasks or other systems.
-  For ad-hoc note creation in a vault outside a project context, use `obsidian:obsidian-cli` instead.
+  Triggered for project-scoped vault operations — "obsidian task", "vault task",
+  "建立任務到 vault", "查 vault 裡的任務", "obsidian 看板", "obsidian ADR",
+  "create task in vault", "list vault tasks", "vault status". Also triggers on `/obw:pm`.
+  Requires `.obsidian.yaml` with a `pm.project` field.
+  NOT triggered by generic "create a task" without Obsidian/vault context.
+  For ad-hoc vault notes outside a project, use `obsidian:obsidian-cli` instead.
 ---
 
-# Obsidian PM — Project Management via Obsidian Vault
+# pm — Obsidian Project Management
 
-Manage tasks, documents, and ADRs for the current project through an Obsidian vault using the `obsidian` CLI.
+This skill owns: folder layout, template names, property schema, ADR numbering, dashboard generation strategy, and the direct-read rule. **For all CLI syntax, invoke the official `obsidian:obsidian-cli` skill first** — it is the authoritative reference. Only fall back to `obsidian help` if that skill's guidance is missing or contradicts observed behavior.
 
-## Prerequisites
-
-- Obsidian must be running (or use headless CLI)
-- The `obsidian` CLI must be installed and enabled
-- Dataview plugin must be installed and enabled in the vault
-- A `.obsidian.yaml` config file must exist in the project root (with a `pm` section)
-
-## Platform Note
-
-Obsidian config path: `~/Library/Application Support/obsidian/obsidian.json` (macOS). Adjust for Linux/Windows.
-
-To resolve vault path from vault name:
-
-```bash
-VAULT_PATH=$(cat ~/Library/Application\ Support/obsidian/obsidian.json | jq -r '.vaults | to_entries[] | select(.value.path | endswith("/'"$VAULT_NAME"'")) | .value.path')
-```
-
-Use `$VAULT_PATH` throughout this skill wherever the vault's filesystem path is needed.
-
-## Configuration
-
-Read `.obsidian.yaml` from the project root. This skill uses the top-level `vault` and the `pm` section:
+## Config (`.obsidian.yaml`)
 
 ```yaml
-vault: CyrisVault           # Obsidian vault name (top-level, shared across /obw:*)
+vault: <VAULT_NAME>
 pm:
-  project: cc-plugins       # Project identifier (used as subfolder name)
+  project: <PROJECT_NAME>
 ```
 
-**MUST read this file before any operation.** If the file does not exist, or the `pm.project` value is missing, instruct the user to run `/obw:init` to create/update the config. Do not proceed with PM operations without a project identifier.
+Missing config or `pm.project` → tell the user to run `/obw:init` and stop.
 
-Use the top-level `vault` value as the first parameter in all CLI commands: `obsidian vault=<vault> ...` and the `pm.project` value wherever `{project}` appears below.
-
-### First-Time Vault Setup
-
-When a project connects to a vault for the first time, ensure the folder structure exists:
-
-```bash
-# Create required folders (resolve $VAULT_PATH per Platform Note)
-mkdir -p "$VAULT_PATH/pm/{project}/tasks"
-mkdir -p "$VAULT_PATH/pm/{project}/archive"
-mkdir -p "$VAULT_PATH/pm/{project}/docs"
-```
-
-Also verify that templates exist at `pm/templates/` in the vault. If not, inform the user that task/doc/adr templates need to be created. Template definitions are available in `references/templates.md`.
-
-Also verify that the **Dataview** community plugin is installed and enabled in the vault. Dashboards require Dataview to render queries. If not installed, inform the user.
-
-## Vault Structure
+## Vault Layout
 
 ```
 pm/
 ├── {project}/
-│   ├── tasks/             # Active tasks
-│   ├── archive/           # Completed tasks
-│   └── docs/              # Project documents (design docs, specs, ADRs, etc.)
-└── templates/
-    ├── task.md            # Task template
-    ├── doc.md             # Document template
-    └── adr.md             # ADR template
+│   ├── tasks/       # active tasks
+│   ├── archive/     # completed tasks
+│   └── docs/        # docs + ADRs
+└── dashboard.md     # cross-project dashboard (optional)
 ```
 
-## CLI Command Reference
+First-time project: create folders via `mkdir -p "$VAULT_PATH/pm/{project}/{tasks,archive,docs}"`. Resolve `$VAULT_PATH` from `~/Library/Application Support/obsidian/obsidian.json` (Linux: `~/.config/obsidian`; Windows: `%APPDATA%\obsidian`).
 
-All commands require `vault=<vault>` as the first parameter.
+## Template Names
 
-**All vault I/O MUST go through the `obsidian` CLI.** Do not use filesystem reads/writes against `$VAULT_PATH/...` as a substitute — the CLI resolves wikilinks, honors Obsidian's metadata cache, and keeps behavior consistent with Dataview and other plugins. Filesystem access is only acceptable in the few places this document explicitly calls it out (e.g. `mkdir -p` for archive folder, Write for full dashboard rewrite).
+Fixed: `task`, `doc`, `adr`. Installed into the vault's Obsidian Templates folder by `/obw:init`. Use via CLI `create template=<name>`.
 
-### Direct Read (name known → one call)
+If `obsidian vault=<v> templates` doesn't list one of these, `/obw:init` hasn't run (or the user removed them). Tell the user to re-run init rather than inlining template content here.
 
-When the user references a note by name (`/obw:pm get <name>`, "read task xxx", "show doc yyy"), the path is fully determined by `.obsidian.yaml` + the known name. Go straight to a single CLI read:
+## Operations
 
+All operations dispatch to the `obsidian` CLI. Use **one call** per known-name read — never chain `search → read`.
+
+| Operation | CLI command (key args only) |
+|-----------|----|
+| Read known note | `read file="{name}"` |
+| Read frontmatter | `properties file="{name}"` |
+| List tasks | `search query="[type:task] [project:{project}] [status:<s>]" format=json` |
+| Create task | `create path="pm/{project}/tasks/{name}.md" template=task` + `property:set` for project/priority/due/tags |
+| Create doc | `create path="pm/{project}/docs/{name}.md" template=doc` + `property:set name=project` |
+| Create ADR | `create path="pm/{project}/docs/adr-{NNNN}-{title}.md" template=adr` + `property:set` for project/status |
+| Update status | `property:set file="{name}" name=status value="{s}"` |
+| Append body | `append file="{name}" content="..."` |
+| Toggle subtask | `task file="{name}" line={n} status=x` (or `status=" "` to uncheck) |
+| Archive | status→done, set `completed`, ensure `pm/{project}/archive` exists, then `move file="{name}" to="pm/{project}/archive"` |
+| Delete | `delete file="{name}"` (confirm first; fall back to `move` if build lacks `delete`) |
+
+### ADR numbering
+
+Before creating an ADR, search existing ADRs in the project and take max(number)+1, zero-padded to 4 digits:
 ```bash
-obsidian vault={vault} read file="{name}"              # content
-obsidian vault={vault} properties file="{name}"       # frontmatter
+obsidian vault={vault} search query="[type:adr] [project:{project}]" format=json
 ```
-
-`file=` uses wikilink resolution — no path, no `.md`. **Do not `search` first to "locate" the note when the name is already given.** That chain (`search` → `read` → `properties`) is the anti-pattern this section exists to prevent; it multiplies CLI round-trips without adding information.
-
-Use `search` only when the name is unknown, or when you need list/filter/aggregate results.
-
-### Read Operations
-
-| Operation | Command |
-|-----------|---------|
-| List active tasks | `search query="[type:task] [project:{project}] [status:todo]" format=json` |
-| List in-progress | `search query="[type:task] [project:{project}] [status:in-progress]" format=json` |
-| List all active | `search query="[type:task] [project:{project}]" format=json` then filter out archived |
-| Read a task (name known) | `read file="{task-name}"` — single call, no prior search |
-| Read properties | `properties file="{task-name}"` |
-| List documents | `search query="[type:doc] [project:{project}]" format=json` |
-| List ADRs | `search query="[type:adr] [project:{project}]" format=json` |
-| Search content | `search query="{keyword}" format=json` |
-| Search with context | `search:context query="{keyword}" format=json` |
-| Search by tag | `search query="[type:task] [tags:{tag}]" format=json` |
-| List files in folder | `files folder="pm/{project}/tasks"` |
-
-### Write Operations
-
-**Create task:**
-```bash
-obsidian vault={vault} create path="pm/{project}/tasks/{task-name}.md" template=task silent
-obsidian vault={vault} property:set file="{task-name}" name=project value="{project}"
-obsidian vault={vault} property:set file="{task-name}" name=priority value="{high|medium|low}"
-obsidian vault={vault} property:set file="{task-name}" name=due value="{YYYY-MM-DD}" type=date
-obsidian vault={vault} property:set file="{task-name}" name=tags value="{tag1,tag2}" type=list
-```
-
-After creation, append the task description and acceptance criteria to the note body:
-```bash
-obsidian vault={vault} append file="{task-name}" content="{description text}"
-```
-
-**Create document:**
-```bash
-obsidian vault={vault} create path="pm/{project}/docs/{doc-name}.md" template=doc silent
-obsidian vault={vault} property:set file="{doc-name}" name=project value="{project}"
-```
-
-**Create ADR:**
-```bash
-obsidian vault={vault} create path="pm/{project}/docs/adr-{number}-{title}.md" template=adr silent
-obsidian vault={vault} property:set file="adr-{number}-{title}" name=project value="{project}"
-obsidian vault={vault} property:set file="adr-{number}-{title}" name=status value="{proposed|accepted|deprecated|superseded}"
-```
-
-ADR numbering: query existing ADRs and increment. Use 4-digit zero-padded numbers (e.g., `adr-0001-use-obsidian-for-pm.md`).
-
-**Update task status:**
-```bash
-obsidian vault={vault} property:set file="{task-name}" name=status value="{todo|in-progress|blocked|done}"
-```
-
-**Update document content:**
-```bash
-obsidian vault={vault} read file="{name}"          # Read current content
-obsidian vault={vault} append file="{name}" content="{new content}"
-```
-
-For full content replacement, use the Write tool to overwrite the file directly at `$VAULT_PATH/{note-path}`. Re-read via CLI afterward to confirm.
-
-**Archive a completed task:**
-```bash
-# 1. Mark as done and add completion date
-obsidian vault={vault} property:set file="{task-name}" name=status value=done
-obsidian vault={vault} property:set file="{task-name}" name=completed value="{YYYY-MM-DD}" type=date
-
-# 2. Ensure archive folder exists
-mkdir -p "$VAULT_PATH/pm/{project}/archive"
-
-# 3. Move to archive
-obsidian vault={vault} move file="{task-name}" to="pm/{project}/archive"
-```
-
-**Note:** The `move` command requires the target folder to already exist. Resolve `$VAULT_PATH` per Platform Note above.
-
-**Delete a note (task / doc / adr):**
-```bash
-obsidian vault={vault} delete file="{name}"
-```
-
-Deletion is destructive — always confirm with the user first (show the target name and what it is). If the installed `obsidian` CLI build lacks a `delete` subcommand, fall back to `move file="{name}" to="pm/{project}/archive"` and tell the user it was archived rather than deleted.
-
-### Task Checkbox Operations
-
-```bash
-# Complete a subtask (by line number)
-obsidian vault={vault} task file="{task-name}" line={n} status=x
-
-# Uncomplete a subtask
-obsidian vault={vault} task file="{task-name}" line={n} status=" "
-```
-
-## Naming Conventions
-
-- **Tasks**: kebab-case descriptive name — `implement-auth`, `fix-search-perf`, `add-rate-limiting`
-- **Documents**: kebab-case — `api-design`, `deployment-guide`, `data-model`
-- **ADRs**: `adr-{NNNN}-{kebab-title}` — `adr-0001-use-obsidian-for-pm`, `adr-0002-vault-structure`
-
-## Wikilinks
-
-When creating notes, use Obsidian wikilinks to connect related items:
-
-- In a task, link to relevant docs: `See [[api-design]] for details`
-- In an ADR, link to the task that triggered it: `Triggered by [[implement-auth]]`
-- In a doc, link to related ADRs: `Decision recorded in [[adr-0001-use-obsidian-for-pm]]`
 
 ## Property Schema
 
-### Task Properties
+**Task**: `type: task`, `status` (todo/in-progress/blocked/done), `priority` (high/medium/low), `project`, `due` (date), `tags` (list), `created`, `completed`.
+**Doc**: `type: doc`, `project`, `created`, `updated`.
+**ADR**: `type: adr`, `project`, `status` (proposed/accepted/deprecated/superseded), `created`, `deciders`.
 
-| Property | Type | Values |
-|----------|------|--------|
-| `status` | text | `todo`, `in-progress`, `blocked`, `done` |
-| `priority` | text | `high`, `medium`, `low` |
-| `project` | text | Project identifier from config |
-| `type` | text | `task` |
-| `due` | date | `YYYY-MM-DD` |
-| `created` | date | Auto-filled by template |
-| `completed` | date | Set when archiving |
-| `tags` | list | Free-form tags for filtering (e.g., `backend`, `auth`) |
+Property names are lowercase. Do not invent fields — dashboards depend on this schema.
 
-### Document Properties
+## Dashboards
 
-| Property | Type | Values |
-|----------|------|--------|
-| `type` | text | `doc` |
-| `project` | text | Project identifier |
-| `created` | date | Auto-filled by template |
-| `updated` | date | Update when content changes |
+Two dashboards are generated from plugin templates (kept in the plugin — not installed into vault Templates folder — because they need project-name substitution):
 
-### ADR Properties
+- **Cross-project** → write to `$VAULT_PATH/pm/dashboard.md`:
+  ```bash
+  obsidian vault={vault} create path="pm/dashboard.md" \
+    content="$(cat "${CLAUDE_PLUGIN_ROOT}/templates/dashboard-cross.md")" overwrite
+  ```
+- **Per-project** → write to `$VAULT_PATH/pm/{project}/dashboard.md`:
+  ```bash
+  obsidian vault={vault} create path="pm/{project}/dashboard.md" \
+    content="$(sed "s/__PROJECT__/{project}/g" "${CLAUDE_PLUGIN_ROOT}/templates/dashboard-project.md")" overwrite
+  ```
 
-| Property | Type | Values |
-|----------|------|--------|
-| `type` | text | `adr` |
-| `project` | text | Project identifier |
-| `status` | text | `proposed`, `accepted`, `deprecated`, `superseded` |
-| `created` | date | Auto-filled by template |
-| `deciders` | text | Who made the decision |
+`{{date}}` inside the templates is resolved by Obsidian when the note is rendered. The `sed` / `cat` happen in shell — template contents never enter the Claude context window.
 
-## Dashboard
+Conversation-mode status (user asks in chat, not Obsidian): run the equivalent `search` and format a summary table in the reply. Don't write a dashboard file unless asked to.
 
-Two types of Dataview-powered dashboards can be generated in the vault:
+## Important Rules
 
-- **Cross-project**: `pm/dashboard.md` — overview of all projects
-- **Per-project**: `pm/{project}/dashboard.md` — single project detail
-
-Dashboard Dataview templates are defined in `references/dashboards.md`. Use the Write tool to create/refresh the dashboard file at the appropriate vault path.
-
-### Dashboard in Claude Code
-
-When the user asks for dashboard/status in the conversation (not in Obsidian), query via CLI and format the results:
-
-```bash
-# Cross-project: get all tasks
-obsidian vault={vault} search query="[type:task]" format=json
-
-# Per-project: get project tasks  
-obsidian vault={vault} search query="[type:task] [project:{project}]" format=json
-```
-
-Parse the JSON results and present a formatted summary table in the conversation.
-
-## Decision Trees
-
-### User mentions a task
-
-```
-Task operation?
-├── "create/add/new task" → Create task from template + set properties
-├── "list/show/my tasks" → Search by [type:task] [project:{project}]
-│   ├── "todo/backlog" → add [status:todo]
-│   ├── "in progress" → add [status:in-progress]
-│   └── "blocked" → add [status:blocked]
-├── "update/change task" → property:set on the target field
-├── "complete/close/done task" → Archive flow (status=done → completed date → move)
-└── "what am I working on" → Search [status:in-progress] [project:{project}]
-```
-
-### User mentions a document
-
-```
-Document operation?
-├── "create/write doc" → Create from doc template + set properties
-├── "create/new ADR" → Create from adr template + auto-number
-├── "list docs" → Search [type:doc] [project:{project}]
-├── "list ADRs" → Search [type:adr] [project:{project}]
-├── "read/show doc" → read file="{name}"
-└── "update doc" → read current → append or inform user of full rewrite needed
-```
-
-### During development (implicit)
-
-These are suggestions only. Do NOT autonomously update task status or create ADRs unless the user explicitly requests it.
-
-```
-Agent is working on implementation?
-├── Starting a task → Suggest: update status to in-progress
-├── Finished implementation → Suggest: mark as done and archive
-├── Made an architectural decision → Suggest: create an ADR
-├── Need to record design context → Suggest: create a doc
-└── Hit a blocker → Suggest: mark as blocked and append blocker description
-```
-
-### User asks for dashboard or status
-
-```
-Dashboard request?
-├── "dashboard" / "status" / "專案狀況" / "project status"
-│   ├── In conversation → CLI search + format summary table
-│   └── In Obsidian → Check if dashboard.md exists, create if not, tell user to open it
-├── "cross-project" / "all projects" / "跨專案"
-│   ├── In conversation → Search all [type:task], group by project, format table
-│   └── In Obsidian → Create/refresh pm/dashboard.md
-├── "project dashboard" / "{project} status"
-│   ├── In conversation → Search [type:task] [project:{project}], format table
-│   └── In Obsidian → Create/refresh pm/{project}/dashboard.md
-└── "refresh dashboard" → Regenerate the dashboard .md file(s)
-```
-
-## Important Notes
-
-1. **Always read `.obsidian.yaml` first** — every operation needs `vault` and `pm.project`
-2. **Use `silent` flag on create** — prevents Obsidian from switching focus
-3. **Use `format=json` on search** — easier to parse results
-4. **Target folder must exist for `move`** — `mkdir -p` before moving
-5. **Do not modify templates** — they are shared across all projects
-6. **Property names are case-sensitive** — always lowercase
-7. **`file=` uses wikilink resolution** — just the note name, no path or extension needed
-8. **Never `search` to locate a note whose name is already known** — go directly to `read`/`properties` (see "Direct Read" above)
-9. **Never bypass the CLI with filesystem reads** — even if `$VAULT_PATH/pm/{project}/tasks/{name}.md` is computable, use `obsidian ... read` instead
-
-## Error Handling
-
-- **CLI not installed or not responding** → Tell the user to install the Obsidian CLI and ensure Obsidian is running
-- **Vault name not found** → List available vaults from `obsidian.json` (see Platform Note) and ask the user to pick one
-- **Note already exists on create** → Ask the user if they want to overwrite the existing note or choose a different name
-- **Search returns no results** → Inform the user that no matches were found and suggest a broader query
-- **Move fails (target folder missing)** → Run `mkdir -p` to create the target folder first, then retry the move
+1. Read `.obsidian.yaml` before any operation.
+2. `file=` uses wikilink resolution — just the base name, no path/extension.
+3. Never `search` to locate a note whose name is known — go straight to `read`.
+4. Never bypass the CLI with filesystem Read/Write against `$VAULT_PATH/...`. Exceptions: (a) `mkdir -p` for new folders, (b) reading `.obsidian/templates.json` / `obsidian.json` for setup. Dashboard creation uses the CLI via shell-piped content.
+5. Confirm destructive intents (delete, archive-move, ADR supersede) before executing.
