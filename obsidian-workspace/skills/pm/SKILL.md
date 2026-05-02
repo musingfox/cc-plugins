@@ -35,10 +35,10 @@ pm/
 │   ├── tasks/       # active tasks
 │   ├── archive/     # completed tasks
 │   └── docs/        # docs + ADRs
-└── dashboard.md     # cross-project dashboard (optional)
+└── dashboard.base   # cross-project dashboard (optional)
 ```
 
-First-time project: create folders via `mkdir -p "$VAULT_PATH/pm/{project}/{tasks,archive,docs}"`. Resolve `$VAULT_PATH` from `~/Library/Application Support/obsidian/obsidian.json` (Linux: `~/.config/obsidian`; Windows: `%APPDATA%\obsidian`).
+Folders are created on demand — `obsidian create path="pm/{project}/tasks/foo.md"` auto-creates any missing parent folders. No `mkdir` needed.
 
 ## Template Names
 
@@ -54,7 +54,7 @@ All vault I/O goes through the `obsidian` CLI — defer to `obsidian:obsidian-cl
 - **Create doc** → `create path="pm/{project}/docs/{name}.md" template=doc`, then `property:set name=project`.
 - **Create ADR** → `create path="pm/{project}/docs/adr-{NNNN}-{title}.md" template=adr`, then `property:set` for `project` / `status`. See ADR numbering below.
 - **List tasks** → `search query="[type:task] [project:{project}] [status:<s>]" format=json`.
-- **Archive** → set `status=done` and `completed`, ensure `pm/{project}/archive` folder exists, then `move file="{name}" to="pm/{project}/archive"`.
+- **Archive** → set `status=done` and `completed`, then `move file="{name}" to="pm/{project}/archive"` (target folder is auto-created if missing).
 - **Delete** → confirm first; fall back to `move` if the build lacks `delete`.
 
 ### ADR numbering
@@ -96,5 +96,5 @@ Conversation-mode status (user asks in chat, not Obsidian): run the equivalent `
 1. Read `.obsidian.yaml` before any operation.
 2. `file=` uses wikilink resolution — just the base name, no path/extension.
 3. Never `search` to locate a note whose name is known — go straight to `read`.
-4. Never bypass the CLI with filesystem Read/Write against `$VAULT_PATH/...`. Exceptions: (a) `mkdir -p` for new folders, (b) reading `.obsidian/templates.json` / `obsidian.json` for setup. Dashboard creation uses the CLI via shell-piped content.
+4. Never bypass the CLI with filesystem Read/Write against `$VAULT_PATH/...`. Only exception: reading `.obsidian/templates.json` / `obsidian.json` during `/obw:init`. Dashboard creation uses the CLI via shell-piped content; folder creation is implicit in `create` / `move`.
 5. Confirm destructive intents (delete, archive-move, ADR supersede) before executing.
