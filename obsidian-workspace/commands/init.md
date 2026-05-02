@@ -21,12 +21,10 @@ Create `.obsidian.yaml` for the current project and install the plugin's starter
 
 3. **Ask config options** (via `AskUserQuestion`):
    - Project identifier for `/obw:pm`? (default = current directory basename; allow "skip" to omit the `pm` section)
-   - Prepend `HH:MM` to `/obw:cap` bullets? (default yes)
-   - Merge `#tags` from `/obw:cap` into daily note frontmatter? (default yes)
    - Default folder for `/obw:note`? (default `Inbox`)
    - Filename strategy for `/obw:note`? options: `title` / `slug` / `timestamp-title`
 
-   Mention: daily note folder / filename / template are configured in Obsidian's **Daily Notes** core plugin, not here.
+   Mention: daily note folder / filename / template are configured in Obsidian's **Daily Notes** core plugin, not here. `/obw:cap` always prepends `HH:MM` and writes `#tag` tokens inline (Obsidian indexes them automatically).
 
 4. **Install starter templates** — read the Templates folder from `$VAULT_PATH/.obsidian/templates.json`:
    ```bash
@@ -49,10 +47,6 @@ Create `.obsidian.yaml` for the current project and install the plugin's starter
 ```yaml
 # Obsidian Workspace configuration
 vault: <VAULT_NAME>
-
-journal:
-  timestamp: true
-  tag_frontmatter: true
 
 note:
   default_folder: Inbox

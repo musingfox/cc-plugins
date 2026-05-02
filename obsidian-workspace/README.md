@@ -43,10 +43,6 @@ Run `/obw:init` in a project root. The generated `.obsidian.yaml`:
 ```yaml
 vault: MyVault
 
-journal:
-  timestamp: true          # Prepend HH:MM to /obw:cap bullets
-  tag_frontmatter: true    # Merge #tags into daily note frontmatter
-
 note:
   default_folder: Inbox
   filename_strategy: title     # title | slug | timestamp-title
