@@ -20,7 +20,7 @@ Natural-language phrasing also works via the matching skills (`cap`, `note`, `pm
 - **Vault I/O** goes through the `obsidian` CLI. This plugin does not duplicate CLI syntax; it defers to the official `obsidian:obsidian-cli` skill and `obsidian help`.
 - **Daily notes** use Obsidian's **Daily Notes** core plugin (folder / filename / template). `/obw:cap` calls `daily:append`.
 - **Templates** (`task`, `doc`, `adr`) live in your vault's Obsidian Templates folder. On `/obw:init` the plugin copies starter files from `templates/` only if the same name doesn't already exist — it never overwrites your edits.
-- **Dashboards** (optional) are generated from plugin-internal templates with shell substitution so the template contents never enter Claude's context.
+- **Dashboards** (optional) are **Obsidian Bases** (`.base` files — core in Obsidian 1.9+) generated from plugin-internal templates via shell substitution, so contents never enter Claude's context.
 
 ## Prerequisites
 
@@ -28,7 +28,7 @@ Natural-language phrasing also works via the matching skills (`cap`, `note`, `pm
 - Obsidian community plugin **`obsidian-cli`** installed and enabled. The plugin's name is `obsidian-cli` but the executable it installs is `obsidian` (invoked as `obsidian vault=<name> ...`). This is **not** the unrelated standalone `obsidian-cli` binary by Yakitrak.
 - **Templates** core plugin enabled (required for `/obw:pm` — `task` / `doc` / `adr` templates)
 - **Daily Notes** core plugin enabled (required for `/obw:cap`)
-- [Dataview](https://github.com/blacksmithgu/obsidian-dataview) community plugin — required only for `/obw:pm` dashboards
+- **Bases** core plugin enabled (required only for `/obw:pm` dashboards — bundled in Obsidian 1.9+)
 
 ## Installation
 
@@ -57,9 +57,9 @@ Daily note folder / filename / template are **not** in `.obsidian.yaml` — they
 
 ```
 pm/
-├── dashboard.md          # Cross-project dashboard (optional, Dataview)
+├── dashboard.base        # Cross-project dashboard (optional, Bases)
 └── {project}/
-    ├── dashboard.md      # Project dashboard (optional, Dataview)
+    ├── dashboard.base    # Project dashboard (optional, Bases)
     ├── tasks/            # Active tasks
     ├── archive/          # Completed tasks
     └── docs/             # Docs + ADRs

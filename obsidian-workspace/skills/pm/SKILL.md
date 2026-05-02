@@ -48,21 +48,14 @@ If `obsidian vault=<v> templates` doesn't list one of these, `/obw:init` hasn't 
 
 ## Operations
 
-All operations dispatch to the `obsidian` CLI. Use **one call** per known-name read — never chain `search → read`.
+All vault I/O goes through the `obsidian` CLI — defer to `obsidian:obsidian-cli` skill for syntax. Use **one call** per known-name read — never chain `search → read`. The pm-specific bits:
 
-| Operation | CLI command (key args only) |
-|-----------|----|
-| Read known note | `read file="{name}"` |
-| Read frontmatter | `properties file="{name}"` |
-| List tasks | `search query="[type:task] [project:{project}] [status:<s>]" format=json` |
-| Create task | `create path="pm/{project}/tasks/{name}.md" template=task` + `property:set` for project/priority/due/tags |
-| Create doc | `create path="pm/{project}/docs/{name}.md" template=doc` + `property:set name=project` |
-| Create ADR | `create path="pm/{project}/docs/adr-{NNNN}-{title}.md" template=adr` + `property:set` for project/status |
-| Update status | `property:set file="{name}" name=status value="{s}"` |
-| Append body | `append file="{name}" content="..."` |
-| Toggle subtask | `task file="{name}" line={n} status=x` (or `status=" "` to uncheck) |
-| Archive | status→done, set `completed`, ensure `pm/{project}/archive` exists, then `move file="{name}" to="pm/{project}/archive"` |
-| Delete | `delete file="{name}"` (confirm first; fall back to `move` if build lacks `delete`) |
+- **Create task** → `create path="pm/{project}/tasks/{name}.md" template=task`, then `property:set` for `project` / `priority` / `due` / `tags`.
+- **Create doc** → `create path="pm/{project}/docs/{name}.md" template=doc`, then `property:set name=project`.
+- **Create ADR** → `create path="pm/{project}/docs/adr-{NNNN}-{title}.md" template=adr`, then `property:set` for `project` / `status`. See ADR numbering below.
+- **List tasks** → `search query="[type:task] [project:{project}] [status:<s>]" format=json`.
+- **Archive** → set `status=done` and `completed`, ensure `pm/{project}/archive` folder exists, then `move file="{name}" to="pm/{project}/archive"`.
+- **Delete** → confirm first; fall back to `move` if the build lacks `delete`.
 
 ### ADR numbering
 
@@ -81,22 +74,22 @@ Property names are lowercase. Do not invent fields — dashboards depend on this
 
 ## Dashboards
 
-Two dashboards are generated from plugin templates (kept in the plugin — not installed into vault Templates folder — because they need project-name substitution):
+Dashboards are **Obsidian Bases** (`.base` files — core in 1.9+). For Bases schema / filter / formula syntax, defer to the `obsidian:obsidian-bases` skill.
 
-- **Cross-project** → write to `$VAULT_PATH/pm/dashboard.md`:
+Generated from plugin templates via shell (template contents never enter context):
+
+- **Cross-project** → `pm/dashboard.base`:
   ```bash
-  obsidian vault={vault} create path="pm/dashboard.md" \
-    content="$(cat "${CLAUDE_PLUGIN_ROOT}/templates/dashboard-cross.md")" overwrite
+  obsidian vault={vault} create path="pm/dashboard.base" \
+    content="$(cat "${CLAUDE_PLUGIN_ROOT}/templates/dashboard-cross.base")" overwrite
   ```
-- **Per-project** → write to `$VAULT_PATH/pm/{project}/dashboard.md`:
+- **Per-project** → `pm/{project}/dashboard.base`:
   ```bash
-  obsidian vault={vault} create path="pm/{project}/dashboard.md" \
-    content="$(sed "s/__PROJECT__/{project}/g" "${CLAUDE_PLUGIN_ROOT}/templates/dashboard-project.md")" overwrite
+  obsidian vault={vault} create path="pm/{project}/dashboard.base" \
+    content="$(sed "s/__PROJECT__/{project}/g" "${CLAUDE_PLUGIN_ROOT}/templates/dashboard-project.base")" overwrite
   ```
 
-`{{date}}` inside the templates is resolved by Obsidian when the note is rendered. The `sed` / `cat` happen in shell — template contents never enter the Claude context window.
-
-Conversation-mode status (user asks in chat, not Obsidian): run the equivalent `search` and format a summary table in the reply. Don't write a dashboard file unless asked to.
+Conversation-mode status (user asks in chat, not Obsidian): run the equivalent `search` and format a summary table in the reply. Don't write a `.base` file unless asked to.
 
 ## Important Rules
 

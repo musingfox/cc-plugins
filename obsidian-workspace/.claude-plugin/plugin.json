@@ -1,6 +1,6 @@
 {
   "name": "obw",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Obsidian Workspace — project-scoped vault productivity (capture / notes / PM). Owns folder layout and templates; delegates vault I/O to the Obsidian CLI and the official obsidian-cli skill.",
   "author": {
     "name": "musingfox"

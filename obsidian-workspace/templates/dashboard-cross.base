@@ -1,0 +1,30 @@
+filters:
+  and:
+    - file.inFolder("pm")
+    - 'type == "task"'
+
+views:
+  - type: table
+    name: "By Project"
+    groupBy:
+      property: project
+      direction: ASC
+    order:
+      - file.name
+      - status
+      - priority
+      - due
+    summaries:
+      file.name: Unique
+
+  - type: table
+    name: "Recently Completed (7d)"
+    filters:
+      and:
+        - 'status == "done"'
+        - 'completed && (today() - date(completed)).days <= 7'
+    order:
+      - file.name
+      - project
+      - completed
+      - tags
