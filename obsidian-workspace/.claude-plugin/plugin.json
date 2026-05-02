@@ -8,5 +8,6 @@
   "repository": "https://github.com/musingfox/cc-plugins",
   "keywords": ["obsidian", "journal", "capture", "notes", "project-management", "adr"],
   "commands": "./commands/",
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "agents": "./agents/"
 }

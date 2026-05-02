@@ -1,12 +1,19 @@
 ---
 description: "Create a long-form note in your Obsidian vault"
 argument-hint: "<title> [--folder <path>] [--tag <tag>] [content...]"
-allowed-tools: ["Bash", "Read", "AskUserQuestion"]
+allowed-tools: ["Agent"]
 ---
 
 # /obw:note — Create a Long-Form Note
 
-Trigger the `note` skill. Creates a new note at the configured default folder (or `--folder` override) using the chosen filename strategy.
+Delegate to the `obsidian-operator` agent so vault I/O stays out of the main context.
+
+Invoke `Agent` with:
+- `subagent_type`: `obsidian-operator`
+- `description`: `Create long-form note`
+- `prompt`: `mode=note\nargs=$ARGUMENTS`
+
+Relay the agent's summary verbatim.
 
 ## Usage
 

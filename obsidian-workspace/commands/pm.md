@@ -1,12 +1,20 @@
 ---
 description: "Obsidian Workspace PM — tasks, documents, and ADRs in your Obsidian vault"
 argument-hint: "[natural language request]"
-allowed-tools: ["Bash", "Read", "Glob", "Grep", "AskUserQuestion"]
+allowed-tools: ["Agent"]
 ---
 
 # /obw:pm — Obsidian Project Management
 
-Trigger the `pm` skill. Accepts free-form natural language (中文 / English) describing the intent — no fixed verb vocabulary.
+Delegate to the `obsidian-operator` agent so vault scans, ADR contents, and dashboard generation stay out of the main context.
+
+Invoke `Agent` with:
+- `subagent_type`: `obsidian-operator`
+- `description`: `PM operation on Obsidian vault`
+- `prompt`: `mode=pm\nargs=$ARGUMENTS`
+- `model`: omit (Haiku default). For requests involving ADR drafting or multi-step task planning where the user explicitly asks for higher quality, override with `sonnet`.
+
+Relay the agent's summary verbatim.
 
 ## Usage
 
@@ -21,21 +29,4 @@ Trigger the `pm` skill. Accepts free-form natural language (中文 / English) de
 /obw:pm delete obsolete-task
 ```
 
-## Intent Classification
-
-Map the argument to one (entity × intent):
-
-| Entity | Intents |
-|--------|---------|
-| task | create, read, list, update, archive, delete |
-| doc | create, read, list, update, delete |
-| adr | create (auto-number), read, list, update status, supersede |
-| dashboard | generate / refresh (cross-project or per-project) |
-| search | free-text vault search |
-
-Ambiguity:
-- Entity unclear (e.g. "看看 api-design") → try a single `read file="..."` first. Do **not** pre-search.
-- Intent unclear → one `AskUserQuestion` with options + "other".
-- No argument → summary of active tasks (in-progress → todo → blocked).
-
-Destructive intents (delete, archive+move, supersede, full-body overwrite) require confirmation before executing.
+The agent handles entity × intent classification (task / doc / adr / dashboard / search) and confirms destructive actions before executing.

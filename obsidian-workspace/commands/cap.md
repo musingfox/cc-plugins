@@ -1,12 +1,19 @@
 ---
 description: "Quick capture — append a short entry to today's daily note"
 argument-hint: "<content> [#tag ...]"
-allowed-tools: ["Bash", "Read"]
+allowed-tools: ["Agent"]
 ---
 
 # /obw:cap — Quick Daily Capture
 
-Trigger the `cap` skill. Extracts `#tags`, composes a timestamped bullet, and delegates the append to `obsidian daily:append`.
+Delegate to the `obsidian-operator` agent so vault I/O stays out of the main context.
+
+Invoke `Agent` with:
+- `subagent_type`: `obsidian-operator`
+- `description`: `Quick capture to daily note`
+- `prompt`: `mode=cap\nargs=$ARGUMENTS`
+
+Relay the agent's summary to the user verbatim (it is already concise). Do not add commentary.
 
 ## Usage
 
@@ -16,4 +23,4 @@ Trigger the `cap` skill. Extracts `#tags`, composes a timestamped bullet, and de
 /obw:cap #worklog 完成了 PR #42 的 review
 ```
 
-Daily note folder, filename, and template come from Obsidian's **Daily Notes** core plugin settings. This command doesn't override them.
+Daily note folder, filename, and template come from Obsidian's **Daily Notes** core plugin settings.
