@@ -15,7 +15,7 @@ when-to-use: |
 
 # pm — Obsidian Project Management
 
-This skill owns: folder layout, template names, property schema, ADR numbering, dashboard generation strategy, and the direct-read rule. **For all CLI syntax, invoke the official `obsidian:obsidian-cli` skill first** — it is the authoritative reference. Only fall back to `obsidian help` if that skill's guidance is missing or contradicts observed behavior.
+This skill owns: folder layout, template names, property schema, ADR numbering, dashboard generation strategy, and the direct-read rule. **For CLI syntax, consult the preloaded `obsidian:obsidian-cli` skill** in the `obsidian-operator` sub-agent; fall back to `obsidian <subcommand> --help` only if the skill doesn't cover it. For Bases (`.base`) syntax used by dashboards, read the bundled `templates/dashboard-cross.base` / `dashboard-project.base` directly — do not guess.
 
 ## Config (`.obsidian.yaml`)
 
@@ -48,7 +48,7 @@ If `obsidian vault=<v> templates` doesn't list one of these, `/obw:init` hasn't 
 
 ## Operations
 
-All vault I/O goes through the `obsidian` CLI — defer to `obsidian:obsidian-cli` skill for syntax. Use **one call** per known-name read — never chain `search → read`. The pm-specific bits:
+All vault I/O goes through the `obsidian` CLI — see preloaded `obsidian:obsidian-cli` skill. Use **one call** per known-name read — never chain `search → read`. The pm-specific bits:
 
 - **Create task** → `create path="pm/{project}/tasks/{name}.md" template=task`, then `property:set` for `project` / `priority` / `due` / `tags`.
 - **Create doc** → `create path="pm/{project}/docs/{name}.md" template=doc`, then `property:set name=project`.

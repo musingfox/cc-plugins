@@ -36,6 +36,26 @@ Natural-language phrasing also works via the matching skills (`cap`, `note`, `pm
 /plugin install obsidian-workspace
 ```
 
+## Permissions (recommended)
+
+The plugin runs vault operations inside the `obsidian-operator` sub-agent, which shells out to the `obsidian` CLI plus a few Unix helpers. In auto mode every un-allowlisted Bash invocation prompts the user — and the sub-agent will stall waiting for that prompt. Add these to user `settings.json` (`~/.claude/settings.json`) once:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(obsidian:*)",
+      "Bash(cat:*)",
+      "Bash(jq:*)",
+      "Bash(cp:*)",
+      "Bash(sed:*)"
+    ]
+  }
+}
+```
+
+Or run `/fewer-permission-prompts` after a stuck `/obw:init` and it will scan transcripts and propose the same list.
+
 ## Configuration
 
 Run `/obw:init` in a project root. The generated `.obsidian.yaml`:

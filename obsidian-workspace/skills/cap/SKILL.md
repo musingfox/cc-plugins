@@ -30,7 +30,7 @@ Daily note folder / filename / template are owned by Obsidian's **Daily Notes** 
 3. Append via `obsidian vault=<v> daily:append content="<bullet>"`. The CLI creates the daily note if missing.
 4. Confirm with the appended line. Return `[[<daily-note-basename>]]`.
 
-For CLI syntax details, defer to the `obsidian:obsidian-cli` skill.
+For CLI syntax, consult the preloaded `obsidian:obsidian-cli` skill; fall back to `obsidian daily:append --help` if needed.
 
 ## Example
 

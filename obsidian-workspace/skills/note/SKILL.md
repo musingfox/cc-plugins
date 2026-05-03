@@ -14,7 +14,7 @@ when-to-use: |
 
 # note — Create a Long-Form Note
 
-This skill owns: target folder resolution, filename strategy, frontmatter composition. Vault I/O delegates to the `obsidian` CLI. **For all CLI syntax, invoke the official `obsidian:obsidian-cli` skill first** — it is the authoritative reference. Only fall back to `obsidian help` if that skill's guidance is missing or contradicts observed behavior.
+This skill owns: target folder resolution, filename strategy, frontmatter composition. Vault I/O delegates to the `obsidian` CLI. **For CLI syntax, consult the preloaded `obsidian:obsidian-cli` skill** in the `obsidian-operator` sub-agent; fall back to `obsidian <subcommand> --help` only if the skill doesn't cover it.
 
 ## Config (`.obsidian.yaml`)
 
