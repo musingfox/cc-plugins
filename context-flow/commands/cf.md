@@ -94,6 +94,33 @@ State which agent and model you selected and why.
 
 ---
 
+## Reporting Principles
+
+Reports to the human must lead with **outcome / trade-off / scope-and-reason**, not artifacts. Technical detail (files, functions, types) belongs in evidence sections, never in headlines.
+
+| Type | Frame | ✅ Example |
+|---|---|---|
+| Functional change | user-visible outcome | "API returns paginated lists — large fetches no longer time out" |
+| Design decision | choice + trade-off concretely | "Postgres over Redis for queue: durability beats latency; cost is ~5× slower writes, well under limit" |
+| Low-level change | scope + why | "Bumped `node-fetch` to v3 — required for streaming work, callers unchanged" |
+
+Rules: one change per bullet (no "and"/"also"); always answer "why now / why this way"; Before→After when behavior shifts; scope+reason for fixes. These override phase output schemas when they conflict.
+
+---
+
+## Human Interaction (use AskUserQuestion by default)
+
+For any decision from the human, prefer `AskUserQuestion` over prose prompts:
+1. One- or two-sentence context.
+2. `AskUserQuestion` with 2-4 options + "Other" (free-text). Recommended option first, marked `_(my recommendation)_` in its description. Labels are short imperative phrases; descriptions answer "what happens if I pick this?".
+3. On "Other", read free text and continue conversationally.
+
+**Skip AskUserQuestion** for: pure clarification ("does X mean Y?"), single-path acknowledgments, or mid-sentence revisions in flight.
+
+Each phase below specifies its own option set. "Ask the human X" everywhere means "call AskUserQuestion".
+
+---
+
 ## Pipeline Overview
 
 ```
@@ -124,7 +151,7 @@ When skipping, dispatch a single agent using the resolved tier for that stage.
 
 When using Agent Teams, teammates can use different model tiers. The resolved tier for the stage determines the **lead teammate's** model. Additional teammates use one tier lower (e.g., if lead is `pro`, teammates use `standard`; if lead is `standard`, teammates use `standard` too — never below `standard` for teammates).
 
-Dispatch teammates via the Agent tool with the same `subagent_type` (e.g., `context-flow:research`) but different `model` values — `opus` for the lead, `sonnet` for standard teammates, `haiku` only if explicitly appropriate.
+Dispatch teammates via the Agent tool with the same `subagent_type` (e.g., `context-flow:research`) but different `model` values — `opus` for the lead, `sonnet` for standard teammates. Use `haiku` only when a teammate's angle is mechanical inventory (e.g., "list all files matching pattern X", "enumerate exports of module Y") rather than analysis.
 
 ### Loop Budget
 
@@ -168,30 +195,22 @@ If this is a loop-back, use the enriched goal instead (see Loop Back section).
 
 **Nothing else.** Each teammate explores from scratch within their angle.
 
+### Mid-Flight Direction Check
+
+Pause and check in (don't wait for synthesis) when continuing would waste effort or silently commit to a direction. **Triggers**: 2+ fundamentally different approaches viable; constraint that may invalidate the goal; adjacent problem worth addressing; new possibility outside the original goal.
+
+**Format**: brief context (what triggered, what's at stake) + `AskUserQuestion` with options for each direction + "Investigate both" + "Reframe goal" + "Continue as planned" + "Other". Mark your recommendation. After response, enrich remaining teammates' angles; if goal is reframed, restart teams (one phase re-run).
+
+**Budget**: max 2 mid-flight checks per research phase; further triggers fold into final synthesis.
+
 ### Synthesis
 
-After all teammates complete, synthesize their findings into a unified research output following the research agent's Output Schema (Existing Capabilities, Constraints, Key Files, Completed, Unresolved). Additionally include:
+Merge teammate findings into the research agent's Output Schema (Existing Capabilities, Constraints, Key Files, Completed, Unresolved), plus:
+- **Convergence**: facts teammates agree on (high confidence)
+- **Divergence**: conflicts / trade-offs (decision points for planning)
+- **Decision Points Requiring Human Input**: per item — what needs deciding, why it matters (concrete consequence), options with upside/downside/reversibility, your recommendation
 
-```markdown
-## Convergence
-{where teammates' findings agree — high-confidence facts}
-
-## Divergence
-{where findings conflict or reveal trade-offs — decision points for planning}
-
-## Decision Points Requiring Human Input
-For each decision point discovered during research, present it clearly:
-- **What needs deciding**: {the specific choice}
-- **Why it matters now**: {concrete consequence of getting it wrong — name the component, data, or behavior affected}
-- **Options with trade-offs**:
-  - Option A: {approach} — upside: {benefit}, downside: {cost}, reversibility: {easy/hard}
-  - Option B: {approach} — upside: {benefit}, downside: {cost}, reversibility: {easy/hard}
-- **Your recommendation**: {which option and why, based on evidence}
-```
-
-**Important**: Decision points are not the same as Unresolved items. Unresolved = missing information. Decision points = sufficient information exists but multiple valid paths forward — the human must choose.
-
-Save synthesized output to `$SESSION/research.md`.
+Decision points ≠ Unresolved: Unresolved is missing information; Decision points are valid choices needing human preference. Save to `$SESSION/research.md`.
 
 ### Transition Validation: Research → Plan
 
@@ -206,16 +225,17 @@ Save synthesized output to `$SESSION/research.md`.
    - Blocking items typically include: unknown data volume, unspecified behavior requirements, ambiguous scope
    - Non-blocking items: minor naming preferences, optimization details that can be decided in plan
 
-3. **If blocking Unresolved items exist** → ask the human. Present each item with:
-   - What the research found (or couldn't find)
-   - Why it matters for planning
-   - Your recommendation or suggested options
+3. **If blocking Unresolved items exist** → ask the human via `AskUserQuestion`. For each item:
+   - Briefly present what was (or wasn't) found and why it matters for planning
+   - Provide options like: "Answer: {recommended value}", "I don't know — proceed with assumption {X}", "Drop this requirement", "Other"
+   - Ask one item at a time so each answer can shape the next question
 
 4. **Confidence check** — examine Completed items marked `medium`:
    - Is the assumption defensible? If too risky, treat as Unresolved and consult human.
 
 5. **Divergence check** — if research teammates produced conflicting findings:
-   - Present the divergence to the human with your recommendation
+   - Present the divergence briefly with your recommendation
+   - Call `AskUserQuestion` with each direction as an option + "Other"
    - Human chooses direction before proceeding to Plan
 
 6. **Once sufficient** → compress research output for plan input (see Context Compression).
@@ -278,68 +298,7 @@ Save output to `$SESSION/plan.md`.
 
 ### Human Gate
 
-The Human Gate gives the human enough context to make an informed judgment **without reading research.md or plan.md**. It always presents a Scope Review, and additionally presents decisions when High/Medium ones exist.
-
-**Prioritize irreversible and architectural decisions.** The Human Gate exists to catch choices that are expensive to change later — new dependencies, public API shapes, data models, migration strategies. If a decision is easily reversible (rename later, swap implementation), it can be Low impact and skip the decision section entirely.
-
-#### Scope Review (always present)
-
-Every Human Gate starts with scope review. Do NOT simply list contracts and ask for approval — the human needs to know what to look for.
-
-> **What will change and why** (goal → contract mapping):
-> - **{contract name}**: {purpose from contract — why this is needed for the goal} → {what it does, one line}
->
-> **Design assumptions made** (choices the plan agent already made — flag any you disagree with):
-> - {assumption}: {why this was chosen over alternatives, one line}
-> - {assumption}: {why this was chosen over alternatives, one line}
->
-> **Review checklist**:
-> - [ ] **Scope**: Are these changes sufficient for the goal? Anything missing or unnecessary?
-> - [ ] **Assumptions**: Do the design assumptions above match your intent?
-> - [ ] **Test coverage**: Do the test cases cover the edge cases you care about?
-
-Extract "design assumptions" from: constraint mappings (research constraint → plan decision), Low-impact decisions from the plan, and any implicit choices the plan agent made without presenting alternatives.
-
-#### Decisions (only when High/Medium decisions exist)
-
-When ≥1 High or Medium decisions exist, present them **after** the Scope Review. For each decision:
-
-> **[Impact] Decision Title**
->
-> **Stakes**: What goes wrong if this choice is incorrect — concrete consequences, not abstract risk labels. Name the affected component, data, or user-facing behavior. **Explicitly state what becomes hard to change once this is implemented.**
->
-> **Evidence**: 1-3 key findings from research that constrain this choice. Include file paths or interface signatures where relevant. This is WHY the options are what they are.
->
-> **Options**:
-> | | Option A: {name} | Option B: {name} | Option C (if any) |
-> |---|---|---|---|
-> | Approach | {what it does} | {what it does} | {what it does} |
-> | Upside | {concrete benefit} | {concrete benefit} | {concrete benefit} |
-> | Downside | {concrete cost} | {concrete cost} | {concrete cost} |
-> | Reversibility | {easy/hard to undo} | {easy/hard to undo} | {easy/hard to undo} |
->
-> *{Optional: additional observation that doesn't fit the fixed dimensions — e.g., performance implication, migration complexity, team familiarity. Omit if nothing to add.}*
->
-> **Recommendation**: {which option and why — reference the evidence}
-
-If any decisions were auto-upgraded, note this:
-
-> **[High ↑ auto-upgraded from Medium] Decision Title**
-> *Auto-upgrade reason*: {which structural rule triggered it}
-
-#### Gate Summary
-
-Present at the end:
-
-> **Scope**: {number} contracts, {number} test cases
-> **Estimated change surface**: {which files/modules will be touched}
-> **Decisions requiring your input**: {count} of {total}
->
-> **Approve / Revise (describe what to change) / Request more research / Abort**
-
-The plan phase is **iterative**. If the human revises decisions or scope, re-run the plan agent with the revision as additional context. Repeat until approved.
-
-Do NOT proceed to implement without explicit human approval.
+When transition validation passes, **read `docs/human-gate-protocol.md`** (relative to plugin root) and follow it. The protocol covers: gate header framing, Scope Review template, Decisions template (only for High/Medium), Gate Action via AskUserQuestion, and Iterative Discussion rules for multi-round dialogue. Do NOT proceed to Phase 3 without explicit human approval.
 
 ---
 
@@ -406,8 +365,8 @@ If 2+ independent contract groups detected, read `docs/parallel-implement-protoc
 4. **If Unresolved contracts exist**:
    - Read the agent's explanation of what was attempted and why it failed
    - Is this a codebase investigation issue? → loop back to research with enriched goal
-   - Is this a missing information issue? → consult human with analysis
-   - Are ALL contracts Unresolved? → escalate to human immediately
+   - Is this a missing information issue? → consult human via `AskUserQuestion` with options: "Adjust contract to {alternative}", "Loop back to research on {area}", "Skip this contract for now", "Other"
+   - Are ALL contracts Unresolved? → escalate to human immediately (still use `AskUserQuestion` for the recovery direction)
 
 5. **If all tests pass and no Unresolved** → proceed to review.
 
@@ -462,39 +421,12 @@ Save output to `$SESSION/review.md`.
 
 ### Presenting Results to Human
 
-When presenting review results, use a **changelog format** that emphasizes functional outcomes — what changed from the user's perspective — not a list of modified files.
-
-#### Changelog Format
-
-```markdown
-## What Changed
-
-### Added
-- {new capability or behavior, described functionally}
-
-### Changed
-- {existing behavior that now works differently, with before→after}
-
-### Fixed
-- {bug or issue that was resolved, described by symptom}
-
-## Contract Status
-{N}/{M} contracts passed — {one-line summary if all passed, or list failures}
-
-## Advisories
-{only critical/warning advisories — omit info-level unless specifically relevant}
-```
-
-**Rules for changelog entries**:
-- Describe WHAT the user/system can now do, not WHICH files were edited
-- Use concrete language: "API now returns paginated results" not "Modified api.ts to add pagination"
-- Group related changes into single entries rather than one entry per file
-- If a contract maps cleanly to a user-visible feature, use the feature name, not the contract name
+Use changelog format — Added / Changed / Fixed sections describing **what the user/system can now do**, not which files were edited. Group related changes; use feature names over contract names. Then: `## Contract Status` (N/M passed) and `## Advisories` (critical/warning only — drop info unless relevant). See agents/review.md for full schema and rules.
 
 ### Handling the Verdict
 
 - **APPROVE, no critical advisories** → present changelog to human. Done.
-- **APPROVE with advisories** → present changelog + advisories to human. Ask: address now or accept as-is?
+- **APPROVE with advisories** → present changelog + advisories to human, then call `AskUserQuestion` with options: "Address all now (loop to implement)", "Address only critical advisories", "Ship as-is — accept advisories", "Other"
 - **REQUEST_CHANGES with contract failures** → re-run implement with the failure details as additional context (phase re-run)
 - **REQUEST_CHANGES with fundamental design issues** → this means a contract is wrong, not just the implementation. Loop back to plan (cross-phase loop).
 
@@ -502,46 +434,15 @@ When presenting review results, use a **changelog format** that emphasizes funct
 
 ## Context Compression
 
-When assembling input for the next phase, compress — don't forward verbatim.
-
-**Preserve**:
-- Concrete facts: file paths, types, interface signatures, evidence
-- Decisions with their outcomes
-- Constraints with their code evidence
-- Test cases with concrete values
-
-**Discard**:
-- Investigation process details (how the agent found things)
-- Rejected alternatives' full analysis (keep only names)
-- Verbose reasoning that the next agent doesn't need
-
-**Reshape**: Adapt information structure to what the receiving agent needs, not what the producing agent generated.
-
-**Bias**: When in doubt, include too much rather than too little. Missing context causes loop-backs (expensive); extra context wastes some input tokens (cheap).
+When forwarding to the next phase: **preserve** concrete facts (paths, types, signatures, evidence), decisions + outcomes, constraints + code evidence, test cases with values. **Discard** investigation process, full analyses of rejected alternatives (keep names only), verbose reasoning the next agent won't use. **Reshape** to what the receiver needs. **Bias toward over-including** — missing context causes expensive loop-backs.
 
 ---
 
 ## Loop Back Mechanism
 
-When a phase's output is insufficient, loop back to the appropriate earlier phase.
+When looping back to research, send an **enriched goal**: original goal + what was attempted in Phase X + the obstacle + what's needed to proceed. The research agent treats it as a more specific goal — it doesn't know it's a loop.
 
-**Enrich the goal** when looping back to research:
-
-```markdown
-## Goal
-{original goal}
-
-## Additional Context
-{what was attempted in Phase X}
-{what specific obstacle was encountered}
-{what the next phase needs to proceed}
-```
-
-The research agent doesn't know it's in a loop — it just sees a more specific goal.
-
-**Track loop counts** and increment the appropriate counter:
-- Same agent re-run with feedback → phase re-run counter for that phase
-- Return to earlier phase → cross-phase loop counter
+Track loop counts: same-agent re-run → phase re-run counter; return to earlier phase → cross-phase loop counter.
 
 ---
 

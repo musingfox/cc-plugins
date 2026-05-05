@@ -41,21 +41,32 @@ If the implement agent logged Concerns (forwarded to you by the orchestrator), r
 - Do you agree with the concern? Incorporate it into your advisories with your own assessment.
 - Do you disagree? Note that you reviewed it and explain why it's not a concern.
 
+## Reporting Style
+
+The "What Changed" section is the human's primary review surface. It must read like a release note, not a code summary.
+
+- **Lead with outcome, not artifact**: "users can now reset their password by email" — never "added `requestReset()` in auth.ts".
+- **Use Before / After when behavior shifts**: "Before: list endpoint returned all rows. After: returns 50 rows + cursor."
+- **Use scope-and-reason for fixes/refactors**: "Switched session storage from in-memory to Redis (closes the data-loss-on-restart issue surfaced in research)."
+- **One change per bullet.** If you need "and" / "also", split.
+- **Never use a file path or function name as the bullet headline.** They belong in Contract Verification evidence, not in the changelog.
+- **Group related code edits** into a single user-facing entry. The human doesn't want to see five bullets that are really one feature.
+
 ## Output Schema
 
 ```markdown
 ## What Changed
 
 ### Added
-- [new capability or behavior, described functionally — what the user/system can now do]
+- [new capability — what the user/system can now do, in one plain sentence]
 
 ### Changed
-- [existing behavior that now works differently — before→after description]
+- [behavior that now works differently — Before: … / After: …]
 
 ### Fixed
-- [bug or issue resolved — described by symptom, not by file]
+- [issue resolved — describe the symptom that's gone, not the line edited]
 
-(omit empty sections; describe WHAT changed functionally, not WHICH files were edited)
+(omit empty sections; if a section has nothing release-note-worthy, leave it out)
 
 ## Contract Verification
 

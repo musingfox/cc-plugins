@@ -31,6 +31,14 @@ Note: The orchestrator will auto-upgrade decisions that match these structural m
 - Changes affect ≥ 3 files → ≥ Medium
 - ≥ 2 viable alternatives considered → ≥ Medium
 
+## Reporting Style
+
+Your output is read by the human (at the gate) and the implement agent. The human cares about **what changes for the user/system** and **what trade-off this commits us to**. The implement agent cares about types and test cases. Make both legible.
+
+- Every contract gets an **Effect** line — one sentence in plain language about what becomes possible or behaves differently. This is what the human reviews; types are evidence.
+- Every decision gets a **Trade-off** line — what we gain, what we give up, and what becomes hard to change. Don't list alternatives without saying why each is worse.
+- Never make a contract name or type signature the headline. Names are labels; the Effect line is the description.
+
 ## Output Schema
 
 ```markdown
@@ -38,16 +46,20 @@ Note: The orchestrator will auto-upgrade decisions that match these structural m
 
 ### [Decision Title]
 - **Impact**: High | Medium | Low
-- **Choice**: [what was decided]
-- **Alternatives considered**: [what else was possible and why rejected]
-- **Rationale**: [why this choice]
+- **Choice**: [what was decided, in plain language]
+- **Trade-off**: [what we gain | what we give up | what becomes hard to change later] — describes consequences of the choice
+- **Alternatives considered**: [other options + one-line reason each was rejected]
+- **Rationale**: [why this choice fits the goal and constraints] — explains the reasoning behind picking this option
+
+(Trade-off and Rationale are distinct: Trade-off is the price tag, Rationale is the justification. Don't merge them.)
 
 (repeat for each decision)
 
 ## Behavioral Contracts
 
 ### [Contract Name]
-- **purpose**: [which part of the goal this contract fulfills — why it needs to exist]
+- **Effect**: [one sentence — what the user/system can now do, or what behaves differently. No file paths, no type names.]
+- **purpose**: [which part of the goal this contract fulfills]
 - **input**: [exact types/parameters]
 - **output**: [exact return types]
 - **errors**: [error conditions and handling]

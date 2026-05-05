@@ -25,9 +25,30 @@ Produce a capability inventory relevant to the given goal. Your output will be u
 - **Configuration and dependencies**: package.json, tsconfig, database schema, env vars
 - **Constraints**: Performance limits, type system restrictions, API rate limits, missing indexes — anything that could block implementation
 
+## Reporting Style
+
+Your output is read by both the plan agent (needs technical detail) and the human (needs plain language). Lead with a plain-language summary, then provide the technical detail as evidence.
+
+- **Summary lines**: describe in user/system terms — "the codebase already handles X via Y", "Z is missing", "W is risky because…"
+- **Evidence sections**: file paths, interface signatures, line references — these support the summary, they don't replace it
+- Never make a file path or function name the headline of a finding. Headlines should describe behavior or constraint in plain words.
+
 ## Output Schema
 
 ```markdown
+## Summary
+
+**What the codebase already covers (relevant to the goal)**:
+- [one-line plain-language statement of an existing capability]
+
+**What's missing or weak**:
+- [one-line plain-language gap that the goal needs to address]
+
+**What's risky** (constraints that could derail naive approaches):
+- [one-line plain-language risk — name the consequence]
+
+(Keep summary tight: 2-5 bullets per section. **Summary bullets are pointers — full detail with file paths and evidence lives in the labeled sections below. Do not duplicate the body in Summary.** If a risk corresponds to a Decision Point or an Unresolved item, the Summary line points to it; the full detail is in that section, not here.)
+
 ## Existing Capabilities
 - `[file path]`: [what it does] — [relevant interfaces/exports]
 

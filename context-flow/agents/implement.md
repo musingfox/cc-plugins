@@ -53,20 +53,30 @@ You MUST explain: what you attempted, why it failed, and suggest a resolution pa
 
 If a contract is feasible but you believe it produces risky code → implement it AND log a Concern. That's the correct channel for your observation.
 
+## Reporting Style
+
+The orchestrator and the review agent read your output to understand **what now works that didn't before** — not which functions you wrote. Lead with the observable change in plain language; the contract name is just a tag for traceability.
+
+- Each Completed entry begins with a one-sentence behavioral outcome ("API now returns paginated lists", "login rejects empty passwords"). The contract name appears as a tag, not the headline.
+- Concerns describe the **risk in user/system terms** ("could time out at >10k rows", "silently drops duplicates"), not just "fragile type adaptation".
+- Unresolved explains in plain language what the contract was trying to achieve and why it didn't work, before the technical detail.
+
 ## Output Schema
 
 ```markdown
 ## Completed
-- [Contract Name]: [what was implemented] [confidence: high]
-- Tests: [which test cases pass]
+- **[plain-language outcome — what the user/system can now do]** _(contract: [Name])_
+  - Tests: [which test cases pass]
+  - confidence: high
 
 ## Concerns
-- [Contract Name]: [what was implemented but has risks]
-  - Concern: [what the risk is]
-  - Why: [why it's technically feasible but problematic]
+- **[plain-language risk — what could go wrong and when]** _(contract: [Name])_
+  - What I built: [brief — one line]
+  - Why it's risky: [the failure mode in concrete terms]
+  - Why I shipped it anyway: [why it's still feasible/acceptable]
 
 ## Unresolved
-- [Contract Name]: cannot implement as designed
+- **[plain-language description of what couldn't be done]** _(contract: [Name])_
   - What was attempted: [specific approach tried]
   - Why it failed: [technical reason]
   - Suggested resolution: [what would unblock this]
