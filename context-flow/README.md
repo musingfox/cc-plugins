@@ -77,7 +77,7 @@ Plan defaults to `pro` because design decision quality is the pipeline's bottlen
 ## Key Features
 
 - **Dynamic model selection**: Orchestrator selects agent model tier per stage based on mode, per-stage overrides, and complexity assessment.
-- **Agent Teams by default**: Research and Review use multi-perspective Agent Teams by default. `--deep` mode runs **native Agent Teams** (`TeamCreate` + `SendMessage`) where teammates cross-check and debate; `default` mode runs **parallel sub-agent dispatch**; `--fast` mode and trivial goals skip to single agent. Native mode falls back to parallel if `TeamCreate` / `SendMessage` are unavailable.
+- **Agent Teams by default**: Research and Review use multi-perspective Agent Teams by default. `--deep` mode runs **native Agent Teams** (`TeamCreate` + `SendMessage`) where teammates cross-check and debate — **requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`**; without it, `/cf --deep` aborts with an actionable error (no silent fallback). `default` mode runs **parallel sub-agent dispatch**; `--fast` mode and trivial goals skip to single agent.
 - **Agent Teams model mixing**: Lead teammate uses the stage's resolved tier; additional analytical teammates use one tier lower (minimum `standard`). Mechanical-inventory teammates may use `haiku`.
 - **Parallel implementation**: When contracts are independent, the orchestrator dispatches multiple implement agents concurrently with worktree isolation.
 - **Decision tiering**: Plan classifies decisions as High/Medium/Low impact. Human gate only blocks on High/Medium. Structural minimum rules prevent under-classification.
@@ -96,6 +96,10 @@ Plan defaults to `pro` because design decision quality is the pipeline's bottlen
 ### Optional Dependencies
 
 - **`ctx7` CLI** (`npm i -g ctx7` then `ctx7 login`) — enables research and implement phases to verify third-party library / API behavior with version-specific docs. Falls back to `WebFetch` if not installed. Without either, agents report Unresolved when the goal hinges on external behavior they can't infer from the local codebase.
+
+### Required for `--deep` Mode
+
+- **`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`** — `/cf --deep` runs native Agent Teams where teammates cross-check findings via `SendMessage`. This Claude Code feature is experimental and must be enabled in your shell or `~/.claude/settings.json`. Without it, `/cf --deep` exits with an error and tells you to set the flag (or run without `--deep` to use parallel sub-agent dispatch). `default` and `--fast` modes do not need this flag.
 
 ### Direct Sub-agent Invocation Caveat
 

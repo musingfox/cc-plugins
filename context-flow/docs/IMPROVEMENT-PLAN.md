@@ -122,11 +122,28 @@ Goal: enable native Agent Teams now that `TeamCreate` / `SendMessage` / `TeamDel
 | 4.5 | Update `DESIGN-v2.md` Implementation section + Principle #13 to reflect both modes | `docs/DESIGN-v2.md` |
 | 4.6 | Update README Key Features bullet | `README.md` |
 
+### 0.4.1 Hardening pass
+
+A multi-lens audit after 0.4.0 ship caught real issues. Verified against primary sources (code.claude.com/docs/en/agent-teams, GitHub issues #32723, #32731) before correcting:
+
+| # | Fix | Files |
+|---|---|---|
+| 4.7 | **Restore `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` gate** — original 0.4.0 dropped this assuming TeamCreate/SendMessage were GA. Primary docs confirm the feature is still experimental and tools are only loaded at startup when the flag is set. `/cf --deep` without the flag now **aborts with an actionable error** (no silent fallback — user picked `--deep` for cross-check quality, parallel can't deliver that) | `commands/cf.md`, `README.md`, `docs/DESIGN-v2.md`, `docs/agent-teams-protocol.md` |
+| 4.8 | `team_name` collision: append `$SESSION_BASENAME` (already has `$$`+`$RANDOM`) so concurrent flows don't collide on `~/.claude/teams/` | `commands/cf.md`, `docs/agent-teams-protocol.md` |
+| 4.9 | Persist team handle to `$SESSION/team-<phase>.json` at `TeamCreate` time + Reconnect path. Context compression wipes orchestrator memory; team config persists on disk but the orchestrator's knowledge of team_name does not | `docs/agent-teams-protocol.md` |
+| 4.10 | Drop the false `team-lead` canonical recipient. Docs make clear teammates address each other only by names assigned at spawn. Every dispatch prompt now MUST include the line `Address messages to the lead by name: <lead-name>` | `docs/agent-teams-protocol.md` |
+| 4.11 | Shutdown rejection cap: 2 rejections per teammate → mark synthesis `tainted`, force `TeamDelete`, escalate to human. Prior wording ("treat as phase incomplete") had no escape | `docs/agent-teams-protocol.md` |
+| 4.12 | `TeamDelete` race: retry up to 3× with 1s sleep between, then leave team orphaned (next `/cf` uses different team_name anyway) | `docs/agent-teams-protocol.md` |
+| 4.13 | Argument parsing precedence: explicit note that all skip rules read *resolved* mode, not original tokens (`--fast --deep` is `deep`, full stop) | `commands/cf.md` |
+| 4.14 | Completion-message discipline: only Output Schema sections in completion; debate context stays in cross-check threads. `[external: <source>]` tags survive `SendMessage` verbatim | `docs/agent-teams-protocol.md` |
+| 4.15 | Resolved-by-debate annotation: native synthesis tags Convergence reached only after debate, preserves originally-divergent points in Divergence with annotation. Prevents premature collapse hiding trade-offs from the human | `docs/agent-teams-protocol.md` |
+| 4.16 | Silent teammate exit path: 2 status checks then synthesize without it, mark missing angle in Unresolved with `[silent: <name>]` | `docs/agent-teams-protocol.md` |
+
 ### Decisions explicitly NOT taken
 
 | Discarded | Reason |
 |---|---|
-| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` env var as the gating signal | Original 0.2.x design used this env var because the feature was experimental. The tools are now first-class deferred tools — env-var gating became dead weight. Mode selection now uses the existing `--deep` flag, no new flag needed |
+| ~~Drop env-var gating in favor of `--deep` alone~~ | **Reverted in 0.4.1** — primary-source audit confirmed env flag is still required to materialize team tools at startup. `--deep` triggers native intent; env flag enables the runtime |
 | Native mode for `default` mode | Native coordination has token / latency overhead that doesn't pay off for routine goals. Reserve it for the explicit "I want maximum quality" knob (`--deep`) |
 | `--native` flag | Don't introduce a new flag when an existing one (`--deep`) carries the same intent ("higher quality, willing to pay more") |
 | Auto-detect tool availability up-front | The orchestrator's `allowed-tools` declares the tools; if the harness ignores them, the first `TeamCreate` call fails and we fall back. Cheaper than a preflight check on every run |
@@ -150,6 +167,7 @@ Native mode keeps the same **1 re-run per Agent Teams phase** budget as parallel
 0.2.4 = Batch 2 (consistency, 1–2 days)
 0.3.0 = Batch 3 (tool/skill expansion, design RFC first, 2–3 days)
 0.4.0 = Batch 4 (native AT, shipped)
+0.4.1 = Batch 4 hardening pass (audit-driven, shipped)
 ```
 
 After each batch, run an end-to-end smoke test: one simple `/cf` goal and one complex one. Confirm transition validation, human gate, and loop budget all behave correctly.

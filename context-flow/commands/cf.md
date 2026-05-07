@@ -12,12 +12,20 @@ You are a **collaborative flow operator**. Your job is to manage a pipeline of a
 
 ```bash
 SESSION="/tmp/context-flow-$(date +%s)-$$-${RANDOM}"
+SESSION_BASENAME=$(basename "$SESSION")
 mkdir -p "$SESSION"
 PROTOCOL_DIR="${CLAUDE_PLUGIN_ROOT}/docs"
 echo '{"phase_reruns":{"research":0,"plan":0,"implement":0,"review":0},"cross_phase_loops":0,"agent_teams_reruns":{"research":0,"review":0}}' > "$SESSION/loop-budget.json"
+
+# Native Agent Teams gate — required by --deep mode.
+if [ "${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-}" = "1" ]; then
+  NATIVE_AT_AVAILABLE=1
+else
+  NATIVE_AT_AVAILABLE=0
+fi
 ```
 
-`$SESSION` includes PID and `$RANDOM` so concurrent flows don't collide on the same second. Sessions are NOT auto-deleted — log the path on completion so the human can inspect or clean up later.
+`$SESSION` includes PID and `$RANDOM` so concurrent flows don't collide on the same second. `$SESSION_BASENAME` is reused as a namespace for `team_name` so concurrent native-mode flows don't collide on `~/.claude/teams/`. Sessions are NOT auto-deleted — log the path on completion so the human can inspect or clean up later.
 
 Protocol files referenced below live under `$PROTOCOL_DIR` (resolved from `${CLAUDE_PLUGIN_ROOT}`). Always read them via this absolute path — never via paths relative to the current working directory, which is the user's project, not the plugin root.
 
@@ -25,7 +33,7 @@ Protocol files referenced below live under `$PROTOCOL_DIR` (resolved from `${CLA
 
 Parse the user's input to extract mode, per-stage overrides, and goal:
 
-1. **Mode flags**: `--fast` or `--deep`. If neither is present, use `default` mode. If both are present, use the last one.
+1. **Mode flags**: `--fast` or `--deep`. If neither is present, use `default` mode. If both are present, use the last one. **All subsequent rules (skip conditions, mode-to-implementation mapping) read the *resolved* mode — not the original tokens.** A user passing `--fast --deep` is in `deep` mode, full stop.
 2. **Per-stage overrides**: `--research=<tier>`, `--plan=<tier>`, `--implement=<tier>`, `--review=<tier>` where tier is `lite`, `standard`, or `pro`. Invalid tier or stage names are silently ignored.
 3. **Goal**: Everything remaining after stripping flags.
 
@@ -148,25 +156,29 @@ Every arrow between phases passes through you. At each transition you perform a 
 
 ### Agent Teams Default
 
-Research and Review phases use **Agent Teams by default**. There are two implementations; pick one per phase based on mode:
+Research and Review phases use **Agent Teams by default**. There are two implementations; pick one per phase based on the resolved mode:
 
-| Mode | Agent Teams implementation | Why |
-|------|----------------------------|-----|
-| `--deep` | **Native Agent Teams** — `TeamCreate` + named teammates that exchange `SendMessage` | Teammates can cross-check findings, debate severity, and converge on shared conclusions — better quality on ambiguous / complex goals |
+| Resolved mode | Agent Teams implementation | Why |
+|---------------|----------------------------|-----|
+| `deep` | **Native Agent Teams** — `TeamCreate` + named teammates that exchange `SendMessage`. Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` | Teammates cross-check findings, debate severity, converge on shared conclusions — better quality on ambiguous / complex goals |
 | `default` | **Parallel sub-agent dispatch** — orchestrator dispatches teammates concurrently and synthesizes | Cheap, no inter-agent coordination overhead; each teammate works independently |
-| `--fast` | Single agent (no teams) | See skip rules below |
+| `fast` | Single agent (no teams) | See skip rules below |
 
 Native and parallel modes use the **same teammate angle/lens definitions and the same Output Schema** — only the coordination mechanism differs. Read `$PROTOCOL_DIR/agent-teams-protocol.md` for both Native Mode and Parallel Mode protocols.
 
-**Skip to single agent** when ANY of these apply (regardless of mode):
-- `--fast` mode is active
+**Skip to single agent** when ANY of these apply (read resolved mode):
+- Resolved mode is `fast`
 - User explicitly requested a fast path in the goal
 - Goal is clearly a single-file bugfix, typo fix, or documentation-only change
 - Goal can be fully described in one sentence with no ambiguity
 
 When skipping, dispatch a single agent using the resolved tier for that stage.
 
-**Native mode availability fallback**: if `TeamCreate` or `SendMessage` is not available in your tool set at runtime (older harness), downgrade to parallel mode and warn the human once: *"Native Agent Teams unavailable — falling back to parallel dispatch."*
+**Native mode strict gate**: if resolved mode is `deep` AND `NATIVE_AT_AVAILABLE=0` (env flag not set), **abort the flow immediately**. Do NOT silently fall back to parallel — the user picked `--deep` for cross-check quality, and parallel can't deliver that. Print:
+
+> `/cf --deep` requires native Agent Teams. Set `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in your shell or `~/.claude/settings.json` and retry, or run without `--deep` to use parallel dispatch.
+
+Then exit. No further phases run.
 
 ### Agent Teams Model Mixing
 
