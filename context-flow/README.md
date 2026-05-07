@@ -39,7 +39,7 @@ Valid tiers: `lite`, `standard`, `pro`
 
 ## Model Tier System
 
-Each stage has 3 agent variants mapped to model tiers:
+Each stage has **a single agent**. The orchestrator selects which model that agent runs with at dispatch time, via the Agent tool's `model` parameter — there are no per-tier agent variants.
 
 | Tier | Model | Use Case |
 |------|-------|----------|
@@ -78,7 +78,7 @@ Plan defaults to `pro` because design decision quality is the pipeline's bottlen
 
 - **Dynamic model selection**: Orchestrator selects agent model tier per stage based on mode, per-stage overrides, and complexity assessment.
 - **Agent Teams by default**: Research and Review use multi-perspective Agent Teams by default; skip to single agent for trivially simple goals or `--fast` mode.
-- **Agent Teams model mixing**: Lead teammate uses resolved tier, additional teammates use one tier lower (minimum standard).
+- **Agent Teams model mixing**: Lead teammate uses the stage's resolved tier; additional analytical teammates use one tier lower (minimum `standard`). Mechanical-inventory teammates may use `haiku`.
 - **Parallel implementation**: When contracts are independent, the orchestrator dispatches multiple implement agents concurrently with worktree isolation.
 - **Decision tiering**: Plan classifies decisions as High/Medium/Low impact. Human gate only blocks on High/Medium. Structural minimum rules prevent under-classification.
 - **Behavioral contracts**: Contracts define input/output/errors, not file paths. Implementation plan is separate guidance.

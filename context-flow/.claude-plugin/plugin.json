@@ -5,5 +5,5 @@
   "author": {
     "name": "Nick Huang"
   },
-  "commands": "./commands/"
+  "commands": ["./commands/"]
 }

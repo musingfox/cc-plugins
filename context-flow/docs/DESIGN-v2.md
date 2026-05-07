@@ -99,12 +99,11 @@ Agent Teams is skipped (single agent used instead) when:
 - Goal is clearly a single-file bugfix, typo fix, or documentation-only change
 - Goal can be fully described in one sentence with no ambiguity
 
-### Mode Selection
+### Implementation
 
-- If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is set → **native Agent Teams** (teammates communicate directly, challenge findings, converge on shared conclusions)
-- Otherwise → **subagent parallel exploration** (parallel Agent dispatch, orchestrator synthesizes)
+Agent Teams runs as **parallel sub-agent dispatch with orchestrator synthesis**: the orchestrator dispatches multiple sub-agents in a single message, each works independently, and the orchestrator merges their outputs.
 
-Native mode produces higher-quality results because teammates can cross-reference findings and debate. Subagent mode is the fallback when the experimental feature is not available.
+A future "native" mode where teammates communicate directly via inter-agent messaging is a separate roadmap item and is not enabled in this version.
 
 ### Re-run Budget
 
@@ -968,7 +967,7 @@ Working directory: /app
 
 **This goal is not a trivial bugfix or docs change, so Agent Teams is used by default.**
 
-**Orchestrator identifies 3 research angles and spawns teammates** (assume subagent mode, not native Agent Teams):
+**Orchestrator identifies 3 research angles and spawns teammates** (parallel sub-agent dispatch):
 
 | Subagent | Angle | Input |
 |----------|-------|-------|
@@ -1138,6 +1137,6 @@ But the design does NOT optimize for minimum token usage. If a goal requires 3 r
 10. **Loop-backs are budgeted** — 2 re-runs per phase, 2 cross-phase loops; limits trigger escalation, not hard stops
 11. **Graceful degradation** — structured escalation with re-entry points; agents always provide analysis and options when stuck
 12. **Agents are pluggable** — the flow defines contracts, not agents; the orchestrator matches agent capabilities to phase requirements
-13. **Agent Teams default for research and review** — multi-perspective exploration (research) and multi-angle code review (review) by default; native Agent Teams when env var set, subagent parallel as fallback; skip to single agent only for trivially simple goals
+13. **Agent Teams default for research and review** — multi-perspective exploration (research) and multi-angle code review (review) by default, implemented via parallel sub-agent dispatch with orchestrator synthesis; skip to single agent only for trivially simple goals
 14. **Simple-task skip, not complex-task trigger** — the previous ACS heuristic gating is replaced by skip conditions (single-file bugfix, typo, docs-only, user fast-path request); default is to use Agent Teams, not to avoid them
 15. **Parallel implement for independent contracts** — orchestrator builds dependency graph, identifies independent groups, spawns up to 3 parallel implement agents with separate worktrees, merges and runs integration tests before review

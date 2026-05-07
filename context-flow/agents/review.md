@@ -2,7 +2,7 @@
 name: review
 description: "Verify implementation against contracts"
 model: sonnet
-color: magenta
+color: purple
 tools: Read, Grep, Glob, Bash
 ---
 

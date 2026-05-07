@@ -2,21 +2,9 @@
 
 Agent Teams are the **default mode** for Research and Review phases. This protocol is loaded by the orchestrator for both phases.
 
-## Mode Detection
+Implementation: **parallel sub-agent dispatch with orchestrator synthesis**. The orchestrator dispatches multiple sub-agents in a single message (parallel), each works independently, and the orchestrator merges their outputs into a unified result.
 
-```bash
-if [ -n "$CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS" ]; then
-    echo "Native Agent Teams mode — teammates communicate directly"
-else
-    echo "Subagent parallel mode — orchestrator synthesizes"
-fi
-```
-
-**Native Agent Teams** (primary): Teammates share a task list, send messages to each other, challenge findings, and converge on shared conclusions. Use when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is set.
-
-**Subagent parallel** (fallback): Dispatch parallel agents via the Agent tool. Each works independently; the orchestrator synthesizes results. Use when the env var is not set.
-
-The dispatch context and synthesis format are the same for both modes. The difference is whether teammates can communicate directly.
+A future "native" mode where teammates communicate directly via inter-agent messaging is tracked as a separate roadmap item and is not enabled in this version.
 
 ---
 
@@ -106,15 +94,6 @@ After all teammates complete, the orchestrator merges findings into a unified re
 
 Save to `$SESSION/research.md`.
 
-### Native Agent Teams Bonus
-
-When using native Agent Teams, teammates can:
-- Request specific code exploration from each other ("can you check if module X also has this pattern?")
-- Challenge each other's findings ("I found a constraint that contradicts your capability claim")
-- Converge on shared Unresolved items with agreed-upon impact assessments
-
-This produces higher-quality Convergence/Divergence sections than independent subagent work.
-
 ---
 
 ## Review Teams
@@ -196,13 +175,6 @@ After all teammates complete, the orchestrator merges into a unified review:
 ```
 
 Save to `$SESSION/review.md`.
-
-### Native Agent Teams Bonus
-
-When using native Agent Teams, review teammates can:
-- Cross-reference findings ("the auth bypass I found in route X — does it affect your contract verification?")
-- Debate severity levels ("I think this is critical, not warning, because...")
-- Identify compound issues that span multiple lenses
 
 ---
 
