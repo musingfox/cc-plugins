@@ -2,9 +2,109 @@
 
 Agent Teams are the **default mode** for Research and Review phases. This protocol is loaded by the orchestrator for both phases.
 
-Implementation: **parallel sub-agent dispatch with orchestrator synthesis**. The orchestrator dispatches multiple sub-agents in a single message (parallel), each works independently, and the orchestrator merges their outputs into a unified result.
+There are two implementations. The **angle definitions, dispatch context schema, and Output Schema below are shared by both** — only the coordination mechanism differs.
 
-A future "native" mode where teammates communicate directly via inter-agent messaging is tracked as a separate roadmap item and is not enabled in this version.
+| Implementation | When | Mechanism |
+|----------------|------|-----------|
+| **Native** | `--deep` mode (and `TeamCreate` / `SendMessage` are available) | Teammates created via `TeamCreate`, communicate via `SendMessage`, can cross-check and debate findings before reporting back |
+| **Parallel** | `default` mode, or fallback when native tools unavailable | Orchestrator dispatches teammates concurrently via `Agent`; each works independently; orchestrator synthesizes outputs |
+
+Single-agent skip conditions are defined in `commands/cf.md` (`--fast`, trivial goals, etc.).
+
+---
+
+## Native Mode
+
+Use when `--deep` mode is active and the orchestrator has `TeamCreate`, `SendMessage`, `TeamDelete` in its tool set.
+
+### Setup
+
+```
+TeamCreate(team_name: "cf-research-<short-id>", description: "Research team for: <one-line goal>")
+```
+
+Use a short, descriptive `team_name` per phase (e.g., `cf-research-auth-oauth2`, `cf-review-payments`). The team's task list (`~/.claude/tasks/<team_name>/`) is auto-created and shared by all teammates.
+
+### Spawning Teammates
+
+For each angle/lens, call `Agent` with `team_name` set to the team and a stable `name`:
+
+```
+Agent(
+  subagent_type: "context-flow:research",
+  team_name: "cf-research-<short-id>",
+  name: "<teammate-name>",
+  model: "<resolved tier>",
+  prompt: "<dispatch context — see schemas below>"
+)
+```
+
+**Teammate naming rules** — names are how teammates address each other in `SendMessage`. Always use these conventions, never UUIDs:
+
+| Phase | Suggested names |
+|-------|-----------------|
+| Research | `breadth`, `depth`, `consumer`, `producer`, `existing`, `greenfield` (pick names that match the angles you chose) |
+| Review | `contracts`, `security`, `quality` (matches the lens) |
+
+The orchestrator (you) is referred to by teammates as `team-lead` (default) or by the `agent_type` you set in `TeamCreate`. Either form should work; prefer `team-lead`.
+
+### Coordination Protocol
+
+After spawning all teammates, send each its initial brief via `SendMessage`. Teammates then work; they can `SendMessage` peers to cross-check findings or `SendMessage` you for clarification.
+
+**Inter-teammate message templates** (teammates use these — include them in the dispatch prompt):
+
+```
+# Cross-check a peer's finding
+SendMessage(to: "<peer>", summary: "cross-check constraint X",
+  message: "I see your finding that X is enforced at module Y. From my angle I found Z which contradicts that — can you re-examine?")
+
+# Request narrow exploration help
+SendMessage(to: "<peer>", summary: "help with module Z",
+  message: "Your angle covers Z directly. Does Z expose a public API for <thing>? Need this for my <X> finding.")
+
+# Report completion to lead
+SendMessage(to: "team-lead", summary: "research angle done",
+  message: "<your full Output Schema sections — Existing Capabilities, Constraints, Decision Points, Completed, Unresolved>")
+```
+
+Teammates go idle between turns. **Do not interpret idle as "done"** — wait for an explicit completion message that includes the full Output Schema.
+
+### Synthesis (Native)
+
+After all teammates have sent their completion messages, synthesize using the same merge format as Parallel mode (see Output Schema below). The native-mode bonus: cross-check exchanges between teammates often produce stronger Convergence (high-confidence agreements after debate) and a tighter Divergence list (genuine open trade-offs, not crossed wires).
+
+If a teammate goes silent past a reasonable budget (e.g., 2× the slowest peer), prompt with:
+```
+SendMessage(to: "<silent>", summary: "status check",
+  message: "Are you blocked? Send your current Output Schema even if incomplete.")
+```
+
+### Shutdown
+
+After synthesis is saved to `$SESSION/research.md` (or `review.md`):
+
+```
+# Send shutdown_request to each teammate
+SendMessage(to: "<teammate>", message: {type: "shutdown_request", reason: "phase complete"})
+
+# Once all teammates have replied with shutdown_response approve=true:
+TeamDelete()
+```
+
+If a teammate rejects shutdown, treat it as the phase being incomplete — read its reason, address, then retry.
+
+### Re-run Budget (Native)
+
+Same as parallel: max **1 re-run** per Agent Teams phase. If you re-run, prefer **reusing the existing team** (send a new brief via `SendMessage`) over `TeamDelete` + recreate — preserves task list continuity.
+
+---
+
+## Parallel Mode
+
+Use in `default` mode, or as fallback when native tools are unavailable.
+
+The orchestrator dispatches multiple sub-agents in a single message (parallel via multiple `Agent` tool calls), each works independently, and the orchestrator merges their outputs into a unified result. No inter-agent communication; the orchestrator is the only coordinator.
 
 ---
 

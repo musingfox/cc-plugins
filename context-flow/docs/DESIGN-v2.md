@@ -101,9 +101,12 @@ Agent Teams is skipped (single agent used instead) when:
 
 ### Implementation
 
-Agent Teams runs as **parallel sub-agent dispatch with orchestrator synthesis**: the orchestrator dispatches multiple sub-agents in a single message, each works independently, and the orchestrator merges their outputs.
+Two modes share the same angle definitions and Output Schema:
 
-A future "native" mode where teammates communicate directly via inter-agent messaging is a separate roadmap item and is not enabled in this version.
+- **Native Agent Teams** (`--deep` mode): teammates created via `TeamCreate`, communicate directly via `SendMessage`, can cross-check and debate findings. Higher quality on ambiguous goals at higher coordination cost.
+- **Parallel sub-agent dispatch** (`default` mode, or fallback): orchestrator dispatches teammates concurrently; each works independently; orchestrator synthesizes. Cheaper, no inter-agent coordination overhead.
+
+If `TeamCreate` / `SendMessage` are unavailable at runtime (older harness), native mode falls back to parallel and warns the human once.
 
 ### Re-run Budget
 
@@ -1137,6 +1140,6 @@ But the design does NOT optimize for minimum token usage. If a goal requires 3 r
 10. **Loop-backs are budgeted** — 2 re-runs per phase, 2 cross-phase loops; limits trigger escalation, not hard stops
 11. **Graceful degradation** — structured escalation with re-entry points; agents always provide analysis and options when stuck
 12. **Agents are pluggable** — the flow defines contracts, not agents; the orchestrator matches agent capabilities to phase requirements
-13. **Agent Teams default for research and review** — multi-perspective exploration (research) and multi-angle code review (review) by default, implemented via parallel sub-agent dispatch with orchestrator synthesis; skip to single agent only for trivially simple goals
+13. **Agent Teams default for research and review** — multi-perspective exploration (research) and multi-angle code review (review) by default; native Agent Teams (`TeamCreate` + `SendMessage`) for `--deep` mode where teammates can cross-check and debate, parallel sub-agent dispatch for `default` mode and as fallback; skip to single agent only for trivially simple goals
 14. **Simple-task skip, not complex-task trigger** — the previous ACS heuristic gating is replaced by skip conditions (single-file bugfix, typo, docs-only, user fast-path request); default is to use Agent Teams, not to avoid them
 15. **Parallel implement for independent contracts** — orchestrator builds dependency graph, identifies independent groups, spawns up to 3 parallel implement agents with separate worktrees, merges and runs integration tests before review

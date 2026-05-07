@@ -1,7 +1,7 @@
 ---
 description: "Context-flow pipeline — contract-driven development with human-in-the-loop decision gating"
 argument-hint: "[--fast|--deep] [--research=lite|standard|pro] [--plan=lite|standard|pro] [--implement=lite|standard|pro] [--review=lite|standard|pro] <goal>"
-allowed-tools: [Agent, Read, Write, Bash, Glob, Grep, AskUserQuestion]
+allowed-tools: [Agent, Read, Write, Bash, Glob, Grep, AskUserQuestion, TeamCreate, TeamDelete, SendMessage]
 ---
 
 # Context Flow Orchestrator
@@ -148,15 +148,25 @@ Every arrow between phases passes through you. At each transition you perform a 
 
 ### Agent Teams Default
 
-Research and Review phases use **Agent Teams by default** — implemented as **parallel sub-agent dispatch with orchestrator synthesis**. Each teammate works independently; the orchestrator merges results. (A future native mode where teammates communicate directly is tracked separately and not yet enabled.)
+Research and Review phases use **Agent Teams by default**. There are two implementations; pick one per phase based on mode:
 
-**Skip to single agent** when ANY of these apply:
+| Mode | Agent Teams implementation | Why |
+|------|----------------------------|-----|
+| `--deep` | **Native Agent Teams** — `TeamCreate` + named teammates that exchange `SendMessage` | Teammates can cross-check findings, debate severity, and converge on shared conclusions — better quality on ambiguous / complex goals |
+| `default` | **Parallel sub-agent dispatch** — orchestrator dispatches teammates concurrently and synthesizes | Cheap, no inter-agent coordination overhead; each teammate works independently |
+| `--fast` | Single agent (no teams) | See skip rules below |
+
+Native and parallel modes use the **same teammate angle/lens definitions and the same Output Schema** — only the coordination mechanism differs. Read `$PROTOCOL_DIR/agent-teams-protocol.md` for both Native Mode and Parallel Mode protocols.
+
+**Skip to single agent** when ANY of these apply (regardless of mode):
 - `--fast` mode is active
 - User explicitly requested a fast path in the goal
 - Goal is clearly a single-file bugfix, typo fix, or documentation-only change
 - Goal can be fully described in one sentence with no ambiguity
 
 When skipping, dispatch a single agent using the resolved tier for that stage.
+
+**Native mode availability fallback**: if `TeamCreate` or `SendMessage` is not available in your tool set at runtime (older harness), downgrade to parallel mode and warn the human once: *"Native Agent Teams unavailable — falling back to parallel dispatch."*
 
 ### Agent Teams Model Mixing
 

@@ -77,7 +77,7 @@ Plan defaults to `pro` because design decision quality is the pipeline's bottlen
 ## Key Features
 
 - **Dynamic model selection**: Orchestrator selects agent model tier per stage based on mode, per-stage overrides, and complexity assessment.
-- **Agent Teams by default**: Research and Review use multi-perspective Agent Teams by default; skip to single agent for trivially simple goals or `--fast` mode.
+- **Agent Teams by default**: Research and Review use multi-perspective Agent Teams by default. `--deep` mode runs **native Agent Teams** (`TeamCreate` + `SendMessage`) where teammates cross-check and debate; `default` mode runs **parallel sub-agent dispatch**; `--fast` mode and trivial goals skip to single agent. Native mode falls back to parallel if `TeamCreate` / `SendMessage` are unavailable.
 - **Agent Teams model mixing**: Lead teammate uses the stage's resolved tier; additional analytical teammates use one tier lower (minimum `standard`). Mechanical-inventory teammates may use `haiku`.
 - **Parallel implementation**: When contracts are independent, the orchestrator dispatches multiple implement agents concurrently with worktree isolation.
 - **Decision tiering**: Plan classifies decisions as High/Medium/Low impact. Human gate only blocks on High/Medium. Structural minimum rules prevent under-classification.

@@ -107,21 +107,39 @@ Goal: give research and implement a real path to verify external library / API b
 
 ---
 
-## Batch 4 — Native Agent Teams (≥ 0.4.0, blocked on external readiness)
+## Batch 4 — Native Agent Teams (0.4.0, shipped)
 
-Goal: when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is genuinely supported, complete the native-mode story.
+Goal: enable native Agent Teams now that `TeamCreate` / `SendMessage` / `TeamDelete` are stable in the Claude Code harness.
 
-Preconditions (provided by Claude Code harness):
-- `Agent` tool's `name` / `team_name` parameters are stable
-- `SendMessage` is reliable between sub-agents
-- `TeamCreate` is documented
+### What shipped
 
-Work:
-- Add `SendMessage`, `TeamCreate` to `commands/cf.md` `allowed-tools`
-- Rewrite the native branch in `docs/agent-teams-protocol.md`: explicit team setup, teammate naming rules, message templates
-- Add a fallback detector: if the env var is set but `SendMessage` is unavailable, downgrade to parallel mode and warn
+| # | Change | Files |
+|---|---|---|
+| 4.1 | Add `TeamCreate`, `TeamDelete`, `SendMessage` to `commands/cf.md` `allowed-tools` | `commands/cf.md` |
+| 4.2 | Rewrite "Agent Teams Default" section: native mode for `--deep`, parallel mode for `default`, single-agent skip for `--fast` and trivial goals | `commands/cf.md` |
+| 4.3 | Add **Native Mode** section to `agent-teams-protocol.md` — `TeamCreate` setup, teammate naming rules, `SendMessage` templates (cross-check, exploration help, completion), shutdown discipline (`shutdown_request` + `TeamDelete`) | `docs/agent-teams-protocol.md` |
+| 4.4 | Document fallback: if `TeamCreate` / `SendMessage` unavailable at runtime → downgrade to parallel mode + warn human once | `commands/cf.md`, `docs/agent-teams-protocol.md` |
+| 4.5 | Update `DESIGN-v2.md` Implementation section + Principle #13 to reflect both modes | `docs/DESIGN-v2.md` |
+| 4.6 | Update README Key Features bullet | `README.md` |
 
-**Out of scope for now.** Batch 1 already removes the empty native branch so users don't think native mode works today.
+### Decisions explicitly NOT taken
+
+| Discarded | Reason |
+|---|---|
+| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` env var as the gating signal | Original 0.2.x design used this env var because the feature was experimental. The tools are now first-class deferred tools — env-var gating became dead weight. Mode selection now uses the existing `--deep` flag, no new flag needed |
+| Native mode for `default` mode | Native coordination has token / latency overhead that doesn't pay off for routine goals. Reserve it for the explicit "I want maximum quality" knob (`--deep`) |
+| `--native` flag | Don't introduce a new flag when an existing one (`--deep`) carries the same intent ("higher quality, willing to pay more") |
+| Auto-detect tool availability up-front | The orchestrator's `allowed-tools` declares the tools; if the harness ignores them, the first `TeamCreate` call fails and we fall back. Cheaper than a preflight check on every run |
+
+### Re-run budget
+
+Native mode keeps the same **1 re-run per Agent Teams phase** budget as parallel. On re-run, prefer reusing the existing team (new `SendMessage` brief) over `TeamDelete` + recreate — preserves the team's task list continuity.
+
+### Out of scope (deferred)
+
+- Long-lived teams across multiple `/cf` invocations — every flow creates and tears down its own team
+- Teammate-initiated `shutdown_request` — only the orchestrator originates shutdown
+- Cross-phase team reuse (one team for both research and review) — phases use separate teams to keep angle/lens definitions decoupled
 
 ---
 
@@ -131,7 +149,7 @@ Work:
 0.2.3 = Batch 1 (blocking, hours)
 0.2.4 = Batch 2 (consistency, 1–2 days)
 0.3.0 = Batch 3 (tool/skill expansion, design RFC first, 2–3 days)
-0.4.0 = Batch 4 (native AT, blocked on external readiness)
+0.4.0 = Batch 4 (native AT, shipped)
 ```
 
 After each batch, run an end-to-end smoke test: one simple `/cf` goal and one complex one. Confirm transition validation, human gate, and loop budget all behave correctly.
