@@ -93,6 +93,14 @@ Plan defaults to `pro` because design decision quality is the pipeline's bottlen
 /plugin install context-flow
 ```
 
+### Optional Dependencies
+
+- **`ctx7` CLI** (`npm i -g ctx7` then `ctx7 login`) — enables research and implement phases to verify third-party library / API behavior with version-specific docs. Falls back to `WebFetch` if not installed. Without either, agents report Unresolved when the goal hinges on external behavior they can't infer from the local codebase.
+
+### Direct Sub-agent Invocation Caveat
+
+Agents (`@context-flow:research`, `@context-flow:plan`, etc.) are designed to be dispatched by the `/cf` orchestrator, which selects the model tier per stage at dispatch time. **If you invoke a sub-agent directly** (e.g., `@context-flow:research <goal>`), no `model:` is set in frontmatter, so it inherits the active session's model — the orchestrator's mode/tier mapping is bypassed. This is intentional (model is dispatch-time configuration), but it means direct invocation gives less predictable cost/quality. Prefer `/cf` for full pipeline behavior.
+
 ## Design Documentation
 
 See [docs/DESIGN-v2.md](docs/DESIGN-v2.md) for the full design rationale, contract structure, and detailed examples.

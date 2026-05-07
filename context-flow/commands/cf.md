@@ -79,9 +79,9 @@ Each stage has a single agent. Model tier is controlled via the Agent tool's `mo
 
 | Stage | Agent | Tools |
 |-------|-------|-------|
-| Research | `context-flow:research` | Read, Grep, Glob, Bash |
+| Research | `context-flow:research` | Read, Grep, Glob, Bash, WebFetch |
 | Plan | `context-flow:plan` | Read, Grep, Glob |
-| Implement | `context-flow:implement` | Read, Edit, Write, Bash, Glob, Grep |
+| Implement | `context-flow:implement` | Read, Edit, Write, Bash, Glob, Grep, WebFetch |
 | Review | `context-flow:review` | Read, Grep, Glob, Bash |
 
 ### Agent Dispatch

@@ -1,7 +1,6 @@
 ---
 name: plan
 description: "Design implementation plan with behavioral contracts and test cases"
-model: sonnet
 color: blue
 tools: Read, Grep, Glob
 ---

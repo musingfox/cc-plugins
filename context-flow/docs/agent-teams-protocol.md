@@ -68,6 +68,8 @@ Explore the codebase through your angle. Produce a capability inventory followin
 
 **Decision Points vs. Unresolved**: Unresolved = missing information that must be obtained. Decision Points = valid choices where multiple answers are correct and the human's preference decides. Don't conflate them.
 
+**External-source tagging**: when a teammate's finding comes from outside the local codebase (ctx7, WebFetch, library docs), it MUST carry an `[external: <source>]` tag. Synthesis preserves the tag — downstream phases need to distinguish facts with code evidence from facts with documentary evidence.
+
 ### Synthesis
 
 After all teammates complete, the orchestrator merges findings into a unified research output:
@@ -80,7 +82,7 @@ After all teammates complete, the orchestrator merges findings into a unified re
 {merged}
 
 ## Constraints
-{merged — if teammates found conflicting constraints, note both with evidence}
+{merged — if teammates found conflicting constraints, note both with evidence. Preserve `[external: <source>]` tags from teammate output verbatim.}
 
 ## Key Files
 {merged, deduplicated}

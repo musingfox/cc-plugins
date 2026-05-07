@@ -67,41 +67,43 @@ Goal: close schema gaps, stabilize counters, complete parallel-implement story, 
 
 ---
 
-## Batch 3 — Execution context expansion (0.3.0, requires design)
+## Batch 3 — Execution context expansion (0.3.0, shipped)
 
-Goal: let agents complete their work without stuffing extra information into the prompt — capability comes through dispatch-time injection. This is a minor bump because it changes what agents can do.
+Goal: give research and implement a real path to verify external library / API behavior instead of bouncing to Unresolved. Outcome of three independent reviews (spec / design / adversarial) reshaped the original plan substantially.
 
-### 3.1 Tool expansion
+### What shipped
 
-| Phase | Current | Add | Why |
-|---|---|---|---|
-| research | Read / Grep / Glob / Bash | + WebFetch, + context7 (`mcp__plugin_context7_context7__*`) | Verify external library / API behavior instead of guessing or kicking back as Unresolved |
-| plan | Read / Grep / Glob | unchanged | Read-only analysis is sufficient |
-| implement | Read / Edit / Write / Bash / Glob / Grep | unchanged | Already appropriate |
-| review | Read / Grep / Glob / Bash | + WebFetch (optional) | Validate CVEs / library advisories |
+| # | Change | Files |
+|---|---|---|
+| 3.1 | Remove `model:` frontmatter from all 4 agents — orchestrator overrides every dispatch, the line was dead | `agents/*.md` |
+| 3.2 | Add `WebFetch` to `tools:` for research and implement (NOT plan/review — no Unresolved-loop pain there) | `agents/research.md`, `agents/implement.md`, `commands/cf.md` Agent Registry |
+| 3.3 | Add **External Verification methodology** to research and implement — `ctx7 --version` probe (cross-shell), `ctx7 whoami` auth check, fact-extraction discipline (no raw doc paste), WebFetch fallback | `agents/research.md`, `agents/implement.md` |
+| 3.4 | Tag external-source findings with `[external: <source>]` in research output schema — synthesis and downstream phases need to distinguish code evidence from documentary evidence | `agents/research.md`, `docs/agent-teams-protocol.md` |
+| 3.5 | Document `ctx7` as optional dependency + warn about direct sub-agent invocation losing tier | `README.md` |
 
-**Note:** tools go in the `tools:` frontmatter of `agents/*.md`, not the orchestrator's `allowed-tools` (which only governs the orchestrator itself).
+### Decisions explicitly NOT taken (with reasons)
 
-### 3.2 Skill injection mechanism (new design)
+| Discarded | Reason |
+|---|---|
+| context7 MCP integration | CLI (`ctx7`) wins on every axis — 0 tool-schema overhead, no cross-plugin hard dependency, output is plain text (greppable, cap-able), failure is at invocation not load |
+| Skill injection mechanism (original 3.2) | **Spec-blocked**: Claude Code does not support dispatch-time skill injection; `skills:` frontmatter is the only mechanism, and it preloads full skill content (always-on cost). For our use case — telling research how to verify external behavior — a methodology block in the agent's own definition is sufficient and avoids the always-on cost of a skill. |
+| Trim `tools:` to minimum + inject specialty (original 3.3 lower half) | Without dispatch-time injection, `tools:` IS the capability surface; trimming it makes the agent useless |
+| WebFetch on plan / review | No evidence of Unresolved-loop pain there. Plan is read-only design; review is contract verification. CVE checks belong to the Agent Teams security lens, not the review main agent |
+| Domain-restrict WebFetch via permissions | Out of scope — no current threat model justifies the friction. Spec note: `WebFetch` in `tools:` allowlist grants all-domain access |
+| Inject lookup methodology via orchestrator dispatch context | **Contradicts B2.4**: Reporting Principles were explicitly framed as orchestrator-side reformat, not agent-prompt nudges. Methodology lives in agent identity, not dispatch hint |
 
-Don't hard-code skills into agent frontmatter — that pollutes every dispatch. Inject them in the orchestrator's dispatch context only when the phase task plausibly needs them:
+### Adversarial findings folded in
 
-```markdown
-## Available Skills
-- `find-docs`: when authoritative library/API behavior is needed
-- `adr-ref-guard`: when scanning for stale ADR references
-```
+- **ctx7 logged out** → methodology forces `ctx7 whoami` preflight; misleading "lookup failed" is replaced by actionable "run `ctx7 login`"
+- **100KB doc bloat** → methodology requires extracting 1-3 facts; raw doc paste forbidden
+- **`command -v` not portable** → use `ctx7 --version` instead
+- **Direct invocation loses tier** → README.md documents the caveat
 
-Add a "Skill Injection" section to `commands/cf.md` listing per-phase candidate skills and their trigger conditions.
+### Out of scope (deferred)
 
-### 3.3 Slim down agent identity
-
-- Remove the `model:` field from `agents/*.md` frontmatter — model is already chosen dynamically by the orchestrator.
-- Keep `tools:` to a "minimum common set" for that phase; specialized tools arrive via dispatch injection.
-
-**Verification:**
-- After context7 is granted, can the research agent answer "behavior diff between lib X v3 and v2" without a loop-back?
-- Are skills only visible to the agent when actually injected?
+- Native Agent Teams (Batch 4)
+- Loop-budget interaction with external-lookup retries (no observed flake rate yet — revisit if WebFetch transient failures cause spurious phase re-runs)
+- WebFetch permission-rule domain filter (no current threat model)
 
 ---
 
