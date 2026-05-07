@@ -52,6 +52,10 @@ Explore the codebase through your angle. Produce a capability inventory followin
 ## Key Files
 - `[file path]`: [why it matters for this goal]
 
+## Decision Points
+- [a valid choice your angle surfaced where the human's preference matters — what's at stake, options found, your tentative recommendation]
+  (omit this section if your angle surfaced no choices — only state-of-the-world findings)
+
 ## Completed
 - [What aspects were fully investigated] [confidence: high | medium]
 
@@ -61,6 +65,8 @@ Explore the codebase through your angle. Produce a capability inventory followin
   - Impact: [how this affects planning]
   - Suggested resolution: [suggestion]
 ```
+
+**Decision Points vs. Unresolved**: Unresolved = missing information that must be obtained. Decision Points = valid choices where multiple answers are correct and the human's preference decides. Don't conflate them.
 
 ### Synthesis
 

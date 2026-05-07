@@ -45,6 +45,14 @@ If the implement agent logged Concerns (forwarded to you by the orchestrator), r
 
 The "What Changed" section is the human's primary review surface. It must read like a release note, not a code summary.
 
+**Downstream-effect rule**: every bullet must answer *what will downstream observers see differently?* The test: if the bullet still describes the diff ("changed X to Y"), rewrite it as the consequence callers/users will observe.
+
+| ❌ Change itself | ✅ Consequence |
+|---|---|
+| "Added `requestReset()` in auth.ts" | "Users can now reset their password by email" |
+| "Changed `ORDER BY created_at DESC`" | "List endpoint now returns newest first — callers relying on old order will break" |
+| "Added `validateEmail()`" | "Signup endpoint now rejects emails that don't conform to RFC 5322" |
+
 - **Lead with outcome, not artifact**: "users can now reset their password by email" — never "added `requestReset()` in auth.ts".
 - **Use Before / After when behavior shifts**: "Before: list endpoint returned all rows. After: returns 50 rows + cursor."
 - **Use scope-and-reason for fixes/refactors**: "Switched session storage from in-memory to Redis (closes the data-loss-on-restart issue surfaced in research)."

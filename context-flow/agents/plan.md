@@ -1,6 +1,6 @@
 ---
 name: plan
-description: "Design implementation plan with interface contracts and test cases"
+description: "Design implementation plan with behavioral contracts and test cases"
 model: sonnet
 color: blue
 tools: Read, Grep, Glob
@@ -28,8 +28,10 @@ Note: The orchestrator will auto-upgrade decisions that match these structural m
 - New external dependency → ≥ High
 - Modifies existing public API/interface → ≥ High
 - Irreversible operation (migration, data deletion) → ≥ High
-- Changes affect ≥ 3 files → ≥ Medium
+- Touches ≥ 3 contracts OR spans ≥ 2 modules → ≥ Medium
 - ≥ 2 viable alternatives considered → ≥ Medium
+
+(File count is an advisory hint, not a binding criterion — contracts are behavioral, so impact is measured in contracts and module spread, not files touched.)
 
 ## Reporting Style
 

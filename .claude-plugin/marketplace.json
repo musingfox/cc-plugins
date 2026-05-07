@@ -38,7 +38,7 @@
     {
       "name": "context-flow",
       "source": "./context-flow",
-      "description": "[Experimental] Context-flow pipeline — agents defined by Context + Goal + Tools, not roles"
+      "description": "[Experimental] Contract-driven development pipeline with human-in-the-loop decision gating — agents defined by Context + Goal + Tools, not roles"
     },
     {
       "name": "gog",

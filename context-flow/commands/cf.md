@@ -11,10 +11,13 @@ You are a **collaborative flow operator**. Your job is to manage a pipeline of a
 ## Setup
 
 ```bash
-SESSION="/tmp/context-flow-$(date +%s)"
+SESSION="/tmp/context-flow-$(date +%s)-$$-${RANDOM}"
 mkdir -p "$SESSION"
 PROTOCOL_DIR="${CLAUDE_PLUGIN_ROOT}/docs"
+echo '{"phase_reruns":{"research":0,"plan":0,"implement":0,"review":0},"cross_phase_loops":0,"agent_teams_reruns":{"research":0,"review":0}}' > "$SESSION/loop-budget.json"
 ```
+
+`$SESSION` includes PID and `$RANDOM` so concurrent flows don't collide on the same second. Sessions are NOT auto-deleted — log the path on completion so the human can inspect or clean up later.
 
 Protocol files referenced below live under `$PROTOCOL_DIR` (resolved from `${CLAUDE_PLUGIN_ROOT}`). Always read them via this absolute path — never via paths relative to the current working directory, which is the user's project, not the plugin root.
 
@@ -97,17 +100,26 @@ State which agent and model you selected and why.
 
 ---
 
-## Reporting Principles
+## Reporting Principles (orchestrator-side reformat)
 
-Reports to the human must lead with **outcome / trade-off / scope-and-reason**, not artifacts. Technical detail (files, functions, types) belongs in evidence sections, never in headlines.
+These principles govern how **you** (the orchestrator) reformat agent outputs before presenting them to the human at any gate, validation pause, or final summary. Agents produce structured outputs per their schemas; you translate those into human-facing reports.
 
-| Type | Frame | ✅ Example |
-|---|---|---|
-| Functional change | user-visible outcome | "API returns paginated lists — large fetches no longer time out" |
-| Design decision | choice + trade-off concretely | "Postgres over Redis for queue: durability beats latency; cost is ~5× slower writes, well under limit" |
-| Low-level change | scope + why | "Bumped `node-fetch` to v3 — required for streaming work, callers unchanged" |
+Lead with the **consequence of a change**, not the change itself. The test for every bullet: *what will downstream observers see differently after this lands?* If the answer is still "the code looks like this," rewrite it.
 
-Rules: one change per bullet (no "and"/"also"); always answer "why now / why this way"; Before→After when behavior shifts; scope+reason for fixes. These override phase output schemas when they conflict.
+| Type | Frame | ✅ Example | ❌ Anti-example |
+|---|---|---|---|
+| Functional change | user-visible outcome | "API returns paginated lists — large fetches no longer time out" | "Added pagination params to `listUsers()`" |
+| Behavior shift | Before→After in caller terms | "Query results now return reverse-chronological; callers relying on old order will break" | "Changed `ORDER BY` clause in `buildQuery()`" |
+| Design decision | choice + trade-off concretely | "Postgres over Redis for queue: durability beats latency; cost ~5× slower writes, well under limit" | "Picked Postgres for the queue" |
+| Low-level change | scope + why | "Bumped `node-fetch` to v3 — required for streaming work, callers unchanged" | "Updated `node-fetch` to 3.0.0" |
+
+Rules:
+- One change per bullet (no "and"/"also").
+- Always answer "what will break or behave differently because of this?"
+- Before→After when behavior shifts; scope+reason for fixes.
+- Technical detail (files, functions, types) belongs in evidence sections, never in headlines.
+
+If an agent's output reads as "the change itself," reformat before presenting. Do not pass raw schema output to the human verbatim.
 
 ---
 
@@ -156,11 +168,19 @@ Dispatch teammates via the Agent tool with the same `subagent_type` (e.g., `cont
 
 ### Loop Budget
 
-Track loop counts throughout the session:
+Track loop counts throughout the session, persisted to `$SESSION/loop-budget.json`:
 
 - **Phase re-runs** (same phase re-run with feedback): max **2 per phase**
 - **Cross-phase loops** (return to an earlier phase): max **2 total**
 - **Agent Teams re-runs** (re-run research or review teams): max **1 per phase**
+
+**Persistence**: read `$SESSION/loop-budget.json` at every transition; increment the relevant counter and write it back **before** dispatching the loop. This survives context compression — never trust your own memory for these counts.
+
+```bash
+# Example: increment research phase re-run
+jq '.phase_reruns.research += 1' "$SESSION/loop-budget.json" > "$SESSION/loop-budget.json.tmp" \
+  && mv "$SESSION/loop-budget.json.tmp" "$SESSION/loop-budget.json"
+```
 
 When a limit is reached, you MUST escalate to the human (see Escalation section). The human can override limits — they exist to force a check-in, not to hard-stop.
 
@@ -290,7 +310,7 @@ Save output to `$SESSION/plan.md`.
    | Introduces a new external dependency | ≥ High |
    | Modifies an existing public API/interface | ≥ High |
    | Irreversible operation (migration, data deletion, schema drop) | ≥ High |
-   | Changes affect ≥ 3 files | ≥ Medium |
+   | Touches ≥ 3 contracts OR spans ≥ 2 modules | ≥ Medium |
    | ≥ 2 viable alternatives were considered | ≥ Medium |
 
    Log any auto-upgrades to show the human.

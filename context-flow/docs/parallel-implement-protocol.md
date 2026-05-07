@@ -51,11 +51,45 @@ Implement these contracts. Write the tests. All tests must pass.
 
 ## After All Parallel Agents Complete
 
-1. Merge all worktrees back to main working directory
-2. Run **all** test cases together (integration test)
-3. If integration test fails:
-   - Examine the failure
-   - If it's a contract interaction issue → escalate to human with analysis
-   - If it's a simple merge conflict → attempt resolution or escalate
+### Merge Strategy
+
+Each worktree has its own branch (Agent tool with `isolation: "worktree"` returns the branch name). Merge them back into the main working directory in dependency order:
+
+```bash
+# For each worktree branch returned by the parallel agents:
+git merge --no-ff <worktree-branch> -m "merge: <group-name> contracts"
+```
+
+**Why `--no-ff`**: keeps a clear merge commit per group, so the history shows which contracts came from which parallel agent. Aids debugging if integration tests fail.
+
+**Order**: merge in dependency order if the groups have any cross-references (e.g., shared test fixtures). Truly independent groups can merge in any order.
+
+### Conflict Handling
+
+Independent groups should **not** produce file-level conflicts (that's the point of independence detection). If `git merge` reports a conflict, treat it as a signal that independence detection was wrong:
+
+- **File-level conflict (same file edited)** → independence detection failed. Abort the merge (`git merge --abort`), escalate to human with: which contracts conflict, which file, and a recommendation to either (a) re-run sequentially, or (b) split the contract differently.
+- **Semantic conflict (no git conflict but tests fail after merge)** → see Integration Test below.
+
+### Integration Test
+
+After all merges succeed:
+
+1. Run **all** test cases from the original plan together (not just per-group).
+2. If integration test fails:
+   - **Contract interaction issue** (one contract's behavior breaks another) → escalate to human with the failing test, the two contracts involved, and your hypothesis.
+   - **Test infrastructure issue** (e.g., shared fixture broken) → attempt one fix, then escalate if still failing.
+
+### Worktree Cleanup
+
+Once merges are complete and integration tests pass, remove the worktrees:
+
+```bash
+git worktree list                     # list active worktrees
+git worktree remove <path>            # remove each parallel worktree
+git branch -d <worktree-branch>       # delete the merged branch
+```
+
+Do NOT clean up worktrees if integration tests failed — the human may need to inspect them.
 
 Proceed to review validation only after integration test passes.

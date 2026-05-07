@@ -26,6 +26,8 @@ One short paragraph naming the specific risk this gate catches and what we'd def
 
 When grouping contracts into one outcome bullet, synthesize a single outcome from the grouped `Effect` lines — don't pick one and drop the rest. State assumptions in user/system terms ("passwords sync immediately"), not implementation terms.
 
+**Downstream-effect rule**: every "What will change" bullet must describe what downstream observers (users, callers, operators) will see differently — not the code-level diff. If you're tempted to write "added X" or "changed Y", reframe as "users can now…" / "callers relying on old behavior will break because…". The human is approving consequences, not edits.
+
 The gate header already covers why scope/assumptions need review — **no per-bullet "Why ask you"**. Per-item "Why ask you" is required only on Decisions (each has a different reason).
 
 ## 3. Decisions (only for High/Medium)

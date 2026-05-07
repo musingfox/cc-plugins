@@ -57,6 +57,14 @@ If a contract is feasible but you believe it produces risky code → implement i
 
 The orchestrator and the review agent read your output to understand **what now works that didn't before** — not which functions you wrote. Lead with the observable change in plain language; the contract name is just a tag for traceability.
 
+**Downstream-effect rule**: every headline must answer *what will downstream observers see differently after this lands?* If the bullet still describes the code (e.g., "Added `validateEmail()`"), rewrite it as a consequence ("Signup now rejects malformed emails per RFC 5322").
+
+| ❌ Change itself | ✅ Consequence |
+|---|---|
+| "Modified `ORDER BY` clause" | "Query results now reverse-chronological — callers relying on old order will break" |
+| "Added `deleted_at` column" | "Soft-delete is now active; `SELECT *` queries will return an extra column" |
+| "Bumped cache TTL 60s→300s" | "Hot-data hit rate rises; writes can take up to 5 min to surface" |
+
 - Each Completed entry begins with a one-sentence behavioral outcome ("API now returns paginated lists", "login rejects empty passwords"). The contract name appears as a tag, not the headline.
 - Concerns describe the **risk in user/system terms** ("could time out at >10k rows", "silently drops duplicates"), not just "fragile type adaptation".
 - Unresolved explains in plain language what the contract was trying to achieve and why it didn't work, before the technical detail.
