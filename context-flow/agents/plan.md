@@ -29,7 +29,9 @@ Note: The orchestrator will auto-upgrade decisions that match these structural m
 - Modifies existing public API/interface → ≥ High
 - Irreversible operation (migration, data deletion) → ≥ High
 - Touches ≥ 3 contracts OR spans ≥ 2 modules → ≥ Medium
-- ≥ 2 viable alternatives considered → ≥ Medium
+- ≥ 2 alternatives with material trade-offs considered → ≥ Medium
+
+**Material trade-off** means the alternatives differ on at least one of: reversibility, performance, UX behavior, dependency footprint, or security surface. Pure style differences (e.g., "extend existing object literal vs. add a separate `module.exports.x =` line") are NOT material — they're advisory only and stay Low.
 
 (File count is an advisory hint, not a binding criterion — contracts are behavioral, so impact is measured in contracts and module spread, not files touched.)
 

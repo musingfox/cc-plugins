@@ -311,7 +311,7 @@ Save output to `$SESSION/plan.md`.
    | Modifies an existing public API/interface | ≥ High |
    | Irreversible operation (migration, data deletion, schema drop) | ≥ High |
    | Touches ≥ 3 contracts OR spans ≥ 2 modules | ≥ Medium |
-   | ≥ 2 viable alternatives were considered | ≥ Medium |
+   | ≥ 2 alternatives with material trade-offs were considered | ≥ Medium |
 
    Log any auto-upgrades to show the human.
 
