@@ -250,17 +250,26 @@ The orchestrator maintains a registry of available agents and their capabilities
 
 **Output Contract**:
 ```markdown
+## Investigated
+- `path/to/file.ext` — [why this file backs a contract or decision]
+
+## Assumptions
+- [Unverified premise] — affects: [Contract A] — if false: [what breaks]
+
 ## Decisions
 
 ### [Decision Title]
 - **Impact**: High | Medium | Low
-- **Choice**: [What was decided]
-- **Alternatives considered**: [What else was possible and why it was rejected]
-- **Rationale**: [Why this choice]
+- **Choice**: [What was decided, in plain language]
+- **Trade-off**: [what we gain | what we give up | what becomes hard to change later]
+- **Alternatives considered**: [other options + one-line reason each was rejected]
+- **Rationale**: [Why this choice fits the goal and constraints]
 
 ## Behavioral Contracts
 
 ### [Contract Name]
+- **Effect**: [one sentence — what becomes possible or behaves differently]
+- **purpose**: [which part of the goal this contract fulfills]
 - **input**: [exact types/parameters]
 - **output**: [exact return types]
 - **errors**: [error conditions and handling]
@@ -282,6 +291,8 @@ The orchestrator maintains a registry of available agents and their capabilities
   - [Suggested resolution path]
 ```
 
+**Bail-out — Research Insufficiency**: When the plan agent cannot produce a plan that meets the goal because research output is inadequate (missing files, uncharacterized behavior, contradictory facts), it returns ONLY a `## Research Insufficiency` section with `Status: BLOCKED` and a list of gaps + investigation requests — skipping Decisions/Contracts/Implementation Plan entirely. The orchestrator detects this signal and loops back to research with the gaps as an enriched goal (cross-phase loop). This keeps the research/plan boundary clean: research owns codebase facts, plan owns design.
+
 **Decision Tiering**:
 
 | Impact | Criteria | Human Gate |
@@ -297,12 +308,15 @@ The orchestrator maintains a registry of available agents and their capabilities
 | Introduces a new external dependency | ≥ High |
 | Modifies an existing public API/interface | ≥ High |
 | Irreversible operation (migration, data deletion, schema drop) | ≥ High |
-| Changes affect ≥ 3 files | ≥ Medium |
-| ≥ 2 viable alternatives exist and were considered | ≥ Medium |
+| Touches ≥ 3 contracts OR spans ≥ 2 modules | ≥ Medium |
+| ≥ 2 alternatives with material trade-offs were considered | ≥ Medium |
+
+A "material trade-off" means the alternatives differ on at least one of: reversibility, performance, UX behavior, dependency footprint, or security surface. Pure style differences are not material.
 
 If the plan agent classifies a decision below the structural minimum, the orchestrator **automatically upgrades** it. This prevents strategic under-classification and does not require judgment — it is a deterministic check.
 
 **Orchestrator validates before Human Gate**:
+- **Research Insufficiency check (first)**: if plan output contains `## Research Insufficiency` with `Status: BLOCKED`, do NOT proceed — loop back to research with gaps as enriched goal (cross-phase loop). Second occurrence in one session escalates to human instead of looping again.
 - Every research constraint is addressed by at least one contract **test case** or explicitly acknowledged in Unresolved with justification. Constraints that are not captured as test cases are considered unverifiable — the plan must either add a test or explain why the constraint is not testable.
 - Every behavioral contract has at least one test case with concrete values
 - Every decision has an impact level assigned and passes structural minimum rules

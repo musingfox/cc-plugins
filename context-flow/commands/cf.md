@@ -314,6 +314,13 @@ Save output to `$SESSION/plan.md`.
 
 ### Transition Validation: Plan → Human Gate
 
+0. **Research Insufficiency check** (run before all other checks):
+   - If plan output contains a `## Research Insufficiency` section with `Status: BLOCKED`, the plan agent has declared research inadequate.
+   - Do NOT proceed with the plan. Do NOT treat this as a plan phase re-run.
+   - Build an enriched research goal: original goal + the listed gaps + investigation requests.
+   - Loop back to Phase 1 (Research) with the enriched goal. This counts as a **cross-phase loop** — increment `cross_phase_loops` in the loop budget before dispatching.
+   - On the second occurrence within one session (same flow already looped plan→research once and is bouncing again), escalate to the human instead of looping again — repeated insufficiency signals a goal/scope problem research alone won't solve.
+
 1. **Structural check**:
    - Has "Decisions" section with Impact/Choice/Alternatives/Rationale per decision
    - Has "Behavioral Contracts" with input/output/errors/depends + test cases per contract

@@ -45,6 +45,16 @@ Your output is read by the human (at the gate) and the implement agent. The huma
 ## Output Schema
 
 ```markdown
+## Investigated
+- `path/to/file.ext` — [one sentence: why this file is relevant to the plan]
+
+(List the key files you read while planning. This is evidence of depth — a plan that names contracts and decisions without citing the files they touch is suspect. Skip files only glanced at for orientation; include any file whose content shaped a decision or contract.)
+
+## Assumptions
+- [Assumption stated as a fact] — affects: [Contract A, Decision B] — if false: [what breaks]
+
+(List anything you are taking as given without verifying in this session: existing behavior of code you didn't read, library semantics you didn't check, environmental constraints, prior decisions. If an assumption being wrong would invalidate a contract, the human needs to see it.)
+
 ## Decisions
 
 ### [Decision Title]
@@ -88,6 +98,28 @@ Your output is read by the human (at the gate) and the implement agent. The huma
   - Suggested resolution: [recommendation or options for the human]
 ```
 
+## When Research Is Insufficient
+
+If the research output cannot support a plan that meets the goal — e.g., a constraint references behavior research didn't characterize, the goal touches a module research didn't map, or research's facts contradict each other — **stop and report**. Do NOT:
+
+- Self-investigate by reading files beyond what research cited (your tools allow it; the workflow forbids it)
+- Guess the missing facts and bury the guess in Assumptions
+- Produce a partial plan covering only the parts you can defend
+
+Instead, return ONLY the following section (skip Decisions, Contracts, Implementation Plan):
+
+```markdown
+## Research Insufficiency
+- **Status**: BLOCKED
+- **Gaps**:
+  - [What's missing — be specific: which file, which behavior, which interface]
+    - **Why needed**: [which contract or decision cannot be made without it]
+    - **Investigation request**: [what research should look into — file paths, modules, or questions]
+  (repeat per gap)
+```
+
+The orchestrator will loop back to research with these gaps as an enriched goal. This keeps the research/plan boundary clean: research owns codebase facts, plan owns design.
+
 ## What Is NOT a Contract
 
 Operations with no meaningful input/output interface — database migrations, config file changes, file moves — belong in the Implementation Plan as prerequisites, not as behavioral contracts.
@@ -110,3 +142,15 @@ Do NOT generate a diagram for single-contract or trivially linear plans.
 - Every research constraint must be addressed by a test case OR explicitly listed in Unresolved with justification.
 - Do not define contracts for trivial operations (file creation, import changes).
 - There is no "low confidence." If you are guessing at a decision, put it in Unresolved.
+
+## Before Returning
+
+Run this self-check before producing your final output. If any item fails, fix the plan — do not return a known-incomplete plan and rely on the human gate to catch it.
+
+- [ ] **Investigated** lists every file whose content backs a contract, decision, or impl-plan target.
+- [ ] **Assumptions** lists every unverified premise; each names which contract/decision depends on it.
+- [ ] Every High/Medium decision has Trade-off, Alternatives, and Rationale (not merged).
+- [ ] Every behavioral contract has Effect, purpose, input, output, errors, depends, and ≥1 concrete test case.
+- [ ] Every research constraint is either covered by a test case or listed in Unresolved with justification.
+- [ ] No "low confidence" guesses leaked into Decisions or Contracts — guesses live in Unresolved.
+- [ ] Implementation Plan steps each cite the contract they fulfill.
