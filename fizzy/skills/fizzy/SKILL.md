@@ -1,13 +1,9 @@
 ---
 name: fizzy
-description: |
-  This skill should be used when the user wants to interact with Fizzy project management.
-  Covers boards, cards, columns, comments, steps, reactions, tags, users, notifications,
-  pins, webhooks, and account settings via the Fizzy CLI. Triggered by phrases like
-  "create card", "my cards", "my tasks", "assigned to me", "search fizzy", "check fizzy",
-  "check notifications", "move card", "close card", "fizzy board", "pinned cards",
-  "link to fizzy", "track in fizzy", or any mention of fizzy.do URLs.
-  Use for ANY Fizzy question or action.
+description: >-
+  Use the Fizzy CLI for project management — boards, cards, columns, comments,
+  steps, tags, notifications, pins, webhooks, account. Triggers on any Fizzy
+  task/card/board action or fizzy.do URL.
 ---
 
 # Fizzy — Project Management via Fizzy CLI
