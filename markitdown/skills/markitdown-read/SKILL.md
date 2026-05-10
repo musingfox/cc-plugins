@@ -1,14 +1,9 @@
 ---
 name: MarkItDown Read
 description: >-
-  This skill should be used when the user asks to read, open, analyze, summarize,
-  or extract content from non-plain-text files such as PDF (.pdf), Word (.docx),
-  PowerPoint (.pptx), Excel (.xlsx, .xls), images (.jpg, .jpeg, .png, .gif, .bmp,
-  .tiff, .webp), audio (.mp3, .wav, .m4a, .ogg, .flac), HTML (.html, .htm),
-  EPUB (.epub), CSV (.csv), JSON (.json), XML (.xml), or ZIP (.zip) files.
-  Also triggered when the user references these file types by name or wants to
-  understand the contents of a document, spreadsheet, presentation, or media file.
-  This skill converts files to Markdown via the markitdown CLI for seamless reading.
+  Use when reading, summarizing, or extracting from non-plain-text files —
+  PDF, Office docs (Word/Excel/PowerPoint), images, audio, HTML, EPUB, archives,
+  and structured data (CSV/JSON/XML). Converts via the markitdown CLI.
 ---
 
 # MarkItDown Read

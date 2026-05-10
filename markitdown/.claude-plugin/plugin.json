@@ -1,6 +1,6 @@
 {
   "name": "markitdown",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Convert PDF, Office documents, images, and more to Markdown using Microsoft's MarkItDown",
   "author": {
     "name": "musingfox"
