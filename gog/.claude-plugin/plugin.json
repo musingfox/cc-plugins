@@ -1,6 +1,6 @@
 {
   "name": "gog",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Skills for using Google Workspace via gogcli (gog) CLI — Gmail, Calendar, Drive",
   "author": {
     "name": "musingfox"

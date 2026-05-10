@@ -253,7 +253,7 @@ cc-plugins/
 ├── gog/                          # Google Workspace CLI skills
 │   ├── .claude-plugin/
 │   │   └── plugin.json
-│   └── skills/                   # gog-gmail, gog-calendar, gog-drive
+│   └── skills/                   # gog (single skill, references/{gmail,calendar,drive}.md)
 ├── markitdown/                   # File-to-Markdown converter
 │   ├── .claude-plugin/
 │   │   └── plugin.json
