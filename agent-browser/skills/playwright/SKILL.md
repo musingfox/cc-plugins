@@ -1,13 +1,9 @@
 ---
 name: playwright
 description: >-
-  This skill should be used when the user asks to "write a Playwright test", "create E2E tests",
-  "add test assertions", "set up Playwright", "write a test spec", "use Playwright locators",
-  "check element visibility", "test a web page", or mentions Playwright, @playwright/test,
-  E2E testing, browser testing, or test automation frameworks. Focuses on writing and structuring
-  Playwright tests with high-precision locator strategies.
-  Do NOT use for interactive browser exploration or debugging live pages — use agent-browser
-  or web-test instead.
+  Use to write or set up Playwright / @playwright/test E2E tests — test specs, locators,
+  assertions, fixtures, config. Focuses on structuring tests with high-precision locator
+  strategies. Not for live page exploration or debugging (use agent-browser or web-test).
 ---
 
 # Playwright Test Writing

@@ -1,13 +1,9 @@
 ---
 name: agent-browser
 description: >-
-  This skill should be used when the user asks to "browse a web page", "open a URL in the browser",
-  "click an element", "fill a form field", "take a screenshot of a page", "inspect page elements",
-  "get a page snapshot", "interact with a website", "automate a browser", "scrape a web page",
-  "extract data from a website", "read a web page", or mentions the agent-browser CLI.
-  Provides the ref-based browser automation workflow for AI agents.
-  Do NOT use when the user wants to write Playwright test code or generate test files —
-  use the playwright or web-test skill instead.
+  Use for live browser automation via the agent-browser CLI — open URLs, snapshot pages,
+  click/fill/screenshot, inspect elements, scrape or read web pages. Ref-based workflow
+  for AI agents. Not for writing Playwright test files (use playwright or web-test).
 ---
 
 # agent-browser
