@@ -19,8 +19,8 @@ The caller passes:
 
 ## Execution
 
-1. Read `${CLAUDE_PLUGIN_ROOT}/skills/<mode>/SKILL.md`.
-2. Follow the skill's instructions exactly, treating `args` as the user input.
+1. Read `${CLAUDE_PLUGIN_ROOT}/operator-modes/<mode>.md`.
+2. Follow the mode's instructions exactly, treating `args` as the user input.
 3. Use `obsidian` CLI for all vault I/O. Never bypass with raw filesystem writes into the vault. The `obsidian:obsidian-cli` skill is preloaded into your context — consult it for syntax. Fall back to `obsidian help` / `obsidian <subcommand> --help` only if the skill doesn't cover what you need. Do not guess flag names.
 4. Destructive operations (delete, archive-with-move, supersede, full-body overwrite) require explicit confirmation via `AskUserQuestion` before executing.
 5. For `init`, use `AskUserQuestion` for the interactive choices the skill requires.
