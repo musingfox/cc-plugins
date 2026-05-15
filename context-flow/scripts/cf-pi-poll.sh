@@ -19,6 +19,12 @@ SESSION="$1"
 # shellcheck source=/dev/null
 . "$SESSION/env.sh"
 
+# Transport multiplex: opt into RPC mode via PI_TRANSPORT=rpc (default: text).
+if [ "${PI_TRANSPORT:-text}" = "rpc" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  exec "$SCRIPT_DIR/cf-pi-rpc-poll.sh" "$SESSION"
+fi
+
 STALL_THRESHOLD="${PI_STALL_THRESHOLD_S:-180}"
 WALL_CLOCK="${PI_WALL_CLOCK_S:-1800}"
 PI_PID=$(cat "$SESSION/pi.pid" 2>/dev/null)

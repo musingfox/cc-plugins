@@ -16,12 +16,25 @@ All Phase 3 mechanics live in `${CLAUDE_PLUGIN_ROOT}/scripts/cf-pi-*.sh`. The or
 
 ```bash
 SCRIPTS="${CLAUDE_PLUGIN_ROOT}/scripts"
-SESSION=$("$SCRIPTS/cf-pi-setup.sh")    # also honors PI_PROVIDER / PI_MODEL / PI_STALL_THRESHOLD_S / PI_WALL_CLOCK_S in env
-. "$SESSION/env.sh"                      # exposes SESSION_BASENAME, BRIEF_FILE, REPORT_FILE, PI_PROTOCOL, PI_STDOUT, PI_STDERR, PI_SESSION_DIR, CLEANUP_SCRIPT, PI_DESC, PI_AVAILABLE, NATIVE_AT_AVAILABLE, thresholds
+SESSION=$("$SCRIPTS/cf-pi-setup.sh")    # honors PI_PROVIDER / PI_MODEL / PI_TRANSPORT / PI_STALL_THRESHOLD_S / PI_WALL_CLOCK_S in env
+. "$SESSION/env.sh"                      # exposes SESSION_BASENAME, BRIEF_FILE, REPORT_FILE, PI_PROTOCOL, PI_STDOUT, PI_STDERR, PI_SESSION_DIR, CLEANUP_SCRIPT, PI_DESC, PI_TRANSPORT, PI_AVAILABLE, NATIVE_AT_AVAILABLE, thresholds
 echo "SESSION=$SESSION"
 ```
 
 Re-source `$SESSION/env.sh` at the top of every subsequent Bash call so paths stay consistent. Sessions are NOT auto-deleted — log the path on completion so the human can inspect.
+
+### Transport (`PI_TRANSPORT`)
+
+- `text` *(default)* — pi runs in print-mode (`pi -p`); orchestrator polls the session JSONL for completion via mtime/`kill -0`/grep.
+- `rpc` *(opt-in)* — pi runs in `--mode rpc`; orchestrator reads the live event stream from `$SESSION/rpc-events.jsonl` and uses `agent_end` as the completion signal. Enables future use of `abort`/`steer`/`get_session_stats` commands.
+
+Set in user/project `settings.json`:
+
+```json
+{ "env": { "PI_TRANSPORT": "rpc" } }
+```
+
+Both transports go through the same `cf-pi-dispatch.sh` / `cf-pi-poll.sh` / `cf-pi-stop.sh` entry points; the multiplex is internal. Orchestrator behavior is identical — same status prefixes (`ALIVE`/`DONE`/`STALL`/`ERROR`/`TIMEOUT`/`NO_PID`/`NO_JSONL`/`NO_JSONL_FAIL`).
 
 ### Argument Parsing
 
@@ -225,7 +238,7 @@ PI_PID=$("$SCRIPTS/cf-pi-dispatch.sh" "$SESSION")
 echo "$PI_PID"
 ```
 
-The script enforces the §1 hard rules (`$PI_PROTOCOL`): brief via `@file`, `--provider`/`--model` only when env-overridden, mandatory `--session-dir`, no `--no-session`, no `--mode json`, background + `disown`. PID and start timestamp are written to disk so the poll script reads state without depending on orchestrator memory.
+The script enforces the §1 hard rules (`$PI_PROTOCOL`) for the resolved transport: `--provider`/`--model` only when env-overridden, mandatory `--session-dir`, no `--no-session`, no `--mode json`, background + `disown`. In `text` transport the brief goes via `@file`; in `rpc` transport it is embedded in the initial `prompt` command via `jq -cRs`. PID and start timestamp are written to disk so the poll script reads state without depending on orchestrator memory.
 
 State to the human: "Dispatching Pi (`$PI_DESC`) on N contracts. Brief: `$BRIEF_FILE`. Monitoring session JSONL at `$PI_SESSION_DIR`."
 
@@ -254,11 +267,14 @@ Parse the status prefix and dispatch:
 
 **Monitor-failure tolerance — non-negotiable**: if the poll Bash call itself fails (harness timeout, exit≠0 with no status line, Task crash), re-poll next round. **Pi is only declared failed when a kill-status line is read from a *successful* poll.** Up to 3 consecutive poll failures before escalation; verify with `kill -0 $(cat $SESSION/pi.pid)` from a fresh Bash call before declaring Pi dead.
 
-**Kill helper** (used when a kill-status fires):
+**Stop helper** (used when a kill-status fires AND after DONE in RPC mode):
 
 ```bash
-P=$(cat "$SESSION/pi.pid"); kill -TERM "$P" 2>/dev/null; sleep 2; kill -9 "$P" 2>/dev/null
+"$SCRIPTS/cf-pi-stop.sh" "$SESSION" --abort   # kill-status paths (STALL/TIMEOUT/ERROR/NO_JSONL_FAIL)
+"$SCRIPTS/cf-pi-stop.sh" "$SESSION"           # graceful close (DONE path — required in RPC mode)
 ```
+
+Transport-aware: in text mode this `SIGTERM`→`SIGKILL`s `pi.pid`; in RPC mode it sends `{"type":"abort"}` (when `--abort` is passed) then closes pi's stdin via the fifo holder. On DONE in text mode the call is a no-op (pi already exited); in RPC mode it is **required** because pi stays alive after `agent_end` waiting for the next command.
 
 **Bounded post-mortem** (kill-status paths only; on DONE the report is the post-mortem):
 

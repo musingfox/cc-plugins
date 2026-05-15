@@ -20,6 +20,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 session="$1"
 load_cf_pi_env "$session"
 
+# Transport multiplex: opt into RPC mode via PI_TRANSPORT=rpc (default: text).
+if [ "${PI_TRANSPORT:-text}" = "rpc" ]; then
+  exec "$SCRIPT_DIR/cf-pi-rpc-dispatch.sh" "$session"
+fi
+
 date +%s > "$session/pi-start.ts"
 
 cd "$WORK"

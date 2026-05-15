@@ -27,6 +27,13 @@ JSON
 
 PI_PROVIDER="${PI_PROVIDER:-}"
 PI_MODEL="${PI_MODEL:-}"
+PI_TRANSPORT="${PI_TRANSPORT:-text}"
+case "$PI_TRANSPORT" in
+  text|rpc) ;;
+  *)
+    echo "cf-pi-setup: invalid PI_TRANSPORT=$PI_TRANSPORT (must be text|rpc)" >&2
+    exit 1 ;;
+esac
 if [ -n "$PI_PROVIDER" ] || [ -n "$PI_MODEL" ]; then
   PI_DESC="${PI_PROVIDER:-<pi-default-provider>}/${PI_MODEL:-<pi-default-model>}"
 else
@@ -53,6 +60,7 @@ CLEANUP_SCRIPT="$SESSION/cleanup.sh"
 PI_PROVIDER="$PI_PROVIDER"
 PI_MODEL="$PI_MODEL"
 PI_DESC="$PI_DESC"
+PI_TRANSPORT="$PI_TRANSPORT"
 PI_STALL_THRESHOLD_S="${PI_STALL_THRESHOLD_S:-180}"
 PI_WALL_CLOCK_S="${PI_WALL_CLOCK_S:-1800}"
 PI_AVAILABLE=$PI_AVAILABLE
