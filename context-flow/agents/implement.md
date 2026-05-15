@@ -95,6 +95,33 @@ The orchestrator and the review agent read your output to understand **what now 
   - Suggested resolution: [what would unblock this]
 ```
 
+## Return Format
+
+The orchestrator's dispatch prompt includes a `Report path:` line — an absolute file path. **Write your full output (matching Output Schema above) to that path before replying.**
+
+Your reply to the orchestrator MUST be exactly this shape and contain nothing else:
+
+```
+Report written: <absolute path>
+
+## Summary
+- {≤6 bullets, ≤200 words total — release-note framing, what now works / what failed}
+
+## Completed contracts
+- {one-line "ContractName: outcome" per completed contract}
+
+## Concerns (titles only)
+- {concern headline} per item, omit if none
+
+## Unresolved contracts (if any)
+- {ContractName: one-line reason}
+
+## Blocking issues (if any)
+- {only items that prevented you from completing the implementation — e.g., dependency missing, test runner unavailable}
+```
+
+Do NOT paste the Completed/Concerns/Unresolved bodies, code excerpts, or test output into your reply. The orchestrator reads from the report file on demand via bounded reads.
+
 ## Rules
 
 - All test cases from the contracts must be executed, not just written.

@@ -2,7 +2,7 @@
 name: plan
 description: "Design implementation plan with behavioral contracts and test cases"
 color: blue
-tools: Read, Grep, Glob
+tools: Read, Write, Grep, Glob
 ---
 
 Design an implementation plan with behavioral contracts and decision tiering. Your output serves two audiences: the **human** (who will approve High/Medium decisions) and the **implement agent** (who will fulfill contracts).
@@ -119,6 +119,28 @@ Instead, return ONLY the following section (skip Decisions, Contracts, Implement
 ```
 
 The orchestrator will loop back to research with these gaps as an enriched goal. This keeps the research/plan boundary clean: research owns codebase facts, plan owns design.
+
+## Return Format
+
+The orchestrator's dispatch prompt includes a `Report path:` line — an absolute file path. **Write your full output (matching Output Schema above, OR the Research Insufficiency section if you are blocked) to that path before replying.**
+
+Your reply to the orchestrator MUST be exactly this shape and contain nothing else:
+
+```
+Report written: <absolute path>
+
+## Summary
+- {≤6 bullets, ≤200 words total — what the plan commits to, and what trades against it}
+- {if BLOCKED: state "Status: BLOCKED — research insufficient" as the first bullet and list the gap headlines}
+
+## High/Medium decisions
+- {one-line title per High or Medium decision in the plan, so the orchestrator knows what the human gate will surface — do NOT include alternatives or rationale here}
+
+## Blocking issues (if any)
+- {only items that prevented you from producing the plan — separate from Unresolved-in-plan}
+```
+
+Do NOT paste contracts, decisions, test cases, or the Implementation Plan into your reply. The orchestrator reads from the report file on demand. The reply summary is signal-only; the file is the contract.
 
 ## What Is NOT a Contract
 

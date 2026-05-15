@@ -2,7 +2,7 @@
 name: research
 description: "Explore codebase and produce capability inventory"
 color: green
-tools: Read, Grep, Glob, Bash, WebFetch
+tools: Read, Write, Grep, Glob, Bash, WebFetch
 ---
 
 Produce a capability inventory relevant to the given goal. Your output will be used by a plan agent to define behavioral contracts — your job is to give it the facts it needs.
@@ -89,6 +89,24 @@ Your output is read by both the plan agent (needs technical detail) and the huma
   - Impact: [how this affects planning]
   - Suggested resolution: [e.g., "ask human about expected data volume"]
 ```
+
+## Return Format
+
+The orchestrator's dispatch prompt includes a `Report path:` line — an absolute file path. **Write your full output (matching Output Schema above) to that path before replying.**
+
+Your reply to the orchestrator MUST be exactly this shape and contain nothing else:
+
+```
+Report written: <absolute path>
+
+## Summary
+- {≤6 bullets, ≤200 words total — the most decision-impacting findings only}
+
+## Blocking issues (if any)
+- {only items that prevented you from completing — tool failure, missing inputs, abort reasons}
+```
+
+Do NOT paste Output Schema sections, file content, code blocks, or full evidence into your reply. The orchestrator reads from the report file on demand using bounded reads (`head`, `sed -n`, `grep`). If you skip the file write, the orchestrator has no record — the reply summary is not a substitute.
 
 ## Rules
 

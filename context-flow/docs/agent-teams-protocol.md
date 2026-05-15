@@ -60,6 +60,8 @@ Agent(
 )
 ```
 
+**Tool inheritance**: spawned teammates use the `tools:` field from the agent definition (`context-flow/agents/<phase>.md` frontmatter). Both `research.md` and `review.md` declare `Write` in `tools:` — this is **required** by the file-write Return Format. If a future edit strips `Write` from those agent files, native-mode teammates will fail with "tool not permitted" when attempting `Write "$SESSION/<phase>-<slug>.md"`. **Do not remove `Write` from those agents without also removing the Return Format contract.**
+
 **Teammate naming rules** — names are how teammates address each other in `SendMessage`. Always use these conventions, never UUIDs:
 
 | Phase | Suggested names |
@@ -97,7 +99,7 @@ SendMessage(to: "<lead-name>", summary: "research angle done",
 
 Teammates go idle between turns. **Do not interpret idle as "done"** — wait for an explicit completion message that includes the full Output Schema.
 
-**Completion-message discipline**: completion messages MUST contain ONLY Output Schema sections. Debate context, cross-check exchanges, and prose narrative stay in inter-teammate threads — never in the completion payload. The orchestrator's reformat (Reporting Principles in `cf.md`) depends on schema-shaped input; collapsing debated points into prose strips the evidence the reformat needs.
+**Completion-message discipline**: completion messages SHOULD follow the per-agent `Return Format` (verdict-free summary + report path written under `$SESSION/<phase>-<name>.md`) — the orchestrator reads the file for the schema body, not the message. When that's not feasible (native runtime constraints), the completion message MUST then contain ONLY Output Schema sections. Either way, debate context, cross-check exchanges, and prose narrative stay in inter-teammate threads — never in the completion payload. The orchestrator's reformat (Reporting Principles in `cf.md`) depends on schema-shaped input; collapsing debated points into prose strips the evidence the reformat needs.
 
 **External-source tags survive `SendMessage`**: when a teammate's finding came from `ctx7` / WebFetch / library docs, the `[external: <source>]` tag is part of the schema and MUST appear verbatim in completion messages. Never paraphrase external findings into plain prose.
 
@@ -173,6 +175,8 @@ Choose angles that maximize coverage with minimal overlap.
 Each research teammate receives:
 
 ```markdown
+Report path: $SESSION/research-{angle-slug}.md
+
 You are a research teammate exploring the **{angle name}** perspective.
 
 ## Goal
@@ -185,7 +189,9 @@ Working directory: {cwd}
 {description of this perspective's exploration focus}
 
 ## Your Task
-Explore the codebase through your angle. Produce a capability inventory following this schema:
+Explore the codebase through your angle. Write your full capability inventory to the `Report path:` above (use the schema below). Reply per the agent's `Return Format` section (verdict-free summary + path) — do NOT paste schema sections back into your reply.
+
+Schema (write this to the file):
 
 ## Existing Capabilities
 - `[file path]`: [what it does] — [relevant interfaces/exports]
@@ -219,7 +225,18 @@ Explore the codebase through your angle. Produce a capability inventory followin
 
 ### Synthesis
 
-After all teammates complete, the orchestrator merges findings into a unified research output:
+Each teammate has already written its full schema to its own `$SESSION/research-<slug>.md`. The orchestrator **does not re-receive the body** — replies are summary-only (see the agent's `Return Format`). Merge by reading bounded sections per file:
+
+```bash
+# Per-teammate bounded reads — never `cat`
+for f in "$SESSION"/research-*.md; do
+  head -30 "$f"                                                   # Summary block (Convergence candidates)
+  sed -n '/^## Constraints/,/^## Key Files/p' "$f"                # Constraints with evidence
+  sed -n '/^## Unresolved/,$p' "$f" | head -40                    # Unresolved tail (Divergence candidates)
+done
+```
+
+Then synthesize via the Write tool into `$SESSION/research.md` using this schema:
 
 ```markdown
 ## Existing Capabilities
@@ -247,8 +264,6 @@ After all teammates complete, the orchestrator merges findings into a unified re
 {where findings conflict or reveal trade-offs — decision points for planning}
 ```
 
-Save to `$SESSION/research.md`.
-
 ---
 
 ## Review Teams
@@ -270,13 +285,15 @@ The contract compliance teammate's results determine the overall verdict. Other 
 Each review teammate receives:
 
 ```markdown
+Report path: $SESSION/review-{lens-slug}.md
+
 You are a review teammate focused on **{lens name}**.
 
 ## Your Review Focus
 {description of what to look for}
 
 ## Behavioral Contracts
-{contracts from plan}
+{contracts extracted from $SESSION/plan.md via `sed -n '/^## Behavioral Contracts/,/^## Implementation Plan/p'`}
 
 ## Test Cases
 {test cases from plan}
@@ -284,11 +301,12 @@ You are a review teammate focused on **{lens name}**.
 ## Implement Concerns
 {concerns from implement agent, if any — otherwise omit}
 
-## Changes
-{git diff output}
+## Diff path
+$SESSION/implement.diff
+(Read the diff directly from this file — the orchestrator does NOT inline it.)
 
 ## Your Task
-Review the changes through your lens. Produce:
+Review the changes through your lens. Write your full findings to the `Report path:` above, then reply per the agent's `Return Format` (verdict + summary + path only — no body). Produce in the file:
 
 ### Findings
 - [finding]: [evidence from diff] — [severity: critical | warning | info]
@@ -311,7 +329,15 @@ Output as:
 
 ### Synthesis
 
-After all teammates complete, the orchestrator merges into a unified review:
+Each teammate has already written `$SESSION/review-<slug>.md`. The replies give you Verdict + contract PASS/FAIL one-liners — enough to gate routing. Read bounded sections only when you need detail:
+
+```bash
+sed -n '/^## Contract Verification/,/^## Advisories/p' "$SESSION/review-contracts.md"   # authoritative PASS/FAIL
+sed -n '/^## Advisories/,/^## /p' "$SESSION/review-security.md"                         # security findings
+sed -n '/^## Advisories/,/^## /p' "$SESSION/review-quality.md"                          # quality findings
+```
+
+Then merge via Write into `$SESSION/review.md`:
 
 ```markdown
 ## Contract Verification
@@ -328,8 +354,6 @@ After all teammates complete, the orchestrator merges into a unified review:
 ## Verdict
 {APPROVE or REQUEST_CHANGES — based on contract verification only}
 ```
-
-Save to `$SESSION/review.md`.
 
 ---
 

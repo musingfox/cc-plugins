@@ -2,7 +2,7 @@
 name: review
 description: "Verify implementation against contracts"
 color: purple
-tools: Read, Grep, Glob, Bash
+tools: Read, Write, Grep, Glob, Bash
 ---
 
 Verify that the implementation satisfies every behavioral contract. Also review for non-contract concerns and report them as advisories.
@@ -103,6 +103,33 @@ The "What Changed" section is the human's primary review surface. It must read l
 ## Verdict
 APPROVE | REQUEST_CHANGES
 ```
+
+## Return Format
+
+The orchestrator's dispatch prompt includes a `Report path:` line — an absolute file path. **Write your full output (matching Output Schema above) to that path before replying.**
+
+Your reply to the orchestrator MUST be exactly this shape and contain nothing else:
+
+```
+Report written: <absolute path>
+
+## Verdict
+APPROVE | REQUEST_CHANGES
+
+## Summary
+- {≤6 bullets, ≤200 words total — release-note framing, what behavior changes for downstream observers}
+
+## Contract status
+- {one-line "ContractName: PASS|FAIL" per contract — no evidence here, that lives in the file}
+
+## Critical/warning advisories (titles only)
+- {advisory title — severity} per item, omit if none
+
+## Blocking issues (if any)
+- {only items that prevented you from completing the review — e.g., tests wouldn't compile}
+```
+
+Do NOT paste the What Changed body, contract evidence, advisory details, or the diff into your reply. The orchestrator reads from the report file on demand. The Verdict line gates routing — it MUST appear in the reply.
 
 ## Rules
 

@@ -106,6 +106,20 @@ Agent(subagent_type: "context-flow:plan", model: "opus", prompt: "...")
 
 State which agent and model you selected and why.
 
+### Agent Output Discipline (file-write + summary reply)
+
+Every research/plan/review agent dispatch in this orchestrator follows the same contract:
+
+1. The dispatch prompt MUST include a `Report path:` line with the absolute target file (e.g., `Report path: $SESSION/research.md`). The agent writes its full Output Schema to this file before replying.
+2. The agent's reply is **summary-only** (verdict + ≤200-word summary + report path) — never the full schema body. The per-agent `Return Format` section spells out the exact reply shape.
+3. **You (the orchestrator) do NOT save the agent's reply to disk** — the agent already wrote the canonical file. Treat the reply as a routing signal: act on the verdict / blocking issues, then read selectively from the report file when you need detail.
+4. **Bounded reads only** on the report file. Use `head -N`, `tail -N`, `sed -n '/^## Section/,/^## NextSection/p'`, or `grep -m N` — never `cat` the entire file. Common targets:
+   - `head -30 "$SESSION/research.md"` → Summary block
+   - `sed -n '/^## Unresolved/,$p' "$SESSION/research.md"` → Unresolved tail
+   - `sed -n '/^## Decisions/,/^## Behavioral Contracts/p' "$SESSION/plan.md"` → Decisions only (for the Human Gate)
+   - `sed -n '/^## Contract Verification/,/^## Advisories/p' "$SESSION/review.md"` → contract PASS/FAIL table
+5. If the agent's reply is missing the `Report written:` line or the file doesn't exist, treat it as a dispatch failure: do NOT continue with phase output — re-dispatch or escalate.
+
 ---
 
 ## Reporting Principles (orchestrator-side reformat)
@@ -224,6 +238,8 @@ Identify 2-3 exploration angles based on the goal. Common patterns:
 Each teammate receives:
 
 ```markdown
+Report path: $SESSION/research-{angle-slug}.md
+
 ## Goal
 {content of goal.md}
 
@@ -236,7 +252,7 @@ Working directory: {cwd}
 
 If this is a loop-back, use the enriched goal instead (see Loop Back section).
 
-**Nothing else.** Each teammate explores from scratch within their angle.
+**Nothing else.** Each teammate explores from scratch within their angle and writes its full output to its `Report path:` per the agent's Return Format. Each teammate gets a distinct slug so parallel files don't collide (e.g., `research-breadth.md`, `research-depth.md`).
 
 ### Mid-Flight Direction Check
 
@@ -248,12 +264,19 @@ Pause and check in (don't wait for synthesis) when continuing would waste effort
 
 ### Synthesis
 
-Merge teammate findings into the research agent's Output Schema (Existing Capabilities, Constraints, Key Files, Completed, Unresolved), plus:
+Each teammate has already written its own `$SESSION/research-<slug>.md`. You synthesize by **reading bounded sections** from each (never `cat` the whole file) and writing the merged result to `$SESSION/research.md` via the Write tool.
+
+Recommended read pattern per teammate file:
+- `head -30` → its Summary block (Convergence candidates live here)
+- `sed -n '/^## Constraints/,/^## Key Files/p'` → its Constraints with code evidence
+- `sed -n '/^## Unresolved/,/^## /p' | head -40` → its Unresolved tail (Divergence candidates live here)
+
+Merge into the research agent's Output Schema (Existing Capabilities, Constraints, Key Files, Completed, Unresolved), plus:
 - **Convergence**: facts teammates agree on (high confidence)
 - **Divergence**: conflicts / trade-offs (decision points for planning)
 - **Decision Points Requiring Human Input**: per item — what needs deciding, why it matters (concrete consequence), options with upside/downside/reversibility, your recommendation
 
-Decision points ≠ Unresolved: Unresolved is missing information; Decision points are valid choices needing human preference. Save to `$SESSION/research.md`.
+Decision points ≠ Unresolved: Unresolved is missing information; Decision points are valid choices needing human preference. Save the merged synthesis to `$SESSION/research.md` (this file is what Phase 2 reads).
 
 ### Transition Validation: Research → Plan
 
@@ -287,14 +310,18 @@ Decision points ≠ Unresolved: Unresolved is missing information; Decision poin
 
 ## Phase 2: Plan
 
+**Before dispatching**: extract the compressed research summary you need by reading bounded sections from `$SESSION/research.md` (e.g., `head -30` for Summary, `sed -n '/^## Constraints/,/^## Key Files/p'` for Constraints) — do NOT `cat` the whole file. Compose the plan dispatch from those bounded reads.
+
 **Dispatch agent** with this context:
 
 ```markdown
+Report path: $SESSION/plan.md
+
 ## Goal
 {1-2 sentence compressed goal, incorporating human clarifications if any}
 
 ## Codebase Research
-{compressed research output}
+{compressed research summary you assembled from bounded reads of $SESSION/research.md}
 
 ## Human Clarifications
 {any answers from human during research validation, if applicable}
@@ -310,7 +337,7 @@ Your output MUST:
 3. Every decision must have an Impact level (High/Medium/Low)
 ```
 
-Save output to `$SESSION/plan.md`.
+The plan agent writes its full output to `$SESSION/plan.md` per the agent's Return Format. **You do NOT re-save the agent's reply** — read sections from `$SESSION/plan.md` on demand for Transition Validation.
 
 ### Transition Validation: Plan → Human Gate
 
@@ -442,11 +469,13 @@ Dispatch 2-3 review teammates with different review lenses:
 Each teammate receives:
 
 ```markdown
+Report path: $SESSION/review-{lens-slug}.md
+
 ## Your Review Focus
 {description of this teammate's review lens}
 
 ## Behavioral Contracts
-{same contracts from Phase 3}
+{same contracts from Phase 3 — extract from $SESSION/plan.md via `sed -n '/^## Behavioral Contracts/,/^## Implementation Plan/p'`}
 
 ## Test Cases
 {same test cases from Phase 3}
@@ -454,20 +483,21 @@ Each teammate receives:
 ## Implement Concerns
 {concerns from implement agent, if any — otherwise omit this section}
 
-## Changes
-{git diff output}
+## Diff path
+$SESSION/implement.diff
+(The teammate reads the diff directly from this file — do NOT inline the diff in the prompt.)
 ```
 
-**Do NOT pass**: research constraints (those should have been captured as test cases by plan).
+**Do NOT pass**: research constraints (those should have been captured as test cases by plan). **Do NOT inline the git diff** — pass the file path; reviewers Read it themselves so the diff bytes never pass through your context. Use lens-slugs like `contracts`, `security`, `quality` so parallel files don't collide.
 
 ### Synthesis
 
-After all teammates complete, synthesize into a unified review output:
+Each teammate has already written `$SESSION/review-<slug>.md`. The dispatch replies give you each teammate's Verdict + contract PASS/FAIL one-liners — enough to decide routing without reading the full files. When you need detail, read bounded sections (e.g., `sed -n '/^## Contract Verification/,/^## Advisories/p' "$SESSION/review-contracts.md"`).
+
+Synthesize into a unified review output by Write tool to `$SESSION/review.md`:
 - **Contract verification**: merge all contract PASS/FAIL results (contract compliance teammate is authoritative)
 - **Advisories**: merge advisories from all teammates, deduplicate, assign severity
 - **Verdict**: based on contract compliance results only
-
-Save output to `$SESSION/review.md`.
 
 ### Presenting Results to Human
 
