@@ -18,8 +18,7 @@ The orchestrator never reads Pi's stdout to determine success. Pi reports via a 
 ```bash
 cd "$WORKDIR" && \
 pi -p \
-   --provider "$PROVIDER" \
-   --model "$MODEL" \
+   "${PI_ARGS[@]}" \
    --session-dir "$PI_SESSION_DIR" \
    @"$BRIEF_FILE" \
    "Read the brief and execute it. When finished, print exactly DONE and nothing else." \
@@ -29,7 +28,7 @@ PI_PID=$!
 
 - `$WORKDIR` — the directory Pi operates in. For unisolated runs this is `cwd`. For isolated runs it is a fresh git worktree (`$SESSION/work/`); see "Isolation" below.
 - `$BRIEF_FILE` — absolute path to the assembled brief markdown.
-- `$PROVIDER` / `$MODEL` — required. **Always specify both explicitly** (e.g., `anthropic` + `claude-sonnet-4-6`, or `openai-codex` + `gpt-5.5`). Do NOT rely on Pi's `defaultProvider` / `defaultModel` from settings — surprises lurk there.
+- `${PI_ARGS[@]}` — orchestrator-assembled provider/model flags. Empty by default → Pi resolves provider/model from its own config (`pi config` → `defaultProvider` / `defaultModel` → CLI fallback `google`). When the user sets `$PI_PROVIDER` and/or `$PI_MODEL`, `PI_ARGS` expands to `--provider <p> --model <m>`. Reproducibility caveat: if a flow needs the same provider/model across machines, set both env vars; relying on the host's `pi config` means a run on a different machine may resolve to a different model.
 - `$PI_SESSION_DIR` — `$SESSION/pi-sessions/`. Mandatory. This is where Pi writes the session JSONL the orchestrator monitors for liveness + errors. See §1.5.
 - `@file` syntax — Pi's native file-include parameter. **The brief MUST be passed via `@file`, never via `"$(cat $BRIEF_FILE)"`.** Shell command substitution will expand backticks/dollars inside the brief and either hang Pi or corrupt the prompt. Empirically verified.
 - **Run Pi in the background (`&`)** — the orchestrator must keep control to tail the session JSONL and enforce stall detection. Do not let Pi block the Bash tool call.
@@ -277,14 +276,13 @@ The orchestrator performs these checks. The Pi report is **untrusted input** —
 
 ### 4.0 Pre-flight model probe (before dispatching the brief)
 
-Before assembling and sending the actual brief, run a tiny liveness probe to confirm the chosen `$PROVIDER` / `$MODEL` actually works on this machine:
+Before assembling and sending the actual brief, run a tiny liveness probe to confirm Pi's resolved provider/model (from `$PI_ARGS` or its own config) actually works on this machine:
 
 ```bash
 PROBE_DIR="$SESSION/pi-probe"
 mkdir -p "$PROBE_DIR"
 echo "say ok" | pi \
-  --provider "$PROVIDER" \
-  --model "$MODEL" \
+  "${PI_ARGS[@]}" \
   --session-dir "$PROBE_DIR" \
   --no-tools > "$SESSION/probe-stdout.log" 2> "$SESSION/probe-stderr.log"
 ```
@@ -293,7 +291,7 @@ Enforce the 30-second cap via the **Bash tool's `timeout` parameter** (`timeout:
 
 - Probe must complete within **30 seconds** and produce non-empty stdout.
 - Then read `$PROBE_DIR/*.jsonl` and check for `errorMessage` containing `usage_limit_reached`, `unauthorized`, `model_not_found`, etc.
-- If probe fails → abort Phase 3, surface the **exact errorMessage** to the human, suggest concrete remediation (`wait for quota reset at <timestamp>`, `run pi auth <provider>`, `verify model ID via pi --list-models`).
+- If probe fails → abort Phase 3, surface the **exact errorMessage** to the human along with the resolved provider/model (look for the `model_change` event in the JSONL; this is essential when Pi resolved from its own config and the orchestrator didn't pass flags). Suggest concrete remediation (`wait for quota reset at <timestamp>`, `run pi auth <resolved-provider>`, `verify model ID via pi --list-models`, or `pi config` to inspect/change defaults).
 - A probe that hangs > 30 seconds with no stdout is the classic "Pi -p + invalid combination" symptom — abort and recommend running `/cf` (Claude implementer) instead.
 
 The probe cost is ~1-5 cents per Pi run. Worth it: a failed brief dispatch wastes vastly more.
