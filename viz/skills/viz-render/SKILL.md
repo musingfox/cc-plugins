@@ -126,7 +126,7 @@ Workflow:
 Markdown without `viz:` frontmatter falls through to the generic viewer
 unchanged.
 
-The recipe Save endpoint listens on port `18080` by default. If that port
+The recipe Save endpoint listens on port `18090` by default. If that port
 is taken (e.g. by another local service), set `VIZ_PORT=<port>` in the
 environment before invoking render.sh.
 

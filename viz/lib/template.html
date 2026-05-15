@@ -207,6 +207,26 @@
             transition: transform 0.15s ease-out;
         }
 
+        /* -- Mermaid flow animation (marching ants on edges & sequence arrows) -- */
+        @keyframes viz-mermaid-flow {
+            to { stroke-dashoffset: -20; }
+        }
+        .mermaid svg .viz-flow {
+            stroke-dasharray: 6 4 !important;
+            animation: viz-mermaid-flow 1.6s linear infinite;
+        }
+        .mermaid svg .viz-flow-dashed {
+            stroke-dasharray: 3 4 !important;
+            animation: viz-mermaid-flow 1.2s linear infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .mermaid svg .viz-flow,
+            .mermaid svg .viz-flow-dashed {
+                animation: none;
+                stroke-dasharray: none !important;
+            }
+        }
+
         .katex-display {
             overflow-x: auto;
             overflow-y: hidden;
@@ -568,9 +588,29 @@
                     securityLevel: 'strict'
                 });
                 var mermaidNodes = document.querySelectorAll('.mermaid');
+                function tagMermaidEdges() {
+                    document.querySelectorAll('.mermaid svg').forEach(function(svg) {
+                        // Flowchart: paths inside any g whose class contains "edge"
+                        svg.querySelectorAll('g[class*="edge"] path').forEach(function(p) {
+                            // Skip arrowhead markers (they live in <defs>/<marker>, not edges)
+                            if (p.closest('marker')) return;
+                            p.classList.add('viz-flow');
+                        });
+                        // Sequence: solid messages
+                        svg.querySelectorAll('.messageLine0, [class*="messageLine0"]').forEach(function(l) {
+                            l.classList.add('viz-flow');
+                        });
+                        // Sequence: dashed reply messages
+                        svg.querySelectorAll('.messageLine1, [class*="messageLine1"]').forEach(function(l) {
+                            l.classList.add('viz-flow-dashed');
+                        });
+                    });
+                }
                 function renderMermaid() {
                     if (mermaidNodes.length === 0) return;
-                    requestAnimationFrame(function() { mermaid.run({ nodes: mermaidNodes }); });
+                    requestAnimationFrame(function() {
+                        mermaid.run({ nodes: mermaidNodes }).then(tagMermaidEdges);
+                    });
                 }
                 if (document.visibilityState === 'visible') {
                     renderMermaid();

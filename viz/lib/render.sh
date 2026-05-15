@@ -54,15 +54,28 @@ TIMESTAMP=$(date +%y%m%d%H%M%S)
 OUTPUT_FILE="${OUTPUT_DIR}/${OUTPUT_NAME}-${TIMESTAMP}.html"
 
 # Use Python for placeholder replacement (handles long base64 strings safely)
+# Also honors `// @inline <relative-path>` directives that splice sibling
+# files (e.g. recipe model JS) into the template at render time, so the
+# HTML and Node tests can share a single source of truth.
 python3 -c "
-import sys, os
-tmpl = open(sys.argv[1]).read()
+import sys, os, re
+tmpl_path = sys.argv[1]
+tmpl = open(tmpl_path).read()
 b64 = open(sys.argv[2]).read().strip()
 name = sys.argv[3]
 src_path = sys.argv[4]
 src_mtime = ''
 if src_path and os.path.isfile(src_path):
     src_mtime = '%.6f' % os.path.getmtime(src_path)
+tmpl_dir = os.path.dirname(os.path.abspath(tmpl_path))
+def _inline(m):
+    rel = m.group(1).strip()
+    p = os.path.join(tmpl_dir, rel)
+    if not os.path.isfile(p):
+        sys.stderr.write('warn: @inline target not found: ' + p + '\n')
+        return m.group(0)
+    return open(p).read()
+tmpl = re.sub(r'^[ \t]*//[ \t]*@inline[ \t]+(\S+)[ \t]*\$', _inline, tmpl, flags=re.MULTILINE)
 print(tmpl
     .replace('DOC_BASE64_PLACEHOLDER', b64)
     .replace('DOC_NAME_PLACEHOLDER', name)
@@ -74,7 +87,7 @@ print(tmpl
 rm -f "$B64_FILE"
 
 SERVE_PATH="/${PROJECT_NAME}/${OUTPUT_NAME}-${TIMESTAMP}.html"
-VIZ_PORT="${VIZ_PORT:-18080}"
+VIZ_PORT="${VIZ_PORT:-18090}"
 export VIZ_PORT
 
 # Start (or verify) the viz server. Used for SSH (always) and recipes (Save endpoint).

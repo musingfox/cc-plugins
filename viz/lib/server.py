@@ -11,7 +11,7 @@ import sys  # noqa: F401  (kept for forward compat)
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = "/tmp/viz"
-PORT = int(os.environ.get("VIZ_PORT", "18080"))
+PORT = int(os.environ.get("VIZ_PORT", "18090"))
 DEFAULT_HOST = "127.0.0.1"
 MAX_BODY = 10 * 1024 * 1024  # 10 MB
 
