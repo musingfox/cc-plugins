@@ -107,7 +107,7 @@ When dispatching a Claude agent:
 
 ### Agent Output Discipline
 
-Identical to `/cf` — see `commands/cf.md` §Agent Output Discipline. Phase 3 (Pi) is exempt: Pi has its own report protocol (§3.7.1, governed by `$PI_PROTOCOL` §3 and §4).
+Identical to `/cf` — see `commands/cf.md` §Agent Output Discipline. Phase 3 (Pi) is exempt: Pi has its own report protocol (governed by `$PI_PROTOCOL` §3 and §4, validated by pi-driver before main sees it).
 
 ---
 
@@ -166,184 +166,81 @@ Pi phase re-runs (e.g., after a failed test execution check) count as `phase_rer
 
 ---
 
-## Phase 3: Implement (Pi)
+## Phase 3: Implement (Pi via pi-driver)
 
-**This is the only phase that differs from `/cf`.** Pi runs as an external process; the orchestrator brokers brief in, report out. All bash mechanics live in `$SCRIPTS/cf-pi-*.sh`; this section is the decision tree around them.
+**This is the only phase that differs from `/cf`.** Pi runs as an external process owned by a sub-agent. Main only computes a few inputs, dispatches `context-flow:pi-driver`, reads its outcome, and routes recovery. All bash mechanics live in `$SCRIPTS/cf-pi-*.sh`; the full lifecycle (brief → worktree → probe → dispatch → poll → validate → diff) is encapsulated by the agent.
 
-### 3.1 Pi protocol — bounded reads only
+### 3.1 Compute three inputs
 
-**Do NOT `Read` `$PI_PROTOCOL` into context.** It is 400+ lines and most of it is bytes that flow file→file (methodology + report schema get sed-extracted into the brief by `cf-pi-brief.sh`). Pulling the whole file in costs ~11k tokens you don't need.
-
-Use bounded reads when needed:
-
-| When you need… | Bash snippet |
-|---|---|
-| Failure-mode recovery options | `sed -n '/^## 5\. Failure Modes/,/^## 6\./p' "$PI_PROTOCOL"` |
-| Allowed-read table for an unusual surface | `sed -n '/^### 1\.6/,/^## 2\./p' "$PI_PROTOCOL"` |
-| Invocation rules (already inlined as hard rules below) | `sed -n '/^## 1\. Invocation/,/^### 1\.5/p' "$PI_PROTOCOL"` |
-
-### 3.2 Assemble the brief
-
-Author three small inputs first:
+The pi-driver agent owns everything else; main only resolves what requires human channel or main-only context:
 
 - `GOAL_ONELINE` — one-sentence compressed goal (from `$SESSION/goal.md` + research summary).
-- `CONSTRAINTS` — bounded read from `$SESSION/research.md` (`sed -n '/^## Constraints/,/^## Key Files/p'`), boiled down to the constraints that affect *implementation* (one short line each).
+- `CONSTRAINTS` — bounded read from `$SESSION/research.md` (`sed -n '/^## Constraints/,/^## Key Files/p'`), boiled down to constraints that affect *implementation* (one short line each).
 - `TEST_RUNNER` — extracted from `$SESSION/plan.md` Implementation Plan, or asked via `AskUserQuestion` with the language-appropriate default (e.g., `node --test test/contracts.test.mjs`, `pytest -xvs`, `cargo test`).
 
-Then invoke:
+### 3.2 Dispatch pi-driver
 
-```bash
-"$SCRIPTS/cf-pi-brief.sh" "$SESSION" "$GOAL_ONELINE" "$CONSTRAINTS" "$TEST_RUNNER"
+```
+Agent(
+  subagent_type: "context-flow:pi-driver",
+  model: "sonnet",
+  prompt: "
+    SESSION=$SESSION
+    PI_PROTOCOL=$PI_PROTOCOL
+    PLAN=$SESSION/plan.md
+    GOAL_ONELINE=<one-sentence goal>
+    CONSTRAINTS=<short bullet list>
+    TEST_RUNNER=<resolved command>
+    PI_DESC=$PI_DESC
+    OUTCOME_FILE=$SESSION/pi-driver-outcome.md
+    
+    Drive Phase 3 per your agent prompt. Write outcome to $OUTCOME_FILE before replying.
+  "
+)
 ```
 
-The script extracts Behavioral Contracts + Implementation Plan from `$SESSION/plan.md`, methodology + report schema from `$PI_PROTOCOL`, stitches `$BRIEF_FILE`, and validates header count. **Non-zero exit + `BRIEF MALFORMED` on stderr** means an upstream heading is missing — inspect `$SESSION/brief-*.md` (each chunk file) to locate which one came out empty, fix the offending heading, re-run.
+State to the human upfront: "Dispatching pi-driver on N contracts via Pi (`$PI_DESC`). Outcome: `$SESSION/pi-driver-outcome.md`."
 
-**Do NOT include**: full research output, decision alternatives, planning rationale, rejected approaches, or this orchestrator's tier/mode metadata.
+The agent absorbs the polling loop (no per-round status lines reach main) and returns a ≤200-word summary with paths to artifacts (Pi report, diff, postmortem if any).
 
-### 3.3 Set up isolated worktree
+### 3.3 Route recovery from the outcome
 
-```bash
-"$SCRIPTS/cf-pi-worktree.sh" "$SESSION"     # echoes WORK path; appends to $CLEANUP_SCRIPT and $SESSION/env.sh
-. "$SESSION/env.sh"                           # pick up WORK / REPO_ROOT
-```
+After pi-driver returns, **bounded read**: `Read` `$SESSION/pi-driver-outcome.md` (full file — it's already structured for main's consumption).
 
-In a git repo: creates a fresh worktree branch `ctxflow/pi-$SESSION_BASENAME` at `$SESSION/work`. Otherwise: scratch directory at `$SESSION/work` (no cleanup). The cleanup script is registered to run before exiting the flow (success OR escalation) — see §Cleanup.
+| Outcome `Status` | Action |
+|---|---|
+| `PASS` | Forward survived contracts + Pi's `Concerns` (verbatim from outcome) to Phase 4. Use `$SESSION/implement.diff` as the diff path. |
+| `PARTIAL` | Some contracts demoted. If any Unresolved is a *codebase investigation* gap (Pi lacked knowledge not in the brief) → loop back to research with enriched goal (`cross_phase_loops += 1`). If a *missing-information* gap → escalate via `AskUserQuestion`: "Adjust contract to {alternative}", "Loop back to research on {area}", "Skip this contract for now", "Fall back to Claude implement agent for this contract", "Other". |
+| `FAIL` | Inspect the `Recovery hints` section of the outcome. Common subcategories: |
+| ↳ probe `ERROR:usage_limit_reached` | Surface "quota resets at <timestamp>" from `$SESSION/pi-probe/*.jsonl`; offer "Retry after quota reset / Switch provider/model / Fall back to Claude implement agent / Abort Phase 3". |
+| ↳ probe `ERROR:unauthorized` / `status_code:401` | Surface "run `pi auth <resolved-provider>` then retry". |
+| ↳ probe `ERROR:model_not_found` | Surface "verify model via `pi --list-models <resolved-provider>` or `pi config`". |
+| ↳ probe `NO_JSONL` | Pi failed to start; surface `$SESSION/probe-stderr.log`; recommend `pi --version` debug or fallback. |
+| ↳ kill-status (`STALL`/`TIMEOUT`/`ERROR`) | Bounded `Read` of postmortem path from outcome; apply §5 of `$PI_PROTOCOL` (Failure Modes & Recovery) — bounded read: `sed -n '/^## 5\. Failure Modes/,/^## 6\./p' "$PI_PROTOCOL"`. |
+| ↳ report missing/malformed | Default to `AskUserQuestion`: "Re-dispatch Pi with the same brief / Fall back to Claude implement agent / Adjust the plan and re-run / Other". |
+| ↳ All contracts demoted | Escalate immediately — do NOT silently fall through to Phase 4. |
 
-### 3.4 Pre-flight model probe (mandatory)
+Pi run re-attempts (after a failed gate or kill-status) count as `phase_reruns.implement += 1` per loop-budget rules.
 
-```bash
-"$SCRIPTS/cf-pi-probe.sh" "$SESSION"          # invoke via Bash tool with timeout: 30000
-```
+### 3.4 Parallel pi-driver dispatch (when the plan exposes independent groups)
 
-Primary defense against silent stalls — Pi hangs for minutes with zero stdout on auth/quota/model-ID failures. The script emits exactly one status line:
+If the plan lists multiple contract groups with no shared file edits, dispatch one pi-driver per group in a **single Agent batch** so they run concurrently. Each sub-agent gets its own brief + worktree + outcome file (e.g., `$SESSION/pi-driver-outcome-group-1.md`). Main aggregates the outcomes after all return; recovery routing in §3.3 still applies per-group.
 
-| Status | Meaning | Action |
-|---|---|---|
-| `OK` | Probe succeeded | Proceed to §3.5 |
-| `NO_JSONL` | No stdout AND no JSONL — Pi failed to start | Surface `$SESSION/probe-stderr.log`; recommend fallback to `/cf` or `pi --version` debug |
-| `ERROR:<pattern>` | Provider/model error in JSONL | Classify below |
+Beta caveat: parallel mode requires the plan to declare group independence explicitly. If unsure, run sequentially (single dispatch) — the default.
 
-Common `ERROR:<pattern>` excerpts (look up the resolved provider/model via the `model_change` event in `$SESSION/pi-probe/*.jsonl` — essential when Pi resolved from its own config):
+### 3.5 Pi protocol bounded reads (main side)
 
-- `usage_limit_reached` → extract `resets_at` from headers; surface "quota resets at <timestamp>"; offer fallback to `/cf` or different provider
-- `unauthorized` / `status_code:401` → "run `pi auth <resolved-provider>`"
-- `model_not_found` → "verify model ID via `pi --list-models <resolved-provider>`" or `pi config` to inspect defaults
-
-If the probe fails, **do NOT dispatch the real brief** — re-running the same broken invocation will reproduce the failure. Escalate via `AskUserQuestion` with options: "Retry probe after fix", "Fall back to Claude implement agent (`/cf` style)", "Switch provider/model", "Abort Phase 3".
-
-### 3.5 Dispatch Pi (background, monitored)
+Main rarely needs to consult `$PI_PROTOCOL` directly — the pi-driver agent owns invocation rules and report schema. Main only needs §5 (Failure Modes) for recovery routing in §3.3:
 
 ```bash
-PI_PID=$("$SCRIPTS/cf-pi-dispatch.sh" "$SESSION")
-echo "$PI_PID"
+sed -n '/^## 5\. Failure Modes/,/^## 6\./p' "$PI_PROTOCOL"
 ```
 
-The script enforces the §1 hard rules (`$PI_PROTOCOL`) for the resolved transport: `--provider`/`--model` only when env-overridden, mandatory `--session-dir`, no `--no-session`, no `--mode json`, background + `disown`. In `text` transport the brief goes via `@file`; in `rpc` transport it is embedded in the initial `prompt` command via `jq -cRs`. PID and start timestamp are written to disk so the poll script reads state without depending on orchestrator memory.
+**Do NOT `Read` `$PI_PROTOCOL` whole into context.** It is 400+ lines (~11k tokens).
 
-State to the human: "Dispatching Pi (`$PI_DESC`) on N contracts. Brief: `$BRIEF_FILE`. Monitoring session JSONL at `$PI_SESSION_DIR`."
+### 3.6 Fallback to Claude implementer
 
-### 3.6 Stall detection + error fast-path (re-entrant short poll)
-
-Drive polling from the orchestrator with short ~30s Bash calls — NOT a long-running shell loop. Each call invokes `cf-pi-poll.sh`, which is stateless: reads `pi.pid`, `pi-start.ts`, and the latest JSONL from disk and emits one status line. A failed poll call ≠ Pi failure — just re-poll.
-
-**Orchestrator loop**, via Bash tool with `timeout: 35000`:
-
-```bash
-sleep 30 && "$SCRIPTS/cf-pi-poll.sh" "$SESSION"
-```
-
-Parse the status prefix and dispatch:
-
-| Status prefix | Interpretation | Next action |
-|---|---|---|
-| `ALIVE` | Pi running, JSONL fresh | Wait another round. |
-| `NO_JSONL` | Pi launched, JSONL not produced yet (within 60s grace) | Wait another round. |
-| `NO_JSONL_FAIL` | JSONL missing past 60s grace | Pi failed to start. Kill, post-mortem, escalate. |
-| `DONE` | `kill -0` failed — Pi process exited cleanly | Exit loop; proceed to §3.7.1 report check. |
-| `STALL` | JSONL mtime unchanged > `$PI_STALL_THRESHOLD_S` | Pi hung. Kill, post-mortem, escalate. |
-| `ERROR` | `"errorMessage"` literal in JSONL | Provider failure. Kill, classify (quota/auth/network), escalate. |
-| `TIMEOUT` | Wall clock > `$PI_WALL_CLOCK_S` | Kill, post-mortem, escalate. |
-| `NO_PID` | `pi.pid` missing | Dispatch broken; abort flow. |
-
-**Monitor-failure tolerance — non-negotiable**: if the poll Bash call itself fails (harness timeout, exit≠0 with no status line, Task crash), re-poll next round. **Pi is only declared failed when a kill-status line is read from a *successful* poll.** Up to 3 consecutive poll failures before escalation; verify with `kill -0 $(cat $SESSION/pi.pid)` from a fresh Bash call before declaring Pi dead.
-
-**Stop helper** (used when a kill-status fires AND after DONE in RPC mode):
-
-```bash
-"$SCRIPTS/cf-pi-stop.sh" "$SESSION" --abort   # kill-status paths (STALL/TIMEOUT/ERROR/NO_JSONL_FAIL)
-"$SCRIPTS/cf-pi-stop.sh" "$SESSION"           # graceful close (DONE path — required in RPC mode)
-```
-
-Transport-aware: in text mode this `SIGTERM`→`SIGKILL`s `pi.pid`; in RPC mode it sends `{"type":"abort"}` (when `--abort` is passed) then closes pi's stdin via the fifo holder. On DONE in text mode the call is a no-op (pi already exited); in RPC mode it is **required** because pi stays alive after `agent_end` waiting for the next command.
-
-**Bounded post-mortem** (kill-status paths only; on DONE the report is the post-mortem):
-
-```bash
-"$SCRIPTS/cf-pi-postmortem.sh" "$SESSION"     # ~5 KB output cap, echoes paths for on-demand Read
-```
-
-### 3.7 Transition Validation: Implement → Review
-
-#### 3.7.1 Report file exists & parseable
-
-- `$REPORT_FILE` exists and is non-empty.
-- Contains both a `## Summary` heading (Pi-authored quick-glance) and a `## Completed` heading. (Concerns/Unresolved sections may be absent — that means none, and Summary's lines say "none".)
-- **Bounded read**: `head -20 "$REPORT_FILE"` — reads Pi's `## Summary` block only. Echo `$REPORT_FILE` so the orchestrator can `Read` the full file on demand if Summary flags something. Do NOT `cat` or `head -200` the report.
-- If missing/malformed → Pi run failed. Run `cf-pi-postmortem.sh`. **Do NOT** promote any contracts to Completed. Apply §5 of `$PI_PROTOCOL` (Failure Modes & Recovery) to pick a recovery path; default to escalating via `AskUserQuestion`: "Re-dispatch Pi with the same brief", "Fall back to Claude implement agent", "Adjust the plan and re-run", "Other".
-
-#### 3.7.2 Test-file grep guard (anti self-grading)
-
-For every contract claimed in `## Completed`, verify the test file actually contains an assertion that exercises the contract's behavior.
-
-1. Locate the test file (per Implementation Plan or by grepping for the contract name within `$WORK`).
-2. Generate the guard as `$SESSION/grep-guard.sh` (script file, not inline `for pat` loop — inline loops parse-fail silently on patterns with apostrophes/parens, e.g. `titleCase('')`). One pattern per `PATTERNS=( … )` entry, `grep -q -F --` against the test file. See §4.3 of `$PI_PROTOCOL`.
-3. If a test case's expected value is too generic to grep (e.g., `0`, `""`) → execute the test runner with verbose output and search the test reporter for an assertion line matching that case.
-4. If ANY test case has no matching assertion → demote that contract from Completed to Unresolved with reason: `Pi claimed Completed but no matching test assertion was found for test case "{T}".` **Self-grading defense**: Pi consolidates test cases into fewer `test(...)` blocks, so do NOT count `test(` occurrences — grep for literals.
-
-#### 3.7.3 Test execution check
-
-**The orchestrator runs it, not Pi.**
-
-```bash
-"$SCRIPTS/cf-pi-test.sh" "$SESSION" <test-command...>
-```
-
-Script writes full output to `$SESSION/test-output.log` and emits `test_exit=<n>` + a bounded tail (tail -15 on pass; tail -30 + FAIL/error markers on fail). Never paste the full log.
-
-- All tests pass → Completed claims survive (subject to §3.7.2).
-- Any test fails → demote the failing contract(s) to Unresolved using the bounded output as evidence. Re-dispatch Pi at most **once** with failure details appended to the brief — counts as `phase_reruns.implement += 1`.
-- Test runner errors out (compile error, missing dependency) → treat as Pi-run failure; escalate with the bounded output.
-
-#### 3.7.4 Consolidate the implement output
-
-After §3.7.1–3.7.3 produce a **merged report** in memory (not a new file unless useful for debugging):
-
-- Pi's `Completed` items that survived both guards
-- Pi's `Concerns` (forwarded verbatim — concerns don't gate)
-- Pi's `Unresolved` items + any items demoted by §3.7.2/3.7.3, each tagged with the demotion reason
-
-If Concerns exist → forward to the review agent as additional input.
-
-If Unresolved contracts exist:
-- Codebase investigation issue (Pi needed knowledge not in the brief)? → loop back to research with enriched goal (cross-phase loop).
-- Missing-information issue? → consult human via `AskUserQuestion`: "Adjust contract to {alternative}", "Loop back to research on {area}", "Skip this contract for now", "Fall back to Claude implement agent for this contract", "Other".
-- ALL contracts Unresolved → escalate immediately.
-
-#### 3.7.5 Capture the diff for review
-
-```bash
-[ -n "$REPO_ROOT" ] && git -C "$WORK" diff HEAD > "$SESSION/implement.diff"
-```
-
-Phase 4 review teammates receive this path as `## Diff path` (never inlined). Do not run cleanup yet — Phase 4 may still need `$WORK` if any teammate reads files for context.
-
-### 3.8 Parallel Pi dispatch — DEFERRED (V2)
-
-Beta runs **single Pi instance, sequential** even if the plan exposes independent contract groups. Log: "Beta limitation: implement phase ran sequentially despite N independent contract groups."
-
-### 3.9 Fallback to Claude implementer
-
-If `$PI_AVAILABLE=0` is detected mid-flow, the pre-flight probe fails irrecoverably, or the human selects "Fall back to Claude implement agent" at any recovery prompt, dispatch the Claude `context-flow:implement` agent using `/cf`'s Phase 3 dispatch logic instead. State the fallback explicitly: "Falling back to Claude implement agent (sonnet)." Log this in the final review presentation.
+If `$PI_AVAILABLE=0` is detected mid-flow, pi-driver returns `Status: FAIL` with an unrecoverable probe error, or the human selects "Fall back to Claude implement agent" at any recovery prompt, dispatch the Claude `context-flow:implement` agent using `/cf`'s Phase 3 dispatch logic instead. State the fallback explicitly: "Falling back to Claude implement agent (sonnet)." Log this in the final review presentation.
 
 ---
 
@@ -375,9 +272,9 @@ Removes the Pi worktree and branch (if applicable) but preserves `$SESSION/` for
 
 ## Beta Caveats (state these to the human at the start of the flow)
 
-- Phase 3 delegates to Pi (pi.dev); defaults and dispatch protocol live in §3.4–3.6 (mechanics in `$SCRIPTS/cf-pi-*.sh`).
-- `ctx7`-based external verification is not available inside Pi — flag at plan time or use the Claude fallback (§3.9).
-- Parallel implement is deferred (§3.8); multi-group plans run sequentially.
+- Phase 3 delegates to Pi (pi.dev) via the `context-flow:pi-driver` sub-agent; main only computes brief inputs and routes recovery (mechanics in `$SCRIPTS/cf-pi-*.sh`).
+- `ctx7`-based external verification is not available inside Pi — flag at plan time or use the Claude fallback (§3.6).
+- Parallel implement is supported when plan groups are independent (§3.4); default is sequential single dispatch.
 
 ---
 
