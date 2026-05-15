@@ -220,13 +220,13 @@ After pi-driver returns, **bounded read**: `Read` `$SESSION/pi-driver-outcome.md
 | ↳ report missing/malformed | Default to `AskUserQuestion`: "Re-dispatch Pi with the same brief / Fall back to Claude implement agent / Adjust the plan and re-run / Other". |
 | ↳ All contracts demoted | Escalate immediately — do NOT silently fall through to Phase 4. |
 
-Pi run re-attempts (after a failed gate or kill-status) count as `phase_reruns.implement += 1` per loop-budget rules.
+**Loop budget ownership**: pi-driver does its own at-most-one re-dispatch internally on test failure (gate 3) and does NOT touch `$SESSION/loop-budget.json`. When main re-dispatches pi-driver after `PARTIAL` / `FAIL` (a fresh Agent call), main MUST increment `phase_reruns.implement` in `$SESSION/loop-budget.json` before the new dispatch and enforce the `max 2 per phase` ceiling per §Loop Budget. Cross-phase loops back to research/plan increment `cross_phase_loops` the same way.
 
-### 3.4 Parallel pi-driver dispatch (when the plan exposes independent groups)
+### 3.4 Parallel pi-driver dispatch (DEFERRED — V2)
 
-If the plan lists multiple contract groups with no shared file edits, dispatch one pi-driver per group in a **single Agent batch** so they run concurrently. Each sub-agent gets its own brief + worktree + outcome file (e.g., `$SESSION/pi-driver-outcome-group-1.md`). Main aggregates the outcomes after all return; recovery routing in §3.3 still applies per-group.
+Parallel implement is **not supported** in the current scripts. `cf-pi-setup.sh` returns a single `$SESSION` and `cf-pi-worktree.sh` creates a single `$WORK`; multiple concurrent pi-drivers would collide on `$BRIEF_FILE`, `$REPORT_FILE`, `$PI_STDOUT`, `pi.pid`, and worktree state. Dispatch sequentially — one pi-driver at a time — even when the plan exposes independent groups.
 
-Beta caveat: parallel mode requires the plan to declare group independence explicitly. If unsure, run sequentially (single dispatch) — the default.
+Deferred to V2: group-suffixed SESSION/WORK paths so each pi-driver gets isolated artifacts.
 
 ### 3.5 Pi protocol bounded reads (main side)
 
@@ -274,7 +274,7 @@ Removes the Pi worktree and branch (if applicable) but preserves `$SESSION/` for
 
 - Phase 3 delegates to Pi (pi.dev) via the `context-flow:pi-driver` sub-agent; main only computes brief inputs and routes recovery (mechanics in `$SCRIPTS/cf-pi-*.sh`).
 - `ctx7`-based external verification is not available inside Pi — flag at plan time or use the Claude fallback (§3.6).
-- Parallel implement is supported when plan groups are independent (§3.4); default is sequential single dispatch.
+- Parallel implement is deferred to V2 (§3.4); always sequential single dispatch.
 
 ---
 

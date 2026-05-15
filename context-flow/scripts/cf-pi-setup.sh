@@ -50,6 +50,7 @@ cat > "$SESSION/env.sh" <<EOF
 SESSION="$SESSION"
 SESSION_BASENAME="$SESSION_BASENAME"
 PLUGIN_ROOT="$PLUGIN_ROOT"
+SCRIPTS="$PLUGIN_ROOT/scripts"
 PI_PROTOCOL="$PLUGIN_ROOT/docs/pi-implementer-protocol.md"
 BRIEF_FILE="$SESSION/implement-brief.md"
 REPORT_FILE="$SESSION/implement-report.md"

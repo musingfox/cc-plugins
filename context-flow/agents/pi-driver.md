@@ -28,7 +28,7 @@ The dispatch prompt MUST include these variables:
 
 First action: `. "$SESSION/env.sh"` to pick up `SCRIPTS`, `BRIEF_FILE`, `REPORT_FILE`, `PI_TRANSPORT`, `PI_SESSION_DIR`, `PI_STALL_THRESHOLD_S`, `PI_WALL_CLOCK_S`, etc. **Re-source at the top of every subsequent Bash call** — variables don't survive Bash boundaries.
 
-Determine `SCRIPTS` once: `SCRIPTS="$(dirname "$PI_PROTOCOL")/../scripts"` or rely on absolute paths embedded in env.sh.
+`SCRIPTS` is exported from env.sh (`$PLUGIN_ROOT/scripts`). Always use that — never derive it locally.
 
 ## Sequence (hard rules from $PI_PROTOCOL §1)
 
