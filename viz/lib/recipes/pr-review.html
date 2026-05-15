@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DOC_NAME_PLACEHOLDER</title>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    line-height: 1.6;
+    color: #2c2c2c;
+    background: #f5f5f7;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.topbar {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid #e0e0e0;
+    padding: 12px 24px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
+}
+.topbar h1 { font-size: 1.05em; font-weight: 600; flex: 1 0 auto; min-width: 200px; }
+.filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.filters button {
+    padding: 5px 12px; border-radius: 999px;
+    border: 1px solid #d0d0d0; background: white;
+    font: inherit; font-size: 0.82em; cursor: pointer;
+    transition: all 0.15s;
+}
+.filters button:hover { border-color: #999; }
+.filters button.active { background: #2563eb; border-color: #2563eb; color: white; }
+.actions { display: flex; gap: 8px; }
+.actions button {
+    padding: 6px 14px; border-radius: 6px;
+    border: 1px solid #2563eb; background: #2563eb; color: white;
+    font: inherit; font-size: 0.85em; cursor: pointer;
+    transition: background 0.15s;
+}
+.actions button:hover { background: #1d4ed8; }
+.actions button.ghost { background: transparent; color: #2563eb; }
+.actions button.ghost:hover { background: rgba(37, 99, 235, 0.08); }
+
+main { max-width: 960px; margin: 24px auto 80px; padding: 0 24px; }
+
+.summary-card {
+    background: white; border-radius: 8px; padding: 18px 22px;
+    margin-bottom: 22px; border: 1px solid #e0e0e0;
+}
+.summary-card h2 {
+    font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.08em;
+    color: #888; font-weight: 600; margin-bottom: 8px;
+}
+.editable { outline: none; }
+.editable:focus { background: #fffbeb; border-radius: 4px; }
+.summary-body { min-height: 1.5em; white-space: pre-wrap; }
+
+.severity-group { margin-bottom: 24px; }
+.severity-header {
+    display: flex; align-items: baseline; gap: 12px;
+    margin-bottom: 10px; padding: 0 6px;
+}
+.severity-header h2 {
+    font-size: 0.92em; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.severity-header .count {
+    font-size: 0.78em; color: #888; font-weight: normal;
+}
+
+.finding {
+    background: white; border-radius: 8px;
+    margin-bottom: 10px; border: 1px solid #e0e0e0;
+    border-left: 4px solid #888;
+    padding: 14px 18px;
+    transition: opacity 0.18s;
+}
+.finding[data-status="fixed"]   { opacity: 0.55; }
+.finding[data-status="wontfix"] { opacity: 0.42; }
+.finding[data-severity="High"]     { border-left-color: #dc2626; }
+.finding[data-severity="Critical"] { border-left-color: #991b1b; }
+.finding[data-severity="Medium"]   { border-left-color: #d97706; }
+.finding[data-severity="Low"]      { border-left-color: #65a30d; }
+.finding[data-severity="Info"]     { border-left-color: #6b7280; }
+
+.finding-head {
+    display: flex; align-items: flex-start; gap: 12px;
+    margin-bottom: 8px;
+}
+.finding-title {
+    flex: 1; font-size: 1.0em; font-weight: 600; line-height: 1.4;
+}
+.status-badge {
+    padding: 3px 10px; border-radius: 999px;
+    font-size: 0.7em; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.04em;
+    cursor: pointer; user-select: none;
+    border: 1px solid; flex-shrink: 0;
+    transition: transform 0.1s;
+}
+.status-badge[data-status="open"]    { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+.status-badge[data-status="fixed"]   { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+.status-badge[data-status="wontfix"] { background: #f3f4f6; color: #4b5563; border-color: #d1d5db; }
+.status-badge:hover { transform: scale(1.06); }
+
+.meta {
+    display: grid; grid-template-columns: 70px 1fr; gap: 4px 14px;
+    font-size: 0.9em;
+}
+.meta .k {
+    color: #888; font-size: 0.78em; text-transform: uppercase;
+    letter-spacing: 0.05em; padding-top: 4px; user-select: none;
+}
+.meta .v { padding: 2px 0; }
+.meta .v code {
+    background: #f0f1f3; padding: 1px 6px; border-radius: 4px;
+    font-family: 'Fira Code', "SFMono-Regular", Consolas, monospace;
+    font-size: 0.85em;
+}
+
+.toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #1f2937; color: white;
+    padding: 10px 22px; border-radius: 8px;
+    font-size: 0.88em; box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+    transition: transform 0.25s ease-out;
+    pointer-events: none; z-index: 100;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+.reload-banner {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%);
+    background: #fef3c7; color: #78350f;
+    padding: 10px 16px; border-radius: 8px;
+    display: flex; gap: 10px; align-items: center;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.14);
+    border: 1px solid #fcd34d;
+    font-size: 0.88em; z-index: 110;
+}
+.reload-banner button {
+    font: inherit; font-size: 0.85em;
+    padding: 5px 12px; border-radius: 6px;
+    border: 1px solid #b45309; background: #b45309; color: white;
+    cursor: pointer;
+}
+.reload-banner button.ghost {
+    background: transparent; color: #78350f; border-color: #d97706;
+}
+@media (prefers-color-scheme: dark) {
+    .reload-banner { background: #422006; color: #fde68a; border-color: #92400e; }
+    .reload-banner button.ghost { color: #fde68a; }
+}
+
+.hidden { display: none !important; }
+.empty {
+    color: #888; font-style: italic; padding: 40px 0; text-align: center;
+}
+
+@media (max-width: 600px) {
+    .topbar { padding: 10px 16px; }
+    main { padding: 0 16px; margin: 16px auto 60px; }
+    .meta { grid-template-columns: 60px 1fr; }
+}
+
+@media (prefers-color-scheme: dark) {
+    body { background: #18181b; color: #d4d4d8; }
+    .topbar { background: rgba(24,24,27,0.92); border-bottom-color: #2e2e33; }
+    .filters button { background: #27272a; border-color: #3e3e44; color: #d4d4d8; }
+    .filters button.active { background: #2563eb; border-color: #2563eb; color: white; }
+    .actions button.ghost { color: #60a5fa; }
+    .actions button.ghost:hover { background: rgba(96, 165, 250, 0.12); }
+    .summary-card, .finding { background: #27272a; border-color: #3e3e44; }
+    .editable:focus { background: #422006; }
+    .meta .v code { background: #18181b; color: #d4d4d8; }
+    .toast { background: #f5f5f7; color: #1f2937; }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+    <h1 id="title">Loading…</h1>
+    <div class="filters" id="filters"></div>
+    <div class="actions">
+        <button id="save-btn" title="Write back to source markdown">Save</button>
+        <button id="export-btn" class="ghost" title="Copy updated markdown to clipboard">Export</button>
+        <button id="download-btn" class="ghost" title="Download as .md">Download</button>
+    </div>
+</header>
+
+<main>
+    <section class="summary-card" id="summary-card">
+        <h2>Summary</h2>
+        <div class="summary-body editable" id="summary" contenteditable="true"></div>
+    </section>
+    <section id="findings"></section>
+</main>
+
+<div class="toast" id="toast"></div>
+<div class="reload-banner hidden" id="reload-banner">
+    <span>File changed externally.</span>
+    <button id="reload-yes">Reload</button>
+    <button id="reload-no" class="ghost">Keep mine</button>
+</div>
+
+<script>
+window.SRC_B64 = "DOC_BASE64_PLACEHOLDER";
+window.SRC_NAME = "DOC_NAME_PLACEHOLDER";
+window.SRC_PATH = "SOURCE_PATH_PLACEHOLDER";
+window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
+</script>
+<script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+<script>
+(function() {
+    'use strict';
+
+    var STATUSES = ['open', 'fixed', 'wontfix'];
+    var CODE_FIELDS = new Set(['file', 'path', 'location']);
+
+    function decodeB64(b64) {
+        var bin = atob(b64);
+        var bytes = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return new TextDecoder('utf-8').decode(bytes);
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[<>&]/g, function(c) {
+            return c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&amp;';
+        });
+    }
+
+    function parseFrontmatter(md) {
+        var m = md.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+        if (!m) return { fm: {}, fmOrder: [], body: md };
+        var fm = {}, order = [];
+        m[1].split('\n').forEach(function(line) {
+            var kv = line.match(/^([^:]+?):\s*(.*)$/);
+            if (kv) {
+                var k = kv[1].trim();
+                fm[k] = kv[2].trim().replace(/^["']|["']$/g, '');
+                order.push(k);
+            }
+        });
+        return { fm: fm, fmOrder: order, body: m[2] };
+    }
+
+    function extractItemText(item) {
+        if (item.text) return item.text.split('\n')[0];
+        if (item.tokens) {
+            for (var i = 0; i < item.tokens.length; i++) {
+                var t = item.tokens[i];
+                if (t.type === 'text' || t.type === 'paragraph') return t.text;
+            }
+        }
+        return '';
+    }
+
+    function parseModel(md) {
+        var fm = parseFrontmatter(md);
+        var tokens = marked.lexer(fm.body);
+        var model = {
+            fm: fm.fm, fmOrder: fm.fmOrder,
+            summary: '', sections: []
+        };
+        var curSection = null, curFinding = null, inSummary = false;
+        var summaryParts = [];
+
+        tokens.forEach(function(tok) {
+            if (tok.type === 'heading' && tok.depth === 1) {
+                inSummary = tok.text.toLowerCase().indexOf('summary') !== -1;
+                curFinding = null;
+            } else if (tok.type === 'heading' && tok.depth === 2) {
+                curSection = { severity: tok.text, findings: [] };
+                model.sections.push(curSection);
+                curFinding = null;
+                inSummary = false;
+            } else if (tok.type === 'heading' && tok.depth === 3 && curSection) {
+                curFinding = { title: tok.text, meta: {}, metaOrder: [] };
+                curSection.findings.push(curFinding);
+                inSummary = false;
+            } else if (tok.type === 'list' && curFinding) {
+                tok.items.forEach(function(item) {
+                    var text = extractItemText(item);
+                    var kv = text.match(/^([^:]+?):\s*(.*)$/);
+                    if (kv) {
+                        var k = kv[1].trim(), v = kv[2].trim();
+                        if (!(k in curFinding.meta)) curFinding.metaOrder.push(k);
+                        curFinding.meta[k] = v;
+                    }
+                });
+            } else if ((tok.type === 'paragraph' || tok.type === 'text') && inSummary) {
+                summaryParts.push(tok.text);
+            }
+        });
+        model.summary = summaryParts.join('\n\n');
+        return model;
+    }
+
+    function serializeModel(model) {
+        var out = '---\n';
+        model.fmOrder.forEach(function(k) {
+            out += k + ': ' + model.fm[k] + '\n';
+        });
+        out += '---\n\n';
+        if (model.summary && model.summary.trim()) {
+            out += '# Summary\n\n' + model.summary.trim() + '\n\n';
+        }
+        model.sections.forEach(function(sec) {
+            out += '## ' + sec.severity + '\n\n';
+            sec.findings.forEach(function(f) {
+                out += '### ' + f.title + '\n';
+                if (f.meta.status && f.metaOrder.indexOf('status') === -1) {
+                    f.metaOrder.push('status');
+                }
+                f.metaOrder.forEach(function(k) {
+                    if (k in f.meta) out += '- ' + k + ': ' + f.meta[k] + '\n';
+                });
+                out += '\n';
+            });
+        });
+        return out.replace(/\n+$/, '') + '\n';
+    }
+
+    function el(tag, attrs) {
+        var e = document.createElement(tag);
+        if (attrs) {
+            for (var k in attrs) {
+                var v = attrs[k];
+                if (k === 'class') e.className = v;
+                else if (k === 'dataset') for (var dk in v) e.dataset[dk] = v[dk];
+                else if (k === 'on') for (var ev in v) e.addEventListener(ev, v[ev]);
+                else if (k === 'html') e.innerHTML = v;
+                else if (k === 'contenteditable') e.contentEditable = v ? 'true' : 'false';
+                else e.setAttribute(k, v);
+            }
+        }
+        for (var i = 2; i < arguments.length; i++) {
+            var c = arguments[i];
+            if (c == null) continue;
+            e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+        }
+        return e;
+    }
+
+    function renderMetaValue(k, v) {
+        var lower = k.toLowerCase();
+        if (CODE_FIELDS.has(lower)) {
+            return '<code>' + escapeHtml(v) + '</code>';
+        }
+        return escapeHtml(v);
+    }
+
+    var currentModel = null;
+    var isDirty = false;
+    var dismissedMtime = 0;
+    var pollHandle = null;
+
+    function markDirty() { isDirty = true; }
+
+    function renderFinding(model, sectionIdx, findingIdx) {
+        var f = model.sections[sectionIdx].findings[findingIdx];
+        var sev = model.sections[sectionIdx].severity;
+        var status = (f.meta.status || 'open').toLowerCase();
+        if (STATUSES.indexOf(status) === -1) status = 'open';
+        f.meta.status = status;
+        if (f.metaOrder.indexOf('status') === -1) f.metaOrder.push('status');
+
+        var titleEl = el('div', {
+            class: 'finding-title editable',
+            contenteditable: true,
+            on: {
+                input: function(e) { f.title = e.target.textContent.trim(); markDirty(); }
+            }
+        }, f.title);
+
+        var badge = el('div', {
+            class: 'status-badge',
+            dataset: { status: status }
+        }, status);
+
+        var metaGrid = el('div', { class: 'meta' });
+        f.metaOrder.forEach(function(k) {
+            if (k === 'status') return;
+            var v = f.meta[k] || '';
+            var keyEl = el('div', { class: 'k' }, k);
+            var valEl = el('div', {
+                class: 'v editable',
+                contenteditable: true,
+                html: renderMetaValue(k, v),
+                on: {
+                    input: function(e) { f.meta[k] = e.target.textContent.trim(); markDirty(); },
+                    blur: function(e) {
+                        e.target.innerHTML = renderMetaValue(k, e.target.textContent.trim());
+                    }
+                }
+            });
+            metaGrid.appendChild(keyEl);
+            metaGrid.appendChild(valEl);
+        });
+
+        var card = el('div', {
+            class: 'finding',
+            dataset: { severity: sev, status: status }
+        },
+            el('div', { class: 'finding-head' }, titleEl, badge),
+            metaGrid
+        );
+
+        badge.addEventListener('click', function() {
+            var cur = STATUSES.indexOf(badge.dataset.status);
+            var next = STATUSES[(cur + 1) % STATUSES.length];
+            badge.dataset.status = next;
+            badge.textContent = next;
+            f.meta.status = next;
+            card.dataset.status = next;
+            markDirty();
+        });
+
+        return card;
+    }
+
+    function render(model) {
+        var title = model.fm.title || 'PR Review';
+        document.getElementById('title').textContent = title;
+        document.title = title;
+
+        var sumEl = document.getElementById('summary');
+        sumEl.textContent = model.summary;
+        sumEl.oninput = function(e) {
+            model.summary = e.target.textContent;
+            markDirty();
+        };
+
+        var findingsEl = document.getElementById('findings');
+        findingsEl.innerHTML = '';
+        if (model.sections.length === 0) {
+            findingsEl.appendChild(el('div', { class: 'empty' },
+                'No findings. Add `## High` / `## Medium` / `## Low` sections with `### Title` items.'));
+        }
+        model.sections.forEach(function(sec, si) {
+            var group = el('div', {
+                class: 'severity-group',
+                dataset: { severity: sec.severity }
+            }, el('div', { class: 'severity-header' },
+                el('h2', null, sec.severity),
+                el('span', { class: 'count' },
+                    sec.findings.length + (sec.findings.length === 1 ? ' finding' : ' findings'))
+            ));
+            sec.findings.forEach(function(_, fi) {
+                group.appendChild(renderFinding(model, si, fi));
+            });
+            findingsEl.appendChild(group);
+        });
+
+        var filtersEl = document.getElementById('filters');
+        filtersEl.innerHTML = '';
+        var allBtn = el('button', { dataset: { filter: 'all' }, class: 'active' }, 'All');
+        filtersEl.appendChild(allBtn);
+        model.sections.forEach(function(sec) {
+            filtersEl.appendChild(el('button', { dataset: { filter: sec.severity } }, sec.severity));
+        });
+        filtersEl.onclick = function(e) {
+            var btn = e.target.closest('button');
+            if (!btn) return;
+            filtersEl.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            var f = btn.dataset.filter;
+            document.querySelectorAll('.severity-group').forEach(function(g) {
+                g.classList.toggle('hidden', f !== 'all' && g.dataset.severity !== f);
+            });
+        };
+    }
+
+    function applyMarkdown(md, mtime) {
+        currentModel = parseModel(md);
+        render(currentModel);
+        if (mtime != null) window.SRC_MTIME = String(mtime);
+        isDirty = false;
+        dismissedMtime = 0;
+    }
+
+    function fetchAndApply() {
+        if (!window.SRC_PATH || location.protocol === 'file:') {
+            return Promise.resolve(false);
+        }
+        return fetch('/api/read?path=' + encodeURIComponent(window.SRC_PATH))
+            .then(function(res) {
+                return res.json().then(function(d) { return { status: res.status, data: d }; });
+            })
+            .then(function(r) {
+                if (r.status === 200) {
+                    applyMarkdown(r.data.content, r.data.mtime);
+                    return true;
+                }
+                return false;
+            })
+            .catch(function() { return false; });
+    }
+
+    function checkRemote() {
+        if (!window.SRC_PATH || location.protocol === 'file:') return;
+        fetch('/api/stat?path=' + encodeURIComponent(window.SRC_PATH))
+            .then(function(res) { return res.ok ? res.json() : null; })
+            .then(function(d) {
+                if (!d || d.mtime == null) return;
+                var local = window.SRC_MTIME ? parseFloat(window.SRC_MTIME) : 0;
+                if (d.mtime - local <= 0.001) return;
+                if (isDirty) {
+                    if (d.mtime > dismissedMtime + 0.001) {
+                        showReloadBanner(d.mtime);
+                    }
+                } else {
+                    fetchAndApply().then(function(ok) {
+                        if (ok) showToast('↻ Reloaded from disk');
+                    });
+                }
+            })
+            .catch(function() {});
+    }
+
+    function showReloadBanner(remoteMtime) {
+        var banner = document.getElementById('reload-banner');
+        banner.dataset.remoteMtime = String(remoteMtime);
+        banner.classList.remove('hidden');
+    }
+
+    function hideReloadBanner() {
+        document.getElementById('reload-banner').classList.add('hidden');
+    }
+
+    function showToast(msg) {
+        var t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        clearTimeout(t._timer);
+        t._timer = setTimeout(function() { t.classList.remove('show'); }, 1800);
+    }
+
+    function downloadMarkdown(md) {
+        var blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = (window.SRC_NAME || 'review').replace(/^doc-/, '') + '.md';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+    }
+
+    function saveToServer(model) {
+        if (!window.SRC_PATH || window.SRC_PATH.indexOf('/') !== 0) {
+            showToast('No source path — opened via file://, use Export instead');
+            return;
+        }
+        var md = serializeModel(model);
+        var clientMtime = window.SRC_MTIME ? parseFloat(window.SRC_MTIME) : null;
+        fetch('/api/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                path: window.SRC_PATH,
+                content: md,
+                mtime: isFinite(clientMtime) ? clientMtime : null
+            })
+        }).then(function(res) {
+            return res.json().then(function(data) { return { status: res.status, data: data }; });
+        }).then(function(r) {
+            if (r.status === 200) {
+                window.SRC_MTIME = String(r.data.mtime);
+                var name = window.SRC_PATH.split('/').pop();
+                showToast('Saved → ' + name);
+            } else if (r.status === 409) {
+                window.SRC_MTIME = String(r.data.current_mtime);
+                showToast('File changed externally — click Save again to overwrite');
+            } else {
+                showToast('Save failed: ' + (r.data.error || r.status));
+            }
+        }).catch(function(e) {
+            showToast('Save failed: ' + e.message + ' (server down? use Export)');
+        });
+    }
+
+    function withModel(fn) {
+        if (!currentModel) { showToast('Still loading…'); return; }
+        fn(currentModel);
+    }
+
+    window.addEventListener('load', function() {
+        try {
+            // Hide Save when running off file:// (no server reachable)
+            if (location.protocol === 'file:') {
+                document.getElementById('save-btn').style.display = 'none';
+            }
+
+            document.getElementById('save-btn').addEventListener('click', function() {
+                withModel(saveToServer);
+            });
+
+            document.getElementById('export-btn').addEventListener('click', function() {
+                withModel(function(model) {
+                    var out = serializeModel(model);
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(out).then(function() {
+                            showToast('Updated markdown copied — paste back to your agent');
+                        }).catch(function() {
+                            downloadMarkdown(out);
+                            showToast('Clipboard blocked — downloaded instead');
+                        });
+                    } else {
+                        downloadMarkdown(out);
+                        showToast('Downloaded markdown');
+                    }
+                });
+            });
+
+            document.getElementById('download-btn').addEventListener('click', function() {
+                withModel(function(model) {
+                    downloadMarkdown(serializeModel(model));
+                    showToast('Downloaded markdown');
+                });
+            });
+
+            // Initial content: prefer live fetch (HTML's embedded base64 is
+            // a render-time snapshot — stale on refresh). Fall back to it
+            // only if /api/read is unreachable (file:// or server down).
+            if (window.SRC_PATH && location.protocol !== 'file:') {
+                fetchAndApply().then(function(ok) {
+                    if (!ok) applyMarkdown(decodeB64(window.SRC_B64), null);
+                });
+            } else {
+                applyMarkdown(decodeB64(window.SRC_B64), null);
+            }
+
+            document.getElementById('reload-yes').addEventListener('click', function() {
+                hideReloadBanner();
+                fetchAndApply().then(function(ok) {
+                    if (ok) showToast('↻ Reloaded from disk');
+                });
+            });
+            document.getElementById('reload-no').addEventListener('click', function() {
+                var banner = document.getElementById('reload-banner');
+                dismissedMtime = parseFloat(banner.dataset.remoteMtime || '0') || 0;
+                hideReloadBanner();
+            });
+
+            // Live-reload: poll mtime every 2s while tab is visible
+            if (window.SRC_PATH && location.protocol !== 'file:') {
+                pollHandle = setInterval(function() {
+                    if (document.visibilityState === 'visible') checkRemote();
+                }, 2000);
+                document.addEventListener('visibilitychange', function() {
+                    if (document.visibilityState === 'visible') checkRemote();
+                });
+            }
+        } catch (err) {
+            document.body.innerHTML = '<pre style="padding:24px;color:#dc2626;font-family:monospace">'
+                + escapeHtml('Recipe error: ' + (err && err.message ? err.message : err))
+                + '</pre>';
+            console.error(err);
+        }
+    });
+})();
+</script>
+</body>
+</html>

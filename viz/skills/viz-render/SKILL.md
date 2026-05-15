@@ -100,8 +100,39 @@ When the user requests a diagram without providing the code:
 The render script prints the output HTML path (under `/tmp/viz/{project}/`)
 and opens it in the default browser. Report the path to the user.
 
+## Recipes (interactive HTML artifacts)
+
+If the markdown file starts with frontmatter `viz: <recipe>`, the render
+script swaps the generic viewer for a recipe-specific interactive template.
+Recipes treat markdown as the canonical source: the HTML reads from it on
+load and exports a roundtrippable markdown back to the clipboard on Export.
+
+Use a recipe when the user wants an output they will iterate on (mark items
+as done/wontfix, filter, edit fields), not just read.
+
+Available recipes:
+
+- **pr-review** — severity-grouped finding cards with status badges,
+  inline-editable metadata, and severity filters. See
+  `references/recipes/pr-review.md` for the markdown structure spec.
+
+Workflow:
+
+1. Author the markdown with the recipe's frontmatter and structure.
+2. `bash "${CLAUDE_PLUGIN_ROOT}/lib/render.sh" <file.md> <output-name>`
+3. User edits in HTML → clicks Export → updated markdown is on clipboard.
+4. User pastes back to chat → agent overwrites the source `.md` → re-render.
+
+Markdown without `viz:` frontmatter falls through to the generic viewer
+unchanged.
+
+The recipe Save endpoint listens on port `18080` by default. If that port
+is taken (e.g. by another local service), set `VIZ_PORT=<port>` in the
+environment before invoking render.sh.
+
 ## References
 
 - **Diagram type syntax**: `references/diagram-types.md`
+- **Recipe specs**: `references/recipes/`
 - **Mermaid docs**: https://mermaid.js.org/
 - **Live editor**: https://mermaid.live
