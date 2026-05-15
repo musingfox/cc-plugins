@@ -35,9 +35,12 @@ if [ -n "$HOLDER_PID" ] && kill -0 "$HOLDER_PID" 2>/dev/null; then
   kill "$HOLDER_PID" 2>/dev/null || true
 fi
 
-# Wait for pi to exit on its own.
+# Wait for pi to exit on its own. After an --abort, pi cancels its current
+# tool then runs one final "aborted" model turn before emitting agent_end and
+# the abort response — observed ~7-9s on openai-codex. 10 iterations gives
+# headroom while still bounding the worst case.
 if [ -n "$PI_PID" ]; then
-  for _ in 1 2 3 4 5; do
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
     kill -0 "$PI_PID" 2>/dev/null || break
     sleep 1
   done
