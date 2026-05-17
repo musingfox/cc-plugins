@@ -393,6 +393,8 @@ After Phase 3 transitions out (success OR escalation):
 ```bash
 if [ -n "$WORK" ] && [ -d "$WORK/.git" ] || git -C "$REPO_ROOT" worktree list | grep -q "$WORK"; then
   # capture the diff for review phase BEFORE cleanup
+  # add --intent-to-add surfaces untracked new files in `git diff HEAD`
+  git -C "$WORK" add --intent-to-add -- .
   git -C "$WORK" diff HEAD > "$SESSION/implement.diff"
   git -C "$REPO_ROOT" worktree remove --force "$WORK"
   git -C "$REPO_ROOT" branch -D "ctxflow/pi-$SESSION_BASENAME" 2>/dev/null || true

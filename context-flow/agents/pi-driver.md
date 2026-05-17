@@ -133,10 +133,13 @@ Script writes full output to `$SESSION/test-output.log` and emits `test_exit=<n>
 ### 8. Capture diff (§3.7.5)
 
 ```bash
-[ -n "${REPO_ROOT:-}" ] && git -C "$WORK" diff HEAD > "$SESSION/implement.diff"
+if [ -n "${REPO_ROOT:-}" ]; then
+  git -C "$WORK" add --intent-to-add -- .  # surface untracked new files
+  git -C "$WORK" diff HEAD > "$SESSION/implement.diff"
+fi
 ```
 
-Always attempt — only writes if `REPO_ROOT` is set (worktree mode).
+Always attempt — only writes if `REPO_ROOT` is set (worktree mode). `add --intent-to-add` is required because `git diff HEAD` alone omits untracked files; we want new files (including unexpected ones like a stray `package-lock.json`) visible to Phase 4 reviewers.
 
 ### 9. Write outcome
 

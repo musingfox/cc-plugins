@@ -24,6 +24,7 @@ if [ -n "$REPO_ROOT" ]; then
   PI_BRANCH="ctxflow/pi-$SESSION_BASENAME"
   git -C "$REPO_ROOT" worktree add -B "$PI_BRANCH" "$WORK" HEAD >&2
   cat >> "$CLEANUP_SCRIPT" <<EOF
+git -C "$WORK" add --intent-to-add -- . 2>/dev/null || true
 git -C "$WORK" diff HEAD > "$session/implement.diff" 2>/dev/null || true
 git -C "$REPO_ROOT" worktree remove --force "$WORK" 2>/dev/null || true
 git -C "$REPO_ROOT" branch -D "$PI_BRANCH" 2>/dev/null || true
