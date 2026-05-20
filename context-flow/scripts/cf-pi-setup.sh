@@ -4,13 +4,16 @@
 # Stdin:   none
 # Stdout:  SESSION path (single line)
 # Env in:  PI_PROVIDER, PI_MODEL, PI_STALL_THRESHOLD_S, PI_WALL_CLOCK_S (all optional)
-#          CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS (optional gate)
 # Side effects:
-#   - creates $SESSION (under /tmp) plus $SESSION/pi-sessions/
-#   - writes $SESSION/env.sh (sourced by sibling scripts)
+#   - creates $SESSION (under /tmp)
+#   - writes $SESSION/env.sh (sourced by sibling scripts — session-wide vars only;
+#     flat per-session paths are derived by load_cf_pi_env)
 #   - writes $SESSION/cleanup.sh (worktree script appends to this)
-#   - writes $SESSION/loop-budget.json
-#   - records PI_AVAILABLE / NATIVE_AT_AVAILABLE gates into env.sh
+#   - writes $SESSION/README.md (human pointer to inspect/clean up the session)
+#   - records PI_AVAILABLE gate into env.sh
+#
+# Note: loop-budget.json is owned by the /cf orchestrator (commands/cf.md
+# Setup block). cf-pi-setup.sh does NOT write it.
 
 set -euo pipefail
 
@@ -19,21 +22,10 @@ PLUGIN_ROOT="$(dirname "$SCRIPT_DIR")"
 
 SESSION="/tmp/context-flow-pi-$(date +%s)-$$-${RANDOM}"
 SESSION_BASENAME="$(basename "$SESSION")"
-mkdir -p "$SESSION" "$SESSION/pi-sessions"
-
-cat > "$SESSION/loop-budget.json" <<'JSON'
-{"phase_reruns":{"research":0,"plan":0,"implement":0,"review":0},"cross_phase_loops":0,"agent_teams_reruns":{"research":0,"review":0}}
-JSON
+mkdir -p "$SESSION"
 
 PI_PROVIDER="${PI_PROVIDER:-}"
 PI_MODEL="${PI_MODEL:-}"
-PI_TRANSPORT="${PI_TRANSPORT:-text}"
-case "$PI_TRANSPORT" in
-  text|rpc) ;;
-  *)
-    echo "cf-pi-setup: invalid PI_TRANSPORT=$PI_TRANSPORT (must be text|rpc)" >&2
-    exit 1 ;;
-esac
 if [ -n "$PI_PROVIDER" ] || [ -n "$PI_MODEL" ]; then
   PI_DESC="${PI_PROVIDER:-<pi-default-provider>}/${PI_MODEL:-<pi-default-model>}"
 else
@@ -43,32 +35,51 @@ fi
 PI_AVAILABLE=0
 command -v pi >/dev/null 2>&1 && PI_AVAILABLE=1
 
-NATIVE_AT_AVAILABLE=0
-[ "${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-}" = "1" ] && NATIVE_AT_AVAILABLE=1
-
 cat > "$SESSION/env.sh" <<EOF
 SESSION="$SESSION"
 SESSION_BASENAME="$SESSION_BASENAME"
 PLUGIN_ROOT="$PLUGIN_ROOT"
 SCRIPTS="$PLUGIN_ROOT/scripts"
 PI_PROTOCOL="$PLUGIN_ROOT/docs/pi-implementer-protocol.md"
-BRIEF_FILE="$SESSION/implement-brief.md"
-REPORT_FILE="$SESSION/implement-report.md"
-PI_STDOUT="$SESSION/pi-stdout.log"
-PI_STDERR="$SESSION/pi-stderr.log"
-PI_SESSION_DIR="$SESSION/pi-sessions"
 CLEANUP_SCRIPT="$SESSION/cleanup.sh"
 PI_PROVIDER="$PI_PROVIDER"
 PI_MODEL="$PI_MODEL"
 PI_DESC="$PI_DESC"
-PI_TRANSPORT="$PI_TRANSPORT"
 PI_STALL_THRESHOLD_S="${PI_STALL_THRESHOLD_S:-180}"
 PI_WALL_CLOCK_S="${PI_WALL_CLOCK_S:-1800}"
 PI_AVAILABLE=$PI_AVAILABLE
-NATIVE_AT_AVAILABLE=$NATIVE_AT_AVAILABLE
 EOF
 
 echo '#!/usr/bin/env bash' > "$SESSION/cleanup.sh"
 chmod +x "$SESSION/cleanup.sh"
+
+cat > "$SESSION/README.md" <<EOF
+# cf-pi session: $SESSION_BASENAME
+
+Pi-driven implement session. Files are flat under this directory.
+
+## Key files
+- \`env.sh\` — session-wide env (provider/model, thresholds, paths)
+- \`implement-brief.md\` — brief Pi was given
+- \`implement-report.md\` — Pi's final report (present on DONE)
+- \`implement.diff\` — captured diff of Pi's work
+- \`pi-stdout.log\` / \`pi-stderr.log\` — Pi process output
+- \`pi-sessions/*.jsonl\` — Pi JSONL transcript (authoritative state)
+- \`pi-probe/\` — pre-flight probe artifacts
+- \`work/\` — Pi's working directory (git worktree on branch \`$SESSION/env.sh:PI_BRANCH\`)
+- \`cleanup.sh\` — run to remove worktree + delete branch + persist diff
+
+## Inspect
+\`\`\`bash
+tail -50 $SESSION/pi-stdout.log
+ls -t $SESSION/pi-sessions/*.jsonl | head -1 | xargs tail -20
+\`\`\`
+
+## Clean up
+\`\`\`bash
+bash $SESSION/cleanup.sh
+rm -rf $SESSION
+\`\`\`
+EOF
 
 echo "$SESSION"

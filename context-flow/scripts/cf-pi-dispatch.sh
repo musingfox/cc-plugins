@@ -20,12 +20,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 session="$1"
 load_cf_pi_env "$session"
 
-# Transport multiplex: opt into RPC mode via PI_TRANSPORT=rpc (default: text).
-if [ "${PI_TRANSPORT:-text}" = "rpc" ]; then
-  exec "$SCRIPT_DIR/cf-pi-rpc-dispatch.sh" "$session"
-fi
-
-date +%s > "$session/pi-start.ts"
+date +%s > "$PI_START_FILE"
 
 cd "$WORK"
 pi -p \
@@ -35,6 +30,6 @@ pi -p \
    "Read the brief and execute it. When finished, print exactly DONE and nothing else." \
    > "$PI_STDOUT" 2> "$PI_STDERR" &
 PI_PID=$!
-echo "$PI_PID" > "$session/pi.pid"
+echo "$PI_PID" > "$PI_PID_FILE"
 disown
 echo "$PI_PID"

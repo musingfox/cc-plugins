@@ -20,6 +20,7 @@ Produce a capability inventory relevant to the given goal. Your output will be u
    - **Query** — `ctx7 docs <library-id> "<specific question>"`. **Extract only the 1-3 facts that answer your question; do NOT paste raw doc content into your output**. A 100KB doc dump will poison downstream synthesis.
    - **WebFetch fallback** — if ctx7 unavailable or returns no answer, WebFetch the official docs URL.
    - **Unresolved last resort** — if both fail, report Unresolved with what was attempted.
+7. **UI/UX surface audit** _(conditional)_: If the goal touches a user-facing surface — anything rendered, displayed, or perceivable by an end user — map the existing **design system** so plan can specify UX state behavior. Skip this step entirely for backend-only / infra / tooling goals. See the Design System Audit section below for what to capture.
 
 ## Sourcing External Findings
 
@@ -69,6 +70,23 @@ Your output is read by both the plan agent (needs technical detail) and the huma
 
 ## Key Files
 - `[file path]`: [why it matters for this goal]
+
+## Design System Audit _(only if the goal touches a user-facing surface; omit entirely otherwise)_
+
+The plan agent uses this to spell out Loading / Empty / Error / Success states in user-facing contracts. Cite real files so plan can reuse existing components rather than inventing new ones.
+
+- **Design tokens / theme**: [where colors, spacing, typography are defined — e.g., `tailwind.config.ts`, `theme.ts`, CSS custom properties]
+- **Component library**: [primary UI primitives in use — e.g., shadcn/ui at `components/ui/`, MUI imported from `@mui/material`, in-house at `app/components/`]
+- **Existing state patterns**:
+  - Loading: [how the codebase currently handles in-flight state — e.g., `<Skeleton />` in `components/ui/skeleton.tsx`, spinner inside button]
+  - Empty: [empty-state pattern — e.g., centered illustration + CTA in `EmptyState.tsx`]
+  - Error: [error UX — toast via `sonner`, inline `<FormMessage />`, error boundary at `app/error.tsx`]
+  - Success: [success feedback — toast, optimistic update, redirect convention]
+- **Accessibility infra**: [a11y conventions — e.g., `aria-*` usage, focus management library, keyboard-shortcut system; "none observed" is a valid finding]
+- **Internationalization**: [i18n setup — e.g., `next-intl` with locale files at `messages/`, English-only, or none]
+- **Form / validation patterns**: [if goal involves forms — e.g., react-hook-form + zod, formik, vanilla; surface the resolver pattern]
+
+If a category is genuinely absent from the codebase (e.g., no i18n, no design tokens), state that explicitly — "absent" is itself a constraint plan must work around. Do NOT skip the category; do NOT invent a finding.
 
 ## Decision Points
 - [decision needed]: [why multiple valid approaches exist]

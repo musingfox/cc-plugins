@@ -1,7 +1,7 @@
 ---
-description: "Context-flow pipeline — contract-driven development with human-in-the-loop decision gating"
-argument-hint: "[--fast|--deep] [--research=lite|standard|pro] [--plan=lite|standard|pro] [--implement=lite|standard|pro] [--review=lite|standard|pro] <goal>"
-allowed-tools: [Agent, Read, Write, Bash, Glob, Grep, AskUserQuestion, TeamCreate, TeamDelete, SendMessage]
+description: "Context-flow pipeline — contract-driven development with human-in-the-loop decision gating; Pi (pi.dev) as default implementer, Claude implement agent as fallback"
+argument-hint: "<goal>"
+allowed-tools: [Agent, Read, Write, Bash, Glob, Grep, AskUserQuestion]
 ---
 
 # Context Flow Orchestrator
@@ -10,105 +10,47 @@ You are a **collaborative flow operator**. Your job is to manage a pipeline of a
 
 ## Setup
 
-```bash
-SESSION="/tmp/context-flow-$(date +%s)-$$-${RANDOM}"
-SESSION_BASENAME=$(basename "$SESSION")
-mkdir -p "$SESSION"
-PROTOCOL_DIR="${CLAUDE_PLUGIN_ROOT}/docs"
-echo '{"phase_reruns":{"research":0,"plan":0,"implement":0,"review":0},"cross_phase_loops":0,"agent_teams_reruns":{"research":0,"review":0}}' > "$SESSION/loop-budget.json"
+Phase 3 mechanics live in `${CLAUDE_PLUGIN_ROOT}/scripts/cf-pi-*.sh`. The orchestrator drives them; the scripts persist state to `$SESSION/env.sh` so subsequent Bash calls can `source` it.
 
-# Native Agent Teams gate — required by --deep mode.
-if [ "${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-}" = "1" ]; then
-  NATIVE_AT_AVAILABLE=1
-else
-  NATIVE_AT_AVAILABLE=0
-fi
+```bash
+SCRIPTS="${CLAUDE_PLUGIN_ROOT}/scripts"
+SESSION=$("$SCRIPTS/cf-pi-setup.sh")    # honors PI_PROVIDER / PI_MODEL / PI_STALL_THRESHOLD_S / PI_WALL_CLOCK_S
+. "$SESSION/env.sh"                      # exposes SESSION_BASENAME, BRIEF_FILE, REPORT_FILE, PI_PROTOCOL, PI_AVAILABLE, PI_DESC, PROTOCOL_DIR, thresholds
+PROTOCOL_DIR="${PROTOCOL_DIR:-${CLAUDE_PLUGIN_ROOT}/docs}"
+echo '{"retries_used":0}' > "$SESSION/loop-budget.json"
+echo "SESSION=$SESSION"
 ```
 
-`$SESSION` includes PID and `$RANDOM` so concurrent flows don't collide on the same second. `$SESSION_BASENAME` is reused as a namespace for `team_name` so concurrent native-mode flows don't collide on `~/.claude/teams/`. Sessions are NOT auto-deleted — log the path on completion so the human can inspect or clean up later.
+Re-source `$SESSION/env.sh` at the top of every subsequent Bash call so paths stay consistent. Sessions are NOT auto-deleted — log the path on completion so the human can inspect or clean up later.
 
-Protocol files referenced below live under `$PROTOCOL_DIR` (resolved from `${CLAUDE_PLUGIN_ROOT}`). Always read them via this absolute path — never via paths relative to the current working directory, which is the user's project, not the plugin root.
+Write the goal to `$SESSION/goal.md`.
 
-### Argument Parsing
+### Implementer pre-flight
 
-Parse the user's input to extract mode, per-stage overrides, and goal:
+After setup, read `$PI_AVAILABLE` from env.sh:
 
-1. **Mode flags**: `--fast` or `--deep`. If neither is present, use `default` mode. If both are present, use the last one. **All subsequent rules (skip conditions, mode-to-implementation mapping) read the *resolved* mode — not the original tokens.** A user passing `--fast --deep` is in `deep` mode, full stop.
-2. **Per-stage overrides**: `--research=<tier>`, `--plan=<tier>`, `--implement=<tier>`, `--review=<tier>` where tier is `lite`, `standard`, or `pro`. Invalid tier or stage names are silently ignored.
-3. **Goal**: Everything remaining after stripping flags.
+- `PI_AVAILABLE=1` → Phase 3 uses Pi (default).
+- `PI_AVAILABLE=0` → Phase 3 falls back to Claude `context-flow:implement` agent. Log: `Pi CLI not on PATH — Phase 3 will use Claude implement agent. Install pi from pi.dev to use the Pi implementer.` Do NOT abort.
 
-Write the goal (flags stripped) to `$SESSION/goal.md`. Log the resolved mode and any overrides.
+The fallback path is also reachable mid-flow (pi-driver `Status: FAIL` with unrecoverable probe error, or the human selects "Fall back to Claude implement agent" at a recovery prompt). See §Phase 3.
 
 ---
 
-## Model Tier System
-
-Three user-facing tiers map to the Agent tool's `model` parameter:
-
-| Tier | `model` value | Use Case |
-|------|---------------|----------|
-| `lite` | `haiku` | Speed-optimized, simple tasks |
-| `standard` | `sonnet` | Balanced cost/quality |
-| `pro` | `opus` | Maximum reasoning depth |
-
-### Mode Presets
-
-Each mode defines a default tier for every stage. Per-stage overrides take precedence over mode defaults.
-
-| Stage | `fast` | `default` | `deep` |
-|-------|--------|-----------|--------|
-| research | lite | standard | pro |
-| plan | standard | pro | pro |
-| implement | lite | standard | standard |
-| review | lite | standard | standard |
-
-### Tier Resolution
-
-For each stage dispatch, resolve the tier in this order:
-1. **Per-stage override** (e.g., `--plan=pro`) → use the override
-2. **Mode default** → look up the mode preset table above
-3. If no mode flag and no override → use `default` mode
-
-### Complexity-Based Mode Selection
-
-When no mode flag is provided (`default` mode), the orchestrator may **upgrade to `deep` mode** if the goal exhibits high complexity signals during initial assessment:
-- Multi-module architectural changes
-- New system design or major refactoring
-- Cross-cutting concerns affecting 5+ files
-- Goals that require significant design decisions
-
-This upgrade happens before Phase 1 dispatch. Log the decision and reasoning.
-
-The orchestrator should NOT downgrade from the user's explicit mode choice. `--fast` and `--deep` are always respected.
-
 ## Agent Registry
-
-Each stage has a single agent. Model tier is controlled via the Agent tool's `model` parameter — no per-tier variants exist.
 
 | Stage | Agent | Tools |
 |-------|-------|-------|
 | Research | `context-flow:research` | Read, Grep, Glob, Bash, WebFetch |
-| Plan | `context-flow:plan` | Read, Grep, Glob |
-| Implement | `context-flow:implement` | Read, Edit, Write, Bash, Glob, Grep, WebFetch |
-| Review | `context-flow:review` | Read, Grep, Glob, Bash |
+| Plan | `context-flow:plan` | Read, Write, Grep, Glob |
+| **Implement (default)** | **Pi via `context-flow:pi-driver`** | Pi's own tools + driver's Bash/Read/Write |
+| Implement (fallback) | `context-flow:implement` | Read, Edit, Write, Bash, Glob, Grep, WebFetch |
+| Review | `context-flow:review` | Read, Write, Grep, Glob, Bash |
 
-### Agent Dispatch
-
-When dispatching an agent:
-1. Resolve the tier for this stage (see Tier Resolution above) → map to `model` value via the Tier table (`lite`→`haiku`, `standard`→`sonnet`, `pro`→`opus`)
-2. Call the Agent tool with `subagent_type: "context-flow:<stage>"` and `model: "<resolved>"`
-3. If a more specialized agent exists for the goal (e.g., a frontend-dev agent for UI work), prefer it — still pass the resolved `model` parameter
-
-Example:
-```
-Agent(subagent_type: "context-flow:plan", model: "opus", prompt: "...")
-```
-
-State which agent and model you selected and why.
+Phase 3 uses Pi's provider/model config (override via `$PI_PROVIDER`/`$PI_MODEL`); the Claude fallback runs on the default model. If a more specialized agent exists for the goal (e.g., a frontend-dev agent for UI work), prefer it.
 
 ### Agent Output Discipline (file-write + summary reply)
 
-Every research/plan/review agent dispatch in this orchestrator follows the same contract:
+Every research/plan/review agent dispatch follows the same contract:
 
 1. The dispatch prompt MUST include a `Report path:` line with the absolute target file (e.g., `Report path: $SESSION/research.md`). The agent writes its full Output Schema to this file before replying.
 2. The agent's reply is **summary-only** (verdict + ≤200-word summary + report path) — never the full schema body. The per-agent `Return Format` section spells out the exact reply shape.
@@ -161,156 +103,92 @@ Each phase below specifies its own option set. "Ask the human X" everywhere mean
 ## Pipeline Overview
 
 ```
-[research — Agent Teams] → VALIDATE → [plan] → VALIDATE → HUMAN GATE (H/M)
-    → [implement] → VALIDATE → [review — Agent Teams] → PRESENT
-         ↑ parallel dispatch if independent contracts
+[research] → VALIDATE
+  → [plan] → VALIDATE → HUMAN GATE (High decisions only)
+       ↑ Research Insufficiency BLOCKED → research (cross-phase)
+  → [implement — Pi default, Claude fallback] → VALIDATE
+       ↑ Failure Class = retry-different-approach → implement (same plan, with hint)
+       ↑ Failure Class = loop-back-to-plan → plan (revise contracts)
+       ↑ Failure Class = pivot-goal → escalate to human (bypass retry budget)
+       ↑ codebase-gap hint → research (cross-phase)
+  → [review] → PRESENT
+       ↑ REQUEST_CHANGES fundamental → plan (cross-phase)
+       ↑ REQUEST_CHANGES contract-fail → implement (same plan)
 ```
 
-Every arrow between phases passes through you. At each transition you perform a **Transition Validation** (see below). The flow is NOT linear — any phase can loop back.
+Every arrow between phases passes through you. At each transition you perform a **Transition Validation** (see below). The flow is NOT linear — any phase can loop back, but each loop counts against the single retry budget.
 
-### Agent Teams Default
+### Loop Budget (single counter)
 
-Research and Review phases use **Agent Teams by default**. There are two implementations; pick one per phase based on the resolved mode:
+Track all loop-backs in `$SESSION/loop-budget.json` under one field: `retries_used`. **Max 4 total retries per flow**, regardless of which phase is re-run. Each of the following increments the counter by 1:
 
-| Resolved mode | Agent Teams implementation | Why |
-|---------------|----------------------------|-----|
-| `deep` | **Native Agent Teams** — `TeamCreate` + named teammates that exchange `SendMessage`. Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` | Teammates cross-check findings, debate severity, converge on shared conclusions — better quality on ambiguous / complex goals |
-| `default` | **Parallel sub-agent dispatch** — orchestrator dispatches teammates concurrently and synthesizes | Cheap, no inter-agent coordination overhead; each teammate works independently |
-| `fast` | Single agent (no teams) | See skip rules below |
+- re-dispatching the same phase with feedback (phase re-run)
+- looping back to an earlier phase (cross-phase loop)
+- re-running plan after implement FAIL
+- re-running implement after review REQUEST_CHANGES
 
-Native and parallel modes use the **same teammate angle/lens definitions and the same Output Schema** — only the coordination mechanism differs. Read `$PROTOCOL_DIR/agent-teams-protocol.md` for both Native Mode and Parallel Mode protocols.
+A single counter forces a check-in once total churn exceeds 4 — it doesn't matter whether the cost came from one stubborn phase or from bouncing between phases.
 
-**Skip to single agent** when ANY of these apply (read resolved mode):
-- Resolved mode is `fast`
-- User explicitly requested a fast path in the goal
-- Goal is clearly a single-file bugfix, typo fix, or documentation-only change
-- Goal can be fully described in one sentence with no ambiguity
-
-When skipping, dispatch a single agent using the resolved tier for that stage.
-
-**Native mode strict gate**: if resolved mode is `deep` AND `NATIVE_AT_AVAILABLE=0` (env flag not set), **abort the flow immediately**. Do NOT silently fall back to parallel — the user picked `--deep` for cross-check quality, and parallel can't deliver that. Print:
-
-> `/cf --deep` requires native Agent Teams. Set `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in your shell or `~/.claude/settings.json` and retry, or run without `--deep` to use parallel dispatch.
-
-Then exit. No further phases run.
-
-### Agent Teams Model Mixing
-
-When using Agent Teams, teammates can use different model tiers. The resolved tier for the stage determines the **lead teammate's** model. Additional analytical teammates use one tier lower than the lead (e.g., if lead is `pro`, analytical teammates use `standard`; if lead is `standard`, analytical teammates also use `standard`).
-
-**Mechanical-inventory exception**: a teammate whose angle is purely mechanical enumeration (e.g., "list all files matching pattern X", "enumerate exports of module Y") may use `haiku` regardless of lead tier. This is the only case where teammates drop below `standard`.
-
-Dispatch teammates via the Agent tool with the same `subagent_type` (e.g., `context-flow:research`) but different `model` values per the rule above.
-
-### Loop Budget
-
-Track loop counts throughout the session, persisted to `$SESSION/loop-budget.json`:
-
-- **Phase re-runs** (same phase re-run with feedback): max **2 per phase**
-- **Cross-phase loops** (return to an earlier phase): max **2 total**
-- **Agent Teams re-runs** (re-run research or review teams): max **1 per phase**
-
-**Persistence**: read `$SESSION/loop-budget.json` at every transition; increment the relevant counter and write it back **before** dispatching the loop. This survives context compression — never trust your own memory for these counts.
+**Persistence**: read `$SESSION/loop-budget.json` at every transition; increment **before** dispatching the loop and write it back. This survives context compression — never trust your own memory for the count.
 
 ```bash
-# Example: increment research phase re-run
-jq '.phase_reruns.research += 1' "$SESSION/loop-budget.json" > "$SESSION/loop-budget.json.tmp" \
+jq '.retries_used += 1' "$SESSION/loop-budget.json" > "$SESSION/loop-budget.json.tmp" \
   && mv "$SESSION/loop-budget.json.tmp" "$SESSION/loop-budget.json"
 ```
 
-When a limit is reached, you MUST escalate to the human (see Escalation section). The human can override limits — they exist to force a check-in, not to hard-stop.
+When `retries_used >= 4`, you MUST escalate to the human (see §Escalation). The human can override — the budget exists to force a check-in, not to hard-stop.
 
 ---
 
-## Phase 1: Research (Agent Teams)
+## Phase 1: Research
 
-Research uses Agent Teams by default. Read the full protocol from `$PROTOCOL_DIR/agent-teams-protocol.md`, section **Research Teams**.
+Dispatch a single research agent.
 
-### Team Composition
+```
+Agent(
+  subagent_type: "context-flow:research",
+  prompt: "
+    Report path: $SESSION/research.md
 
-Identify 2-3 exploration angles based on the goal. Common patterns:
-- **Breadth vs depth**: one teammate maps overall architecture, another drills into the most relevant module
-- **Different subsystems**: for cross-cutting goals, one teammate per affected layer (e.g., API, data, UI)
-- **Existing vs greenfield**: one teammate investigates existing patterns, another explores what's needed that doesn't exist yet
+    ## Goal
+    {content of $SESSION/goal.md}
 
-### Dispatch
-
-Each teammate receives:
-
-```markdown
-Report path: $SESSION/research-{angle-slug}.md
-
-## Goal
-{content of goal.md}
-
-## Scope
-Working directory: {cwd}
-
-## Your Angle
-{description of this teammate's exploration focus}
+    ## Scope
+    Working directory: {cwd}
+  "
+)
 ```
 
-If this is a loop-back, use the enriched goal instead (see Loop Back section).
-
-**Nothing else.** Each teammate explores from scratch within their angle and writes its full output to its `Report path:` per the agent's Return Format. Each teammate gets a distinct slug so parallel files don't collide (e.g., `research-breadth.md`, `research-depth.md`).
-
-### Mid-Flight Direction Check
-
-Pause and check in (don't wait for synthesis) when continuing would waste effort or silently commit to a direction. **Triggers**: 2+ fundamentally different approaches viable; constraint that may invalidate the goal; adjacent problem worth addressing; new possibility outside the original goal.
-
-**Format**: brief context (what triggered, what's at stake) + `AskUserQuestion` with options for each direction + "Investigate both" + "Reframe goal" + "Continue as planned" + "Other". Mark your recommendation. After response, enrich remaining teammates' angles; if goal is reframed, restart teams (one phase re-run).
-
-**Budget**: max 2 mid-flight checks per research phase; further triggers fold into final synthesis.
-
-### Synthesis
-
-Each teammate has already written its own `$SESSION/research-<slug>.md`. You synthesize by **reading bounded sections** from each (never `cat` the whole file) and writing the merged result to `$SESSION/research.md` via the Write tool.
-
-Recommended read pattern per teammate file:
-- `head -30` → its Summary block (Convergence candidates live here)
-- `sed -n '/^## Constraints/,/^## Key Files/p'` → its Constraints with code evidence
-- `sed -n '/^## Unresolved/,/^## /p' | head -40` → its Unresolved tail (Divergence candidates live here)
-
-Merge into the research agent's Output Schema (Existing Capabilities, Constraints, Key Files, Completed, Unresolved), plus:
-- **Convergence**: facts teammates agree on (high confidence)
-- **Divergence**: conflicts / trade-offs (decision points for planning)
-- **Decision Points Requiring Human Input**: per item — what needs deciding, why it matters (concrete consequence), options with upside/downside/reversibility, your recommendation
-
-Decision points ≠ Unresolved: Unresolved is missing information; Decision points are valid choices needing human preference. Save the merged synthesis to `$SESSION/research.md` (this file is what Phase 2 reads).
+If this is a loop-back, use the enriched goal instead (see §Loop Back).
 
 ### Transition Validation: Research → Plan
 
-1. **Structural check**:
+1. **Structural check** (bounded read of `$SESSION/research.md`):
    - Output has "Existing Capabilities" with file paths
    - Output has "Constraints" with evidence from code
    - Output has "Completed" and "Unresolved" sections
-   - If missing → re-run research with feedback about what's missing (counts as phase re-run)
+   - If missing → re-run research with feedback about what's missing (increment `retries_used`).
 
 2. **Semantic check** — examine Unresolved items:
    - For each Unresolved: would this prevent the plan agent from defining correct contracts?
-   - Blocking items typically include: unknown data volume, unspecified behavior requirements, ambiguous scope
-   - Non-blocking items: minor naming preferences, optimization details that can be decided in plan
+   - Blocking items typically include: unknown data volume, unspecified behavior requirements, ambiguous scope.
+   - Non-blocking items: minor naming preferences, optimization details that can be decided in plan.
 
 3. **If blocking Unresolved items exist** → ask the human via `AskUserQuestion`. For each item:
-   - Briefly present what was (or wasn't) found and why it matters for planning
-   - Provide options like: "Answer: {recommended value}", "I don't know — proceed with assumption {X}", "Drop this requirement", "Other"
-   - Ask one item at a time so each answer can shape the next question
+   - Briefly present what was (or wasn't) found and why it matters for planning.
+   - Provide options like: "Answer: {recommended value}", "I don't know — proceed with assumption {X}", "Drop this requirement", "Other".
+   - Ask one item at a time so each answer can shape the next question.
 
 4. **Confidence check** — examine Completed items marked `medium`:
    - Is the assumption defensible? If too risky, treat as Unresolved and consult human.
 
-5. **Divergence check** — if research teammates produced conflicting findings:
-   - Present the divergence briefly with your recommendation
-   - Call `AskUserQuestion` with each direction as an option + "Other"
-   - Human chooses direction before proceeding to Plan
-
-6. **Once sufficient** → compress research output for plan input (see Context Compression).
+5. **Once sufficient** → compress research output for plan input (see §Context Compression).
 
 ---
 
 ## Phase 2: Plan
 
-**Before dispatching**: extract the compressed research summary you need by reading bounded sections from `$SESSION/research.md` (e.g., `head -30` for Summary, `sed -n '/^## Constraints/,/^## Key Files/p'` for Constraints) — do NOT `cat` the whole file. Compose the plan dispatch from those bounded reads.
+**Before dispatching**: extract the compressed research summary by reading bounded sections from `$SESSION/research.md` (e.g., `head -30` for Summary, `sed -n '/^## Constraints/,/^## Key Files/p'` for Constraints) — do NOT `cat` the whole file. Compose the plan dispatch from those bounded reads.
 
 **Dispatch agent** with this context:
 
@@ -321,21 +199,20 @@ Report path: $SESSION/plan.md
 {1-2 sentence compressed goal, incorporating human clarifications if any}
 
 ## Codebase Research
-{compressed research summary you assembled from bounded reads of $SESSION/research.md}
+{compressed research summary from bounded reads of $SESSION/research.md}
 
 ## Human Clarifications
 {any answers from human during research validation, if applicable}
 
-## Research Divergence
-{If research teammates produced conflicting findings: include the divergence and human's chosen direction.
- If no divergence or single-agent research: omit this section entirely.}
-
 ## Contract Requirements
 Your output MUST:
-1. Address every Constraint listed in the research
-2. Every behavioral contract must have at least one test case with concrete input → expected output
-3. Every decision must have an Impact level (High/Medium/Low)
+1. Address every Constraint listed in the research.
+2. Every behavioral contract must have at least one test case with concrete input → expected output.
+3. Every decision must have an Impact level (High/Medium/Low).
+4. Self-check contract atomicity per your agent prompt's `## Atomicity Self-Check` rules — collapse or split contracts that fail.
 ```
+
+**If this is a re-dispatch after implement FAIL**, add a `## Implement Failure` section to the dispatch — see §Phase 3.4 (Failure → Plan Loopback) for the exact format.
 
 The plan agent writes its full output to `$SESSION/plan.md` per the agent's Return Format. **You do NOT re-save the agent's reply** — read sections from `$SESSION/plan.md` on demand for Transition Validation.
 
@@ -343,139 +220,222 @@ The plan agent writes its full output to `$SESSION/plan.md` per the agent's Retu
 
 0. **Research Insufficiency check** (run before all other checks):
    - If plan output contains a `## Research Insufficiency` section with `Status: BLOCKED`, the plan agent has declared research inadequate.
-   - Do NOT proceed with the plan. Do NOT treat this as a plan phase re-run.
+   - Do NOT proceed with the plan.
    - Build an enriched research goal: original goal + the listed gaps + investigation requests.
-   - Loop back to Phase 1 (Research) with the enriched goal. This counts as a **cross-phase loop** — increment `cross_phase_loops` in the loop budget before dispatching.
-   - On the second occurrence within one session (same flow already looped plan→research once and is bouncing again), escalate to the human instead of looping again — repeated insufficiency signals a goal/scope problem research alone won't solve.
+   - Loop back to Phase 1 (Research) with the enriched goal. Increment `retries_used`.
+   - On the second `BLOCKED` verdict within one flow, escalate to the human instead of looping again — repeated insufficiency signals a goal/scope problem research alone won't solve.
 
 1. **Structural check**:
-   - Has "Decisions" section with Impact/Choice/Alternatives/Rationale per decision
-   - Has "Behavioral Contracts" with input/output/errors/depends + test cases per contract
+   - Has "Decisions" section. **High** decisions must carry Choice/Trade-off/Alternatives/Rationale. Medium decisions need at least a Rationale line. Low decisions need only the Choice line.
+   - Has "Behavioral Contracts" with input/output/errors/depends + test cases per contract. **User-facing contracts** must also include a `States` block (Loading / Empty / Error / Success, plus Partial/Stale if applicable) with at least one test case per non-trivial state.
    - Has "Implementation Plan" with steps
    - Has "Completed" and "Unresolved" sections
-   - If missing → re-run plan with feedback (phase re-run)
+   - If missing → re-run plan with feedback (increment `retries_used`).
 
 2. **Constraint coverage check**:
-   - Every research constraint is addressed by at least one contract **test case**, OR explicitly acknowledged in Unresolved with justification
-   - If a constraint is not captured as a test case, tell the plan agent which constraint is missing and re-run
+   - Every research constraint is addressed by at least one contract **test case**, OR explicitly acknowledged in Unresolved with justification.
+   - If a constraint is not captured as a test case, tell the plan agent which constraint is missing and re-run.
 
-3. **Structural Minimum Rules** — enforce these mechanically. If the plan agent classified a decision below the minimum, **auto-upgrade** it:
+3. **High-classification audit** — the plan agent self-classifies decisions per `agents/plan.md`'s criteria (High = Strategic direction OR Irreversible technical). Your job is to **flag suspected misclassifications**, not auto-upgrade. Scan Medium/Low decisions for any that match a High criterion:
 
-   | Condition | Minimum Impact |
-   |-----------|---------------|
-   | Introduces a new external dependency | ≥ High |
-   | Modifies an existing public API/interface | ≥ High |
-   | Irreversible operation (migration, data deletion, schema drop) | ≥ High |
-   | Touches ≥ 3 contracts OR spans ≥ 2 modules | ≥ Medium |
-   | ≥ 2 alternatives with material trade-offs were considered | ≥ Medium |
+   - **Strategic direction**: changes success criteria, affects ≥ 2 features, commits product direction, introduces a new third-party vendor
+   - **Irreversible technical**: non-rollback migration, public API break, auth change, removes existing functionality, new data location/format, vendor lock-in > 1 person-week
 
-   Log any auto-upgrades to show the human.
+   If a Medium/Low decision plausibly matches one of the above, re-dispatch plan with a focused note ("Decision X looks Strategic/Irreversible — reconsider classification") rather than rewriting it yourself. Increment `retries_used` only if you re-dispatch.
 
 4. **Semantic check** — examine Unresolved items for blocking potential.
 
 ### Human Gate
 
-When transition validation passes, **read `$PROTOCOL_DIR/human-gate-protocol.md`** and follow it. The protocol covers: gate header framing, Scope Review template, Decisions template (only for High/Medium), Gate Action via AskUserQuestion, and Iterative Discussion rules for multi-round dialogue. Do NOT proceed to Phase 3 without explicit human approval.
+When transition validation passes, **read `$PROTOCOL_DIR/human-gate-protocol.md`** and follow it. The protocol covers: gate header framing, Scope Review template, Decisions template (only for High decisions — Medium/Low are plan-agent-decided and do NOT surface at the gate), Gate Action via AskUserQuestion, and Iterative Discussion rules for multi-round dialogue.
+
+Do NOT proceed to Phase 3 without explicit human approval.
 
 ---
 
 ## Phase 3: Implement
 
-**Before dispatching**, extract from plan.md:
-- Behavioral Contracts section only
-- Test Cases only
-- Implementation Plan only
+State to the human upfront: `Phase 3: <implementer> on <N> contract(s).`
 
-**Assemble context summary** (you create this, not from plan directly):
-```markdown
-## Context Summary
-- **Goal**: {one-line compressed goal}
-- **Key constraints**: {constraints from research that affect implementation}
+### 3.1 Brief assembly
+
+Extract from `$SESSION/plan.md` via bounded reads — never `cat` the whole file:
+
+- `GOAL_ONELINE` — one-sentence compressed goal (derive from `$SESSION/goal.md`).
+- `CONTRACTS` — bounded read of `## Behavioral Contracts`:
+  ```bash
+  sed -n '/^## Behavioral Contracts/,/^## Implementation Plan/p' "$SESSION/plan.md"
+  ```
+- `CONSTRAINTS` — bounded read of `$SESSION/research.md` (`sed -n '/^## Constraints/,/^## Key Files/p'`), boiled down to constraints that affect implementation (one short line each).
+- `TEST_RUNNER` — extracted from `$SESSION/plan.md` Implementation Plan, or asked once via `AskUserQuestion` with the language-appropriate default (e.g., `node --test test/contracts.test.mjs`, `pytest -xvs`, `cargo test`).
+
+### 3.2 Implementer dispatch
+
+**Default path (`$PI_AVAILABLE=1`)** — dispatch `context-flow:pi-driver`:
+
+```
+Agent(
+  subagent_type: "context-flow:pi-driver",
+  prompt: "
+    SESSION=$SESSION
+    PI_PROTOCOL=$PI_PROTOCOL
+    PLAN=$SESSION/plan.md
+    GOAL_ONELINE=<one-sentence goal>
+    CONSTRAINTS=<short bullet list>
+    TEST_RUNNER=<resolved command>
+    PI_DESC=$PI_DESC
+    OUTCOME_FILE=$SESSION/pi-driver-outcome.md
+
+    Drive Phase 3 per your agent prompt. Write outcome to $OUTCOME_FILE before replying.
+  "
+)
 ```
 
-### Contract Independence Check
+The pi-driver absorbs the polling loop (no per-round status reaches main) and returns a ≤200-word summary with paths to artifacts (Pi report, diff, postmortem if any).
 
-Check if contracts can be parallelized: examine `depends` fields, file overlaps in implementation plan, and test interdependencies. If contracts form 2+ independent groups with no coupling, use parallel dispatch.
+**Fallback path (Claude implement agent)** — dispatch `context-flow:implement`:
 
-### Single Agent Dispatch (Default)
-
-**Dispatch agent** with:
-
-```markdown
-## Context Summary
-{the context summary you assembled above}
-
-## Behavioral Contracts
-{contracts extracted from plan}
-
-## Test Cases
-{test cases extracted from plan}
-
-## Implementation Plan
-{steps extracted from plan — guidance, not binding}
-
-Implement these contracts. Write the tests. All tests must pass.
 ```
+Agent(
+  subagent_type: "context-flow:implement",
+  prompt: "
+    ## Context Summary
+    - Goal: <one-line goal>
+    - Key constraints: <short bullet list>
+
+    ## Behavioral Contracts
+    <contracts>
+
+    ## Test Cases
+    <test cases>
+
+    ## Implementation Plan
+    <impl steps from $SESSION/plan.md — guidance, not binding>
+
+    Implement these contracts. Write the tests. All tests must pass.
+    Write Outcome (Completed / Concerns / Unresolved) to $SESSION/implement-outcome.md before replying.
+  "
+)
+```
+
+State the fallback explicitly when used: `Falling back to Claude implement agent.`
 
 **Do NOT pass**: full research output, decision alternatives, planning rationale, rejected approaches.
 
-### Parallel Agent Dispatch
+### 3.3 Recovery routing
 
-If 2+ independent contract groups detected, read `$PROTOCOL_DIR/parallel-implement-protocol.md` and follow it. Key points:
+After the implementer returns, **bounded read** the outcome file (`pi-driver-outcome.md` or `implement-outcome.md`).
 
-- Dispatch each group to a separate agent with `isolation: "worktree"`
-- Max 3 parallel agents
-- Inform human before dispatching
-- Run integration test after merging all worktrees
+#### Pi-driver outcomes
 
-### Transition Validation: Implement → Review
+| Outcome `Status` | Action |
+|---|---|
+| `PASS` | Forward survived contracts + Pi's `Concerns` (verbatim) to Phase 4. Use `$SESSION/implement.diff` as the diff path. |
+| `PARTIAL` | Read the **Failure Class** of each failed contract from the outcome and route per §3.4 (worst class wins: `pivot-goal` > `loop-back-to-plan` > `retry-different-approach`). |
+| `FAIL` | Inspect the `Recovery hints` section. Common subcategories: |
+| ↳ probe `ERROR:usage_limit_reached` | Surface "quota resets at <timestamp>" from `$SESSION/pi-probe/*.jsonl`; offer "Retry after quota reset / Switch provider/model / Fall back to Claude implement agent / Abort Phase 3". |
+| ↳ probe `ERROR:unauthorized` / `status_code:401` | Surface "run `pi auth <resolved-provider>` then retry". |
+| ↳ probe `ERROR:model_not_found` | Surface "verify model via `pi --list-models <resolved-provider>` or `pi config`". |
+| ↳ probe `NO_JSONL` | Pi failed to start; surface `$SESSION/probe-stderr.log`; recommend `pi --version` debug or fallback. |
+| ↳ kill-status (`STALL`/`TIMEOUT`/`ERROR`) | Bounded `Read` of postmortem path from outcome; apply §5 of `$PI_PROTOCOL` (Failure Modes & Recovery) — `sed -n '/^## 5\. Failure Modes/,/^## 6\./p' "$PI_PROTOCOL"`. |
+| ↳ report missing/malformed | Default `AskUserQuestion`: "Re-dispatch Pi with the same brief / Fall back to Claude implement agent / Revisit plan / Other". |
+| ↳ All contracts demoted | Treat as §3.4 (Failure routing by class). |
 
-1. **Test execution check**: All test cases must actually pass. Run them.
+#### Claude implement-agent outcomes
 
-2. **Examine output structure**:
-   - "Completed" items with confidence
-   - "Concerns" (if any) — these are risks the implement agent flagged while still delivering working code
-   - "Unresolved" items — contracts that were technically infeasible
+1. **Test execution check** — all test cases must pass (the implement agent ran them; verify by reading `## Completed` confidence + re-running if uncertain).
+2. **Examine output structure** — `## Completed`, `## Concerns`, `## Unresolved`. Each Unresolved item carries a **Failure Class** tag: `retry-different-approach` | `loop-back-to-plan` | `pivot-goal`.
+3. **If Concerns exist** — forward to Phase 4.
+4. **If Unresolved contracts exist** — apply §3.4, routing by Failure Class.
+5. **If all tests pass and no Unresolved** → proceed to Phase 4.
 
-3. **If Concerns exist**: note them — they will be forwarded to the review agent as additional input.
+### 3.4 Failure routing by Failure Class
 
-4. **If Unresolved contracts exist**:
-   - Read the agent's explanation of what was attempted and why it failed
-   - Is this a codebase investigation issue? → loop back to research with enriched goal
-   - Is this a missing information issue? → consult human via `AskUserQuestion` with options: "Adjust contract to {alternative}", "Loop back to research on {area}", "Skip this contract for now", "Other"
-   - Are ALL contracts Unresolved? → escalate to human immediately (still use `AskUserQuestion` for the recovery direction)
+**When the implementer reports `PARTIAL` / `FAIL` / Unresolved contracts**, route each failed contract by its **Failure Class** (self-classified by the implement agent per `agents/implement.md`). The implementer's classification is the primary signal — your job is to act on it, not to reclassify.
 
-5. **If all tests pass and no Unresolved** → proceed to review.
+**Failure Class → routing**:
+
+| Failure Class | Routing | Increment `retries_used`? |
+|---|---|---|
+| `retry-different-approach` | Re-dispatch the **same** implementer with the strategy hint from the outcome appended to the brief. Plan stays unchanged. | Yes |
+| `loop-back-to-plan` | Re-dispatch **plan** with the `## Implement Failure` section (see template below). Contract itself is broken. | Yes |
+| `pivot-goal` | **Immediate human escalation** with "Goal conflicts with reality" framing. **Do NOT increment `retries_used`** — this bypasses the budget because no retry will fix a goal/reality mismatch. | **No** |
+
+**Multi-class failures** (different contracts failed with different classes in one run): pick the worst class — `pivot-goal` > `loop-back-to-plan` > `retry-different-approach` — and route the whole batch by that class. If any contract is `pivot-goal`, escalate.
+
+**Codebase-gap override**: if the outcome's hint indicates the implementer hit an unknown subsystem research didn't surface (regardless of declared class), prefer a loop-back to **Phase 1** (research) with the gap added to the enriched goal. Increment `retries_used`.
+
+**Tooling / environment failures** (probe error, quota, auth) are NOT Failure Class — surface options per §3.3 routing table.
+
+**Flow**:
+
+1. Read the outcome's `## Unresolved` section via `sed -n '/^## Unresolved/,$p' "$SESSION/pi-driver-outcome.md"` (or the implement-outcome equivalent). Extract Failure Class per failed contract.
+2. Route per the table above.
+3. For `loop-back-to-plan`, build the `## Implement Failure` section:
+
+   ```markdown
+   ## Implement Failure
+   Status: PARTIAL  (or FAIL)
+   Implementer: <pi | claude-implement>
+   Failed contracts:
+   - <contract-name> [class=loop-back-to-plan]: <one-sentence reason from outcome>
+   - ...
+   Survived contracts:
+   - <contract-name>
+   Hint from implementer: <verbatim suggested resolution, if any>
+
+   Revisit the failed contracts. Options to consider:
+   - Split the contract into smaller atomic contracts.
+   - Drop the contract if it's not load-bearing for the goal.
+   - Restate the contract with the missing precondition / dependency made explicit.
+   Preserve the survived contracts as-is unless the failure analysis shows they share the same flaw.
+   ```
+
+4. For `retry-different-approach`, build a brief addendum:
+
+   ```markdown
+   ## Previous Attempt
+   Failed contracts:
+   - <contract-name> [class=retry-different-approach]: <one-sentence reason>
+   Suggested alternative: <verbatim hint from implementer>
+
+   Re-attempt the failed contracts using the suggested alternative strategy. The contracts themselves are unchanged.
+   ```
+
+5. For `pivot-goal`, present to human via `AskUserQuestion`:
+   - One-paragraph framing: "Implementer reports the goal itself conflicts with reality: <verbatim reason>. No retry will fix this — a real-world constraint blocks the goal as stated."
+   - Options: "Revise the goal (describe how)", "Drop the conflicting requirement and proceed", "Abort the flow", "Other".
+
+6. **Only after plan returns a revised contract set** does Phase 3 re-dispatch for the loop-back-to-plan path. The new dispatch passes the revised contracts (not the original ones).
+
+7. **Partial-delivery override** — partial delivery is allowed only when the human explicitly approves it. Trigger the explicit `AskUserQuestion` when:
+   - `retries_used >= 4` (budget exhausted), OR
+   - the human asked for it during a recovery prompt, OR
+   - the survived contracts ship a self-contained increment AND the failed contracts are clearly orthogonal.
+
+   Options: "Revisit plan and re-implement (default) / Ship survived contracts only, drop failed / Loop back to research / Abort and escalate / Other".
 
 ---
 
-## Phase 4: Review (Agent Teams)
+## Phase 4: Review
 
-Review uses Agent Teams by default. Read the full protocol from `$PROTOCOL_DIR/agent-teams-protocol.md`, section **Review Teams**.
+Dispatch a single review agent.
+
+Capture the diff to a file before dispatching review — never into a shell variable, which would inject the full diff into the orchestrator's context. For Pi the diff is already at `$SESSION/implement.diff` (written by pi-driver). For Claude-fallback, capture it now:
 
 ```bash
-DIFF=$(git diff)
+git diff > "$SESSION/implement.diff"
 ```
 
-### Team Composition
-
-Dispatch 2-3 review teammates with different review lenses:
-- **Contract compliance**: verify each behavioral contract is satisfied by the changes (binding — determines verdict)
-- **Security & performance**: review for injection risks, auth gaps, O(n²) patterns, resource leaks
-- **Code quality & correctness**: review for race conditions, edge cases, maintainability, dead code
+The reviewer Reads this file directly; the orchestrator never reads its body.
 
 ### Dispatch
 
-Each teammate receives:
-
 ```markdown
-Report path: $SESSION/review-{lens-slug}.md
-
-## Your Review Focus
-{description of this teammate's review lens}
+Report path: $SESSION/review.md
 
 ## Behavioral Contracts
-{same contracts from Phase 3 — extract from $SESSION/plan.md via `sed -n '/^## Behavioral Contracts/,/^## Implementation Plan/p'`}
+{contracts from Phase 3 — extract from $SESSION/plan.md via `sed -n '/^## Behavioral Contracts/,/^## Implementation Plan/p'`}
 
 ## Test Cases
 {same test cases from Phase 3}
@@ -485,30 +445,23 @@ Report path: $SESSION/review-{lens-slug}.md
 
 ## Diff path
 $SESSION/implement.diff
-(The teammate reads the diff directly from this file — do NOT inline the diff in the prompt.)
+(Read the diff directly from this file — do NOT inline the diff in the prompt.)
 ```
 
-**Do NOT pass**: research constraints (those should have been captured as test cases by plan). **Do NOT inline the git diff** — pass the file path; reviewers Read it themselves so the diff bytes never pass through your context. Use lens-slugs like `contracts`, `security`, `quality` so parallel files don't collide.
-
-### Synthesis
-
-Each teammate has already written `$SESSION/review-<slug>.md`. The dispatch replies give you each teammate's Verdict + contract PASS/FAIL one-liners — enough to decide routing without reading the full files. When you need detail, read bounded sections (e.g., `sed -n '/^## Contract Verification/,/^## Advisories/p' "$SESSION/review-contracts.md"`).
-
-Synthesize into a unified review output by Write tool to `$SESSION/review.md`:
-- **Contract verification**: merge all contract PASS/FAIL results (contract compliance teammate is authoritative)
-- **Advisories**: merge advisories from all teammates, deduplicate, assign severity
-- **Verdict**: based on contract compliance results only
+**Do NOT pass**: research constraints (those should have been captured as test cases by plan). **Do NOT inline the git diff** — pass the file path so the diff bytes never pass through your context.
 
 ### Presenting Results to Human
 
-Use changelog format — Added / Changed / Fixed sections describing **what the user/system can now do**, not which files were edited. Group related changes; use feature names over contract names. Then: `## Contract Status` (N/M passed) and `## Advisories` (critical/warning only — drop info unless relevant). See agents/review.md for full schema and rules.
+Use changelog format — Added / Changed / Fixed sections describing **what the user/system can now do**, not which files were edited. Group related changes; use feature names over contract names. Then: `## Contract Status` (N/M passed) and `## Advisories` (critical/warning only — drop info unless relevant). See `agents/review.md` for full schema and rules.
+
+When describing the run, mention which implementer ran (`Implementation by Pi ($PI_DESC)` or `Fallback: Claude implement agent`).
 
 ### Handling the Verdict
 
 - **APPROVE, no critical advisories** → present changelog to human. Done.
-- **APPROVE with advisories** → present changelog + advisories to human, then call `AskUserQuestion` with options: "Address all now (loop to implement)", "Address only critical advisories", "Ship as-is — accept advisories", "Other"
-- **REQUEST_CHANGES with contract failures** → re-run implement with the failure details as additional context (phase re-run)
-- **REQUEST_CHANGES with fundamental design issues** → this means a contract is wrong, not just the implementation. Loop back to plan (cross-phase loop).
+- **APPROVE with advisories** → present changelog + advisories to human, then call `AskUserQuestion` with options: "Address all now (loop to implement)", "Address only critical advisories", "Ship as-is — accept advisories", "Other".
+- **REQUEST_CHANGES with contract failures** → re-run implement with the failure details as additional context (treat as `retry-different-approach`; increment `retries_used`).
+- **REQUEST_CHANGES with fundamental design issues** → this means a contract is wrong, not just the implementation. Loop back to plan via the `## Implement Failure` mechanism in §3.4 with class `loop-back-to-plan`. Increment `retries_used`.
 
 ---
 
@@ -522,13 +475,13 @@ When forwarding to the next phase: **preserve** concrete facts (paths, types, si
 
 When looping back to research, send an **enriched goal**: original goal + what was attempted in Phase X + the obstacle + what's needed to proceed. The research agent treats it as a more specific goal — it doesn't know it's a loop.
 
-Track loop counts: same-agent re-run → phase re-run counter; return to earlier phase → cross-phase loop counter.
+Every loop-back increments `retries_used`. The single counter caps total flow churn at 4.
 
 ---
 
 ## Escalation
 
-When you cannot proceed (loop limit reached, all contracts unresolved, fundamental blocker), read `$PROTOCOL_DIR/escalation-protocol.md` and follow it. Key principle: re-enter at the **earliest phase invalidated by the change**.
+When you cannot proceed (`retries_used >= 4`, all contracts unresolved, fundamental blocker), read `$PROTOCOL_DIR/escalation-protocol.md` and follow it. Key principle: re-enter at the **earliest phase invalidated by the change**.
 
 ---
 
@@ -538,17 +491,31 @@ When you cannot proceed (loop limit reached, all contracts unresolved, fundament
 |-----------|--------|
 | Research finds nothing relevant | Escalate: "Codebase has nothing related to this goal. Start from scratch or wrong codebase?" |
 | All High decisions rejected by human | Escalate: "All approaches rejected. Provide direction or research alternatives?" |
-| All implement contracts Unresolved | Escalate: "Implementation blocked on all fronts." with full context |
-| All review contracts FAIL | Re-run implement (1st time) or escalate (2nd time) |
-| Loop limit reached | Escalate with full context |
+| All implement contracts Unresolved | Route per §3.4 Failure Class. If any class is `pivot-goal`, escalate immediately (no `retries_used` increment). Otherwise, if `retries_used` already at cap, escalate. |
+| All review contracts FAIL | Re-run implement (1st time) or escalate (2nd time, or if budget exhausted) |
+| `retries_used >= 4` | Escalate with full context |
+
+---
+
+## Cleanup
+
+At the end of the flow (success OR escalation), if Pi ran, invoke the cleanup script that `cf-pi-setup.sh` registered in `$SESSION/env.sh`:
+
+```bash
+. "$SESSION/env.sh"
+[ -n "${CLEANUP_SCRIPT:-}" ] && [ -x "$CLEANUP_SCRIPT" ] && bash "$CLEANUP_SCRIPT"
+```
+
+Removes the Pi worktree and branch (if applicable) but preserves `$SESSION/` for inspection. Log the session path for the human.
 
 ---
 
 ## Rules
 
-1. **Context isolation**: never pass information not listed in the phase's context spec
-2. **Contracts are behavioral**: they define input/output/errors, not file paths — implementation plan is separate guidance
-3. **Validate before flow**: check output meets requirements before passing to next phase
-4. **Save everything**: all outputs to `$SESSION/` for traceability
-5. **Opinionated, not bureaucratic**: when presenting to human, always include your analysis and recommendation
-6. **Agents provide decision support**: if an agent's Unresolved item lacks a suggested resolution path, ask it to provide one before proceeding
+1. **Context isolation**: never pass information not listed in the phase's context spec.
+2. **Contracts are behavioral**: they define input/output/errors, not file paths — implementation plan is separate guidance.
+3. **Validate before flow**: check output meets requirements before passing to next phase.
+4. **Save everything**: all outputs to `$SESSION/` for traceability.
+5. **Opinionated, not bureaucratic**: when presenting to human, always include your analysis and recommendation.
+6. **Agents provide decision support**: if an agent's Unresolved item lacks a suggested resolution path, ask it to provide one before proceeding.
+7. **Failure questions the plan**: implementation failure defaults to revisiting contracts, not shipping partial delivery — partial requires explicit human approval.

@@ -8,6 +8,8 @@
 #          or the assembled brief has fewer than 6 '## ' headers
 # Reads:   $SESSION/plan.md (must contain '## Behavioral Contracts' and '## Implementation Plan')
 #          $PI_PROTOCOL (must contain METHODOLOGY-BEGIN/END and SCHEMA-BEGIN/END markers)
+# Writes:  $SESSION/{brief-contracts.md, brief-impl-plan.md, brief-methodology.md,
+#                    brief-report-schema.md, implement-brief.md ($BRIEF_FILE)}
 
 set -euo pipefail
 
@@ -37,8 +39,6 @@ for f in brief-contracts.md brief-impl-plan.md brief-methodology.md brief-report
     exit 1
   fi
 done
-
-WORK="${WORK:-$session/work}"
 
 {
   echo "# Implementation Brief"; echo

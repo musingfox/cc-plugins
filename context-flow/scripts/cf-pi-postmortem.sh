@@ -4,14 +4,24 @@
 # On DONE the report file IS the post-mortem; skip this script.
 #
 # Usage:   cf-pi-postmortem.sh SESSION
-# Stdout:  echoed JSONL errorMessage matches + tails of JSONL, stderr, stdout.
+# Stdout:  error count + echoed JSONL errorMessage matches + tails of JSONL, stderr, stdout.
 #          Paths are echoed so caller can Read them on demand.
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=cf-pi-env.sh
+. "$SCRIPT_DIR/cf-pi-env.sh"
+
 SESSION="$1"
-# shellcheck source=/dev/null
-. "$SESSION/env.sh"
+load_cf_pi_env "$SESSION"
 
 JSONL=$(ls -t "$PI_SESSION_DIR"/*.jsonl 2>/dev/null | head -1)
+if [ -n "$JSONL" ]; then
+  ERROR_COUNT=$(grep -c '"errorMessage"' "$JSONL" 2>/dev/null || echo 0)
+else
+  ERROR_COUNT=0
+fi
+echo "=== summary ==="
+echo "error_count=$ERROR_COUNT jsonl=$JSONL"
 echo "=== JSONL ($JSONL) ==="
 [ -n "$JSONL" ] && grep -m 5 '"errorMessage"' "$JSONL" | head -c 2000
 [ -n "$JSONL" ] && tail -3 "$JSONL" | head -c 2000

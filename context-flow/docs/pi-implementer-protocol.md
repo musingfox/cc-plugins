@@ -1,4 +1,4 @@
-# Pi Implementer Protocol (beta)
+# Pi Implementer Protocol
 
 This protocol governs the Phase 3 (Implement) handoff when the orchestrator delegates to **Pi** (pi.dev) instead of the Claude `context-flow:implement` agent. It defines:
 
@@ -9,6 +9,10 @@ This protocol governs the Phase 3 (Implement) handoff when the orchestrator dele
 
 The orchestrator never reads Pi's stdout to determine success. Pi reports via a file; the orchestrator independently verifies. Stdout is treated as untrusted log noise.
 
+**Transport**: text mode only. Pi is launched as a backgrounded `pi -p` process; the orchestrator polls the session JSONL for liveness. There is no RPC channel.
+
+**Paths**: every per-session artifact lives directly under `$SESSION/` (flat layout, no per-ticket subdirectories). Resolve them via `load_cf_pi_env "$SESSION"` from `scripts/cf-pi-env.sh`.
+
 ---
 
 ## 1. Invocation Contract (orchestrator → Pi)
@@ -16,7 +20,7 @@ The orchestrator never reads Pi's stdout to determine success. Pi reports via a 
 ### Command Shape
 
 ```bash
-cd "$WORKDIR" && \
+cd "$WORK" && \
 pi -p \
    "${PI_ARGS[@]}" \
    --session-dir "$PI_SESSION_DIR" \
@@ -26,8 +30,8 @@ pi -p \
 PI_PID=$!
 ```
 
-- `$WORKDIR` — the directory Pi operates in. For unisolated runs this is `cwd`. For isolated runs it is a fresh git worktree (`$SESSION/work/`); see "Isolation" below.
-- `$BRIEF_FILE` — absolute path to the assembled brief markdown.
+- `$WORK` — the directory Pi operates in. For isolated runs (default) it is a fresh git worktree (`$SESSION/work/`); see "Isolation" below.
+- `$BRIEF_FILE` — `$SESSION/implement-brief.md`.
 - `${PI_ARGS[@]}` — orchestrator-assembled provider/model flags. Empty by default → Pi resolves provider/model from its own config (`pi config` → `defaultProvider` / `defaultModel` → CLI fallback `google`). When the user sets `$PI_PROVIDER` and/or `$PI_MODEL`, `PI_ARGS` expands to `--provider <p> --model <m>`. Reproducibility caveat: if a flow needs the same provider/model across machines, set both env vars; relying on the host's `pi config` means a run on a different machine may resolve to a different model.
 - `$PI_SESSION_DIR` — `$SESSION/pi-sessions/`. Mandatory. This is where Pi writes the session JSONL the orchestrator monitors for liveness + errors. See §1.5.
 - `@file` syntax — Pi's native file-include parameter. **The brief MUST be passed via `@file`, never via `"$(cat $BRIEF_FILE)"`.** Shell command substitution will expand backticks/dollars inside the brief and either hang Pi or corrupt the prompt. Empirically verified.
@@ -40,7 +44,7 @@ PI_PID=$!
 
 ### Capture & Timeout
 
-- Wall-clock cap: 600 seconds (10 min). Enforced by the orchestrator via background-process monitoring, not by a Bash tool timeout.
+- Wall-clock cap: enforced by the orchestrator via `$PI_WALL_CLOCK_S` (default 1800s), not by a Bash tool timeout.
 - Capture stdout to `$PI_STDOUT` (`$SESSION/pi-stdout.log`), stderr to `$PI_STDERR`. Stdout in text mode is human-readable progress; do NOT inline-paste it.
 - Success signal is **Pi process exits 0** + **`$REPORT_FILE` exists and parses**. The text-mode `DONE` sentinel is a hint, not a contract. The session JSONL has no terminal "done" event — Pi simply stops writing when the turn completes.
 
@@ -59,9 +63,9 @@ Pi writes a per-session JSONL to `$PI_SESSION_DIR/<timestamp>_<uuid>.jsonl`. Eac
 | `thinking` | Extended thinking chunk | Reset stall timer (Pi is reasoning) |
 | `toolCall` | Pi invoked a tool (read/write/edit/bash) | Reset stall timer (Pi is working) |
 
-**Liveness rule**: any new event line (especially `text` / `thinking` / `toolCall`) means Pi is alive. The orchestrator's stall detector watches the file's mtime — when no new line has been appended for 90s, the run is hung.
+**Liveness rule**: any new event line (especially `text` / `thinking` / `toolCall`) means Pi is alive. The orchestrator's stall detector watches the file's mtime — when no new line has been appended for `$PI_STALL_THRESHOLD_S` (default 180s), the run is hung.
 
-**Failure detection**: grep the JSONL for the literal `"errorMessage"` (the field appears in `message` events when an API call fails). Common patterns to match (case-sensitive):
+**Failure detection**: grep the JSONL for the literal `"errorMessage"` (the field appears in `message` events when an API call fails). Common patterns to match:
 
 - `usage_limit_reached` → quota exhausted; extract `resets_at` epoch from headers
 - `"status_code":401` or `unauthorized` → auth failure
@@ -81,76 +85,53 @@ The allowed reads, per surface:
 
 | Surface | Path | Allowed read | Notes |
 |---|---|---|---|
-| Status polls | (poll-pi.sh stdout) | full (1 line) | already bounded by design |
-| Pi stdout | `$PI_STDOUT` | `tail -20 "$PI_STDOUT"` | the `DONE` sentinel lives in the last few lines |
-| Pi stderr | `$PI_STDERR` | `tail -10 "$PI_STDERR"` | usually empty; tail only on failure paths |
+| Status polls | `cf-pi-poll.sh` stdout | full (1 line) | already bounded by design |
+| Pi stdout | `$PI_STDOUT` (`$SESSION/pi-stdout.log`) | `tail -20 "$PI_STDOUT"` | the `DONE` sentinel lives in the last few lines |
+| Pi stderr | `$PI_STDERR` (`$SESSION/pi-stderr.log`) | `tail -10 "$PI_STDERR"` | usually empty; tail only on failure paths |
 | Session JSONL | `$PI_SESSION_DIR/<ts>_<uuid>.jsonl` | `grep -m 5 '"errorMessage"' "$JSONL"` + `tail -3 "$JSONL"` | never `cat`; the latest 3 events plus matched error lines are enough for post-mortem |
-| Implement report | `$REPORT_FILE` | `head -20 "$REPORT_FILE"` (reads Pi's `## Summary` block) | Pi writes a ≤ 5-bullet `## Summary` at the top of the report. Read only that by default. If Summary flags concerns or unresolved items, escalate to `Read $REPORT_FILE` for full content — but only then. |
-| Test runner output | `$SESSION/test-output.log` (redirect target) | `tail -30 "$SESSION/test-output.log"` on failure, **nothing** on pass beyond the pass/fail summary | run the test runner with stdout/stderr redirected to a file; do not stream it through the orchestrator |
-| Grep guard output | (script stdout) | full (one PASS/FAIL line per pattern, ~10 lines) | already bounded |
-| Diff for review | `$SESSION/implement.diff` | **never read** — pass as file path to Phase 4 reviewers | reviewers consume it via their own Read tool |
+| Implement report | `$REPORT_FILE` (`$SESSION/implement-report.md`) | `head -20 "$REPORT_FILE"` (reads Pi's `## Summary` block) | Pi writes a ≤ 5-bullet `## Summary` at the top of the report. Read only that by default. If Summary flags concerns or unresolved items, escalate to `Read $REPORT_FILE` for full content — but only then. |
+| Test runner output | `$TEST_LOG` (`$SESSION/test-output.log`) | `tail -30 "$TEST_LOG"` on failure, **nothing** on pass beyond the pass/fail summary | run the test runner with stdout/stderr redirected to a file; do not stream it through the orchestrator |
+| Grep guard output | `cf-pi-guard.sh` stdout | full (one PASS/FAIL line per pattern, ~10 lines) | already bounded |
+| Diff for review | `$DIFF_FILE` (`$SESSION/implement.diff`) | **never read** — pass as file path to Phase 4 reviewers | reviewers consume it via their own Read tool |
 
-**Failure-path bounded post-mortem snippet** (run on STALL / ERROR / TIMEOUT / NO_JSONL_FAIL):
-
-```bash
-JSONL=$(ls -t "$PI_SESSION_DIR"/*.jsonl 2>/dev/null | head -1)
-echo "=== JSONL ($JSONL) ==="
-[ -n "$JSONL" ] && grep -m 5 '"errorMessage"' "$JSONL" | head -c 2000
-echo
-[ -n "$JSONL" ] && tail -3 "$JSONL" | head -c 2000
-echo
-echo "=== Pi stderr ($PI_STDERR) ==="
-tail -10 "$PI_STDERR"
-echo
-echo "=== Pi stdout ($PI_STDOUT) ==="
-tail -20 "$PI_STDOUT"
-echo "(Read tool on any path above for full content.)"
-```
-
-Total output is bounded under ~5 KB regardless of how large the underlying files are. Use this snippet — do not invent ad-hoc dumps. Path echoes are deliberate: bounded tail is the default surface, the full file is opt-in via the orchestrator's `Read` tool only when the tail leaves the cause ambiguous.
+**Failure-path bounded post-mortem**: use `scripts/cf-pi-postmortem.sh "$SESSION"` (~5 KB output: error count + JSONL errorMessage matches + tails of JSONL/stderr/stdout). Do not invent ad-hoc dumps. Path echoes are deliberate: bounded tail is the default surface, the full file is opt-in via the orchestrator's `Read` tool only when the tail leaves the cause ambiguous.
 
 ### Brief Anatomy
 
-The brief is a single markdown file. Use this exact layout — Pi has been smoke-tested against it:
+The brief is a single markdown file assembled by `scripts/cf-pi-brief.sh`. The layout — Pi has been smoke-tested against it:
 
 ```markdown
 # Implementation Brief
 
 ## Methodology
 
-{paste the full "Pi Methodology" section from this protocol verbatim}
+{the "Pi Methodology" section from this protocol, extracted via the METHODOLOGY markers}
 
 ## Context Summary
 - **Goal**: {one-line compressed goal}
 - **Key constraints**: {constraints from research that affect implementation}
-- **Working directory**: {absolute path of $WORKDIR}
+- **Working directory**: {absolute path of $WORK}
 - **Test runner**: {exact command, e.g. `node --test test/contracts.test.mjs`}
 
 ## Behavioral Contracts
 
-### Contract: {Name}
-- **Input**: {type/shape}
-- **Output**: {type/shape + meaning}
-- **Errors**: {error modes, or "none"}
-- **Test cases**:
-  - {input → expected output, one bullet per case}
-
-{repeat per contract}
+{copied from $SESSION/plan.md, section "## Behavioral Contracts"}
 
 ## Implementation Plan
-{steps from plan.md — guidance, not binding}
+
+{copied from $SESSION/plan.md, section "## Implementation Plan" — guidance, not binding}
 
 ## Output Requirements
 
-You MUST write a report to `{$REPORT_FILE}` using EXACTLY this schema:
+You MUST write a report to `$REPORT_FILE` using EXACTLY this schema:
 
-{paste the full "Report Schema" section from this protocol verbatim}
+{the "Report Schema" section from this protocol, extracted via the SCHEMA markers}
 
 After writing the report and only after all tests pass, your stdout must print exactly: `DONE`
 ```
 
-- `{$REPORT_FILE}` is the absolute path the orchestrator assigns; default `$SESSION/implement-report.md`.
-- The methodology and report schema are **embedded verbatim** in every brief — Pi has no persistent memory of this protocol between runs. (Even though we now pass `--session-dir`, that flag only writes the JSONL for orchestrator monitoring; it does not load prior conversation context.)
+- `$REPORT_FILE` is the absolute path the orchestrator assigns; default `$SESSION/implement-report.md`.
+- The methodology and report schema are **embedded verbatim** in every brief — Pi has no persistent memory of this protocol between runs. (Even though we pass `--session-dir`, that flag only writes the JSONL for orchestrator monitoring; it does not load prior conversation context.)
 
 ### Isolation
 
@@ -158,20 +139,22 @@ By default, Pi runs **isolated in a git worktree** to prevent it from polluting 
 
 ```bash
 WORK="$SESSION/work"
-git worktree add -B "ctxflow/pi-$SESSION_BASENAME" "$WORK" HEAD
+PI_BRANCH="ctxflow/pi-$SESSION_BASENAME"
+git worktree add -B "$PI_BRANCH" "$WORK" HEAD
 # ... run pi inside $WORK ...
-# on success: merge changes back via patch or `git -C $WORK diff` for review handoff
-# always: git worktree remove --force "$WORK" && git branch -D "ctxflow/pi-$SESSION_BASENAME"
+# on success: capture diff via `git -C "$WORK" diff HEAD > "$DIFF_FILE"` for review handoff
+# always: git worktree remove --force "$WORK" && git branch -D "$PI_BRANCH"
 ```
 
-- The orchestrator MUST register the cleanup at the start of Phase 3 (e.g., append to `$SESSION/cleanup.sh`) so it runs even if Phase 3 aborts.
-- If the host is not a git repo, fall back to an isolated scratch directory: `WORK="$SESSION/work"; mkdir -p "$WORK"`. In that mode there is no merge-back path; Pi's output must be self-contained (used for greenfield generation, demos, or smoke tests).
+`scripts/cf-pi-worktree.sh` handles setup and appends the cleanup commands to `$CLEANUP_SCRIPT` so they run even if Phase 3 aborts.
+
+If the host is not a git repo, fall back to an isolated scratch directory: `mkdir -p "$WORK"`. In that mode there is no merge-back path; Pi's output must be self-contained (used for greenfield generation, demos, or smoke tests).
 
 ---
 
 ## 2. Pi Methodology (paste into every brief)
 
-> The block below is the system-prompt content Pi must follow. Embed it verbatim in the brief under `## Methodology`. The fenced `<!-- METHODOLOGY-{BEGIN,END} -->` markers below are extraction anchors used by `cf-pi.md` §3.2 — do not remove them.
+> The block below is the system-prompt content Pi must follow. Embed it verbatim in the brief under `## Methodology`. The fenced `<!-- METHODOLOGY-{BEGIN,END} -->` markers below are extraction anchors used by `scripts/cf-pi-brief.sh` — do not remove them.
 
 <!-- METHODOLOGY-BEGIN -->
 You are a **faithful executor**. You implement the behavioral contracts in this brief, write tests that verify them, and report results to a file. You do NOT question the design — that was the planning phase's job upstream.
@@ -213,7 +196,7 @@ If a contract is feasible but you believe it produces risky code → implement i
 
 Lead each entry with **what the caller/system can now do**, in plain language. The contract name is a trailing tag for traceability, not the headline.
 
-| ❌ Code-itself framing | ✅ Consequence framing |
+| Code-itself framing (avoid) | Consequence framing (use) |
 |---|---|
 | "Added `validateEmail()`" | "Signup now rejects malformed emails per RFC 5322" |
 | "Modified `ORDER BY` clause" | "Query results now reverse-chronological — callers relying on old order will break" |
@@ -231,7 +214,7 @@ Lead each entry with **what the caller/system can now do**, in plain language. T
 
 ## 3. Report Schema (paste into every brief)
 
-> The block below is the output schema. Embed it verbatim in the brief under `## Output Requirements`. The `<!-- SCHEMA-{BEGIN,END} -->` markers are extraction anchors used by `cf-pi.md` §3.2 — do not remove them.
+> The block below is the output schema. Embed it verbatim in the brief under `## Output Requirements`. The `<!-- SCHEMA-{BEGIN,END} -->` markers are extraction anchors used by `scripts/cf-pi-brief.sh` — do not remove them.
 
 <!-- SCHEMA-BEGIN -->
 ```markdown
@@ -276,29 +259,19 @@ The orchestrator performs these checks. The Pi report is **untrusted input** —
 
 ### 4.0 Pre-flight model probe (before dispatching the brief)
 
-Before assembling and sending the actual brief, run a tiny liveness probe to confirm Pi's resolved provider/model (from `$PI_ARGS` or its own config) actually works on this machine:
+Before assembling and sending the actual brief, run `scripts/cf-pi-probe.sh "$SESSION"` to confirm Pi's resolved provider/model actually works on this machine. The script:
 
-```bash
-PROBE_DIR="$SESSION/pi-probe"
-mkdir -p "$PROBE_DIR"
-echo "say ok" | pi \
-  "${PI_ARGS[@]}" \
-  --session-dir "$PROBE_DIR" \
-  --no-tools > "$SESSION/probe-stdout.log" 2> "$SESSION/probe-stderr.log"
-```
+- Writes a `say ok` prompt to `$PI_PROBE_DIR`.
+- Enforces the 30-second cap via the **Bash tool's `timeout` parameter** (`timeout: 30000`), not the GNU `timeout` command — macOS does not ship one by default.
+- Emits one of: `OK` | `NO_JSONL` | `ERROR:<excerpt>`.
 
-Enforce the 30-second cap via the **Bash tool's `timeout` parameter** (`timeout: 30000`), not the GNU `timeout` command — macOS does not ship one by default and `pi` running synchronously via the Bash tool inherits its timeout cleanly. If the tool fires its timeout, Pi is killed and stdout/stderr are returned with the partial output.
-
-- Probe must complete within **30 seconds** and produce non-empty stdout.
-- Then read `$PROBE_DIR/*.jsonl` and check for `errorMessage` containing `usage_limit_reached`, `unauthorized`, `model_not_found`, etc.
-- If probe fails → abort Phase 3, surface the **exact errorMessage** to the human along with the resolved provider/model (look for the `model_change` event in the JSONL; this is essential when Pi resolved from its own config and the orchestrator didn't pass flags). Suggest concrete remediation (`wait for quota reset at <timestamp>`, `run pi auth <resolved-provider>`, `verify model ID via pi --list-models`, or `pi config` to inspect/change defaults).
-- A probe that hangs > 30 seconds with no stdout is the classic "Pi -p + invalid combination" symptom — abort and recommend running `/cf` (Claude implementer) instead.
+If probe fails → abort Phase 3, surface the **exact errorMessage** to the human along with the resolved provider/model (look for the `model_change` event in the JSONL; essential when Pi resolved from its own config and the orchestrator didn't pass flags). Suggest concrete remediation (`wait for quota reset at <timestamp>`, `run pi auth <resolved-provider>`, `verify model ID via pi --list-models`, or `pi config` to inspect/change defaults). A probe that hangs > 30 seconds with no stdout is the classic "Pi -p + invalid combination" symptom — abort and recommend running `/cf` with Claude implementer instead.
 
 The probe cost is ~1-5 cents per Pi run. Worth it: a failed brief dispatch wastes vastly more.
 
-### 4.1 Stall detection (during Pi dispatch) — re-entrant short poll
+### 4.1 Stall detection — re-entrant short poll
 
-**Design principle**: the orchestrator drives polling, NOT a long-running shell loop. After Pi is launched with `&` and `disown`, the orchestrator writes a stateless poll script (see cf-pi.md §3.6) and calls it once per ~30-second round via short Bash tool invocations. Each call reads its state from disk (`pi.pid`, `pi-start.ts`, latest JSONL) and emits one status line, then exits.
+**Design principle**: the orchestrator drives polling, NOT a long-running shell loop. After Pi is launched with `&` and `disown`, the pi-driver sub-agent calls `scripts/cf-pi-poll.sh "$SESSION"` once per ~30-second round via short Bash tool invocations (`timeout: 35000`). Each call reads its state from disk (`pi.pid`, `pi-start.ts`, latest JSONL) and emits one status line, then exits.
 
 **Why re-entrant.** Production data (Pi v0.73.1, May 2026, 20-minute Rust task): a single 10-minute polling loop inside one Bash tool call fails when the harness timeouts, when `wait $PID` is called cross-shell on a disowned PID, or when a background-task monitor exits 1. Every one of those failures used to be misread as "Pi hung", and the orchestrator's conversation summary would then falsely claim Pi was killed and Claude fell back — even though Pi was still running detached and completed the task on its own. Short, stateless polls eliminate the failure modes.
 
@@ -315,7 +288,7 @@ Status surface (one line of stdout per poll):
 | `TIMEOUT <e>s` | Wall clock > `$PI_WALL_CLOCK_S`. **Kill, escalate.** |
 | `NO_PID` | `pi.pid` missing. **Dispatch broken; abort flow.** |
 
-**Threshold defaults and tuning.** The orchestrator sets two env-tunable thresholds at session setup (cf-pi.md §Setup):
+**Threshold defaults and tuning.** The orchestrator sets two env-tunable thresholds at session setup (via `scripts/cf-pi-setup.sh`):
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -324,17 +297,17 @@ Status surface (one line of stdout per poll):
 
 Bump higher for Rust/Docker-heavy briefs (`export PI_STALL_THRESHOLD_S=300 PI_WALL_CLOCK_S=3600`). The cost of waiting a bit longer to detect a true stall is small; the cost of false-positive killing Pi during a legit long tool call is losing all in-progress work.
 
-**Monitor-failure tolerance — non-negotiable.** If a poll Bash call itself fails (exit ≠ 0 with no recognizable status word, harness timeout, Task crash) the orchestrator MUST re-poll on the next round. **Pi is only declared failed when one of the kill-status lines is read from a successful poll.** A failed poll is silent evidence — it tells you nothing about Pi. The orchestrator should re-poll up to 3 times consecutively before manual escalation, and even then verify with a fresh `kill -0 $(cat $SESSION/pi.pid)` Bash call.
+**Heartbeat.** Every 5 polling rounds the pi-driver sub-agent emits one short status line to its own stdout (e.g., `heartbeat round=5 ALIVE 152s jsonl=3421B stale=4s`) so the parent orchestrator can see the run is progressing without the per-round chatter leaking up. The heartbeat is informational — it does NOT replace the poll status.
+
+**Monitor-failure tolerance — non-negotiable.** If a poll Bash call itself fails (exit ≠ 0 with no recognizable status word, harness timeout, Task crash) the orchestrator MUST re-poll on the next round. **Pi is only declared failed when one of the kill-status lines is read from a successful poll.** A failed poll is silent evidence — it tells you nothing about Pi. The orchestrator should re-poll up to 3 times consecutively before manual escalation, and even then verify with a fresh `kill -0 $(cat "$PI_PID_FILE")` Bash call.
 
 This rule is what separates v0.2.1 from v0.2.0: in v0.2.0 a monitor exit-1 cascade incorrectly attributed work-product failures to Pi when Pi had actually completed the task. Never again.
-
-The reference implementation of the poll script lives in cf-pi.md §3.6 as a heredoc — kept there so it ships with the orchestrator command and is regenerated per session.
 
 ### 4.2 Report-file exists & parseable
 
 - `$REPORT_FILE` exists and is non-empty.
 - Contains a `## Completed` heading. (Concerns/Unresolved may be absent — that means none.)
-- If missing: treat the Pi run as failed. Do NOT promote any contracts to Completed. Escalate to human.
+- If missing: treat the Pi run as failed. Do NOT promote any contracts to Completed. Loop back to plan via the `## Implement Failure` channel (see `agents/plan.md`).
 
 ### 4.3 Test-file grep guard (anti self-grading)
 
@@ -376,58 +349,54 @@ Implementation notes:
 - If a test case's expected value is too generic to grep (e.g., `0` or `""`), fall back to executing the test file with the runner and checking exit code + reporter output for that specific assertion.
 - Parse the guard's `PASS=/FAIL=` summary; if `FAIL > 0`, identify which contracts those patterns belong to and demote them.
 
-If a Completed claim fails the guard, move that contract to **Unresolved** in the merged report with reason "Pi claimed Completed but no matching test assertion was found." Then escalate as if the contract were Unresolved.
+If a Completed claim fails the guard, move that contract to **Unresolved** in the merged report with reason "Pi claimed Completed but no matching test assertion was found." Then loop back to plan via `## Implement Failure`.
 
 ### 4.4 Test execution check
 
-Run the test runner specified in the brief's Context Summary. **The orchestrator runs it, not Pi.**
+Run the test runner specified in the brief's Context Summary via `scripts/cf-pi-test.sh "$SESSION" <test_cmd> [args...]`. **The orchestrator runs it, not Pi.**
 
 - All tests pass → Completed claims survive.
-- Any test fails → demote the failing contract(s) to Unresolved with the failure output as evidence. Re-run Pi at most once with the failure details appended to the brief (this counts as a phase re-run in the loop budget).
+- Any test fails → demote the failing contract(s) to Unresolved with the failure output as evidence. Loop back to plan via `## Implement Failure` with the failure details. The plan agent decides whether to split/restate/drop the failed contract.
 - Test runner errors out (compile error, missing dependency, etc.) → treat as Pi-run failure; escalate to human.
 
 ### 4.5 Worktree cleanup
 
-After Phase 3 transitions out (success OR escalation):
+After Phase 3 transitions out (success OR escalation), run `bash "$CLEANUP_SCRIPT"` which `scripts/cf-pi-worktree.sh` populated at session setup:
 
 ```bash
-if [ -n "$WORK" ] && [ -d "$WORK/.git" ] || git -C "$REPO_ROOT" worktree list | grep -q "$WORK"; then
-  # capture the diff for review phase BEFORE cleanup
-  # add --intent-to-add surfaces untracked new files in `git diff HEAD`
-  git -C "$WORK" add --intent-to-add -- .
-  git -C "$WORK" diff HEAD > "$SESSION/implement.diff"
-  git -C "$REPO_ROOT" worktree remove --force "$WORK"
-  git -C "$REPO_ROOT" branch -D "ctxflow/pi-$SESSION_BASENAME" 2>/dev/null || true
-fi
+git -C "$WORK" add --intent-to-add -- . 2>/dev/null || true
+git -C "$WORK" diff HEAD > "$DIFF_FILE" 2>/dev/null || true
+git -C "$REPO_ROOT" worktree remove --force "$WORK" 2>/dev/null || true
+git -C "$REPO_ROOT" branch -D "$PI_BRANCH" 2>/dev/null || true
 ```
 
-The captured `$SESSION/implement.diff` is what feeds into Phase 4 review's `## Changes` section.
+- `--intent-to-add` surfaces untracked new files in `git diff HEAD`.
+- The captured `$DIFF_FILE` (`$SESSION/implement.diff`) is what feeds into Phase 4 review's `## Changes` section.
 
 ---
 
 ## 5. Failure Modes & Recovery
 
-Diagnose primarily from `$PI_SESSION_DIR/*.jsonl` (rich event stream), then from `$PI_STDERR` (Pi startup errors only).
+Diagnose primarily from `$PI_SESSION_DIR/*.jsonl` (rich event stream), then from `$PI_STDERR` (Pi startup errors only). Use `scripts/cf-pi-postmortem.sh "$SESSION"` for a bounded ~5KB dump.
 
 | Symptom | Likely cause | Action |
 |---|---|---|
-| Pre-flight probe times out > 30s with no stdout | `pi -p` + invalid flag combo; or provider auth missing; or Pi installation broken | Abort Phase 3. Inspect `$SESSION/probe-stdout.log` and `$PROBE_DIR/*.jsonl`. Recommend fallback to `/cf`. |
-| Session JSONL contains `errorMessage` matching `usage_limit_reached` | Provider quota exhausted | Extract `resets_at` from event headers; tell human "quota resets at <timestamp>"; offer fallback to `/cf` or different provider |
+| Pre-flight probe times out > 30s with no stdout | `pi -p` + invalid flag combo; or provider auth missing; or Pi installation broken | Abort Phase 3. Inspect `$PROBE_STDOUT` and `$PI_PROBE_DIR/*.jsonl`. Recommend fallback to Claude implement agent. |
+| Session JSONL `errorMessage` matches `usage_limit_reached` | Provider quota exhausted | Extract `resets_at` from event headers; tell human "quota resets at <timestamp>"; offer fallback to `/cf` Claude implementer or different provider |
 | Session JSONL `errorMessage` matches `unauthorized` / `status_code:401` | Provider auth missing or expired | Recommend `pi auth <provider>`; do not silently switch providers |
 | Session JSONL `errorMessage` matches `model_not_found` | Invalid model ID for provider | Recommend `pi --list-models <provider>`; abort Phase 3 |
 | No JSONL file appears in `$PI_SESSION_DIR` after 60s | Pi failed to start or wrong `--session-dir` plumbing | Check `$PI_STDERR` for startup errors; verify directory permissions; retry once |
-| JSONL exists but mtime stale > 90s | Pi stall — either network hang or internal lockup | Kill `$PI_PID`; read last 5 events from JSONL for clues; escalate to human |
+| JSONL exists but mtime stale > `$PI_STALL_THRESHOLD_S` | Pi stall — either network hang or internal lockup | Kill `$PI_PID`; read last 5 events from JSONL for clues; loop to plan |
 | Pi exits within 5s, no report | Brief failed to load (path wrong, `@file` typo) or pre-flight should have caught | Inspect `$PI_STDERR`; re-dispatch with corrected path |
 | Pi runs > 5 min, last JSONL event > 5 min old, CPU near 0 | Shell-expansion bug in brief (backticks expanded by parent shell) or `-p`+invalid flag combo | Confirm brief was passed via `@file`, not `$(cat ...)`; check Pi invocation flags; if neither, kill and re-dispatch |
-| Report exists but `## Completed` missing | Pi gave up mid-run | Read Pi's actual report content — may be all Unresolved; treat per §4 |
+| Report exists but `## Completed` missing | Pi gave up mid-run | Read Pi's actual report content — may be all Unresolved; loop to plan with `## Implement Failure` |
 | Report has Completed but test-file grep guard fails | Pi wrote tests in a different file or used different literals | Locate actual test file via `grep -r`; re-validate. If genuinely missing, demote per §4.3 |
 | Tests pass when Pi runs but fail when orchestrator re-runs | Environment drift (Pi's bash session vs orchestrator's) | Re-run with full env captured in brief; if persistent, escalate |
 
 ---
 
-## 6. What This Protocol Does NOT Cover (V2 scope)
+## 6. Out of Scope
 
-- **Parallel implement dispatch** — multiple Pi instances on independent contract groups via parallel worktrees. Defer until single-agent flow is stable.
-- **Pi via ACP adapter** — richer streaming integration. Defer until base flow is proven.
 - **External-API verification (ctx7) inside Pi** — the Claude `implement` agent has this; Pi does not. For now, any contract requiring external-API verification should be handled by the Claude `implement` agent or pre-resolved during planning. If Pi hits unknown library behavior, it should report Unresolved with the question.
-- **Cross-tier dispatch for implement** — `--implement=<tier>` flags are accepted by `/cf-pi` but are no-ops for the Pi dispatcher (Pi always uses `openai-codex/gpt-5.5`). The orchestrator should log "implement tier ignored: Pi dispatcher uses gpt-5.5" once at Phase 3 start.
+- **Pi via ACP adapter** — richer streaming integration. Not needed while the text-mode JSONL channel is sufficient.
+- **Parallel implement dispatch** — multiple Pi instances on independent contract groups via parallel worktrees. The simplified flow runs one Pi at a time.

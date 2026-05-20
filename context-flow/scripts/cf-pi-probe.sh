@@ -8,8 +8,8 @@
 #            OK
 #            NO_JSONL          (no stdout AND no JSONL produced — Pi failed to start)
 #            ERROR:<excerpt>   (JSONL contains "errorMessage": pattern excerpt follows)
-# Side effects: writes $SESSION/probe-stdout.log, $SESSION/probe-stderr.log,
-#               and a session JSONL under $SESSION/pi-probe/.
+# Side effects: writes $PROBE_STDOUT, $PROBE_STDERR,
+#               and a session JSONL under $PI_PROBE_DIR/.
 
 set -uo pipefail   # no -e: pi may exit non-zero on quota/auth errors; we classify instead
 
@@ -20,18 +20,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 session="$1"
 load_cf_pi_env "$session"
 
-PROBE_DIR="$session/pi-probe"
-mkdir -p "$PROBE_DIR"
+mkdir -p "$PI_PROBE_DIR"
 
 echo "say ok" | pi \
   ${PI_ARGS[@]+"${PI_ARGS[@]}"} \
-  --session-dir "$PROBE_DIR" \
-  --no-tools > "$session/probe-stdout.log" 2> "$session/probe-stderr.log" || true
+  --session-dir "$PI_PROBE_DIR" \
+  --no-tools > "$PROBE_STDOUT" 2> "$PROBE_STDERR" || true
 
-JSONL=$(ls -t "$PROBE_DIR"/*.jsonl 2>/dev/null | head -1)
+JSONL=$(ls -t "$PI_PROBE_DIR"/*.jsonl 2>/dev/null | head -1)
 
 if [ -z "$JSONL" ]; then
-  if [ ! -s "$session/probe-stdout.log" ]; then
+  if [ ! -s "$PROBE_STDOUT" ]; then
     echo "NO_JSONL"
     exit 0
   fi

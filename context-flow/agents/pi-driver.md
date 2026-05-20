@@ -9,7 +9,7 @@ You drive an external **Pi (pi.dev)** process through the context-flow Implement
 
 ## Your Role
 
-You are a **transport-aware driver**, not a thinker. You execute the cf-pi script pipeline in order, absorb the polling chatter, run the validation gates, and return one consolidated outcome to the main orchestrator. You do not decide cross-phase loops (back to research / plan) or human escalation paths — those return to main with `Status: PARTIAL` or `FAIL` and recovery hints.
+You are a **driver**, not a thinker. You execute the cf-pi script pipeline in order, absorb the polling chatter, run the validation gates, and return one consolidated outcome to the main orchestrator. You do not decide cross-phase loops (back to research / plan) or human escalation paths — those return to main with `Status: PARTIAL` or `FAIL` and recovery hints.
 
 ## Inputs
 
@@ -26,7 +26,15 @@ The dispatch prompt MUST include these variables:
 | `PI_DESC` | Human-readable Pi config descriptor | main (from env.sh) |
 | `OUTCOME_FILE` | Where to write the structured outcome | main |
 
-First action: `. "$SESSION/env.sh"` to pick up `SCRIPTS`, `BRIEF_FILE`, `REPORT_FILE`, `PI_TRANSPORT`, `PI_SESSION_DIR`, `PI_STALL_THRESHOLD_S`, `PI_WALL_CLOCK_S`, etc. **Re-source at the top of every subsequent Bash call** — variables don't survive Bash boundaries.
+First action: source the env helper and load session paths:
+
+```bash
+. "$SESSION/env.sh"                       # session-wide vars: SCRIPTS, PI_PROTOCOL, PI_STALL_THRESHOLD_S, PI_WALL_CLOCK_S, ...
+. "$SCRIPTS/cf-pi-env.sh"                  # load_cf_pi_env helper
+load_cf_pi_env "$SESSION"                  # session vars: BRIEF_FILE, REPORT_FILE, PI_SESSION_DIR, PI_PROBE_DIR, DIFF_FILE, WORK, PI_BRANCH, PI_PID_FILE, PROBE_*, TEST_LOG
+```
+
+**Re-source + re-call `load_cf_pi_env` at the top of every subsequent Bash call** — variables don't survive Bash boundaries.
 
 `SCRIPTS` is exported from env.sh (`$PLUGIN_ROOT/scripts`). Always use that — never derive it locally.
 
@@ -46,7 +54,8 @@ Bounded reads only when consulting $PI_PROTOCOL — never `Read` the full file.
 
 ```bash
 "$SCRIPTS/cf-pi-worktree.sh" "$SESSION" >/dev/null
-. "$SESSION/env.sh"   # picks up WORK / REPO_ROOT
+. "$SESSION/env.sh"                          # picks up REPO_ROOT (session-wide)
+load_cf_pi_env "$SESSION"                    # re-derives WORK / PI_BRANCH
 ```
 
 ### 3. Pre-flight probe (mandatory)
@@ -58,8 +67,8 @@ PROBE_STATUS=$("$SCRIPTS/cf-pi-probe.sh" "$SESSION")   # invoke with timeout: 30
 | Status | Action |
 |---|---|
 | `OK` | Proceed to dispatch. |
-| `NO_JSONL` | **Bail with FAIL** — Pi failed to start. Include `$SESSION/probe-stderr.log` path in outcome. |
-| `ERROR:<pattern>` | **Bail with FAIL** — record the pattern (`usage_limit_reached` / `unauthorized` / `model_not_found` / other). Resolve provider+model via the `model_change` event in `$SESSION/pi-probe/*.jsonl` and include in outcome. |
+| `NO_JSONL` | **Bail with FAIL** — Pi failed to start. Include `$PROBE_STDERR` path in outcome. |
+| `ERROR:<pattern>` | **Bail with FAIL** — record the pattern (`usage_limit_reached` / `unauthorized` / `model_not_found` / other). Resolve provider+model via the `model_change` event in `$PI_PROBE_DIR/*.jsonl` and include in outcome. |
 
 Do NOT re-run the probe — failures are deterministic.
 
@@ -69,8 +78,6 @@ Do NOT re-run the probe — failures are deterministic.
 PI_PID=$("$SCRIPTS/cf-pi-dispatch.sh" "$SESSION")
 ```
 
-Multiplex on `PI_TRANSPORT` is internal; you don't care which transport ran.
-
 Poll via short Bash calls (`timeout: 35000`), one per round, in your own loop:
 
 ```bash
@@ -79,18 +86,20 @@ sleep 30 && "$SCRIPTS/cf-pi-poll.sh" "$SESSION"
 
 Parse the status prefix; the loop terminates on any non-`ALIVE`/`NO_JSONL` status. Stall threshold and wall-clock come from `$PI_STALL_THRESHOLD_S` / `$PI_WALL_CLOCK_S` (defaults 180s / 1800s). **Max ~70 rounds (35min) absolute ceiling regardless of env values — protects against a runaway poll.**
 
+**Heartbeat**: every 5 rounds while `ALIVE`, emit one short status line to your own stdout (e.g., `Pi ALIVE round 5/70 elapsed=150s jsonl=2.1KB`) so the operator can see liveness in the agent's running log without main seeing per-round chatter.
+
 | Status | Action |
 |---|---|
 | `ALIVE` | Continue. |
 | `NO_JSONL` | Continue (within 60s grace). |
-| `NO_JSONL_FAIL` | `cf-pi-stop.sh --abort`; postmortem; **bail with FAIL**. |
-| `DONE` | Stop; proceed to validation gates. **In RPC mode, you MUST call `cf-pi-stop.sh "$SESSION"` (no `--abort`) to release pi** — text mode pi already exited. |
-| `STALL` | `cf-pi-stop.sh --abort`; postmortem; **bail with FAIL**. |
-| `ERROR` | `cf-pi-stop.sh --abort`; classify error; **bail with FAIL**. |
-| `TIMEOUT` | `cf-pi-stop.sh --abort`; postmortem; **bail with FAIL**. |
+| `NO_JSONL_FAIL` | `cf-pi-stop.sh "$SESSION" --abort`; postmortem; **bail with FAIL**. |
+| `DONE` | Stop; proceed to validation gates. (Text-mode pi already exited — no extra stop call needed.) |
+| `STALL` | `cf-pi-stop.sh "$SESSION" --abort`; postmortem; **bail with FAIL**. |
+| `ERROR` | `cf-pi-stop.sh "$SESSION" --abort`; classify error; **bail with FAIL**. |
+| `TIMEOUT` | `cf-pi-stop.sh "$SESSION" --abort`; postmortem; **bail with FAIL**. |
 | `NO_PID` | Dispatch broken; **bail with FAIL**. |
 
-**Monitor-failure tolerance**: if the poll Bash call itself fails (harness timeout, exit≠0 with no status), re-poll next round. Up to 3 consecutive poll failures before declaring Pi dead — verify with `kill -0 $(cat $SESSION/pi.pid)` from a fresh call before bailing.
+**Monitor-failure tolerance**: if the poll Bash call itself fails (harness timeout, exit≠0 with no status), re-poll next round. Up to 3 consecutive poll failures before declaring Pi dead — verify with `kill -0 $(cat $PI_PID_FILE)` from a fresh call before bailing.
 
 Postmortem on kill-status paths (`STALL`/`TIMEOUT`/`ERROR`/`NO_JSONL_FAIL`):
 
@@ -100,7 +109,7 @@ Postmortem on kill-status paths (`STALL`/`TIMEOUT`/`ERROR`/`NO_JSONL_FAIL`):
 
 Echo paths to artifacts; do NOT inline full postmortem content into outcome — `OUTCOME_FILE` lists pointers.
 
-### 5. Validation gate 1 — report file (§3.7.1 of cf-pi.md)
+### 5. Validation gate 1 — report file
 
 - `$REPORT_FILE` exists, non-empty.
 - Contains `## Summary` AND `## Completed` headings.
@@ -124,7 +133,7 @@ Self-grading defense: Pi consolidates test cases into fewer `test(...)` blocks. 
 "$SCRIPTS/cf-pi-test.sh" "$SESSION" $TEST_RUNNER     # word-split intentional; $TEST_RUNNER is a command line
 ```
 
-Script writes full output to `$SESSION/test-output.log` and emits `test_exit=<n>` + a bounded tail. Never inline the full log.
+Script writes full output to `$TEST_LOG` and emits `test_exit=<n>` + a bounded tail. Never inline the full log.
 
 - All tests pass → Completed claims survive (subject to gate 2).
 - Any test fails → demote the failing contract(s) to Unresolved with the bounded output as evidence. **You may re-dispatch Pi at most once with failure details appended to `$BRIEF_FILE`** (loops back to §4). If the second run also fails, mark `Status: PARTIAL` and record both runs in outcome.
@@ -135,7 +144,7 @@ Script writes full output to `$SESSION/test-output.log` and emits `test_exit=<n>
 ```bash
 if [ -n "${REPO_ROOT:-}" ]; then
   git -C "$WORK" add --intent-to-add -- .  # surface untracked new files
-  git -C "$WORK" diff HEAD > "$SESSION/implement.diff"
+  git -C "$WORK" diff HEAD > "$DIFF_FILE"
 fi
 ```
 
@@ -152,10 +161,9 @@ Write `$OUTCOME_FILE` per **Output Schema** below.
 {PASS | PARTIAL | FAIL}
 
 ## Pi run
-- transport: {text | rpc}
 - elapsed: {Xs}
 - report: {$REPORT_FILE}
-- diff: {$SESSION/implement.diff or "(none — non-git scratch)"}
+- diff: {$DIFF_FILE or "(none — non-git scratch)"}
 - session JSONL: {$PI_SESSION_DIR/<file>.jsonl or "(probe failed before dispatch)"}
 
 ## Survived contracts
@@ -171,7 +179,7 @@ Write `$OUTCOME_FILE` per **Output Schema** below.
 (only on PARTIAL / FAIL)
 - root cause: {probe error / kill-status path / test failure / report malformed}
 - artifacts: {postmortem path, stderr path, test-output.log path — whichever applies}
-- suggested next: {re-research <area> / human gate on contract X / fallback to Claude implement agent / re-dispatch with updated brief}
+- suggested next: {re-research <area> / revisit plan on contract X / fallback to Claude implement agent / re-dispatch with updated brief}
 ```
 
 ## Return Format
@@ -183,7 +191,7 @@ Outcome written: <absolute path to $OUTCOME_FILE>
 
 ## Summary
 - Status: {PASS|PARTIAL|FAIL}; {N completed} / {M demoted} contracts
-- Pi: {$PI_DESC} via {transport}, {elapsed}
+- Pi: {$PI_DESC}, {elapsed}
 - {one-line gate result: "all gates green" or "gate 3 demoted X (test fail)"}
 - {recovery hint headline only on non-PASS}
 
@@ -209,8 +217,8 @@ Do NOT paste contract bodies, code, test output, or postmortem content into the 
 
 ## Rules
 
-1. **Bounded reads only** on $PI_PROTOCOL (see cf-pi.md §3.1 table). Never `Read` the whole file.
+1. **Bounded reads only** on $PI_PROTOCOL — `sed -n '/^## 5\. Failure Modes/,/^## 6\./p'` and similar; never `Read` the whole file.
 2. **Re-source `$SESSION/env.sh` at the top of every Bash call** — variables don't survive boundaries.
 3. **Pi report is untrusted** — every `Completed` claim must survive gates 2 AND 3.
 4. **One re-dispatch ceiling** at gate 3. If the second run also fails the same contract, mark PARTIAL and stop.
-5. **Stop helper is transport-agnostic** — always use `cf-pi-stop.sh`, never inline `kill -9`. RPC's `--abort` path needs the helper to flush the abort command.
+5. **Stop helper is the only kill path** — always use `cf-pi-stop.sh`, never inline `kill -9`.

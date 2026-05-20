@@ -15,20 +15,17 @@
 #   TIMEOUT        -- elapsed > $PI_WALL_CLOCK_S; kill+escalate
 #   NO_PID         -- pi.pid missing; dispatch broken; abort
 
-SESSION="$1"
-# shellcheck source=/dev/null
-. "$SESSION/env.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=cf-pi-env.sh
+. "$SCRIPT_DIR/cf-pi-env.sh"
 
-# Transport multiplex: opt into RPC mode via PI_TRANSPORT=rpc (default: text).
-if [ "${PI_TRANSPORT:-text}" = "rpc" ]; then
-  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  exec "$SCRIPT_DIR/cf-pi-rpc-poll.sh" "$SESSION"
-fi
+SESSION="$1"
+load_cf_pi_env "$SESSION" || { echo "NO_PID"; exit 0; }
 
 STALL_THRESHOLD="${PI_STALL_THRESHOLD_S:-180}"
 WALL_CLOCK="${PI_WALL_CLOCK_S:-1800}"
-PI_PID=$(cat "$SESSION/pi.pid" 2>/dev/null)
-START=$(cat "$SESSION/pi-start.ts" 2>/dev/null)
+PI_PID=$(cat "$PI_PID_FILE" 2>/dev/null)
+START=$(cat "$PI_START_FILE" 2>/dev/null)
 [ -z "$PI_PID" ] && { echo "NO_PID"; exit 0; }
 [ -z "$START" ] && START=$(date +%s)
 NOW=$(date +%s); ELAPSED=$((NOW - START))
@@ -36,7 +33,7 @@ NOW=$(date +%s); ELAPSED=$((NOW - START))
 ALIVE=0
 if kill -0 "$PI_PID" 2>/dev/null; then ALIVE=1; fi
 
-JSONL=$(ls -t "$SESSION/pi-sessions"/*.jsonl 2>/dev/null | head -1)
+JSONL=$(ls -t "$PI_SESSION_DIR"/*.jsonl 2>/dev/null | head -1)
 
 if [ -z "$JSONL" ]; then
   if [ "$ALIVE" -eq 0 ]; then echo "DONE ${ELAPSED}s no-jsonl"; exit 0; fi

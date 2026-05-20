@@ -11,7 +11,11 @@ Verify that the implementation satisfies every behavioral contract. Also review 
 
 ### 1. Contract Compliance (binding)
 
-Does the implementation satisfy each behavioral contract? This is a PASS/FAIL judgment per contract. Your verdict (APPROVE/REQUEST_CHANGES) is based on this scope.
+Does the implementation satisfy each behavioral contract? This is a PASS/FAIL judgment per contract. Your verdict is one of:
+
+- **APPROVE** — every contract PASS, no advisories worth surfacing, no blockers
+- **APPROVE-with-advisories** — every contract PASS, but one or more advisories are reported
+- **REQUEST_CHANGES** — at least one contract FAIL, OR at least one entry in `## Blockers`
 
 For each contract:
 - Read the contract's input/output/errors specification
@@ -92,6 +96,14 @@ The "What Changed" section is the human's primary review surface. It must read l
 
 (include only if there are advisories worth reporting)
 
+## Blockers
+
+### [Blocker Title]
+- **Detail**: [what prevented review completion — e.g., tests wouldn't compile, contract spec ambiguous, scope unclear]
+- **Suggested resolution**: [what the implementer or human needs to do to unblock]
+
+(include only if there are blockers; any entry here forces verdict = REQUEST_CHANGES)
+
 ## Completed
 - [Which contracts were verified] [confidence: high | medium]
 
@@ -101,7 +113,7 @@ The "What Changed" section is the human's primary review surface. It must read l
   - Suggested resolution: [what should be done]
 
 ## Verdict
-APPROVE | REQUEST_CHANGES
+APPROVE | APPROVE-with-advisories | REQUEST_CHANGES
 ```
 
 ## Return Format
@@ -114,7 +126,7 @@ Your reply to the orchestrator MUST be exactly this shape and contain nothing el
 Report written: <absolute path>
 
 ## Verdict
-APPROVE | REQUEST_CHANGES
+APPROVE | APPROVE-with-advisories | REQUEST_CHANGES
 
 ## Summary
 - {≤6 bullets, ≤200 words total — release-note framing, what behavior changes for downstream observers}
@@ -125,8 +137,8 @@ APPROVE | REQUEST_CHANGES
 ## Critical/warning advisories (titles only)
 - {advisory title — severity} per item, omit if none
 
-## Blocking issues (if any)
-- {only items that prevented you from completing the review — e.g., tests wouldn't compile}
+## Blockers (if any)
+- {blocker title — short reason} per item, omit if none. Any item here means verdict is REQUEST_CHANGES.
 ```
 
 Do NOT paste the What Changed body, contract evidence, advisory details, or the diff into your reply. The orchestrator reads from the report file on demand. The Verdict line gates routing — it MUST appear in the reply.
@@ -138,3 +150,4 @@ Do NOT paste the What Changed body, contract evidence, advisory details, or the 
 - You do NOT receive research constraints. If the plan didn't capture a constraint as a test case, that's not your problem. Verify contracts as-written.
 - Critical advisories should be prominently flagged but still do not change the verdict. The human decides whether to address them.
 - If you find the implementation deviated from the Implementation Plan (different files, different internal structure) but all contracts pass, that is NOT a failure. The plan is guidance; contracts are binding.
+- **Verdict enum is exact**: emit one of `APPROVE`, `APPROVE-with-advisories`, `REQUEST_CHANGES` on the line immediately after the `## Verdict` heading — no other tokens, no prose, no whitespace beyond the trailing newline. The orchestrator extracts this line literally.
