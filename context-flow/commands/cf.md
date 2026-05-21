@@ -255,7 +255,21 @@ Do NOT proceed to Phase 3 without explicit human approval.
 
 ## Phase 3: Implement
 
-State to the human upfront: `Phase 3: <implementer> on <N> contract(s).`
+State to the human upfront: `Phase 3: <implementer> on <N> contract(s). Working in isolated branch ctxflow/$SESSION_BASENAME.`
+
+### 3.0 Worktree setup (idempotent)
+
+Before dispatching the implementer, materialize the isolated worktree shared by Pi and Claude paths:
+
+```bash
+. "$SESSION/env.sh"
+"$SCRIPTS/cf-pi-worktree.sh" "$SESSION" >/dev/null
+. "$SESSION/env.sh"                          # picks up REPO_ROOT, BASE_BRANCH, BASE_HEAD
+```
+
+After this, `$WORK` is a git worktree on `ctxflow/$SESSION_BASENAME`, forked from the user's HEAD at flow start. **All Phase 3 edits, test runs, and commits happen inside `$WORK`** — the user's host working tree is never touched during implement. The branch survives Phase 3 cleanup; the orchestrator rebases it onto the latest `$BASE_BRANCH` after Phase 4 PASS so the user can ff at will.
+
+If `$REPO_ROOT` is empty after the call, the host is non-git: `$WORK` is a scratch directory, and the post-PASS rebase step is skipped (the user merges the diff manually).
 
 ### 3.1 Brief assembly
 
@@ -299,6 +313,12 @@ The pi-driver absorbs the polling loop (no per-round status reaches main) and re
 Agent(
   subagent_type: "context-flow:implement",
   prompt: "
+    ## Working directory
+    $WORK = <absolute $WORK path>
+    All Read/Edit/Write paths must be anchored at $WORK (treat plan-referenced paths as $WORK-relative).
+    For Bash (tests, git, build): prefix with `cd \"$WORK\" && ...`.
+    Do NOT modify anything outside $WORK during this phase.
+
     ## Context Summary
     - Goal: <one-line goal>
     - Key constraints: <short bullet list>
@@ -311,6 +331,11 @@ Agent(
 
     ## Implementation Plan
     <impl steps from $SESSION/plan.md — guidance, not binding>
+
+    ## Per-contract commits
+    After each contract's tests pass, commit before moving to the next:
+      cd \"$WORK\" && git add -A && git commit -m \"<ContractName>: <one-line behavioral outcome>\"
+    Impl + tests land in the same commit. Never bundle multiple contracts in one commit.
 
     Implement these contracts. Write the tests. All tests must pass.
     Write Outcome (Completed / Concerns / Unresolved) to $SESSION/implement-outcome.md before replying.
@@ -421,11 +446,19 @@ After the implementer returns, **bounded read** the outcome file (`pi-driver-out
 
 Dispatch a single review agent.
 
-Capture the diff to a file before dispatching review — never into a shell variable, which would inject the full diff into the orchestrator's context. For Pi the diff is already at `$SESSION/implement.diff` (written by pi-driver). For Claude-fallback, capture it now:
+Capture the diff to a file before dispatching review — never into a shell variable, which would inject the full diff into the orchestrator's context. For Pi the diff is already at `$SESSION/implement.diff` (written by pi-driver). For Claude-fallback, capture it from the worktree now:
 
 ```bash
-git diff > "$SESSION/implement.diff"
+. "$SESSION/env.sh"
+if [ -n "${REPO_ROOT:-}" ]; then
+  git -C "$WORK" add --intent-to-add -- . 2>/dev/null || true
+  git -C "$WORK" diff "${BASE_HEAD:-HEAD}" > "$SESSION/implement.diff"
+else
+  : > "$SESSION/implement.diff"   # non-git scratch mode
+fi
 ```
+
+The diff spans from `$BASE_HEAD` (flow-start HEAD) to the current cf-branch tip, so per-contract commits collapse into the review payload cleanly.
 
 The reviewer Reads this file directly; the orchestrator never reads its body.
 
@@ -458,10 +491,48 @@ When describing the run, mention which implementer ran (`Implementation by Pi ($
 
 ### Handling the Verdict
 
-- **APPROVE, no critical advisories** → present changelog to human. Done.
-- **APPROVE with advisories** → present changelog + advisories to human, then call `AskUserQuestion` with options: "Address all now (loop to implement)", "Address only critical advisories", "Ship as-is — accept advisories", "Other".
-- **REQUEST_CHANGES with contract failures** → re-run implement with the failure details as additional context (treat as `retry-different-approach`; increment `retries_used`).
-- **REQUEST_CHANGES with fundamental design issues** → this means a contract is wrong, not just the implementation. Loop back to plan via the `## Implement Failure` mechanism in §3.4 with class `loop-back-to-plan`. Increment `retries_used`.
+- **APPROVE, no critical advisories** → present changelog to human → **run post-PASS rebase** (see below). Done.
+- **APPROVE with advisories** → present changelog + advisories to human, then call `AskUserQuestion` with options: "Address all now (loop to implement)", "Address only critical advisories", "Ship as-is — accept advisories", "Other". On "Ship as-is" or after advisories addressed, **run post-PASS rebase**.
+- **REQUEST_CHANGES with contract failures** → re-run implement with the failure details as additional context (treat as `retry-different-approach`; increment `retries_used`). Do NOT rebase yet — the cf branch accumulates more commits.
+- **REQUEST_CHANGES with fundamental design issues** → this means a contract is wrong, not just the implementation. Loop back to plan via the `## Implement Failure` mechanism in §3.4 with class `loop-back-to-plan`. Increment `retries_used`. Do NOT rebase.
+
+### Post-PASS rebase + delivery
+
+Run `cf-rebase.sh` to align the cf branch with the latest `$BASE_BRANCH`, then hand the branch to the human. Never auto-fast-forward `$BASE_BRANCH` — the human decides when to merge.
+
+```bash
+. "$SESSION/env.sh"
+REBASE_STATUS=$("$SCRIPTS/cf-rebase.sh" "$SESSION")
+echo "$REBASE_STATUS"
+```
+
+Interpret the first token of `$REBASE_STATUS`:
+
+| Prefix | Meaning | What to tell the human |
+|---|---|---|
+| `OK <sha>` | Cf branch rebased onto latest `$BASE_BRANCH`, head is `<sha>`. | "Rebased onto `$BASE_BRANCH`. Ready to fast-forward." |
+| `NOOP` | `$BASE_BRANCH` hasn't moved during the flow; cf branch already linear over it. | "Already linear over `$BASE_BRANCH`." |
+| `CONFLICT <files>` | Rebase aborted to keep state clean; cf branch is still at its original (pre-rebase) tip. | "Rebase conflicts in `<files>`. Branch left at original tip — resolve manually before ff." |
+| `SKIP <reason>` | Non-git mode or missing base; nothing to rebase. | Skip rebase messaging entirely. |
+
+Always close with branch + ff guidance:
+
+```
+Phase 4 PASSED. Committed to branch `ctxflow/$SESSION_BASENAME` (<N> commits).
+
+To merge into your branch:
+  git checkout $BASE_BRANCH && git merge --ff-only ctxflow/$SESSION_BASENAME
+
+Inspect first:
+  git log --oneline $BASE_BRANCH..ctxflow/$SESSION_BASENAME
+  git diff $BASE_BRANCH..ctxflow/$SESSION_BASENAME
+```
+
+On `CONFLICT`, also include the manual rebase command:
+```
+  git checkout ctxflow/$SESSION_BASENAME
+  git rebase $BASE_BRANCH    # resolve conflicts, then git rebase --continue
+```
 
 ---
 
@@ -499,14 +570,22 @@ When you cannot proceed (`retries_used >= 4`, all contracts unresolved, fundamen
 
 ## Cleanup
 
-At the end of the flow (success OR escalation), if Pi ran, invoke the cleanup script that `cf-pi-setup.sh` registered in `$SESSION/env.sh`:
+At the end of the flow (success OR escalation), invoke the cleanup script that `cf-pi-setup.sh` registered in `$SESSION/env.sh`:
 
 ```bash
 . "$SESSION/env.sh"
 [ -n "${CLEANUP_SCRIPT:-}" ] && [ -x "$CLEANUP_SCRIPT" ] && bash "$CLEANUP_SCRIPT"
 ```
 
-Removes the Pi worktree and branch (if applicable) but preserves `$SESSION/` for inspection. Log the session path for the human.
+Captures the final diff and removes the worktree. **The cf branch (`ctxflow/$SESSION_BASENAME`) intentionally survives** — it carries the per-contract commit history the human needs to fast-forward (success path) or salvage (escalation path). `$SESSION/` is also preserved for inspection. Log both the session path and the surviving branch name.
+
+If a prior `/cf` flow left a stale branch the user no longer wants, suggest cleanup explicitly:
+
+```
+git branch -D ctxflow/<old-session>
+```
+
+Never delete cf branches automatically — the user owns that decision.
 
 ---
 

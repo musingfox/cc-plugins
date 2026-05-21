@@ -31,7 +31,7 @@ First action: source the env helper and load session paths:
 ```bash
 . "$SESSION/env.sh"                       # session-wide vars: SCRIPTS, PI_PROTOCOL, PI_STALL_THRESHOLD_S, PI_WALL_CLOCK_S, ...
 . "$SCRIPTS/cf-pi-env.sh"                  # load_cf_pi_env helper
-load_cf_pi_env "$SESSION"                  # session vars: BRIEF_FILE, REPORT_FILE, PI_SESSION_DIR, PI_PROBE_DIR, DIFF_FILE, WORK, PI_BRANCH, PI_PID_FILE, PROBE_*, TEST_LOG
+load_cf_pi_env "$SESSION"                  # session vars: BRIEF_FILE, REPORT_FILE, PI_SESSION_DIR, PI_PROBE_DIR, DIFF_FILE, WORK, CF_BRANCH, PI_PID_FILE, PROBE_*, TEST_LOG
 ```
 
 **Re-source + re-call `load_cf_pi_env` at the top of every subsequent Bash call** — variables don't survive Bash boundaries.
@@ -55,7 +55,7 @@ Bounded reads only when consulting $PI_PROTOCOL — never `Read` the full file.
 ```bash
 "$SCRIPTS/cf-pi-worktree.sh" "$SESSION" >/dev/null
 . "$SESSION/env.sh"                          # picks up REPO_ROOT (session-wide)
-load_cf_pi_env "$SESSION"                    # re-derives WORK / PI_BRANCH
+load_cf_pi_env "$SESSION"                    # re-derives WORK / CF_BRANCH
 ```
 
 ### 3. Pre-flight probe (mandatory)
@@ -144,11 +144,11 @@ Script writes full output to `$TEST_LOG` and emits `test_exit=<n>` + a bounded t
 ```bash
 if [ -n "${REPO_ROOT:-}" ]; then
   git -C "$WORK" add --intent-to-add -- .  # surface untracked new files
-  git -C "$WORK" diff HEAD > "$DIFF_FILE"
+  git -C "$WORK" diff "${BASE_HEAD:-HEAD}" > "$DIFF_FILE"
 fi
 ```
 
-Always attempt — only writes if `REPO_ROOT` is set (worktree mode). `add --intent-to-add` is required because `git diff HEAD` alone omits untracked files; we want new files (including unexpected ones like a stray `package-lock.json`) visible to Phase 4 reviewers.
+Diff is taken against `$BASE_HEAD` (flow-start commit), NOT `HEAD` — Pi commits per contract per the methodology, so `$WORK`'s HEAD is the cf-branch tip and `diff HEAD` would be empty. `$BASE_HEAD..HEAD` is the full cf delta the reviewer needs. Only writes if `REPO_ROOT` is set (worktree mode). `add --intent-to-add` surfaces untracked new files in the range diff.
 
 ### 9. Write outcome
 

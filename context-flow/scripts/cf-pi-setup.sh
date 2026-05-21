@@ -66,8 +66,8 @@ Pi-driven implement session. Files are flat under this directory.
 - \`pi-stdout.log\` / \`pi-stderr.log\` — Pi process output
 - \`pi-sessions/*.jsonl\` — Pi JSONL transcript (authoritative state)
 - \`pi-probe/\` — pre-flight probe artifacts
-- \`work/\` — Pi's working directory (git worktree on branch \`$SESSION/env.sh:PI_BRANCH\`)
-- \`cleanup.sh\` — run to remove worktree + delete branch + persist diff
+- \`work/\` — implementer's working directory (git worktree on branch \`$SESSION/env.sh:CF_BRANCH\`)
+- \`cleanup.sh\` — run to capture diff + remove worktree (branch survives for review/merge)
 
 ## Inspect
 \`\`\`bash

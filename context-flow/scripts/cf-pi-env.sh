@@ -9,11 +9,11 @@
 #     Session-wide: SESSION, SESSION_BASENAME, PLUGIN_ROOT, SCRIPTS,
 #       PI_PROTOCOL, CLEANUP_SCRIPT, PI_PROVIDER, PI_MODEL, PI_DESC,
 #       PI_STALL_THRESHOLD_S, PI_WALL_CLOCK_S, PI_AVAILABLE,
-#       REPO_ROOT (after cf-pi-worktree.sh has run).
+#       REPO_ROOT, BASE_BRANCH, BASE_HEAD (after cf-pi-worktree.sh has run).
 #     Flat paths (all directly under $SESSION/):
 #       BRIEF_FILE, REPORT_FILE,
 #       PI_STDOUT, PI_STDERR, PI_SESSION_DIR, PI_PROBE_DIR,
-#       DIFF_FILE, WORK, PI_BRANCH,
+#       DIFF_FILE, WORK, CF_BRANCH,
 #       PI_PID_FILE, PI_START_FILE,
 #       PROBE_STDOUT, PROBE_STDERR, TEST_LOG.
 #     PI_ARGS array rebuilt from PI_PROVIDER/PI_MODEL (empty when neither set).
@@ -35,7 +35,7 @@ load_cf_pi_env() {
   PI_PROBE_DIR="$session/pi-probe"
   DIFF_FILE="$session/implement.diff"
   WORK="$session/work"
-  PI_BRANCH="ctxflow/pi-$SESSION_BASENAME"
+  CF_BRANCH="ctxflow/$SESSION_BASENAME"
   PI_PID_FILE="$session/pi.pid"
   PI_START_FILE="$session/pi-start.ts"
   PROBE_STDOUT="$session/probe-stdout.log"

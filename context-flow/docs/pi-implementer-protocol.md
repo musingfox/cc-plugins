@@ -139,11 +139,13 @@ By default, Pi runs **isolated in a git worktree** to prevent it from polluting 
 
 ```bash
 WORK="$SESSION/work"
-PI_BRANCH="ctxflow/pi-$SESSION_BASENAME"
-git worktree add -B "$PI_BRANCH" "$WORK" HEAD
+CF_BRANCH="ctxflow/$SESSION_BASENAME"
+git worktree add -B "$CF_BRANCH" "$WORK" HEAD
 # ... run pi inside $WORK ...
-# on success: capture diff via `git -C "$WORK" diff HEAD > "$DIFF_FILE"` for review handoff
-# always: git worktree remove --force "$WORK" && git branch -D "$PI_BRANCH"
+# on success: capture diff via `git -C "$WORK" diff "$BASE_HEAD" > "$DIFF_FILE"` for review handoff (NOT `diff HEAD` — after per-contract commits, HEAD == cf-branch tip → empty diff)
+# always: git worktree remove --force "$WORK"
+# the cf branch SURVIVES the flow — it carries per-contract commits the
+# orchestrator rebases onto BASE_BRANCH for the human to ff at their convenience.
 ```
 
 `scripts/cf-pi-worktree.sh` handles setup and appends the cleanup commands to `$CLEANUP_SCRIPT` so they run even if Phase 3 aborts.
@@ -169,7 +171,13 @@ You have `read`, `write`, `edit`, and `bash` enabled by default. If you need to 
 2. **Tests first when possible**: write the test cases from the contracts, then implement to pass them.
 3. **Follow the Implementation Plan as guidance, not as binding**: the binding constraint is the behavioral contract. If the plan suggests file X but file Y is the right place, use Y.
 4. **Run tests after each contract**: don't batch — verify incrementally with the test runner specified in Context Summary.
-5. **Use the Context Summary**: the one-line goal and key constraints give you directional awareness for micro-decisions (naming, error messages, organization). Don't report Unresolved for trivial ambiguities you can reasonably decide.
+5. **Commit after each contract passes**: once a contract's tests pass, commit before moving on. The working tree is a fresh git worktree on a per-flow branch, so commits stay isolated. One commit per contract; impl + tests in the same commit.
+   ```bash
+   git add -A
+   git commit -m "<ContractName>: <one-line behavioral outcome>"
+   ```
+   If a contract requires multiple logical steps that you want separately traceable, you may split into 2–3 commits — never bundle multiple contracts into one commit.
+6. **Use the Context Summary**: the one-line goal and key constraints give you directional awareness for micro-decisions (naming, error messages, organization). Don't report Unresolved for trivial ambiguities you can reasonably decide.
 
 ### Three valid outcomes per contract
 
@@ -365,13 +373,14 @@ After Phase 3 transitions out (success OR escalation), run `bash "$CLEANUP_SCRIP
 
 ```bash
 git -C "$WORK" add --intent-to-add -- . 2>/dev/null || true
-git -C "$WORK" diff HEAD > "$DIFF_FILE" 2>/dev/null || true
+git -C "$WORK" diff "$BASE_HEAD" > "$DIFF_FILE" 2>/dev/null || true     # NOT diff HEAD — see below
 git -C "$REPO_ROOT" worktree remove --force "$WORK" 2>/dev/null || true
-git -C "$REPO_ROOT" branch -D "$PI_BRANCH" 2>/dev/null || true
 ```
 
-- `--intent-to-add` surfaces untracked new files in `git diff HEAD`.
+- Diff is taken against `$BASE_HEAD` (the user's HEAD at flow start), NOT `HEAD`. With per-contract commits, `$WORK`'s HEAD == cf-branch tip → `diff HEAD` is empty. `$BASE_HEAD..HEAD` is the full cf delta. `cf-pi-worktree.sh` resolves `$BASE_HEAD` at append-time so the cleanup script captures the correct range even if `$BASE_BRANCH` later moves.
+- `--intent-to-add` surfaces untracked new files in the range diff.
 - The captured `$DIFF_FILE` (`$SESSION/implement.diff`) is what feeds into Phase 4 review's `## Changes` section.
+- The `$CF_BRANCH` (`ctxflow/$SESSION_BASENAME`) intentionally survives cleanup; the orchestrator rebases it onto `$BASE_BRANCH` after Phase 4 PASS so the user can fast-forward at will.
 
 ---
 
