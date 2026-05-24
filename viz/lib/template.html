@@ -206,6 +206,14 @@
             transform-origin: 0 0;
             transition: transform 0.15s ease-out;
         }
+        /* Fill the frame width so SVG and shell always scale together.
+           `width: 100%` overrides mermaid's inline `max-width: <px>` cap;
+           `height: auto` keeps the viewBox aspect ratio. */
+        .mermaid svg {
+            width: 100% !important;
+            height: auto !important;
+            max-width: 100% !important;
+        }
 
         /* -- Mermaid flow animation (marching ants on edges & sequence arrows) -- */
         @keyframes viz-mermaid-flow {
