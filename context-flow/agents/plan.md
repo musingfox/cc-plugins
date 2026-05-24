@@ -61,6 +61,15 @@ Your output is read by the human (at the gate) and the implement agent. The huma
 
 ## Output Schema
 
+You emit TWO paired artifacts every run (full-plan mode):
+
+- `plan.md` — the human-readable schema below (prose for human review + implement agent context).
+- `contracts.json` — schema-versioned, machine-readable sidecar consumed by orchestration scripts (`cf-pi-shard.sh`, `cf-pi-brief.sh`, `cf-pi-merge-revision.sh`). Scripts never parse `plan.md`.
+
+Both file paths are provided by the orchestrator's dispatch prompt (`Report path:` for `plan.md`, `Contracts path:` for `contracts.json`). Write both before replying.
+
+### plan.md (prose)
+
 ```markdown
 ## Investigated
 - `path/to/file.ext` — [one sentence: why this file is relevant to the plan]
@@ -123,6 +132,56 @@ Your output is read by the human (at the gate) and the implement agent. The huma
   - Why: [why this can't be decided from available information]
   - Suggested resolution: [recommendation or options for the human]
 ```
+
+### contracts.json (machine-readable sidecar)
+
+Write a single JSON document conforming to schema_version 1:
+
+```json
+{
+  "schema_version": 1,
+  "flow_id": "<SESSION_BASENAME — orchestrator-provided>",
+  "contracts": [
+    {
+      "name": "<ContractName>",
+      "summary": "<one-line Effect>",
+      "touches_files": ["<path>", "<path>"],
+      "test_cases": [
+        {"id": "T1", "given": "<concrete input>", "expect": "<concrete value or pattern>"}
+      ],
+      "attachments": [
+        {"name": "<short-name>", "path": "plan-attachments/<contract>-<topic>.md"}
+      ]
+    }
+  ]
+}
+```
+
+Field rules:
+
+- **`name`**: matches the contract heading in `plan.md` exactly. Stable identifier — used as merge key for partial-replan, anchor in prose, branch label hint.
+- **`summary`**: one-line restatement of the contract's Effect.
+- **`touches_files`** (load-bearing): SUPERSET of every file the contract creates or modifies. **Test files count. Doc files count if the contract changes docs.** Underset is a bug — `cf-pi-run.sh` post-validates `actual_touched ⊆ declared_touched` and emits NEEDS_REPLAN with `reason: undeclared_file_touched` on violation. Use repo-relative paths.
+- **`test_cases`**: structured form of the markdown Test Cases — drives shell-side grep-guard generation.
+- **`attachments`**: ESCAPE HATCH for rich design discussion (decision logs, diagrams). Default `[]`. Use only when contract-body prose is too long; place files under `$SESSION/plan-attachments/`. Brief assembly includes attachment contents verbatim for the implementer.
+
+The orchestrator's `cf-pi-shard.sh` derives parallel groups from the file-touch graph (connected components over `touches_files`). **Plan does NOT assign `parallel_group`** — it is script-derived.
+
+#### Worked example — touches_files completeness
+
+Goal: "Add a /healthz endpoint"
+
+```markdown
+### Contract: HealthzEndpoint
+- Effect: ...
+- touches_files:
+  - src/server/routes/healthz.ts        (new file: the endpoint handler)
+  - src/server/router.ts                (modified: register the new route)
+  - test/server/healthz.test.ts         (new file: behavioral test)
+  - docs/api.md                         (modified: document the new endpoint)
+```
+
+Notice all four file kinds: new code, modified code, test, doc. Plans regularly miss the test or doc file — this is the most common underset cause.
 
 ## Atomicity Self-Check
 
@@ -193,9 +252,59 @@ When you receive this:
 
 Treat re-plan after implement failure as a normal phase re-run; the orchestrator increments the retry budget.
 
+## Partial Replan Mode
+
+The orchestrator invokes this mode when ONE OR MORE shards from Phase 3 returned NEEDS_REPLAN — distinct from the existing post-fail full re-plan above. The goal is to revise ONLY the affected contracts while preserving interfaces that already-PASS contracts depend on.
+
+The orchestrator injects this section into your input:
+
+```markdown
+## Partial Replan Request
+- Affected contracts:
+  - <ContractName1>
+  - <ContractName2>
+- Preserve interfaces (do NOT change these contracts' external shape; later work depends on them):
+  - <ContractName3>
+  - <ContractName4>
+- Escalations:
+  - <path to escalate.md from shard X>
+  - <path to escalate.md from shard Y>
+- Base contracts: <path to current contracts.json>
+- Base plan: <path to current plan.md>
+- Revision path: <path to contracts-revision-<n>.json to write>
+- Status path: <path to replan-status.json to write if declining>
+```
+
+You read the escalations and the base files (bounded; do not re-investigate research) and choose one of two outputs:
+
+### (a) Successful partial revision
+
+Write `contracts-revision-<n>.json` (path supplied above) containing ONLY the rewritten contracts. Same schema as `contracts.json` (schema_version=1). Each entry MUST use the same `name` as in base contracts — introducing a new contract name implies a full re-plan, which the orchestrator routes differently. Also update `plan.md` prose for the affected contract sections (orchestrator merges by contract-name anchor).
+
+### (b) Decline partial revision (rollback required)
+
+If the fix demands changing a preserved interface, write `replan-status.json` (path supplied above):
+
+```json
+{
+  "status": "REPLAN_REQUIRES_ROLLBACK",
+  "rollback_contracts": ["ContractA", "ContractB"],
+  "rationale": "<one-paragraph explanation>"
+}
+```
+
+The orchestrator will either auto-roll-back the named contracts and trigger a full re-plan, or escalate to the user per the design's rollback budget.
+
+### Reply shape in partial-replan mode
+
+Use the same Return Format below, with these differences:
+
+- First Summary bullet = `"Status: PARTIAL-REPLAN (revised N contracts)"` OR `"Status: REPLAN_REQUIRES_ROLLBACK (K contracts must roll back)"`.
+- Remaining bullets focus on what changed in the revision and why — not the unchanged contracts.
+
 ## Return Format
 
-The orchestrator's dispatch prompt includes a `Report path:` line — an absolute file path. **Write your full output (matching Output Schema above, OR the Research Insufficiency section if you are blocked) to that path before replying.**
+The orchestrator's dispatch prompt includes a `Report path:` line and a `Contracts path:` line — both absolute file paths. **Write your full output (matching Output Schema above, OR the Research Insufficiency section if you are blocked) to the report path, AND the matching `contracts.json` sidecar to the contracts path, before replying.** If partial-replan mode is active, the Summary's first bullet is the Status line per the new mode (PARTIAL-REPLAN or REPLAN_REQUIRES_ROLLBACK), and the relevant revision / status JSON is written to the path supplied in the Partial Replan Request block.
 
 Your reply to the orchestrator MUST be exactly this shape and contain nothing else:
 
@@ -252,3 +361,5 @@ Run this self-check before producing your final output. If any item fails, fix t
 - [ ] Every research constraint is either covered by a test case or listed in Unresolved with justification.
 - [ ] No "low confidence" guesses leaked into Decisions or Contracts — guesses live in Unresolved.
 - [ ] Implementation Plan steps each cite the contract they fulfill.
+- [ ] **contracts.json sidecar**: emitted with `schema_version=1` + every contract has `touches_files` (superset, includes test files and doc files).
+- [ ] If partial-replan mode: revision file uses same `name` values as base contracts; new names mean full re-plan (decline via `REPLAN_REQUIRES_ROLLBACK` instead).

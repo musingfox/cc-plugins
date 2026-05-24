@@ -255,190 +255,176 @@ Do NOT proceed to Phase 3 without explicit human approval.
 
 ## Phase 3: Implement
 
-State to the human upfront: `Phase 3: <implementer> on <N> contract(s). Working in isolated branch ctxflow/$SESSION_BASENAME.`
+State to the human upfront: `Phase 3: parallel-sharded Pi fan-out on <N> contract(s). Parent branch ctxflow/$SESSION_BASENAME; per-shard branches under cf/$SESSION_BASENAME/shard-<id>.`
 
-### 3.0 Worktree setup (idempotent)
+Phase 3 splits the contract set by file-touch graph and runs one `pi-driver` sub-agent per shard in parallel. The full per-shard lifecycle (brief → worktree → probe → dispatch → poll → gates → outcome) lives in `cf-pi-run.sh`; main only fans out, collects rigid-format returns, and routes. Token discipline (design §17) is non-negotiable: main NEVER reads `report.md`, `contracts.json`, `escalate.md`, postmortems, or test logs — only bounded `Read(file, limit=…)`, `jq '.field'`, and `head -N` peeks.
 
-Before dispatching the implementer, materialize the isolated worktree shared by Pi and Claude paths:
+### 3.0 Parent worktree setup (idempotent)
+
+Before sharding, materialize the parent worktree that all shard branches will be forked from and later merged into:
 
 ```bash
 . "$SESSION/env.sh"
 "$SCRIPTS/cf-pi-worktree.sh" "$SESSION" >/dev/null
-. "$SESSION/env.sh"                          # picks up REPO_ROOT, BASE_BRANCH, BASE_HEAD
+. "$SESSION/env.sh"                          # picks up REPO_ROOT, BASE_BRANCH, BASE_HEAD, WORK
 ```
 
-After this, `$WORK` is a git worktree on `ctxflow/$SESSION_BASENAME`, forked from the user's HEAD at flow start. **All Phase 3 edits, test runs, and commits happen inside `$WORK`** — the user's host working tree is never touched during implement. The branch survives Phase 3 cleanup; the orchestrator rebases it onto the latest `$BASE_BRANCH` after Phase 4 PASS so the user can ff at will.
+After this, `$WORK` is a git worktree on `ctxflow/$SESSION_BASENAME` forked from the user's HEAD at flow start. Per-shard branches (`cf/$SESSION_BASENAME/shard-A`, `-B`, …) are created from this parent inside `cf-pi-run.sh`; the integration gate merges them back here. The user's host working tree is never touched during implement. After Phase 4 PASS, the parent branch is rebased onto the latest `$BASE_BRANCH`.
 
-If `$REPO_ROOT` is empty after the call, the host is non-git: `$WORK` is a scratch directory, and the post-PASS rebase step is skipped (the user merges the diff manually).
+If `$REPO_ROOT` is empty (host is non-git): `$WORK` is a scratch directory; integration and rollback degrade gracefully (each script reports the limitation in its result JSON).
 
-### 3.1 Brief assembly
+### 3.1 Shard
 
-Extract from `$SESSION/plan.md` via bounded reads — never `cat` the whole file:
+Build the file-touch graph from `contracts.json` and emit one shard per connected component:
 
-- `GOAL_ONELINE` — one-sentence compressed goal (derive from `$SESSION/goal.md`).
-- `CONTRACTS` — bounded read of `## Behavioral Contracts`:
-  ```bash
-  sed -n '/^## Behavioral Contracts/,/^## Implementation Plan/p' "$SESSION/plan.md"
-  ```
-- `CONSTRAINTS` — bounded read of `$SESSION/research.md` (`sed -n '/^## Constraints/,/^## Key Files/p'`), boiled down to constraints that affect implementation (one short line each).
-- `TEST_RUNNER` — extracted from `$SESSION/plan.md` Implementation Plan, or asked once via `AskUserQuestion` with the language-appropriate default (e.g., `node --test test/contracts.test.mjs`, `pytest -xvs`, `cargo test`).
+```bash
+"$SCRIPTS/cf-pi-shard.sh" "$SESSION"
+FAN_OUT=$(jq '.fan_out_count' "$SESSION/shards.json")
+SHARD_IDS=$(jq -r '.groups[].id' "$SESSION/shards.json")
+```
 
-### 3.2 Implementer dispatch
+`shards.json` carries `{fan_out_count, groups:[{id, contracts:[…], files:[…]}…]}` and seeds `$SESSION/shards/<id>/env.sh` per shard. Main reads only those two scalars / id list — never the full groups payload. Also assemble the brief inputs once (shared across all shards):
 
-**Default path (`$PI_AVAILABLE=1`)** — dispatch `context-flow:pi-driver`:
+- `GOAL_ONELINE` — derived from `$SESSION/goal.md` (one sentence).
+- `CONSTRAINTS` — `sed -n '/^## Constraints/,/^## Key Files/p' "$SESSION/research.md"`, boiled to short lines.
+- `TEST_RUNNER` — from `$SESSION/plan.md` Implementation Plan, or one-shot `AskUserQuestion` with language default.
+
+### 3.2 Fan-out
+
+Spawn N `pi-driver` sub-agents in PARALLEL — all `Agent()` calls in a **single message**:
 
 ```
 Agent(
   subagent_type: "context-flow:pi-driver",
   prompt: "
-    SESSION=$SESSION
-    PI_PROTOCOL=$PI_PROTOCOL
-    PLAN=$SESSION/plan.md
+    SHARD_SESSION=$SESSION/shards/A
     GOAL_ONELINE=<one-sentence goal>
     CONSTRAINTS=<short bullet list>
     TEST_RUNNER=<resolved command>
-    PI_DESC=$PI_DESC
-    OUTCOME_FILE=$SESSION/pi-driver-outcome.md
+    SCRIPTS=$SCRIPTS
 
-    Drive Phase 3 per your agent prompt. Write outcome to $OUTCOME_FILE before replying.
+    Drive this shard per your agent prompt. Return the rigid 4-section format.
   "
-)
+),
+Agent(
+  subagent_type: "context-flow:pi-driver",
+  prompt: "SHARD_SESSION=$SESSION/shards/B ..."
+),
+... (one Agent() per id in $SHARD_IDS)
 ```
 
-The pi-driver absorbs the polling loop (no per-round status reaches main) and returns a ≤200-word summary with paths to artifacts (Pi report, diff, postmortem if any).
+Do NOT pass research output, decision alternatives, plan prose, or rejected approaches. Each driver derives everything else from its `SHARD_SESSION/env.sh`.
 
-**Fallback path (Claude implement agent)** — dispatch `context-flow:implement`:
+### 3.3 Collect
+
+Wait for ALL N replies before routing (round-collection rule, design §7) — this lets NEEDS_REPLAN coalesce into a single Plan invocation and prevents interleaved replans.
+
+Parse each reply via its rigid 3-section format (`## Status`, `## Survived`, `## Affected`, optional `## Notes`; see `agents/pi-driver.md` §11). Status is one of `PASS | FAIL | NEEDS_REPLAN`. If a reply violates the format or its Notes exceeds 200 words, use `SendMessage` to ask the same sub-agent for a compressed re-return — do NOT respawn.
+
+Persist round results to disk (main never holds the JSON in context):
+
+```bash
+"$SCRIPTS/cf-pi-record-round.sh" "$SESSION" \
+    --round "$ROUND" --result "A=PASS" --result "B=NEEDS_REPLAN" --result "C=FAIL"
+# Updates $SESSION/dispatch-state.json (current round only) and appends prior
+# round to $SESSION/dispatch-state-archive.jsonl (never read by main during flow).
+```
+
+Bounded reads on state for routing:
+
+```bash
+jq -r '.results_latest | to_entries[] | "\(.key)=\(.value)"' "$SESSION/dispatch-state.json"
+jq -r '.replan_count["<contract>"] // 0'                     "$SESSION/dispatch-state.json"
+jq -r '.rollback_count'                                       "$SESSION/dispatch-state.json"
+```
+
+### 3.4 Route by status set
+
+Precedence within one round: **FAIL retries are resolved first, then NEEDS_REPLAN is coalesced, then all-PASS triggers integration.** (FAIL is an infra signal; resolving it may change the NEEDS_REPLAN set.)
+
+#### Any FAIL
+
+A FAIL means Pi infrastructure failure (probe error, dispatch broken, stall after in-script retry, outcome missing/malformed). Re-spawn `pi-driver` for that shard with the same inputs — one message, one Agent() call per failed shard if multiple:
+
+```
+Agent(subagent_type: "context-flow:pi-driver", prompt: "SHARD_SESSION=$SESSION/shards/<id> ...")
+```
+
+If the second attempt still returns FAIL, escalate via `AskUserQuestion` (peek context with `head -80 "$SESSION/shards/<id>/escalate.md"` if present):
+
+- Options: `accept-partial` (drop failed shard, route remaining via §3.4 below) / `abort-flow` / `attempt-third-retry`.
+
+Per-shard, per-round FAIL retry budget = 1 (design §10).
+
+#### All PASS (after FAIL resolution)
+
+Run the integration gate — merge all PASS shard branches into `cf/$SESSION_BASENAME/integrated` and run the full test suite:
+
+```bash
+"$SCRIPTS/cf-pi-integrate.sh" "$SESSION" "$TEST_RUNNER"
+INT_STATUS=$(jq -r '.status' "$SESSION/integration-result.json")
+```
+
+- `INT_STATUS=PASS` → proceed to Phase 4. Diff path is `$SESSION/implement.diff`.
+- `INT_STATUS=NEEDS_REPLAN` → integration gate auto-injects NEEDS_REPLAN for the affected contracts (`jq -r '.affected_contracts[]' "$SESSION/integration-result.json"`). Funnel into the partial-replan path below as if they came from shard outcomes.
+
+#### Any NEEDS_REPLAN (after FAIL resolution)
+
+Coalesce all NEEDS_REPLAN this round (Pi-initiated escalate.md, gate-2/3 demotion, persistent-test-fail, undeclared_file_touched, AND any integration-injected affected_contracts) into a single Plan partial-replan invocation. Already-PASS contracts (from this and prior rounds) are preserved — their checkpoints stay on shard branches.
+
+Build the Partial Replan Request block per `agents/plan.md` §Partial Replan Request, then dispatch:
 
 ```
 Agent(
-  subagent_type: "context-flow:implement",
+  subagent_type: "context-flow:plan",
   prompt: "
-    ## Working directory
-    $WORK = <absolute $WORK path>
-    All Read/Edit/Write paths must be anchored at $WORK (treat plan-referenced paths as $WORK-relative).
-    For Bash (tests, git, build): prefix with `cd \"$WORK\" && ...`.
-    Do NOT modify anything outside $WORK during this phase.
+    Report path: $SESSION/plan-replan-${ROUND}.md
+    Contracts path: $SESSION/contracts.json
 
-    ## Context Summary
-    - Goal: <one-line goal>
-    - Key constraints: <short bullet list>
+    ## Partial Replan Request
+    - Affected contracts: <coalesced list>
+    - Preserve interfaces: <already-PASS contract names>
+    - Escalations: <paths to per-shard escalate.md, if any>
+    - Base contracts: $SESSION/contracts.json
+    - Base plan: $SESSION/plan.md
+    - Revision path: $SESSION/contracts-revision-${ROUND}.json
+    - Status path: $SESSION/replan-status-${ROUND}.json
 
-    ## Behavioral Contracts
-    <contracts>
-
-    ## Test Cases
-    <test cases>
-
-    ## Implementation Plan
-    <impl steps from $SESSION/plan.md — guidance, not binding>
-
-    ## Per-contract commits
-    After each contract's tests pass, commit before moving to the next:
-      cd \"$WORK\" && git add -A && git commit -m \"<ContractName>: <one-line behavioral outcome>\"
-    Impl + tests land in the same commit. Never bundle multiple contracts in one commit.
-
-    Implement these contracts. Write the tests. All tests must pass.
-    Write Outcome (Completed / Concerns / Unresolved) to $SESSION/implement-outcome.md before replying.
+    Mode: partial-replan. Return per your partial-replan reply shape.
   "
 )
 ```
 
-State the fallback explicitly when used: `Falling back to Claude implement agent.`
+Read only the reply's first Summary bullet to branch:
 
-**Do NOT pass**: full research output, decision alternatives, planning rationale, rejected approaches.
+- `Status: PARTIAL-REPLAN (...)` → apply the revision and re-fan-out only affected shards:
+  ```bash
+  "$SCRIPTS/cf-pi-merge-revision.sh" "$SESSION" "$SESSION/contracts-revision-${ROUND}.json"
+  "$SCRIPTS/cf-pi-shard.sh"          "$SESSION"   # re-emits shards.json; affected shards get new env
+  # then re-fan-out: one Agent(pi-driver) per affected shard id, single message (back to §3.2)
+  ```
+- `Status: REPLAN_REQUIRES_ROLLBACK (...)` → Plan declines partial-replan; the preserved interface itself is the problem. Bounded read of the rollback list:
+  ```bash
+  jq -r '.rollback_contracts[]' "$SESSION/replan-status-${ROUND}.json"
+  ROLLBACK_COUNT=$(jq -r '.rollback_count' "$SESSION/dispatch-state.json")
+  ```
+  If `rollback_count < 2`: run `"$SCRIPTS/cf-pi-rollback.sh" "$SESSION" <contract...>` (resets the named shard checkpoints, increments `rollback_count`), then dispatch a full Plan re-invocation (no partial-replan flag) and return to §3.1. If `rollback_count >= 2`: escalate (see Budget guards).
 
-### 3.3 Recovery routing
+### 3.5 Budget guards
 
-After the implementer returns, **bounded read** the outcome file (`pi-driver-outcome.md` or `implement-outcome.md`).
+After each round, before routing the next dispatch, check budgets via bounded `jq`:
 
-#### Pi-driver outcomes
+```bash
+jq -r '.replan_count | to_entries[] | select(.value >= 3) | .key' "$SESSION/dispatch-state.json"
+jq -r 'select(.rollback_count >= 3) | "rollback-exhausted"'        "$SESSION/dispatch-state.json"
+```
 
-| Outcome `Status` | Action |
-|---|---|
-| `PASS` | Forward survived contracts + Pi's `Concerns` (verbatim) to Phase 4. Use `$SESSION/implement.diff` as the diff path. |
-| `PARTIAL` | Read the **Failure Class** of each failed contract from the outcome and route per §3.4 (worst class wins: `pivot-goal` > `loop-back-to-plan` > `retry-different-approach`). |
-| `FAIL` | Inspect the `Recovery hints` section. Common subcategories: |
-| ↳ probe `ERROR:usage_limit_reached` | Surface "quota resets at <timestamp>" from `$SESSION/pi-probe/*.jsonl`; offer "Retry after quota reset / Switch provider/model / Fall back to Claude implement agent / Abort Phase 3". |
-| ↳ probe `ERROR:unauthorized` / `status_code:401` | Surface "run `pi auth <resolved-provider>` then retry". |
-| ↳ probe `ERROR:model_not_found` | Surface "verify model via `pi --list-models <resolved-provider>` or `pi config`". |
-| ↳ probe `NO_JSONL` | Pi failed to start; surface `$SESSION/probe-stderr.log`; recommend `pi --version` debug or fallback. |
-| ↳ kill-status (`STALL`/`TIMEOUT`/`ERROR`) | Bounded `Read` of postmortem path from outcome; apply §5 of `$PI_PROTOCOL` (Failure Modes & Recovery) — `sed -n '/^## 5\. Failure Modes/,/^## 6\./p' "$PI_PROTOCOL"`. |
-| ↳ report missing/malformed | Default `AskUserQuestion`: "Re-dispatch Pi with the same brief / Fall back to Claude implement agent / Revisit plan / Other". |
-| ↳ All contracts demoted | Treat as §3.4 (Failure routing by class). |
+If either fires, escalate to the user via `AskUserQuestion`:
 
-#### Claude implement-agent outcomes
+- Context: name the over-budget contract(s) or `rollback-exhausted` and the round number. Optionally peek `head -80 "$SESSION/shards/<latest-failed>/escalate.md"` if it exists.
+- Options: `revise-goal` (loop back to Phase 1 with new framing) / `accept-partial` (ship PASS contracts only, drop the over-budget ones) / `abort-flow` / `other`.
 
-1. **Test execution check** — all test cases must pass (the implement agent ran them; verify by reading `## Completed` confidence + re-running if uncertain).
-2. **Examine output structure** — `## Completed`, `## Concerns`, `## Unresolved`. Each Unresolved item carries a **Failure Class** tag: `retry-different-approach` | `loop-back-to-plan` | `pivot-goal`.
-3. **If Concerns exist** — forward to Phase 4.
-4. **If Unresolved contracts exist** — apply §3.4, routing by Failure Class.
-5. **If all tests pass and no Unresolved** → proceed to Phase 4.
-
-### 3.4 Failure routing by Failure Class
-
-**When the implementer reports `PARTIAL` / `FAIL` / Unresolved contracts**, route each failed contract by its **Failure Class** (self-classified by the implement agent per `agents/implement.md`). The implementer's classification is the primary signal — your job is to act on it, not to reclassify.
-
-**Failure Class → routing**:
-
-| Failure Class | Routing | Increment `retries_used`? |
-|---|---|---|
-| `retry-different-approach` | Re-dispatch the **same** implementer with the strategy hint from the outcome appended to the brief. Plan stays unchanged. | Yes |
-| `loop-back-to-plan` | Re-dispatch **plan** with the `## Implement Failure` section (see template below). Contract itself is broken. | Yes |
-| `pivot-goal` | **Immediate human escalation** with "Goal conflicts with reality" framing. **Do NOT increment `retries_used`** — this bypasses the budget because no retry will fix a goal/reality mismatch. | **No** |
-
-**Multi-class failures** (different contracts failed with different classes in one run): pick the worst class — `pivot-goal` > `loop-back-to-plan` > `retry-different-approach` — and route the whole batch by that class. If any contract is `pivot-goal`, escalate.
-
-**Codebase-gap override**: if the outcome's hint indicates the implementer hit an unknown subsystem research didn't surface (regardless of declared class), prefer a loop-back to **Phase 1** (research) with the gap added to the enriched goal. Increment `retries_used`.
-
-**Tooling / environment failures** (probe error, quota, auth) are NOT Failure Class — surface options per §3.3 routing table.
-
-**Flow**:
-
-1. Read the outcome's `## Unresolved` section via `sed -n '/^## Unresolved/,$p' "$SESSION/pi-driver-outcome.md"` (or the implement-outcome equivalent). Extract Failure Class per failed contract.
-2. Route per the table above.
-3. For `loop-back-to-plan`, build the `## Implement Failure` section:
-
-   ```markdown
-   ## Implement Failure
-   Status: PARTIAL  (or FAIL)
-   Implementer: <pi | claude-implement>
-   Failed contracts:
-   - <contract-name> [class=loop-back-to-plan]: <one-sentence reason from outcome>
-   - ...
-   Survived contracts:
-   - <contract-name>
-   Hint from implementer: <verbatim suggested resolution, if any>
-
-   Revisit the failed contracts. Options to consider:
-   - Split the contract into smaller atomic contracts.
-   - Drop the contract if it's not load-bearing for the goal.
-   - Restate the contract with the missing precondition / dependency made explicit.
-   Preserve the survived contracts as-is unless the failure analysis shows they share the same flaw.
-   ```
-
-4. For `retry-different-approach`, build a brief addendum:
-
-   ```markdown
-   ## Previous Attempt
-   Failed contracts:
-   - <contract-name> [class=retry-different-approach]: <one-sentence reason>
-   Suggested alternative: <verbatim hint from implementer>
-
-   Re-attempt the failed contracts using the suggested alternative strategy. The contracts themselves are unchanged.
-   ```
-
-5. For `pivot-goal`, present to human via `AskUserQuestion`:
-   - One-paragraph framing: "Implementer reports the goal itself conflicts with reality: <verbatim reason>. No retry will fix this — a real-world constraint blocks the goal as stated."
-   - Options: "Revise the goal (describe how)", "Drop the conflicting requirement and proceed", "Abort the flow", "Other".
-
-6. **Only after plan returns a revised contract set** does Phase 3 re-dispatch for the loop-back-to-plan path. The new dispatch passes the revised contracts (not the original ones).
-
-7. **Partial-delivery override** — partial delivery is allowed only when the human explicitly approves it. Trigger the explicit `AskUserQuestion` when:
-   - `retries_used >= 4` (budget exhausted), OR
-   - the human asked for it during a recovery prompt, OR
-   - the survived contracts ship a self-contained increment AND the failed contracts are clearly orthogonal.
-
-   Options: "Revisit plan and re-implement (default) / Ship survived contracts only, drop failed / Loop back to research / Abort and escalate / Other".
+Replan budget = 2 attempts per contract (third NEEDS_REPLAN escalates). Rollback budget = 2 cycles per flow (third escalates). FAIL retry budget = 1 per shard per round (handled in §3.4 Any FAIL).
 
 ---
 
