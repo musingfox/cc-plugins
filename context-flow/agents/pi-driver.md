@@ -90,7 +90,7 @@ Output to main MUST be EXACTLY this shape and nothing else:
 
 | Status | What it implies for your distillation |
 |---|---|
-| `PASS` | All contracts in shard survived gates 1+2+3 AND actual_touched ⊆ declared_touched. Notes section: omit. |
+| `PASS` | All contracts in shard survived gates 1 and 3 AND actual_touched ⊆ declared_touched. Notes section: omit. |
 | `FAIL` | Pi infrastructure failure (probe, dispatch, stall, report malformed, test-runner crash). Notes section: one-sentence narrative of what main should inspect (which artifact path tells the story). |
 | `NEEDS_REPLAN` | Spec issue: Pi escalated, OR persistent test failure after one in-shard re-dispatch, OR undeclared file touched. Notes section: one-paragraph narrative summarizing the pattern from outcome.md's Reason + Affected fields. |
 

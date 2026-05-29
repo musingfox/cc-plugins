@@ -317,47 +317,22 @@ This rule is what separates v0.2.1 from v0.2.0: in v0.2.0 a monitor exit-1 casca
 - Contains a `## Completed` heading. (Concerns/Unresolved may be absent — that means none.)
 - If missing: treat the Pi run as failed. Do NOT promote any contracts to Completed. Loop back to plan via the `## Implement Failure` channel (see `agents/plan.md`).
 
-### 4.3 Test-file grep guard (anti self-grading)
+### 4.3 Survivors: declared ∩ reported (no test-content grep)
 
-For every contract claimed in `## Completed`, the orchestrator MUST verify that the test file actually exists AND contains at least one assertion that exercises the contract's behavior.
+A contract claimed in `## Completed` is recorded as a **survivor** iff it was also
+declared in this shard. The orchestrator does NOT grep the test source for the
+contract's expected literals.
 
-**Implementation hard rule — always materialize the guard as a generated script, not an inline shell loop.** Test-case literals routinely contain apostrophes, parentheses, and other characters that get mangled when the entire `for pat in 'a' 'b(c)' …; do grep …; done` is passed as one Bash `-c` argument. Empirically, this manifests as the loop producing **zero output and exit 1** — a silent failure that looks like every assertion failed when really nothing ran.
+A prior "grep guard" did exactly that — matching each contract's prose `expect`
+from `contracts.json` literally against the test file — and was **removed**. It
+mechanically checked a *non-deterministic validation* question ("does this test
+capture the intent?"), a category error: no well-written assertion contains the
+prose `expect` verbatim, so it spuriously demoted virtually every real test.
 
-```bash
-GUARD_SCRIPT="$SESSION/grep-guard.sh"
-cat > "$GUARD_SCRIPT" <<'OUTER'
-#!/usr/bin/env bash
-TEST_FILE="$1"
-PASS=0; FAIL=0
-PATTERNS=(
-  # one expected-output literal per line, quoted for shell
-  "'helloworld'"
-  "stripWhitespace('')"
-  # ...one entry per (contract, test case)
-)
-for pat in "${PATTERNS[@]}"; do
-  if grep -q -F -- "$pat" "$TEST_FILE"; then
-    printf 'PASS: %s\n' "$pat"; PASS=$((PASS+1))
-  else
-    printf 'FAIL: %s\n' "$pat"; FAIL=$((FAIL+1))
-  fi
-done
-echo "---"
-echo "PASS=$PASS FAIL=$FAIL"
-OUTER
-chmod +x "$GUARD_SCRIPT"
-"$GUARD_SCRIPT" "$TEST_FILE"
-```
-
-Implementation notes:
-
-- Pi tends to consolidate multiple test cases into fewer `test(...)` blocks. **Do NOT count `test(` occurrences** — that yields false negatives. Grep for the expected-output literal from each test case.
-- Use `grep -q -F -- "$pat"` (fixed-string, supports literals starting with `-`). String outputs include the surrounding quotes (e.g. `"'olleh'"`); function calls include the parens (e.g. `"foo('')"`).
-- For numeric outputs: search for the literal number near an `assert`/`expect`/`equal` call (a tighter regex; literal-only is too loose).
-- If a test case's expected value is too generic to grep (e.g., `0` or `""`), fall back to executing the test file with the runner and checking exit code + reporter output for that specific assertion.
-- Parse the guard's `PASS=/FAIL=` summary; if `FAIL > 0`, identify which contracts those patterns belong to and demote them.
-
-If a Completed claim fails the guard, move that contract to **Unresolved** in the merged report with reason "Pi claimed Completed but no matching test assertion was found." Then loop back to plan via `## Implement Failure`.
+The correct split:
+- **Verification** ("do the tests pass") is deterministic — §4.4 runs the suite.
+- **Whether the tests meaningfully cover the contract** is a *judgement*, deferred
+  to the Review phase (`agents/review.md`), not a per-shard grep.
 
 ### 4.4 Test execution check
 
@@ -399,7 +374,6 @@ Diagnose primarily from `$PI_SESSION_DIR/*.jsonl` (rich event stream), then from
 | Pi exits within 5s, no report | Brief failed to load (path wrong, `@file` typo) or pre-flight should have caught | Inspect `$PI_STDERR`; re-dispatch with corrected path |
 | Pi runs > 5 min, last JSONL event > 5 min old, CPU near 0 | Shell-expansion bug in brief (backticks expanded by parent shell) or `-p`+invalid flag combo | Confirm brief was passed via `@file`, not `$(cat ...)`; check Pi invocation flags; if neither, kill and re-dispatch |
 | Report exists but `## Completed` missing | Pi gave up mid-run | Read Pi's actual report content — may be all Unresolved; loop to plan with `## Implement Failure` |
-| Report has Completed but test-file grep guard fails | Pi wrote tests in a different file or used different literals | Locate actual test file via `grep -r`; re-validate. If genuinely missing, demote per §4.3 |
 | Tests pass when Pi runs but fail when orchestrator re-runs | Environment drift (Pi's bash session vs orchestrator's) | Re-run with full env captured in brief; if persistent, escalate |
 
 ---

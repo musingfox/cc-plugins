@@ -370,7 +370,7 @@ INT_STATUS=$(jq -r '.status' "$SESSION/integration-result.json")
 
 #### Any NEEDS_REPLAN (after FAIL resolution)
 
-Coalesce all NEEDS_REPLAN this round (Pi-initiated escalate.md, gate-2/3 demotion, persistent-test-fail, undeclared_file_touched, AND any integration-injected affected_contracts) into a single Plan partial-replan invocation. Already-PASS contracts (from this and prior rounds) are preserved — their checkpoints stay on shard branches.
+Coalesce all NEEDS_REPLAN this round (Pi-initiated escalate.md, persistent-test-fail, undeclared_file_touched, AND any integration-injected affected_contracts) into a single Plan partial-replan invocation. Already-PASS contracts (from this and prior rounds) are preserved — their checkpoints stay on shard branches.
 
 Build the Partial Replan Request block per `agents/plan.md` §Partial Replan Request, then dispatch:
 

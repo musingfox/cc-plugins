@@ -238,9 +238,9 @@ Three statuses (collapsed from four — PARTIAL's routing was identical to NEEDS
 
 | Status | Trigger | Main routing |
 |---|---|---|
-| `PASS` | All contracts in shard survive gates 2 + 3 | Tag checkpoint, mark shard done |
+| `PASS` | All contracts in shard survive gate 1 + gate 3 + file-scope check | Tag checkpoint, mark shard done |
 | `FAIL` | Pi infrastructure failure (probe error, stall after retry, dispatch broken, report missing) | Retry brief once; second FAIL ⇒ escalate to user |
-| `NEEDS_REPLAN` | Any of: `$ESCALATE_FILE` present; some contracts demoted at gate 2/3; same contract failed after one in-shard redispatch | Coalesce all NEEDS_REPLAN this round; accept any passed contracts; invoke Plan partial-replan for `affected_contracts` |
+| `NEEDS_REPLAN` | Any of: `$ESCALATE_FILE` present; persistent test failure after one in-shard redispatch; an undeclared file was touched | Coalesce all NEEDS_REPLAN this round; accept any passed contracts; invoke Plan partial-replan for `affected_contracts` |
 
 `NEEDS_REPLAN` always carries:
 - `passed_contracts`: contracts that did survive (already committed on shard branch — preserved)

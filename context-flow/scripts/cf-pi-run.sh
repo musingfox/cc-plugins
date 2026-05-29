@@ -18,8 +18,7 @@
 #   5. poll loop             cf-pi-poll.sh once per ~30s, max 70 rounds
 #   6. escalation detect     $ESCALATE_FILE present => NEEDS_REPLAN
 #   7. gate 1 report         head -20 contains ## Summary && ## Completed
-#   8. gate 2 grep guard     each Completed contract's non-trivial test expects
-#                            must grep-hit some test file in $WORK
+#   8. survivors set         contracts this shard both declared and reported done
 #   9. gate 3 test execute   cf-pi-test.sh; one in-shard re-dispatch on fail
 #  10. actual ⊆ declared     git diff name-only ⊆ shard's declared files
 #  11. capture diff          git diff $BASE_HEAD > $DIFF_FILE
@@ -136,31 +135,6 @@ completed_contracts() {
     | grep -oE '_\(contract: [^)]+\)_' \
     | sed -E 's/^_\(contract: (.+)\)_$/\1/' \
     | awk '!seen[$0]++'
-}
-
-# Non-trivial expected values for a contract (skip empty/numeric/bracket-only).
-contract_expects() {
-  local name="$1"
-  jq -r --arg n "$name" '
-    .contracts[] | select(.name == $n) |
-    (.test_cases // [])[] | .expect // ""
-  ' "$CONTRACTS_FILE" \
-    | awk 'length($0) >= 3 && !/^[0-9[:space:]]+$/ && !/^[\[\](){}'\''"`,. ]+$/'
-}
-
-# Candidate test file paths inside $WORK for a contract: from touches_files,
-# filter to entries containing "test", ".test.", or "spec." -- absolutized.
-contract_test_files() {
-  local name="$1"
-  jq -r --arg n "$name" '
-    .contracts[] | select(.name == $n) |
-    (.touches_files // [])[]
-  ' "$CONTRACTS_FILE" \
-    | grep -E '(^|/)test(s)?/|\.test\.|\.spec\.|_test\.' \
-    | while IFS= read -r rel; do
-        [ -z "$rel" ] && continue
-        echo "$WORK/$rel"
-      done
 }
 
 # Run cf-pi-postmortem.sh and stash output as a file path. Returns the path.
@@ -323,58 +297,25 @@ if ! echo "$report_head" | grep -q '^## Summary' || \
 fi
 echo "[shard $SHARD_ID] gate 1 ok"
 
-# -------- 8. gate 2: grep guard ----------------------------------------
+# -------- 8. survivors: contracts this shard both declared and reported done ----
+# Survivors = (declared in this shard) ∩ (claimed Completed in the report).
+# The former "gate 2 grep guard" -- which matched each contract's prose `expect`
+# from contracts.json literally against the test source -- was removed: it
+# mechanically checked a non-deterministic validation question (does this test
+# capture the intent?), a category error that spuriously demoted virtually every
+# well-written test. Verification ("do the tests pass") is gate 3's deterministic
+# job; whether the tests meaningfully cover the contract is a judgement for the
+# Review phase, not a per-shard grep.
 
 declared_names=$(shard_contract_names)
-claimed_names=$(completed_contracts)
-
-# Survivors after gate 2; demoted go to affected list.
-gate2_survivors=""
-gate2_demoted=""
-
-for cname in $claimed_names; do
-  # Only consider names that belong to this shard.
-  if ! echo "$declared_names" | grep -qxF "$cname"; then
-    continue
-  fi
-
-  expects=$(contract_expects "$cname")
-  if [ -z "$expects" ]; then
-    # No non-trivial expects -- grep guard cannot fire; pass through.
-    gate2_survivors="$gate2_survivors${gate2_survivors:+
+survivors=""
+for cname in $(completed_contracts); do
+  if echo "$declared_names" | grep -qxF "$cname"; then
+    survivors="$survivors${survivors:+
 }$cname"
-    continue
-  fi
-
-  test_files=$(contract_test_files "$cname")
-  if [ -z "$test_files" ]; then
-    gate2_demoted="$gate2_demoted${gate2_demoted:+
-}$cname: gate2 no candidate test file in touches_files"
-    continue
-  fi
-
-  hit=0
-  while IFS= read -r expect_val; do
-    [ -z "$expect_val" ] && continue
-    while IFS= read -r tf; do
-      [ -z "$tf" ] && continue
-      [ -f "$tf" ] || continue
-      if grep -q -F -- "$expect_val" "$tf"; then
-        hit=1
-        break 2
-      fi
-    done <<< "$test_files"
-  done <<< "$expects"
-
-  if [ "$hit" -eq 1 ]; then
-    gate2_survivors="$gate2_survivors${gate2_survivors:+
-}$cname"
-  else
-    gate2_demoted="$gate2_demoted${gate2_demoted:+
-}$cname: gate2 no test assertion matched non-trivial expects"
   fi
 done
-echo "[shard $SHARD_ID] gate 2 ok (survivors=$(echo "$gate2_survivors" | grep -c . || true) demoted=$(echo "$gate2_demoted" | grep -c . || true))"
+echo "[shard $SHARD_ID] survivors=$(echo "$survivors" | grep -c . || true)"
 
 # -------- 9. gate 3: test execution (with at most one re-dispatch) -----
 
@@ -411,7 +352,7 @@ if [ "$TEST_RC" -ne 0 ]; then
       # Persistent failure => NEEDS_REPLAN, all this shard's contracts affected.
       affected=$(shard_contract_names | awk '{print $0 ": gate3 test fail (persistent)"}')
       pm=$(do_postmortem)
-      write_outcome NEEDS_REPLAN test-fail-persistent "$gate2_survivors" "$affected" "$pm" "-"
+      write_outcome NEEDS_REPLAN test-fail-persistent "$survivors" "$affected" "$pm" "-"
       echo "[shard $SHARD_ID] NEEDS_REPLAN test-fail-persistent"
       exit 2
     fi
@@ -438,7 +379,7 @@ fi
 if [ -n "$undeclared" ]; then
   undecl_csv=$(printf '%s' "$undeclared" | tr '\n' ',' | sed 's/,$//')
   affected=$(shard_contract_names | awk '{print $0 ": gate-scope undeclared_file_touched"}')
-  write_outcome NEEDS_REPLAN undeclared_file_touched "$gate2_survivors" "$affected" "-" "$undecl_csv"
+  write_outcome NEEDS_REPLAN undeclared_file_touched "$survivors" "$affected" "-" "$undecl_csv"
   echo "[shard $SHARD_ID] NEEDS_REPLAN undeclared_file_touched ($undecl_csv)"
   exit 2
 fi
@@ -450,7 +391,7 @@ git -C "$WORK" diff "$BASE_HEAD" > "$DIFF_FILE" 2>/dev/null || true
 
 # -------- 12. write PASS outcome ---------------------------------------
 
-# Final survived list = gate2 survivors, plus demoted entries pushed to affected.
-write_outcome PASS none "$gate2_survivors" "$gate2_demoted" "-" "-"
+# All contracts this shard declared + reported survived (gates 1+3 ok, scope ok).
+write_outcome PASS none "$survivors" "" "-" "-"
 echo "[shard $SHARD_ID] PASS"
 exit 0
