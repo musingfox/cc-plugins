@@ -1,0 +1,16 @@
+{
+  "description": "Spiral deterministic gate — blocks `git commit` while a spiral turn is active and its checks fail. Dormant otherwise (no active turn → all commits pass).",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/gate.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

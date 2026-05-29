@@ -91,6 +91,21 @@ Experimental agentic workflow based on the **Context + Goal + Tools** principle:
 /plugin install context-flow
 ```
 
+### Spiral (Experimental)
+
+Development as a spiral of **converge → diverge**, built on one axiom: the non-deterministic world has only opinions, the deterministic world has only right/wrong — sort each piece of work correctly.
+- **Two roles, isolated**: a **Convergence** subagent (vague idea → code + tests) and an independent **Divergence** subagent (judge against intent + adversarially hunt holes). Fresh context guarantees the judge never saw how the builder reasoned.
+- **The machine**: a deterministic commit-gate hook blocks `git commit` when tests/lint fail — *a failing gate means not done*, enforced (not at the model's discretion) and bypass-proof.
+- **The human is the decision-maker**: owns the criteria (approve the Specification-by-Example) and the STOP (ship, continue, or reframe), via in-flow gates.
+- **Single command**: `/spiral "goal"` runs one turn — formalize → human-approve → build → gate → diverge → human-decide.
+
+See `spiral/docs/concept.md` for the full concept.
+
+**Installation:**
+```bash
+/plugin install spiral
+```
+
 ### gog (Google Workspace)
 
 Interact with Google Workspace services via the [gogcli](https://github.com/steipete/gogcli) CLI:

@@ -1,0 +1,22 @@
+{
+  "name": "spiral",
+  "version": "0.1.0",
+  "description": "[Experimental] Spiral — converge a vague idea into code, diverge into the next idea: a deterministic commit gate (the machine), an independent adversarial judge (Divergence), and the human as decision-maker",
+  "author": {
+    "name": "Nick Huang",
+    "email": "nick12703990@gmail.com"
+  },
+  "repository": "https://github.com/musingfox/cc-plugins",
+  "homepage": "https://github.com/musingfox/cc-plugins/tree/main/spiral",
+  "keywords": [
+    "spiral",
+    "convergence",
+    "divergence",
+    "deterministic-gate",
+    "human-in-the-loop",
+    "contract-first",
+    "specification-by-example"
+  ],
+  "license": "MIT",
+  "commands": ["./commands/"]
+}

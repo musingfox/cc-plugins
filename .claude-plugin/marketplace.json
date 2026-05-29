@@ -41,6 +41,11 @@
       "description": "[Experimental] Contract-driven development pipeline with human-in-the-loop decision gating — agents defined by Context + Goal + Tools, not roles"
     },
     {
+      "name": "spiral",
+      "source": "./spiral",
+      "description": "[Experimental] Spiral — converge a vague idea into code, diverge into the next idea: a deterministic commit gate (the machine), an independent adversarial judge (Divergence), and the human as decision-maker"
+    },
+    {
       "name": "gog",
       "source": "./gog",
       "description": "Google Workspace CLI skills — Gmail, Calendar, and Drive via gogcli (gog)"
