@@ -21,10 +21,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 session="$1"
 load_cf_pi_env "$session"
 
-# Idempotent: if env.sh already has REPO_ROOT, the worktree was created earlier
-# in this session — just emit $WORK and exit. Lets /cf orchestrator and
-# pi-driver both call this without double-creation.
-if grep -q '^REPO_ROOT=' "$session/env.sh" 2>/dev/null; then
+# Idempotent: if $WORK already exists and is a registered git worktree (or a
+# scratch dir in non-git mode), just emit $WORK and exit. Check on-disk reality
+# rather than env.sh contents -- the env-grep proxy false-positives when callers
+# (e.g. cf-pi-shard.sh seeding per-shard env) write REPO_ROOT into env.sh as an
+# inheritance hint before this script ever runs.
+if [ -n "${REPO_ROOT:-}" ]; then
+  # Git mode: real check is whether $WORK is a live worktree.
+  if [ -d "$WORK" ] && git -C "$WORK" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "$WORK"
+    exit 0
+  fi
+elif [ -d "$WORK" ]; then
+  # Scratch mode: dir presence is the only signal.
   echo "$WORK"
   exit 0
 fi

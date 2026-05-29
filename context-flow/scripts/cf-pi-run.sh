@@ -10,8 +10,9 @@
 # Exit:    0 = PASS, 1 = FAIL, 2 = NEEDS_REPLAN
 #
 # Lifecycle (in order):
-#   1. cf-pi-brief.sh        assemble brief
-#   2. cf-pi-worktree.sh     create worktree + branch
+#   1. cf-pi-worktree.sh     create worktree + branch (BEFORE brief, so brief's
+#                            Environment block can include WORK/CF_BRANCH/BASE_HEAD)
+#   2. cf-pi-brief.sh        assemble brief
 #   3. cf-pi-probe.sh        liveness probe
 #   4. cf-pi-dispatch.sh     background Pi
 #   5. poll loop             cf-pi-poll.sh once per ~30s, max 70 rounds
@@ -169,16 +170,8 @@ do_postmortem() {
   echo "$out"
 }
 
-# -------- 1. brief ------------------------------------------------------
-
-echo "[shard $SHARD_ID] assembling brief"
-if ! "$SCRIPTS/cf-pi-brief.sh" "$SHARD_SESSION" "$GOAL" "$CONSTRAINTS" "$TEST_RUNNER" >/dev/null; then
-  write_outcome FAIL brief-assembly "" "" "-" "-"
-  echo "[shard $SHARD_ID] FAIL brief-assembly"
-  exit 1
-fi
-
-# -------- 2. worktree ---------------------------------------------------
+# -------- 1. worktree (MUST run before brief so BASE_HEAD/CF_BRANCH/WORK
+#               appear correctly in the brief's Environment block) -----
 
 echo "[shard $SHARD_ID] setting up worktree"
 "$SCRIPTS/cf-pi-worktree.sh" "$SHARD_SESSION" >/dev/null
@@ -186,6 +179,15 @@ echo "[shard $SHARD_ID] setting up worktree"
 # Worktree appended REPO_ROOT/BASE_BRANCH/BASE_HEAD to env.sh; re-source.
 load_cf_pi_env "$SHARD_SESSION"
 load_cf_flow_env "$FLOW_SESSION"
+
+# -------- 2. brief ------------------------------------------------------
+
+echo "[shard $SHARD_ID] assembling brief"
+if ! "$SCRIPTS/cf-pi-brief.sh" "$SHARD_SESSION" "$GOAL" "$CONSTRAINTS" "$TEST_RUNNER" >/dev/null; then
+  write_outcome FAIL brief-assembly "" "" "-" "-"
+  echo "[shard $SHARD_ID] FAIL brief-assembly"
+  exit 1
+fi
 
 # -------- 3. probe ------------------------------------------------------
 
