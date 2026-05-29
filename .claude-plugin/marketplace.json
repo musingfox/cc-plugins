@@ -79,6 +79,11 @@
       "name": "discord-webhook",
       "source": "./discord-webhook",
       "description": "Send Discord webhook notifications with plain text or rich Embed format, multi-webhook routing"
+    },
+    {
+      "name": "pi-dispatch",
+      "source": "./pi-dispatch",
+      "description": "[Experimental] Offload heavy work to Pi's cheap/fast models — a dispatcher subagent + dispatch.sh so Claude only writes briefs and reads summaries, saving tokens"
     }
   ]
 }

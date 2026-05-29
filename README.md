@@ -207,6 +207,20 @@ Send Discord webhook notifications from Claude Code:
 /plugin install discord-webhook
 ```
 
+### pi-dispatch (Experimental)
+
+Offload heavy work to [Pi](https://github.com/badlogic/pi-mono)'s cheap/fast models so Claude only writes briefs and reads summaries — saving tokens:
+- **Dispatcher subagent (`pi-dispatcher`)**: runs on a cheap model (`haiku`); takes a self-contained brief, invokes the script, returns a tight summary + an output-file path — never the full result
+- **`pi-dispatch.sh`**: routes one brief to a cheap/fast Pi model (`--provider`/`--model`, default `google/gemini-2.5-flash-lite`), writes the result to a file, prints its path
+- **Token-saving by design**: main thread issues the instruction and collects the path; all reading/reasoning/generation happens inside Pi, off Claude's context
+- **Configurable routing**: `PI_PROVIDER` / `PI_MODEL` env vars override the cheap-model defaults
+- **Prerequisite**: `pi` CLI installed and authenticated
+
+**Installation:**
+```bash
+/plugin install pi-dispatch
+```
+
 ### Readability
 
 Enhances AI-generated text readability:
