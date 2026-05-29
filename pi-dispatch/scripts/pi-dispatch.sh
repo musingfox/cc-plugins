@@ -13,9 +13,8 @@
 #
 # Stdout (returns instantly, does NOT wait for Pi):
 #   OUTPUT=<absolute path to result file>     <- the handle the caller reads later
-#   PID=<background pi pid>
-#   STATUSFILE=<path to done-marker (pi's exit code lands here when it finishes)>
-#   RUNDIR=<per-run dir holding result/stderr/pid/done>
+#   PID=<background pi pid>                    <- REAL pi pid (no subshell wrapper)
+#   RUNDIR=<per-run dir holding result/stderr/pid/start>
 #
 # Routing (cheap/fast by default; override via env):
 #   PI_PROVIDER  default: google
@@ -26,8 +25,10 @@
 #     shell expansion of a large brief hangs Pi.
 #   - stdout (the result) and stderr (diagnostics) go to SEPARATE files.
 #     Never merge them — no 2>and1 here, on purpose.
-#   - pi runs in a background subshell; its real exit code is captured with `|| rc=$?`
-#     and persisted to the done-marker so set -e cannot silently swallow a failure.
+#   - Background pi DIRECTLY (`pi … &`) so $! is pi's REAL pid — never a subshell
+#     wrapper, whose pid would be the subshell, not pi. That real pid is what
+#     pi-stop.sh kills (process tree included). There is NO done-marker: pi-poll.sh
+#     decides OK/FAIL from process-exit + result content + a pi-side error scan.
 
 set -euo pipefail
 
@@ -43,7 +44,7 @@ SESSION_DIR="$RUNDIR/sessions"
 OUTPUT_FILE="$RUNDIR/result.md"
 STDERR_FILE="$RUNDIR/pi.stderr.log"
 PID_FILE="$RUNDIR/pi.pid"
-DONE_FILE="$RUNDIR/done"
+START_FILE="$RUNDIR/pi-start.ts"
 mkdir -p "$SESSION_DIR"
 
 # Normalize the brief into a file so we can hand it to Pi via @file (never via
@@ -55,21 +56,20 @@ else
   printf '%s\n' "$BRIEF" > "$BRIEF_FILE"
 fi
 
-# Launch Pi in the BACKGROUND. The subshell inherits `set -e`, so pi MUST sit in
-# an `|| rc=$?` list — otherwise a non-zero pi exit aborts the subshell before the
-# done-marker is written and the failure is lost silently. result -> stdout file,
-# diagnostics -> separate stderr file (streams stay split; no 2>and1 merge).
-(
-  rc=0
-  pi -p \
-     --provider "$PROVIDER" \
-     --model "$MODEL" \
-     --session-dir "$SESSION_DIR" \
-     @"$BRIEF_FILE" \
-     "Read the brief above and complete it. Output only the result." \
-     > "$OUTPUT_FILE" 2> "$STDERR_FILE" || rc=$?
-  printf '%s\n' "$rc" > "$DONE_FILE"
-) &
+# Record the start wall-clock (epoch seconds). pi-poll.sh reads this same start
+# file to compute elapsed for wall-clock + no-marker-grace decisions.
+date +%s > "$START_FILE"
+
+# Launch Pi in the BACKGROUND, DIRECTLY (no subshell wrapper). $! is therefore the
+# REAL pi pid — exactly what pi-stop.sh needs to kill the whole tree. result ->
+# stdout file, diagnostics -> separate stderr file (streams stay split; no 2>and1).
+pi -p \
+   --provider "$PROVIDER" \
+   --model "$MODEL" \
+   --session-dir "$SESSION_DIR" \
+   @"$BRIEF_FILE" \
+   "Read the brief above and complete it. Output only the result." \
+   > "$OUTPUT_FILE" 2> "$STDERR_FILE" &
 PI_PID=$!
 printf '%s\n' "$PI_PID" > "$PID_FILE"
 disown
@@ -77,5 +77,4 @@ disown
 # Return the handle immediately — do NOT block on Pi.
 echo "OUTPUT=$OUTPUT_FILE"
 echo "PID=$PI_PID"
-echo "STATUSFILE=$DONE_FILE"
 echo "RUNDIR=$RUNDIR"
