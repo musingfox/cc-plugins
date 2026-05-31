@@ -27,8 +27,12 @@
 #     Never merge them — no 2>and1 here, on purpose.
 #   - Background pi DIRECTLY (`pi … &`) so $! is pi's REAL pid — never a subshell
 #     wrapper, whose pid would be the subshell, not pi. That real pid is what
-#     pi-stop.sh kills (process tree included). There is NO done-marker: pi-poll.sh
-#     decides OK/FAIL from process-exit + result content + a pi-side error scan.
+#     pi-stop.sh kills (process tree included). Success is confirmed by a sentinel
+#     (__PI_DISPATCH_DONE__) that pi itself prints as the LAST line of its result;
+#     pi-poll.sh treats a process-exit WITH that trailing sentinel as OK, and a
+#     process-exit WITHOUT it (e.g. SIGKILL mid-write) as a truncated FAIL. The
+#     sentinel comes from pi via the prompt — NOT from a shell wrapper — so the
+#     backgrounded pid stays pi's real pid.
 
 set -euo pipefail
 
@@ -68,7 +72,7 @@ pi -p \
    --model "$MODEL" \
    --session-dir "$SESSION_DIR" \
    @"$BRIEF_FILE" \
-   "Read the brief above and complete it. Output only the result." \
+   "Read the brief above and complete it. Output only the result. Then, on a final line by itself, print exactly this sentinel and nothing after it: __PI_DISPATCH_DONE__" \
    > "$OUTPUT_FILE" 2> "$STDERR_FILE" &
 PI_PID=$!
 printf '%s\n' "$PI_PID" > "$PID_FILE"

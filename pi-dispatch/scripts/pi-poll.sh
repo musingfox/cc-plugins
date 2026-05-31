@@ -26,10 +26,17 @@
 #   no fresh output     STALL    -> STATUS=FAIL
 #   pi-side error       ERROR    -> STATUS=FAIL
 #
-# There is NO done-marker. OK vs FAIL after exit comes from: result file non-empty
-# AND no "errorMessage" in the session log / stderr. The dead-but-no-result case
-# (pi killed mid-run) is bounded by a no-marker grace so it cannot loop RUNNING
-# forever — past the grace it becomes terminal STATUS=FAIL.
+# Success is gated by a SENTINEL: OK after exit requires the trailing line of the
+# result to be __PI_DISPATCH_DONE__ (printed by pi itself per the launch prompt)
+# AND no quoted-key "errorMessage" in the session log / stderr. A process that
+# exited WITHOUT the trailing sentinel (e.g. SIGKILL mid-write) is truncated, not
+# success. The dead-but-no-sentinel case is bounded by a no-marker grace so it
+# cannot loop RUNNING forever — past the grace it becomes terminal STATUS=FAIL.
+#
+# On a terminal FAIL detected while pi is still ALIVE (TIMEOUT / STALL / pi-side
+# ERROR), this script first calls pi-stop.sh to cancel the orphan pi tree, then
+# emits STATUS=FAIL — the cancel is closed in the script layer, not left to the
+# agent. The dead branch needs no kill (the process already exited).
 #
 # Tunables (numeric, env-overridable):
 #   PI_WALL_CLOCK_S        hard elapsed ceiling while alive   (default 900)
@@ -37,6 +44,14 @@
 #   PI_NO_MARKER_GRACE_S   grace for dead-but-empty result    (default 30)
 
 set -uo pipefail
+
+# Locate our own script dir so we can invoke the sibling pi-stop.sh to cancel an
+# orphan pi on a terminal FAIL (closed in the script layer, not via the agent).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Success sentinel: pi prints this as the LAST line of its result when it finishes
+# cleanly (see pi-dispatch.sh launch prompt). A trailing-region match gates OK.
+SENTINEL='__PI_DISPATCH_DONE__'
 
 HANDLE="${1:?usage: pi-poll.sh HANDLE (RUNDIR or OUTPUT path)}"
 
@@ -77,11 +92,18 @@ kill -0 "$PI_PID" 2>/dev/null
 rc=$?
 
 # Result size + a pi-side error scan (session log + stderr) shared by both branches.
+# The error scan keys on the QUOTED JSON field "errorMessage" so prose that merely
+# mentions the word errorMessage in the result/log body is NOT a false ERROR.
 SZ=$(wc -c < "$OUTPUT_FILE" 2>/dev/null || echo 0)
 SESSION_JSONL=$(ls -t "$SESSION_DIR"/*.jsonl 2>/dev/null | head -1)
 PI_ERROR=0
-if [ -n "$SESSION_JSONL" ] && grep -q 'errorMessage' "$SESSION_JSONL" 2>/dev/null; then PI_ERROR=1; fi
-if grep -q 'errorMessage' "$STDERR_FILE" 2>/dev/null; then PI_ERROR=1; fi
+if [ -n "$SESSION_JSONL" ] && grep -q '"errorMessage"' "$SESSION_JSONL" 2>/dev/null; then PI_ERROR=1; fi
+if grep -q '"errorMessage"' "$STDERR_FILE" 2>/dev/null; then PI_ERROR=1; fi
+
+# Sentinel-at-tail probe: did pi finish cleanly (trailing sentinel present)? Check
+# only the trailing region so the sentinel must be at the END of the result.
+SENTINEL_OK=0
+if tail -n 5 "$OUTPUT_FILE" 2>/dev/null | grep -qF "$SENTINEL"; then SENTINEL_OK=1; fi
 
 # ---- PROCESS-STATE-FIRST: the process has EXITED -> judge the result, terminal ----
 if [ "$rc" -ne 0 ]; then
@@ -90,29 +112,36 @@ if [ "$rc" -ne 0 ]; then
     echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE ERROR ${ELAPSED}s"
     exit 0
   fi
-  # Clean exit with real output -> success.
-  if [ "$SZ" -gt 0 ]; then
+  # Clean exit WITH the trailing sentinel -> success. Result size alone is NOT
+  # enough: a SIGKILL mid-write leaves a non-empty but truncated file with no
+  # sentinel, which must FAIL — so success is gated on the sentinel, not on size.
+  if [ "$SENTINEL_OK" -eq 1 ]; then
     echo "STATUS=OK OUTPUT=$OUTPUT_FILE ${ELAPSED}s ${SZ}B"
     exit 0
   fi
-  # Dead with NO result and no error marker = killed mid-run. Bound it with the
-  # no-marker grace so we never loop RUNNING forever (the permanent-RUNNING fix).
-  # ELAPSED grows monotonically (start-ts is fixed on disk), so it always crosses
-  # the grace on a later poll -> terminal FAIL.
+  # Dead with NO trailing sentinel = killed/crashed mid-run (truncated). Bound it
+  # with the no-marker grace so we never loop RUNNING forever (the permanent-
+  # RUNNING fix). ELAPSED grows monotonically (start-ts is fixed on disk), so it
+  # always crosses the grace on a later poll -> terminal FAIL.
   if [ "$ELAPSED" -gt "$NO_MARKER_GRACE" ]; then
-    echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE no-result ${ELAPSED}s grace=${NO_MARKER_GRACE}s"
+    echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE no-sentinel ${ELAPSED}s grace=${NO_MARKER_GRACE}s"
     exit 0
   fi
-  echo "RUNNING settling ${ELAPSED}s (dead, awaiting result within grace=${NO_MARKER_GRACE}s)"
+  echo "RUNNING settling ${ELAPSED}s (dead, awaiting sentinel within grace=${NO_MARKER_GRACE}s)"
   exit 0
 fi
 
 # ---- ALIVE: liveness guards (wall-clock TIMEOUT, stall STALL, pi-side ERROR) ----
+# On any ALIVE-branch terminal FAIL the pi tree is still running, so we CANCEL it
+# (kill via the sibling pi-stop.sh) BEFORE emitting STATUS=FAIL — closing the loop
+# in the script layer so no orphan pi is left behind for the agent to chase.
 if [ "$PI_ERROR" -eq 1 ]; then
+  "$SCRIPT_DIR/pi-stop.sh" "$RUNDIR" >/dev/null 2>&1
   echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE ERROR ${ELAPSED}s"
   exit 0
 fi
 if [ "$ELAPSED" -gt "$WALL_CLOCK" ]; then
+  "$SCRIPT_DIR/pi-stop.sh" "$RUNDIR" >/dev/null 2>&1
   echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE TIMEOUT ${ELAPSED}s wall=${WALL_CLOCK}s"
   exit 0
 fi
@@ -122,9 +151,11 @@ NEWEST="$OUTPUT_FILE"
 MTIME=$(stat -f %m "$NEWEST" 2>/dev/null || stat -c %Y "$NEWEST" 2>/dev/null || echo "$NOW")
 STALE=$((NOW - MTIME))
 if [ "$STALE" -gt "$STALL_THRESHOLD" ]; then
+  "$SCRIPT_DIR/pi-stop.sh" "$RUNDIR" >/dev/null 2>&1
   echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE STALL ${ELAPSED}s stale=${STALE}s thr=${STALL_THRESHOLD}s"
   exit 0
 fi
 
+# Still alive, within all guards, not yet finished — keep polling (non-terminal).
 echo "RUNNING ${ELAPSED}s ${SZ}B stale=${STALE}s"
 exit 0

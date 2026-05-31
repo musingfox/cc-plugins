@@ -46,7 +46,9 @@ Loop short `pi-poll.sh` calls (one per round, small Bash timeout, brief sleep be
 Each call prints exactly one line:
 - `RUNNING` — Pi still working; sleep briefly and poll again (non-terminal).
 - `STATUS=OK OUTPUT=<path>` — Pi finished cleanly; stop polling, go to step 3.
-- `STATUS=FAIL OUTPUT=<path>` — Pi exited non-zero or the handle broke; stop polling. Report failure to main (note: result file may be empty/partial; the run's `pi.stderr.log` in `$RUNDIR` holds diagnostics).
+- `STATUS=FAIL OUTPUT=<path>` — terminal non-OK (exited bad, TIMEOUT, STALL, pi-side ERROR, or truncated with no sentinel); stop polling. For the still-alive failures (TIMEOUT / STALL / ERROR) `pi-poll.sh` has ALREADY invoked `pi-stop.sh` to cancel the orphan pi tree before printing the line — you do not need to kill anything. Report failure to main (note: result file may be empty/partial; the run's `pi.stderr.log` in `$RUNDIR` holds diagnostics).
+
+If you ever abort the poll loop early yourself (e.g. you decide to stop before a terminal `STATUS=` line), call `"$SCRIPTS/pi-stop.sh" "$RUNDIR"` first so no orphan pi is left running.
 
 Stop the loop the moment a `STATUS=` line appears. Keep the round count bounded — if it stays `RUNNING` far past a reasonable budget, report that as a stall rather than looping forever.
 
