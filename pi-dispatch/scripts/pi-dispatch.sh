@@ -13,26 +13,33 @@
 #
 # Stdout (returns instantly, does NOT wait for Pi):
 #   OUTPUT=<absolute path to result file>     <- the handle the caller reads later
-#   PID=<background pi pid>                    <- REAL pi pid (no subshell wrapper)
-#   RUNDIR=<per-run dir holding result/stderr/pid/start>
+#   PID=<background wrapper pid (== PGID)>     <- the perl setsid wrapper's pid
+#   RUNDIR=<per-run dir holding result/stderr/pid/pgid/rc/start>
 #
 # Routing (cheap/fast by default; override via env):
 #   PI_PROVIDER  default: google
 #   PI_MODEL     default: gemini-2.5-flash-lite
+#
+# Process-group model (macOS-first; darwin has no `setsid` binary):
+#   We launch pi through a perl POSIX::setsid THIN WRAPPER, backgrounded + disowned.
+#   perl setsid() makes the wrapper a NEW session + process-group LEADER, so its
+#   PGID equals its own pid (and bash's $! is that same pid) — pi and every bash/
+#   tool descendant it spawns inherit this PGID. We record it to pi.pgid; pi-stop.sh
+#   group-kills `-$PGID` to take down the WHOLE tree (grandchildren included).
+#
+#   The wrapper runs pi via perl system() (NOT exec — exec would replace perl and
+#   leave nobody to record the exit code). When pi exits, the wrapper translates
+#   pi's real wait-status into a shell-convention rc (128+signal if signalled, else
+#   the plain exit code) and writes it to the `rc` file. pi-poll.sh reads `rc` to
+#   judge OK (rc==0) vs FAIL. A group-killed run
+#   never reaches the rc write (the wrapper, as group leader, dies too), so an
+#   ABSENT rc on a dead process is the truncated/killed FAIL signal.
 #
 # Hard rules:
 #   - Pass the brief via @"$BRIEF_FILE" — never via "$(cat $BRIEF_FILE)";
 #     shell expansion of a large brief hangs Pi.
 #   - stdout (the result) and stderr (diagnostics) go to SEPARATE files.
 #     Never merge them — no 2>and1 here, on purpose.
-#   - Background pi DIRECTLY (`pi … &`) so $! is pi's REAL pid — never a subshell
-#     wrapper, whose pid would be the subshell, not pi. That real pid is what
-#     pi-stop.sh kills (process tree included). Success is confirmed by a sentinel
-#     (__PI_DISPATCH_DONE__) that pi itself prints as the LAST line of its result;
-#     pi-poll.sh treats a process-exit WITH that trailing sentinel as OK, and a
-#     process-exit WITHOUT it (e.g. SIGKILL mid-write) as a truncated FAIL. The
-#     sentinel comes from pi via the prompt — NOT from a shell wrapper — so the
-#     backgrounded pid stays pi's real pid.
 
 set -euo pipefail
 
@@ -48,6 +55,8 @@ SESSION_DIR="$RUNDIR/sessions"
 OUTPUT_FILE="$RUNDIR/result.md"
 STDERR_FILE="$RUNDIR/pi.stderr.log"
 PID_FILE="$RUNDIR/pi.pid"
+PGID_FILE="$RUNDIR/pi.pgid"
+RC_FILE="$RUNDIR/rc"
 START_FILE="$RUNDIR/pi-start.ts"
 mkdir -p "$SESSION_DIR"
 
@@ -61,24 +70,49 @@ else
 fi
 
 # Record the start wall-clock (epoch seconds). pi-poll.sh reads this same start
-# file to compute elapsed for wall-clock + no-marker-grace decisions.
+# file to compute elapsed for wall-clock + no-rc-grace decisions.
 date +%s > "$START_FILE"
 
-# Launch Pi in the BACKGROUND, DIRECTLY (no subshell wrapper). $! is therefore the
-# REAL pi pid — exactly what pi-stop.sh needs to kill the whole tree. result ->
-# stdout file, diagnostics -> separate stderr file (streams stay split; no 2>and1).
-pi -p \
-   --provider "$PROVIDER" \
-   --model "$MODEL" \
-   --session-dir "$SESSION_DIR" \
-   @"$BRIEF_FILE" \
-   "Read the brief above and complete it. Output only the result. Then, on a final line by itself, print exactly this sentinel and nothing after it: __PI_DISPATCH_DONE__" \
-   > "$OUTPUT_FILE" 2> "$STDERR_FILE" &
-PI_PID=$!
-printf '%s\n' "$PI_PID" > "$PID_FILE"
+# Launch Pi through the perl POSIX::setsid wrapper, BACKGROUNDED + disowned.
+#
+# The wrapper (perl one-liner):
+#   1. POSIX::setsid() — become a new session + process-group LEADER. After this
+#      getpgrp()==$$, so the wrapper's pid IS the PGID that pi + descendants share.
+#   2. system(pi …) — run pi as a child, blocking until it exits. stdout/stderr are
+#      already redirected to their own separate files by the shell below (streams
+#      stay split on purpose; stdout and stderr are never merged).
+#   3. translate pi's wait-status to a shell-convention rc and write it to `rc`:
+#        signalled -> 128 + signal ; otherwise -> exit code (status >> 8).
+#      A group-kill of -$PGID destroys the wrapper too, so it never gets here — an
+#      absent `rc` on a dead process is exactly the killed/truncated FAIL signal.
+perl -MPOSIX -e '
+  POSIX::setsid();
+  my $rcfile = shift @ARGV;
+  my $status = system(@ARGV);
+  my $rc;
+  if ($status == -1)        { $rc = 127; }                 # could not exec pi
+  elsif ($status & 127)     { $rc = 128 + ($status & 127); } # killed by signal
+  else                      { $rc = $status >> 8; }          # normal exit code
+  open(my $fh, ">", $rcfile) or exit 255;
+  print $fh "$rc\n";
+  close($fh);
+' "$RC_FILE" \
+  pi -p \
+     --provider "$PROVIDER" \
+     --model "$MODEL" \
+     --session-dir "$SESSION_DIR" \
+     @"$BRIEF_FILE" \
+     "Read the brief above and complete it. Output only the result." \
+  > "$OUTPUT_FILE" 2> "$STDERR_FILE" &
+WRAP_PID=$!
+# setsid makes PGID == the wrapper's own pid, and $! is that wrapper pid, so the
+# wrapper pid serves as BOTH the liveness handle (pi.pid) and the kill group
+# (pi.pgid). pi-poll.sh probes `kill -0 pi.pid`; pi-stop.sh group-kills -pi.pgid.
+printf '%s\n' "$WRAP_PID" > "$PID_FILE"
+printf '%s\n' "$WRAP_PID" > "$PGID_FILE"
 disown
 
 # Return the handle immediately — do NOT block on Pi.
 echo "OUTPUT=$OUTPUT_FILE"
-echo "PID=$PI_PID"
+echo "PID=$WRAP_PID"
 echo "RUNDIR=$RUNDIR"
