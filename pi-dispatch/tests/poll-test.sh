@@ -3,13 +3,18 @@
 # network, deterministic. Builds artificial fixture RUNDIRs on disk and asserts the
 # EXACT STATUS= line pi-poll.sh emits for each.
 #
-# Cases:
-#   (1) rc=0 + non-empty result + no error event            -> STATUS=OK
+# Cases (clean-success WHITELIST: rc==0 AND non-empty result AND terminal=="stop"):
+#   (1) rc=0 + non-empty result + terminal stop             -> STATUS=OK
 #   (2) rc=7                                                 -> STATUS=FAIL (rc/exit)
 #   (3) no rc file + dead pid + start-ts past grace          -> STATUS=FAIL ... no-rc
-#   (4a) jsonl carries an error EVENT ("stopReason":"error") -> STATUS=FAIL (ERROR)
-#   (4b) result.md merely QUOTES "errorMessage" but jsonl is clean -> STATUS=OK
-#        (proves we key on the error EVENT, not free-answer prose)
+#   (4a) last assistant stopReason == error                  -> STATUS=FAIL (ERROR)
+#   (4b) result.md QUOTES "stopReason":"error" but the structural terminal state is a
+#        clean stop                                          -> STATUS=OK
+#        (proves we key on the STRUCTURAL terminal state, not the answer's prose)
+#   (new-empty)   rc=0 + EMPTY result + terminal stop        -> STATUS=FAIL ... empty
+#   (new-recover) intermediate stopReason error, LAST assistant == stop, rc=0,
+#                 non-empty result                           -> STATUS=OK (recovered)
+#   (new-aborted) rc=0 + terminal aborted                    -> NOT clean OK (FAIL/not-stop)
 #   (5) alive pid within thresholds                          -> RUNNING
 #
 # Returns 0 iff every assertion holds.
@@ -49,11 +54,28 @@ make_run() {
   if [ -n "$jsonl" ]; then printf '%s\n' "$jsonl" > "$dir/sessions/run.jsonl"; fi
 }
 
+# A clean run ends on the real pi terminal state "stop" (verified on this darwin host —
+# NOT "end_turn"). An intermediate toolUse turn before it is normal and must NOT taint
+# the verdict, since we read only the LAST assistant message's stopReason.
 CLEAN_JSONL='{"type":"session","id":"s1"}
-{"type":"message","message":{"role":"assistant","stopReason":"end_turn"}}'
+{"type":"message","message":{"role":"assistant","stopReason":"toolUse"}}
+{"type":"message","message":{"role":"assistant","stopReason":"stop"}}'
 
+# The LAST assistant message terminated on error -> not a clean success.
 ERROR_JSONL='{"type":"session","id":"s1"}
 {"type":"message","message":{"role":"assistant","stopReason":"error","errorMessage":"boom"}}'
+
+# RECOVER: an intermediate turn hit error, but the run RECOVERED and the LAST assistant
+# message ended on stop -> clean success (proves we judge the terminal state, not any
+# intermediate error anywhere in the file).
+RECOVER_JSONL='{"type":"session","id":"s1"}
+{"type":"message","message":{"role":"assistant","stopReason":"error","errorMessage":"transient"}}
+{"type":"message","message":{"role":"assistant","stopReason":"stop"}}'
+
+# ABORTED: the LAST assistant message terminated on aborted -> NOT a clean stop. The
+# whitelist must reject it even though rc==0 (defends against terminal-state leakage).
+ABORTED_JSONL='{"type":"session","id":"s1"}
+{"type":"message","message":{"role":"assistant","stopReason":"aborted"}}'
 
 DEAD="$(dead_pid)"
 
@@ -77,11 +99,28 @@ D4="$TMP/c4"; make_run "$D4" "$DEAD" 100 "0" "looks fine" "$ERROR_JSONL"
 OUT="$(bash "$POLL" "$D4")"
 case "$OUT" in STATUS=FAIL*ERROR*) ok "(4a) error-event -> $OUT";; *) bad "(4a) expected STATUS=FAIL ... ERROR, got: $OUT";; esac
 
-# --- (4b) result QUOTES errorMessage but jsonl clean -> STATUS=OK (no false ERROR) ---
+# --- (4b) result QUOTES "stopReason":"error" in its TEXT but the structural terminal
+#         state is a clean stop -> STATUS=OK (we never scan the answer's prose) ---
 D5="$TMP/c5"
-make_run "$D5" "$DEAD" 100 "0" 'Here is a JSON example: {"errorMessage":"sample"} — use errorMessage for failures.' "$CLEAN_JSONL"
+make_run "$D5" "$DEAD" 100 "0" 'Example: a failed turn carries {"stopReason":"error","errorMessage":"sample"}. Use errorMessage to debug.' "$CLEAN_JSONL"
 OUT="$(bash "$POLL" "$D5")"
-case "$OUT" in STATUS=OK*) ok "(4b) prose errorMessage not a false ERROR -> $OUT";; *) bad "(4b) expected STATUS=OK, got: $OUT";; esac
+case "$OUT" in STATUS=OK*) ok "(4b) literal stopReason:error in prose, not a false ERROR -> $OUT";; *) bad "(4b) expected STATUS=OK, got: $OUT";; esac
+
+# --- (new-empty) rc=0 + EMPTY result + terminal stop -> must surface 'empty' (H1) ---
+DE="$TMP/c-empty"; make_run "$DE" "$DEAD" 100 "0" "" "$CLEAN_JSONL"
+OUT="$(bash "$POLL" "$DE")"
+case "$OUT" in *empty*) ok "(new-empty) empty result surfaced -> $OUT";; *) bad "(new-empty) expected output containing 'empty', got: $OUT";; esac
+
+# --- (new-recover) intermediate error then LAST assistant == stop, rc=0, non-empty
+#     -> STATUS=OK (recovered; intermediate error must not fail it) (H2) ---
+DR="$TMP/c-recover"; make_run "$DR" "$DEAD" 100 "0" "the answer is 42" "$RECOVER_JSONL"
+OUT="$(bash "$POLL" "$DR")"
+case "$OUT" in STATUS=OK*) ok "(new-recover) recovered-then-stop -> $OUT";; *) bad "(new-recover) expected STATUS=OK, got: $OUT";; esac
+
+# --- (new-aborted) rc=0 + terminal aborted -> NOT a clean OK (whitelist rejects) ---
+DA="$TMP/c-aborted"; make_run "$DA" "$DEAD" 100 "0" "partial work" "$ABORTED_JSONL"
+OUT="$(bash "$POLL" "$DA")"
+case "$OUT" in STATUS=FAIL*) ok "(new-aborted) aborted not a clean OK -> $OUT";; *) bad "(new-aborted) expected STATUS=FAIL (not-stop), got: $OUT";; esac
 
 # --- (5) alive pid within thresholds -> RUNNING ---
 D6="$TMP/c6"

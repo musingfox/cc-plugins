@@ -11,8 +11,10 @@
 #              Every artifact path is derived deterministically from it; no globbing.
 #
 # Stdout — exactly one of:
-#   STATUS=OK   OUTPUT=<path>   Pi exited rc==0; result present, no pi-side error; terminal.
-#   STATUS=FAIL OUTPUT=<path>   Pi exited rc!=0 / no-rc (killed) / pi-side error; terminal.
+#   STATUS=OK   OUTPUT=<path>   CLEAN-SUCCESS WHITELIST: rc==0 AND non-empty result
+#                               AND terminal state == "stop". Terminal.
+#   STATUS=FAIL OUTPUT=<path>   Anything else: rc!=0 / no-rc (killed) / terminal state
+#                               not "stop" (error/aborted/toolUse) / empty result. Terminal.
 #   RUNNING                     Pi still alive (or settling within grace); KEEP POLLING.
 #
 # Decision order is PROCESS-STATE-FIRST: once the process has exited we judge the
@@ -20,22 +22,30 @@
 # Pi that already finished is terminal regardless of elapsed time. Only while the
 # wrapper process is still ALIVE do the liveness guards (wall-clock, stall) apply.
 #
-# Success is gated on the rc FILE that the perl setsid wrapper writes with pi's REAL
-# exit code (see pi-dispatch.sh). After the wrapper exits:
-#   rc == 0                 -> STATUS=OK   (clean, terminal)
+# Success is a WHITELIST, not just rc. The rc FILE (written by the perl setsid wrapper
+# with pi's REAL exit code, see pi-dispatch.sh) is necessary but NOT sufficient.
+# After the wrapper exits, a clean OK requires ALL of:
+#   rc == 0  AND  result non-empty  AND  terminal state == "stop".
+# Otherwise:
 #   rc != 0                 -> STATUS=FAIL (pi exited bad; rc/exit in the tail)
+#   terminal != "stop"      -> STATUS=FAIL (error/aborted/toolUse — not a clean finish;
+#                              "error" gets the ERROR sub-class)
+#   rc==0 + terminal stop + empty result -> STATUS=FAIL empty (success state, no answer)
 #   NO rc file (past grace) -> STATUS=FAIL no-rc  (group-killed / truncated mid-run:
 #                              the wrapper, group leader, died before writing rc —
 #                              the killed/truncated signal — there is no rc to read)
-# A pi-side ERROR (an error EVENT in the session jsonl) is a secondary safety net
-# overriding even a non-empty result. The dead-but-no-rc case is bounded by a grace
-# so it can never loop RUNNING forever — past the grace it becomes terminal FAIL.
+# The terminal state is the stopReason of the LAST assistant message in the session
+# jsonl, extracted structurally with jq (NOT a whole-file substring scan), so an
+# intermediate error/toolUse turn that later RECOVERS to "stop" is a clean success.
+# The dead-but-no-rc case is bounded by a grace so it can never loop RUNNING forever.
 #
-# Three-state terminal sub-classes surfaced in the diagnostic tail:
-#   (rc != 0)           STATUS=FAIL
-#   wall-clock exceeded TIMEOUT  -> STATUS=FAIL
-#   no fresh output     STALL    -> STATUS=FAIL
-#   pi-side error event ERROR    -> STATUS=FAIL
+# Terminal FAIL sub-classes surfaced in the diagnostic tail:
+#   (rc != 0)                    STATUS=FAIL  exit rc=N
+#   wall-clock exceeded TIMEOUT  STATUS=FAIL  (ALIVE liveness guard)
+#   no fresh output     STALL    STATUS=FAIL  (ALIVE liveness guard)
+#   terminal == error   ERROR    STATUS=FAIL  (dead-branch whitelist)
+#   terminal not "stop"          STATUS=FAIL  not-stop (dead-branch whitelist)
+#   empty result                 STATUS=FAIL  empty    (dead-branch whitelist)
 #
 # On a terminal FAIL detected while the wrapper is still ALIVE (TIMEOUT / STALL /
 # pi-side ERROR), this script first calls pi-stop.sh to group-kill the orphan pi
@@ -94,15 +104,24 @@ ELAPSED=$((NOW - START))
 kill -0 "$PI_PID" 2>/dev/null
 alive_rc=$?
 
-# Result size + a pi-side error-EVENT scan of the session jsonl, shared by both
-# branches. macOS pi records a failed turn as a message event carrying
-# "stopReason":"error" (verified on this darwin host) — we key on that error-event
-# marker, NOT on free-answer prose, so a result that merely discusses the word
-# errorMessage is never a false ERROR.
+# Result size + the TERMINAL STATE of the run, shared by both branches.
+#
+# TERMINAL STATE (the load-bearing success signal): the stopReason of the LAST
+# assistant message in the session jsonl. Verified across 40 real pi sessions on
+# this darwin host, a run's last-assistant terminal state is one of
+# stop / aborted / error / toolUse — and ONLY "stop" is a clean success. We extract
+# it STRUCTURALLY with jq (host has jq, verified), keying on the final assistant
+# message's terminal state — NOT on any whole-file substring scan and NOT on the
+# free-answer prose. A result that merely quotes an error marker in its text, or a
+# run that hit an intermediate toolUse/error turn but RECOVERED and ended on stop,
+# is judged purely by that final structural state. jq reads the jsonl FILE (never
+# stdin), so it can never block this poll.
 SZ=$(wc -c < "$OUTPUT_FILE" 2>/dev/null || echo 0)
 SESSION_JSONL=$(ls -t "$SESSION_DIR"/*.jsonl 2>/dev/null | head -1)
-PI_ERROR=0
-if [ -n "$SESSION_JSONL" ] && grep -q '"stopReason":"error"' "$SESSION_JSONL" 2>/dev/null; then PI_ERROR=1; fi
+TERMINAL=""
+if [ -n "$SESSION_JSONL" ]; then
+  TERMINAL=$(jq -rn '[ inputs | select(.type=="message" and .message.role=="assistant") | .message.stopReason ] | last // empty' "$SESSION_JSONL" 2>/dev/null)
+fi
 
 # Read pi's real exit code if the wrapper has written it.
 PI_RC=""
@@ -110,15 +129,30 @@ PI_RC=""
 
 # ---- PROCESS-STATE-FIRST: the wrapper has EXITED -> judge the result, terminal ----
 if [ "$alive_rc" -ne 0 ]; then
-  # pi-side error event wins: even a non-empty result is a failure if the turn errored.
-  if [ "$PI_ERROR" -eq 1 ]; then
-    echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE ERROR ${ELAPSED}s"
-    exit 0
-  fi
-  # rc file present -> the wrapper recorded pi's real exit. rc==0 is the only OK.
+  # rc file present -> the wrapper recorded pi's real exit. A clean OK requires the
+  # WHOLE whitelist: rc==0 AND a non-empty result AND the terminal state == "stop".
   if [ -n "$PI_RC" ]; then
     if [ "$PI_RC" -eq 0 ]; then
-      echo "STATUS=OK OUTPUT=$OUTPUT_FILE ${ELAPSED}s ${SZ}B rc=0"
+      # rc==0 but the run did NOT end cleanly on "stop" (error/aborted/toolUse/empty
+      # terminal) -> NOT a clean success. Surface the real terminal state; never a
+      # silent OK. "error" gets the explicit ERROR sub-class for the diagnostic tail.
+      if [ "$TERMINAL" = "error" ]; then
+        echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE ERROR terminal=error ${ELAPSED}s"
+        exit 0
+      fi
+      if [ "$TERMINAL" != "stop" ]; then
+        echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE terminal=${TERMINAL:-none} not-stop ${ELAPSED}s"
+        exit 0
+      fi
+      # Terminal == stop, but the result file is EMPTY -> rc/terminal say success yet
+      # there is no answer. Do NOT pass it off as a clean OK: emit the literal `empty`
+      # marker so main can tell the difference from a real, non-empty success.
+      if [ "$SZ" -eq 0 ]; then
+        echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE empty 0B terminal=stop ${ELAPSED}s"
+        exit 0
+      fi
+      # Full whitelist satisfied: rc==0 AND non-empty AND terminal==stop.
+      echo "STATUS=OK OUTPUT=$OUTPUT_FILE ${ELAPSED}s ${SZ}B rc=0 terminal=stop"
       exit 0
     fi
     echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE exit rc=$PI_RC ${ELAPSED}s"
@@ -136,15 +170,16 @@ if [ "$alive_rc" -ne 0 ]; then
   exit 0
 fi
 
-# ---- ALIVE: liveness guards (pi-side ERROR, wall-clock TIMEOUT, stall STALL) ----
+# ---- ALIVE: liveness guards (wall-clock TIMEOUT, stall STALL) ----
 # On any ALIVE-branch terminal FAIL the pi tree is still running, so we CANCEL it
 # (group-kill via the sibling pi-stop.sh) BEFORE emitting STATUS=FAIL — closing the
 # loop in the script layer so no orphan pi is left behind for the agent to chase.
-if [ "$PI_ERROR" -eq 1 ]; then
-  "$SCRIPT_DIR/pi-stop.sh" "$RUNDIR" >/dev/null 2>&1
-  echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE ERROR ${ELAPSED}s"
-  exit 0
-fi
+#
+# NOTE: no pi-side ERROR check while ALIVE. Terminal state is the LAST assistant
+# message's stopReason; a still-running pi may be mid-turn on a transient
+# error/toolUse state that it then RECOVERS from and ends on "stop". Judging a live
+# run by an intermediate state would wrongly kill recoverable runs, so the terminal
+# whitelist is applied only once the wrapper has EXITED (the dead branch above).
 if [ "$ELAPSED" -gt "$WALL_CLOCK" ]; then
   "$SCRIPT_DIR/pi-stop.sh" "$RUNDIR" >/dev/null 2>&1
   echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE TIMEOUT ${ELAPSED}s wall=${WALL_CLOCK}s"
