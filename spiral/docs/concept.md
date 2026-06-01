@@ -52,6 +52,14 @@ non-det never disappears; it is pushed onto the **threshold and criteria seams**
 are anchored once by the decision-maker and never re-litigated below. That is what buys
 the machine its purity.
 
+The sort also governs **how much capability each unit deserves**. Det work needs a mechanism,
+not a mind — spend no judgment on it (a script, not a deliberator). Non-det work needs judgment
+in proportion to its opinion-density *and* the cost of being wrong — and never less, for the
+**checker**, than the thing it checks. Whether that capability is a senior versus a junior, or a
+large model versus a small one, the allocation follows the sort, not the volume of work: a big
+pile of mechanical labor still deserves no judgment, and a one-line call that turns the whole
+result deserves the most.
+
 ---
 
 ## 3. The two roles
@@ -77,7 +85,9 @@ Beyond the two motions, two further roles complete the system.
 
 - **The machine** is the deterministic gate. It judges the det world by mechanism — right
   or wrong, no opinion. A failing gate means the pass is **not done**: it cannot be
-  delivered or declared complete. This is the reality floor.
+  delivered or declared complete. This is the reality floor. The machine does not build
+  itself: drawing its checks from the spec is a non-det act, so an independent hand forges it
+  from the "what" *before the build exists* (§8) — never the builder, who would test itself.
 - **The decision-maker** is the anchor, and owns what no other role may take:
   1. the **criteria** — what the formalized "what" is, what "good enough" means;
   2. the **navigation** — when to keep oscillating, when to descend a layer (§5), when to
@@ -158,6 +168,22 @@ wanted" and hunting holes are opinion-judgments, so the judge must be independen
 builder. The Convergence role authored the idea→result translation and is structurally
 blind to its own misreading of the goal; only an independent Divergence role, and the
 decision-maker who owns the goal, sit outside that translation.
+
+But the machine itself has a blind spot the axiom hides: *executing* the gate is mechanical
+and bias-immune, yet **drawing its lines** — which checks, which thresholds, what counts as
+the behavior — is an opinion-laden act. So "Convergence may check its own result" means it
+may *run* the machine, never *build* it. If the builder authors the gate that judges its
+build, the bias the machine exists to remove leaks back in through the machine's
+construction: a gate can be written to grep for a string the build trivially contains,
+passing green while the behavior is broken (the §2 mistake, now mechanized). So the gate's
+**authorship** is its own independent act — a separate hand forges the gate from the spec
+*before the build exists*, so the machine cannot be bent to fit the code. It is not the
+builder's (it would test itself), and not the driver's either: constructing the machine is
+hands-work, distinct from advancing the turn. And independent means *derived*, not relabeled:
+if the builder hands over a runnable gate the constructor merely transcribes, construction
+still sits inside the builder. The constructor must draw the checks from the *what* — the
+Examples — by its own judgment of the *how*. The machine is bias-immune only once it exists;
+making it is not.
 
 Convergence does; Divergence judges; the machine gates; the decision-maker anchors and
 navigates the layers.
