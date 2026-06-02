@@ -4,6 +4,5 @@
   "description": "[Experimental] Offload heavy work to Pi's cheap/fast models — a dispatcher subagent + a dispatch.sh script so Claude only issues briefs and collects summaries, saving tokens",
   "author": {
     "name": "Nick Huang"
-  },
-  "agents": ["./agents/"]
+  }
 }
