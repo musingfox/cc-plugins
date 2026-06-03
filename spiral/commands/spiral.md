@@ -41,16 +41,26 @@ Invoke the Convergence role to formalize the seed:
 
 It returns a VERDICT and EXAMPLES (each with a verifiable handle describing *what* would
 prove it) plus VERIFY_INFO. It does **not** hand you a runnable gate — only the information
-to author one. That separation is deliberate (see step 2).
+to author one. That separation is deliberate (see step 2). Each Example also carries how any
+open choice in it was sorted by **cost to reverse**: a *two-way door* comes with the sane default
+it already chose (the loop, not you, corrects these); a *one-way door* comes flagged for the
+human, framed by the door it opens/closes. Retrievable facts it resolved by investigation, or — if
+it could not — reported as "needs X" (a fact to fetch, never a vote to take).
 
 - If `VERDICT: INFEASIBLE` → present the reasons to the human and **STOP this turn**. Build
   nothing. (Infeasible is a complete, legitimate outcome.)
 
 ### 2 — Human gate: approve the criteria
 
-The human owns what "done" means. Use **AskUserQuestion** to present the Examples and let
-them **approve / edit / abort**. Do not proceed on your own opinion of the Examples. On
-approval, freeze the Examples and persist them into `.spiral/state.json`.
+The human owns what "done" means — but ratifying every criterion every turn is the
+re-litigation §2 forbids, and it is what makes the human rubber-stamp. So surface **by cost to
+reverse**, not exhaustively. Freeze the two-way-door Examples on their chosen defaults (list them
+in one line each — the human can still override any, but the loop is the cheaper corrector). Use
+**AskUserQuestion** only on the **one-way doors**, each framed by the door it opens/closes (not a
+bare value), so the human judges a commitment they actually own. If a FORMALIZE "needs X" fact is
+still open, surface it too — as a fact to fetch, not a vote. If there are no one-way doors, present
+one compact confirm ("freeze these N criteria — approve / edit"). On approval, freeze the Examples
+and persist them into `.spiral/state.json`.
 
 ### 2b — EXAMINE: forge the gate from the spec
 
@@ -111,12 +121,17 @@ Only after a green commit, invoke the Divergence role:
 > commit ref. It is independent — pass it the artifact and goal, not Convergence's notes.
 
 It returns a VERDICT (opinion on goal-fulfilment), HOLES (each with a proposed next-turn
-gate check), and NEXT_SEEDS.
+gate check **and a ship-blocking / parkable tag** — whether shipping it commits to something
+expensive to reverse, or is a cheap later fix), and NEXT_SEEDS.
 
 ### 6 — Human gate: STOP or continue
 
-Clear the active marker (`rm -f .spiral/active`) so the gate goes dormant. Use
-**AskUserQuestion** to present the Divergence feedback and let the human decide:
+Clear the active marker (`rm -f .spiral/active`) so the gate goes dormant. Lead with the
+Divergence **VERDICT** as the headline (goal met or not), then use **AskUserQuestion** framed as
+the navigation call itself — **ship / continue / reframe** — with the **ship-blocking** holes as
+the reasons to weigh. Keep the **parkable** holes collapsed (one line: "N parkable — expand to
+see"); they are next-turn `accepted_holes` candidates, not material to the stop/go. The human
+decides:
 
 - **STOP** — ship. End the spiral. (Feedback is not "fix now"; the human owns when good
   enough is good enough.)
@@ -133,8 +148,13 @@ Clear the active marker (`rm -f .spiral/active`) so the gate goes dormant. Use
 
 ## Rules
 
-- **The human, not you, owns every non-deterministic decision**: the criteria (step 2) and
-  the STOP (step 6). You surface options via AskUserQuestion; you do not decide for them.
+- **The human owns the non-deterministic decisions — but you surface them by cost to reverse,
+  not exhaustively.** A *one-way door* (expensive to reverse once later turns build on it) and the
+  *STOP* are the human's, upfront, via AskUserQuestion — you never decide these for them. A
+  *two-way door* (cheap to reverse) is anchored *lazily*: the Convergence default rides, the loop
+  surfaces it if wrong, and the human overrides at a later gate. Ratifying every reversible
+  criterion every turn is the re-litigation §2 forbids — and what trains the human to rubber-stamp.
+  A retrievable fact is nobody's vote: it gets investigated, never asked.
 - **Never bypass the gate.** A red gate means not done. No `--no-verify`, no editing the gate
   to pass, no committing around it.
 - **The gate is forged by a build-blind EXAMINE instance — not the build instance, not you.**
