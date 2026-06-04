@@ -1,5 +1,5 @@
 ---
-description: "Spiral — run one turn of converge → independent gate forging → deterministic gate → independent diverge → human decision, then loop or stop. Two roles run as isolated subagents (Convergence builds, and via a separate build-blind EXAMINE instance forges the gate; Divergence judges); the human is the decision-maker."
+description: "Spiral — run one turn of converge → independent gate forging → deterministic gate → independent diverge, then auto-continue or escalate to the human only on genuine stop/go (ship-blocking holes), goal-met, or reframe. Two roles run as isolated subagents (Convergence builds, and via a separate build-blind EXAMINE instance forges the gate; Divergence judges); the human owns STOP and reframe."
 argument-hint: "<vague goal>"
 allowed-tools: [Agent, Read, Write, Bash, Glob, Grep, AskUserQuestion]
 ---
@@ -30,6 +30,49 @@ Read `.spiral/state.json` if it exists (carries `goal`, `turn`, `examples`, `gat
 
 ---
 
+## Surfacing a decision
+
+Every AskUserQuestion in the turn below routes through this. A bare-keyword question — a few
+labels with no context — is the failure mode this section exists to kill: the human can't own a
+call they can't see. Earn their attention with a brief, render it, *then* ask.
+
+1. **Escalation test — is this even the human's call?** Stopping the loop to ask is not free; a
+   question that didn't need asking trains the human to rubber-stamp (§2). Escalate only when the
+   decision is genuinely theirs (§4): a **one-way door**, a **criteria gap**, a **STOP / ship
+   decision** (a ship opportunity *or* ship-blocking holes that force a stop/go), or a
+   **frame-break**. A two-way door or a retrievable fact is *not* a question —
+   take the sane default / go fetch it and advance, logging one line. Cost to reverse breaks ties:
+   cheap to undo → you decide; expensive → the human decides.
+
+2. **Author the brief** (`.spiral/decision-turn-N.md`) — *you* write it (surfacing is the
+   driver's job; the roles return data, never human-facing prose). It must carry enough for the
+   human to actually own the call, not rubber-stamp:
+   - **The decision** — framed as the call itself (ship / continue / reframe; freeze *this*
+     one-way door), never a bare value.
+   - **Why now** — what forces the question *this* turn.
+   - **The stakes** — what choosing wrong commits to, and how expensive it is to reverse.
+   - **Each option with its trade-offs** — pros/cons framed by cost to reverse, drawn from the
+     Divergence holes (each tagged ship-blocking/parkable with a proposed next check) or the
+     FORMALIZE one-way-door framing. No option without its consequence.
+
+3. **Render it for review** — a real decision deserves better than a wall of terminal text:
+
+   ```bash
+   bash "${CLAUDE_PLUGIN_ROOT}/scripts/render-decision.sh" \
+     .spiral/decision-turn-N.md spiral-decision-turn-N
+   ```
+
+   The script locates the sibling `viz` plugin's renderer across install layouts, renders the
+   markdown to HTML, opens it in the browser, and prints the path — report the path. If viz is
+   absent or you are headless, it prints the full brief inline instead: still a complete brief,
+   never bare keywords.
+
+4. **Then ask** — call **AskUserQuestion** with concise labels that *point at the brief* (the
+   brief carries the reasoning; the options carry only the choice). "Other" always lets the human
+   write their own path.
+
+---
+
 ## One turn
 
 ### 1 — Converge: FORMALIZE
@@ -55,11 +98,12 @@ it could not — reported as "needs X" (a fact to fetch, never a vote to take).
 The human owns what "done" means — but ratifying every criterion every turn is the
 re-litigation §2 forbids, and it is what makes the human rubber-stamp. So surface **by cost to
 reverse**, not exhaustively. Freeze the two-way-door Examples on their chosen defaults (list them
-in one line each — the human can still override any, but the loop is the cheaper corrector). Use
-**AskUserQuestion** only on the **one-way doors**, each framed by the door it opens/closes (not a
-bare value), so the human judges a commitment they actually own. If a FORMALIZE "needs X" fact is
-still open, surface it too — as a fact to fetch, not a vote. If there are no one-way doors, present
-one compact confirm ("freeze these N criteria — approve / edit"). On approval, freeze the Examples
+in one line each — the human can still override any, but the loop is the cheaper corrector). The
+**one-way doors** are the only criteria to escalate, each framed by the door it opens/closes (not a
+bare value), so the human judges a commitment they actually own — route them through **Surfacing a
+decision** (brief → render → ask). If a FORMALIZE "needs X" fact is still open, surface it too — as
+a fact to fetch, not a vote. If there are no one-way doors, present one compact confirm ("freeze
+these N criteria — approve / edit") — no brief needed. On approval, freeze the Examples
 and persist them into `.spiral/state.json`.
 
 ### 2b — EXAMINE: forge the gate from the spec
@@ -110,8 +154,8 @@ git commit -m "spiral(turn N): <goal one-liner>"
 - **Commit succeeds** → the gate is green; proceed to Divergence.
 - **Commit blocked** (the hook exits 2 with `SPIRAL GATE FAILED`) → the build is *not done*.
   Feed the gate output back into a new `BUILD:` invocation (oscillation). Cap at **2**
-  rebuilds; if still red, surface the failure to the human and let them decide (fix path,
-  edit Examples, or stop). Never bypass the gate.
+  rebuilds; if still red, surface the failure through **Surfacing a decision** and let them
+  decide (fix path, edit Examples, or stop). Never bypass the gate.
 
 ### 5 — Diverge: independent judgment
 
@@ -124,14 +168,29 @@ It returns a VERDICT (opinion on goal-fulfilment), HOLES (each with a proposed n
 gate check **and a ship-blocking / parkable tag** — whether shipping it commits to something
 expensive to reverse, or is a cheap later fix), and NEXT_SEEDS.
 
-### 6 — Human gate: STOP or continue
+### 6 — Human gate: STOP or continue — *only when the call is genuinely the human's*
 
-Clear the active marker (`rm -f .spiral/active`) so the gate goes dormant. Lead with the
-Divergence **VERDICT** as the headline (goal met or not), then use **AskUserQuestion** framed as
-the navigation call itself — **ship / continue / reframe** — with the **ship-blocking** holes as
-the reasons to weigh. Keep the **parkable** holes collapsed (one line: "N parkable — expand to
-see"); they are next-turn `accepted_holes` candidates, not material to the stop/go. The human
-decides:
+Clear the active marker (`rm -f .spiral/active`) so the gate goes dormant. Then apply the
+**escalation test**: stopping the loop to ask *every* turn is the rubber-stamp trap §2 forbids, so
+escalate only when the navigation is genuinely the human's (§4). Exactly three cases earn the ask:
+
+- **Goal met** — the Divergence VERDICT says the goal is fulfilled → a ship opportunity, the
+  human's to take.
+- **Ship-blocking holes present** — a real stop/go tension (shipping commits to something
+  expensive to reverse).
+- **Dead-end / reframe candidate** — Divergence signals the layer is exhausted → a frame-break
+  the human owns (§7).
+
+**Otherwise — not done, no ship-blocking holes, a clear NEXT_SEED — do not ask.** Auto-continue:
+append parkable holes to `accepted_holes`, set the seed to the chosen NEXT_SEED, increment `turn`,
+append to `feedback_log`, `log` one line on what you are continuing toward, and go to step 1. The
+human can interrupt the loop at any time; **STOP and reframe are never automatic** — only
+"continue with an obvious next seed" is.
+
+When you do escalate, run it through **Surfacing a decision** (brief → render → ask), framed as the
+navigation call — **ship / continue / reframe** — with the **ship-blocking** holes as the reasons
+to weigh and the **parkable** holes collapsed to one line ("N parkable — expand to see"; next-turn
+`accepted_holes` candidates, not material to the stop/go). The human decides:
 
 - **STOP** — ship. End the spiral. (Feedback is not "fix now"; the human owns when good
   enough is good enough.)
@@ -155,6 +214,14 @@ decides:
   surfaces it if wrong, and the human overrides at a later gate. Ratifying every reversible
   criterion every turn is the re-litigation §2 forbids — and what trains the human to rubber-stamp.
   A retrievable fact is nobody's vote: it gets investigated, never asked.
+- **Escalate less, but make each escalation thick.** Fewer questions and richer ones are the same
+  discipline, not two. Every AskUserQuestion goes through **Surfacing a decision**: pass the
+  escalation test (is this genuinely the human's call?), author a brief (the decision, why now, the
+  stakes, each option's trade-offs by cost to reverse), render it to HTML for review, *then* ask
+  with labels that point at the brief. A bare-keyword question — labels with no context — is a bug.
+  At step 6 the loop **auto-continues** when there is a clear next seed and no ship-blocking hole;
+  it asks only on goal-met, ship-blocking holes, or a reframe candidate. STOP and reframe are never
+  automatic.
 - **Never bypass the gate.** A red gate means not done. No `--no-verify`, no editing the gate
   to pass, no committing around it.
 - **The gate is forged by a build-blind EXAMINE instance — not the build instance, not you.**

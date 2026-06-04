@@ -1,6 +1,6 @@
 {
   "name": "spiral",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "[Experimental] Spiral — converge a vague idea into code, diverge into the next idea: a deterministic commit gate (the machine), an independent adversarial judge (Divergence), and the human as decision-maker",
   "author": {
     "name": "Nick Huang",
@@ -18,5 +18,6 @@
     "specification-by-example"
   ],
   "license": "MIT",
+  "dependencies": ["viz"],
   "commands": ["./commands/"]
 }
