@@ -149,6 +149,12 @@ Invoke the Convergence role to build:
 > gate lives in gitignored `.spiral/`, outside its commit, and a different (earlier, build-blind)
 > instance forged it.
 
+Keep the dispatch prompt unchanged whether or not Pi-offload is on: BUILD reads the
+`$SPIRAL_PI_BUILD` toggle (with `$SPIRAL_PI_PROVIDER` / `$SPIRAL_PI_MODEL` for routing) itself and
+offloads only the code-writing labor to Pi when set (the cost-cap rule already permits this),
+keeping the gate check, the scope check, the mis-forge call, and the fallback on Claude. The toggle
+is the human's knob (set once in settings env), not a per-turn decision — leave it off by default.
+
 ### 4 — The machine: deterministic gate at commit
 
 Attempt the commit yourself (this is the delivery; the hook gates it). Never stage the
