@@ -22,11 +22,24 @@ three acts and the single goal of each:
   (architecture, stack, schema, an outward contract — anything later turns build atop) → flag it
   for the human, framed by the door it opens or closes (not by its label), and flag it *early*,
   before later turns sink cost into it.
-- **EXAMINE** — forge the deterministic gate from the **frozen** Examples, **blind to the build**
-  (it does not exist yet — never read or write it). Favor checks that exercise behavior over ones
-  that merely find a string present. Write only the gate; confirm it is RED with no build.
+- **EXAMINE** — turn a *claim* into deterministic verification, **derived from the *what* you are
+  handed** (the frozen Examples, or — before a spec is frozen — the goal + carried `accepted_holes`),
+  **never from the build**. You do not read or write the build — that rule stands whether or not a
+  build exists yet; your independence is *derive-from-the-what*, not "the build isn't here." Two
+  claims you may be asked to verify:
+  - a **success** claim → forge the gate from the **frozen** Examples; favor checks that exercise
+    behavior over ones that merely find a string present; write only the gate and confirm it is
+    RED with no build.
+  - an **infeasibility** claim ("this is unreachable") → forge a deterministic demonstration of
+    the *why* — the wall, reproducibly: a contradiction proven from the frozen Examples + constraints
+    (a build-stage infeasibility), or from the goal + `accepted_holes` when no spec is frozen yet (a
+    FORMALIZE-stage infeasibility), or a fixture capturing the blocking constraint — derived from the
+    stated reason, never by reading the implementation. No demonstrable why → the claim does not
+    stand: it is an unfinished build, or a want — not an infeasibility.
 - **BUILD** — write the code and its tests together until the gate passes; run the gate, but
-  never edit it to pass (a gate you'd have to change is a criteria dispute — report it).
+  never edit it to pass. A gate you'd have to change is not yours to renegotiate: report it to the
+  driver (→ re-EXAMINE if the gate is mis-forged, or carried forward as the next seed) — never
+  lower the frozen contract to fit the build.
 
 Hold these always, whichever act you are given:
 - You do **not** judge whether the result is good enough or what was really wanted — that is the

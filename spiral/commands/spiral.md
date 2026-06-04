@@ -90,8 +90,17 @@ it already chose (the loop, not you, corrects these); a *one-way door* comes fla
 human, framed by the door it opens/closes. Retrievable facts it resolved by investigation, or — if
 it could not — reported as "needs X" (a fact to fetch, never a vote to take).
 
-- If `VERDICT: INFEASIBLE` → present the reasons to the human and **STOP this turn**. Build
-  nothing. (Infeasible is a complete, legitimate outcome.)
+- If `VERDICT: INFEASIBLE` → this is **feedback, not a stop** — but a *claim* that the plan and
+  what is buildable conflict, and in that conflict neither the goal nor FORMALIZE's verdict is
+  automatically trustworthy, so it is **verified, not taken on faith** (the same two layers a build
+  clears). Build nothing. First **EXAMINE the why** — dispatch EXAMINE to forge a deterministic
+  demonstration that the goal is genuinely unreachable (a contradiction in the goal + carried
+  `accepted_holes`, derived from FORMALIZE's stated reasons). **No demonstrable why → FORMALIZE gave
+  up too early → re-FORMALIZE** (cap **1**; if it returns INFEASIBLE again with still no demonstrable
+  why, escalate — FORMALIZE insists but cannot prove it, the human's call). With the why verified,
+  hand the **verified infeasibility + goal** to **Divergence** (step 5) to judge a frame-level
+  **dead end** (→ §7, the human's reframe) vs a viable reframed next seed (auto-continue — the frame
+  holds, only the approach was wrong).
 
 ### 2 — Human gate: approve the criteria
 
@@ -114,10 +123,10 @@ build-blind instance:
 
 > `Agent(subagent_type: "spiral:convergence")` with a task beginning `EXAMINE:` then the
 > **frozen Examples**, the carried `accepted_holes`, the VERIFY_INFO from FORMALIZE, and the
-> gate path `.spiral/gate-turn-N.sh`. It forges the deterministic checks from the spec alone
-> (this turn's build does not exist yet), confirms the gate is RED, and returns the path. It
-> writes only the gate — never implementation, and never reads the build it is gating. Its
-> independence is the fresh context + the timing (before BUILD), not a different role.
+> gate path `.spiral/gate-turn-N.sh`. It forges the deterministic checks from the spec alone,
+> confirms the gate is RED, and returns the path. It writes only the gate — never implementation,
+> and never reads the build it is gating (that rule holds whether or not a build exists yet). Its
+> independence is *derive-from-the-spec* + fresh context, not a different role.
 
 Point the active marker at the EXAMINE gate and sanity-run it (running a check to confirm its
 state is review — yours to do — not authoring):
@@ -151,22 +160,57 @@ git add -A && git reset -q -- .spiral 2>/dev/null
 git commit -m "spiral(turn N): <goal one-liner>"
 ```
 
-- **Commit succeeds** → the gate is green; proceed to Divergence.
-- **Commit blocked** (the hook exits 2 with `SPIRAL GATE FAILED`) → the build is *not done*.
-  Feed the gate output back into a new `BUILD:` invocation (oscillation). Cap at **2**
-  rebuilds; if still red, surface the failure through **Surfacing a decision** and let them
-  decide (fix path, edit Examples, or stop). Never bypass the gate.
+- **Commit succeeds** → the gate is green; a shippable result exists; proceed to Divergence.
+- **Commit blocked** (the hook exits 2 with `SPIRAL GATE FAILED`) → there is no shippable code
+  *this turn* — but the spiral still advances on the feedback (the gate gates the *commit*, never
+  the *turn*). Do **not** grind to green and do **not** touch the frozen goal. An optional bounded
+  rebuild is fine for an obviously unfinished build (oscillation, cap **2**); beyond that, classify
+  what the red means:
+  - **The gate looks mis-forged** — it tests the wrong behavior or sets an impossible check; the
+    machine is wrong, not the build. The *build instance is an interested party* in this claim and
+    you are forward-biased, so do not adjudicate it alone: **re-EXAMINE** is a fresh, build-blind
+    re-forge from the *unchanged* frozen Examples (it derives from the spec, never reads the build,
+    even though the build now exists), and Divergence (step 5) gets a say on whether the gate was
+    genuinely mis-forged. Cap re-EXAMINE at **1** per turn; rebuild against the re-forged gate and
+    re-attempt the commit — if still red after that one re-forge, the red is a discovery, not
+    another re-forge. Re-forging a broken gate is fixing the machine, not editing the goal.
+  - **Otherwise the red is a discovery** — the approach errors or the contract is unreachable as
+    framed. This is a *claim* ("infeasible"), not yet a delivery: it must clear the same two layers
+    a success does. First **EXAMINE the why** — dispatch Convergence's EXAMINE on the infeasibility
+    claim to forge a deterministic demonstration of the wall (a spec-level contradiction, or a
+    fixture capturing the blocking constraint). **No demonstrable why → it is an unfinished build
+    (rebuild, within the cap) or a want (rejected — never a delivery); if the rebuild cap is already
+    spent and there is still no why, the build can neither pass nor prove why it can't — escalate to
+    the human (a genuine stuck, step 6's test), do not loop.** With the why verified, the red-discovery
+    *is* a legitimate delivery: write the verified why to `feedback_log` and proceed to Divergence
+    (step 5) to judge it — do **not** auto-continue on your say-so alone; the claim is judged, not
+    self-certified. (A turn needs no green commit to be real — concept §6 — but it does need its
+    claim verified and judged.)
+
+  Never bypass the gate (no `--no-verify`, no editing the gate to pass).
 
 ### 5 — Diverge: independent judgment
 
-Only after a green commit, invoke the Divergence role:
+Divergence judges the turn's **result**, whether or not it committed — a no-commit red-discovery
+(step 4, with its *why* already EXAMINE-verified) is a result too. The independent judge is most
+needed exactly where no commit exists: "red → infeasible" is the driver's inference, and only an
+independent role can tell a real wall from the driver's preference wearing a verified-but-irrelevant
+red. Invoke the Divergence role:
 
-> `Agent(subagent_type: "spiral:divergence")` with the goal, the approved Examples, and the
-> commit ref. It is independent — pass it the artifact and goal, not Convergence's notes.
+> `Agent(subagent_type: "spiral:divergence")` with the goal, the Examples (if any were frozen), and
+> either the **commit ref** (a green turn) or the **EXAMINE-verified infeasibility** — the
+> demonstrated *why*, plus the red gate output for a BUILD-red (a no-commit turn). It is independent
+> — pass it the artifact/claim and goal, not Convergence's notes.
 
-It returns a VERDICT (opinion on goal-fulfilment), HOLES (each with a proposed next-turn
-gate check **and a ship-blocking / parkable tag** — whether shipping it commits to something
-expensive to reverse, or is a cheap later fix), and NEXT_SEEDS.
+- **Green turn** → it returns a VERDICT (opinion on goal-fulfilment), HOLES (each with a proposed
+  next-turn gate check **and a ship-blocking / parkable tag** — whether shipping it commits to
+  something expensive to reverse, or is a cheap later fix), and NEXT_SEEDS.
+- **No-commit turn** → it judges whether the infeasibility is **feedback-grounded** (a real wall →
+  a legitimate delivery, with NEXT_SEEDS) or **want-driven** (reject — not a delivery and not a
+  seed: the build could have passed, so it returns to the build — rebuild within the cap, else
+  escalate). On a real wall it signals **dead-end** (→ §7, the human's reframe) vs a real NEXT_SEED.
+  This restocks step 6's triggers on the no-commit path, so the loop can no longer auto-continue on
+  an unjudged red.
 
 ### 6 — Human gate: STOP or continue — *only when the call is genuinely the human's*
 
@@ -176,8 +220,9 @@ escalate only when the navigation is genuinely the human's (§4). Exactly three 
 
 - **Goal met** — the Divergence VERDICT says the goal is fulfilled → a ship opportunity, the
   human's to take.
-- **Ship-blocking holes present** — a real stop/go tension (shipping commits to something
-  expensive to reverse).
+- **Ship-blocking holes present** — a hole that **breaks the working whole** or commits to
+  something expensive to reverse (data corruption, an outward API, security). Not-yet-perfect is
+  not ship-blocking; only *broke what worked* is.
 - **Dead-end / reframe candidate** — Divergence signals the layer is exhausted → a frame-break
   the human owns (§7).
 
@@ -207,6 +252,17 @@ to weigh and the **parkable** holes collapsed to one line ("N parkable — expan
 
 ## Rules
 
+- **The spiral moves forward, continuously — turns are a hand-off, not a checkpoint.** Whatever a
+  turn produces is feedback, and feedback *is* delivery: a turn needs no committed code to advance.
+  Zero code change with one thing learned — "the planned approach is infeasible" — *can be* a
+  complete, legitimate delivery that seeds the next turn (concept §6) — but **only once that claim
+  is verified and judged, never on your say-so**: an infeasibility clears the same two layers a
+  success does — EXAMINE the *why* (det), then Divergence judges it (steps 1, 4, 5). The bias is
+  always forward; you **trust the prior planning** (§2 anchored the criteria — you do not
+  re-litigate them mid-flow), you never modify this turn's frozen goal, and you never agonize over
+  "this turn vs the next" — the answer is always *carry it forward*. The gate gates the *commit*
+  (no shippable code → no commit), never the *turn* — but the turn still advances only on
+  *verified, independently-judged* feedback, never on an unexamined red.
 - **The human owns the non-deterministic decisions — but you surface them by cost to reverse,
   not exhaustively.** A *one-way door* (expensive to reverse once later turns build on it) and the
   *STOP* are the human's, upfront, via AskUserQuestion — you never decide these for them. A
@@ -222,8 +278,9 @@ to weigh and the **parkable** holes collapsed to one line ("N parkable — expan
   At step 6 the loop **auto-continues** when there is a clear next seed and no ship-blocking hole;
   it asks only on goal-met, ship-blocking holes, or a reframe candidate. STOP and reframe are never
   automatic.
-- **Never bypass the gate.** A red gate means not done. No `--no-verify`, no editing the gate
-  to pass, no committing around it.
+- **Never bypass the gate.** A red gate means there is no shippable code — you don't commit broken
+  work. No `--no-verify`, no editing the gate to pass, no committing around it. The spiral still
+  advances on the feedback (step 4), but never by faking green.
 - **The gate is forged by a build-blind EXAMINE instance — not the build instance, not you.**
   FORMALIZE hands over no runnable gate, only Examples + what proves each; a separate Convergence
   instance (EXAMINE act) derives the checks from those frozen Examples, before the build exists,

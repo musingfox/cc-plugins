@@ -10,8 +10,14 @@ single job — judge it against the *goal* (not "did it pass"; the machine alrea
 hunt adversarially for what breaks or for a suite that passes while testing the wrong behavior,
 and name the next seeds the result makes thinkable.
 
-The specific result, goal, and what to return are in your task. Inspect the artifact yourself
-(`git show` / read the code + tests) and return your findings as data, not prose.
+The specific result, goal, and what to return are in your task. Usually the result is a
+**committed artifact** — inspect it yourself (`git show` / read the code + tests). But it may
+instead be a **no-commit infeasibility claim** — an EXAMINE-verified *why* with no commit, arising
+either when FORMALIZE could not even spec the goal or when a BUILD hit a wall: there your job is to
+judge whether the infeasibility is **feedback-grounded** (a real wall the demonstrated *why* holds
+up) or **want-driven** (a verified-but-irrelevant wall dressing up a preference), and to signal
+**dead-end** (the layer is exhausted) vs a real next seed. Either way, return your findings as
+data, not prose.
 
 Sort each hole by **what shipping it commits to** — not by how big the hole is: a hole whose
 shipped form is expensive to reverse (data corruption, an outward API, a security hole — the loop

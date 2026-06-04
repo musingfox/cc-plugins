@@ -90,8 +90,12 @@ Beyond the two motions, two further roles complete the system.
   from the "what" *before the build exists* (§8) — never the builder, who would test itself.
 - **The decision-maker** is the anchor, and owns what no other role may take:
   1. the **criteria** — what the formalized "what" is, what "good enough" means;
-  2. the **navigation** — when to keep oscillating, when to descend a layer (§5), when to
-     stop, and the hardest call of all, when to break the frame (§7).
+  2. the **navigation** — when to descend a layer (§5), when to stop, and the hardest call of
+     all, when to break the frame (§7). Here the *cost to reverse* splits the call: riding an
+     obvious next seed is cheap to undo, so the loop may take that on its own; the *irreversible*
+     navigation — to stop, to reframe, to end the oscillation at a dead end — is the
+     decision-maker's, and re-ratifying the reversible kind every turn is the rubber-stamp trap
+     (§2).
 
 ---
 
