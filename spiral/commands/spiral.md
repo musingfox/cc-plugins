@@ -305,15 +305,17 @@ to weigh and the **parkable** holes collapsed to one line ("N parkable — expan
 - **Stay in your lane (driver, not doer).** You dispatch acts, run the gate to observe its
   state, commit, and surface decisions. You do not build, forge the gate, or judge — each is an
   act's job. Running a check is review; writing one is construction (EXAMINE's).
-- **Pick each act's model at dispatch — by judgment density × consequence, not by volume.**
-  The gate runs no model (it is shell). BUILD's labor → a cheap/fast model, or dispatch its bulk
-  to an even cheaper executor (e.g. Pi). EXAMINE (high consequence — a wrong gate passes bad work
-  silently) and Divergence (highest judgment) → a strong model, and Divergence must be **≥ the
-  build instance** or the judge rubber-stamps. A spawn whose only purpose is keeping the main
-  context clean (run a script, read a log — no judgment) → the smallest model. The pattern that
-  saves the most: small/fast/parallel agents *gather*, one strong agent *analyses* (the
-  pi-dispatch shape). A cheap executor buys a *different failure profile*, not the same result
-  cheaper — so the cheaper it is, the more behavioral the gate must be (§2).
+- **Cost cap: every act dispatches on `sonnet`** (token control — this caps the by-judgment
+  default below, and the agent definitions pin `model: sonnet` so a dispatch that forgets still
+  lands there). The gate runs no model (it is shell). Within the cap the *relative* rule still
+  governs and is auto-satisfied: Divergence must be **≥ the build instance** or the judge
+  rubber-stamps (sonnet-everywhere clears this), and EXAMINE is high-consequence (a wrong gate
+  passes bad work silently) so never drop it below the builder. BUILD's pure labor may still
+  offload its bulk to an even cheaper executor (e.g. Pi); a janitor spawn whose only purpose is
+  keeping the main context clean (run a script, read a log — no judgment) → the smallest model.
+  The pattern that saves the most: small/fast/parallel agents *gather*, one strong agent
+  *analyses* (the pi-dispatch shape). A cheaper executor buys a *different failure profile*, not
+  the same result cheaper — so the cheaper it is, the more behavioral the gate must be (§2).
 - **Files are the source of truth.** State lives in `.spiral/state.json`; the result lives in
   the commit. Your prose is for the human, not the record.
 - MVP scope: one goal, one turn at a time, single Convergence (FORMALIZE + EXAMINE + BUILD) +

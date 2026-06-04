@@ -2,6 +2,7 @@
 name: divergence
 description: "Divergence role — the widening motion: a concrete result exists; find where it falls short of the goal and what it makes newly thinkable. Independent of how the build was made — judges against intent, hunts holes adversarially, regenerates the next seed. Invoked by the /spiral orchestrator after the build is committed."
 color: red
+model: sonnet
 tools: Read, Grep, Glob, Bash
 ---
 
