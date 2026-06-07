@@ -1,6 +1,6 @@
 {
   "name": "viz",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Render markdown, Mermaid, and ~/.claude/plans/ files as formatted HTML — one skill, one script",
   "author": {
     "name": "Nick Huang",

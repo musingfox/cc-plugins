@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DOC_NAME_PLACEHOLDER</title>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    line-height: 1.7; color: #2c2c2c; background: #f5f5f7;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+}
+
+/* -- Top bar -- */
+.topbar {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(255,255,255,0.92); backdrop-filter: blur(10px);
+    border-bottom: 1px solid #e0e0e0; padding: 12px 24px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
+}
+.topbar h1 { font-size: 1.0em; font-weight: 600; flex: 1 0 auto; min-width: 180px; }
+.topbar .pill {
+    font-size: 0.72em; font-weight: 600; color: #2563eb;
+    background: rgba(37,99,235,0.1); padding: 3px 10px; border-radius: 999px;
+}
+.actions { display: flex; gap: 8px; }
+.actions button {
+    padding: 6px 14px; border-radius: 6px; border: 1px solid #2563eb;
+    background: #2563eb; color: white; font: inherit; font-size: 0.85em;
+    cursor: pointer; transition: background 0.15s;
+}
+.actions button:hover { background: #1d4ed8; }
+.actions button.ghost { background: transparent; color: #2563eb; }
+.actions button.ghost:hover { background: rgba(37,99,235,0.08); }
+
+/* -- Document body -- */
+main { max-width: 880px; margin: 28px auto 120px; padding: 0 24px; }
+.brief {
+    background: white; border: 1px solid #e0e0e0; border-radius: 10px;
+    padding: 32px 38px;
+}
+.brief h1, .brief h2, .brief h3 {
+    margin-top: 1.5em; margin-bottom: 0.55em; font-weight: 700;
+    letter-spacing: -0.01em; line-height: 1.35;
+}
+.brief > :first-child { margin-top: 0; }
+.brief h1 { font-size: 1.7em; border-bottom: 1px solid #e8e8e8; padding-bottom: 0.3em; }
+.brief h2 { font-size: 1.3em; border-bottom: 1px solid #f0f0f0; padding-bottom: 0.22em; }
+.brief h3 { font-size: 1.1em; }
+.brief p { margin: 0.7em 0; }
+.brief a { color: #2563eb; text-decoration: none; }
+.brief a:hover { text-decoration: underline; }
+.brief ul, .brief ol { padding-left: 1.5em; margin: 0.6em 0; }
+.brief li { margin: 0.3em 0; }
+.brief code {
+    background: #f0f1f3; padding: 2px 6px; border-radius: 4px;
+    font-family: 'Fira Code', "SFMono-Regular", Consolas, monospace; font-size: 0.85em;
+}
+.brief pre {
+    background: #282c34; color: #abb2bf; padding: 16px; border-radius: 8px;
+    overflow-x: auto; margin: 1.1em 0;
+}
+.brief pre code { background: none; padding: 0; color: inherit; font-size: 0.82em; }
+.brief blockquote {
+    border-left: 3px solid #d0d0d0; margin: 1.1em 0; padding: 0.5em 1.1em;
+    background: #f8f9fa; color: #4a4a4a; border-radius: 0 6px 6px 0;
+}
+.table-wrap { overflow-x: auto; margin: 1.1em 0; border-radius: 8px; border: 1px solid #e0e0e0; }
+.brief table { border-collapse: collapse; width: 100%; }
+.brief th, .brief td { padding: 10px 14px; text-align: left; font-size: 0.9em; }
+.brief th { font-weight: 600; background: #f8f9fa; border-bottom: 2px solid #d0d0d0; white-space: nowrap; }
+.brief td { border-bottom: 1px solid #eee; }
+.brief tr:last-child td { border-bottom: none; }
+.brief hr { border: none; border-top: 1px solid #e8e8e8; margin: 2em 0; }
+.mermaid-shell {
+    border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px;
+    background: white; margin: 1.1em 0; text-align: center; overflow-x: auto;
+}
+
+/* -- Feedback panel -- */
+.decision {
+    background: white; border: 1px solid #e0e0e0; border-radius: 10px;
+    margin-top: 22px; padding: 24px 28px;
+    border-top: 4px solid #2563eb;
+}
+.decision h2 {
+    font-size: 0.78em; text-transform: uppercase; letter-spacing: 0.08em;
+    color: #2563eb; font-weight: 700; margin-bottom: 4px;
+}
+.decision .sub { font-size: 0.86em; color: #888; margin-bottom: 16px; }
+.opts { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+.opt {
+    display: flex; align-items: center; gap: 12px;
+    border: 1.5px solid #e0e0e0; border-radius: 8px; padding: 13px 16px;
+    cursor: pointer; transition: all 0.13s; user-select: none;
+}
+.opt:hover { border-color: #93b4f5; background: #f8faff; }
+.opt.selected { border-color: #2563eb; background: #eff5ff; box-shadow: 0 0 0 1px #2563eb inset; }
+.opt .dot {
+    width: 18px; height: 18px; border-radius: 999px; border: 2px solid #bbb;
+    flex-shrink: 0; transition: all 0.13s; position: relative;
+}
+.opt.selected .dot { border-color: #2563eb; }
+.opt.selected .dot::after {
+    content: ''; position: absolute; inset: 3px;
+    background: #2563eb; border-radius: 999px;
+}
+.opt .label { flex: 1; font-size: 0.96em; font-weight: 500; }
+.opt .rec {
+    font-size: 0.68em; font-weight: 700; color: #047857;
+    background: #ecfdf5; border: 1px solid #a7f3d0;
+    padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.notes-label { font-size: 0.82em; color: #666; font-weight: 600; margin-bottom: 6px; display: block; }
+textarea#notes {
+    width: 100%; min-height: 84px; resize: vertical;
+    border: 1.5px solid #e0e0e0; border-radius: 8px; padding: 12px 14px;
+    font: inherit; font-size: 0.92em; line-height: 1.6; color: inherit;
+    background: #fcfcfd; outline: none; transition: border-color 0.13s;
+}
+textarea#notes:focus { border-color: #2563eb; background: white; }
+.decision-foot {
+    display: flex; align-items: center; gap: 12px; margin-top: 16px;
+}
+.decision-foot .hint { font-size: 0.8em; color: #999; flex: 1; }
+.decision-foot button {
+    padding: 9px 22px; border-radius: 8px; border: 1px solid #2563eb;
+    background: #2563eb; color: white; font: inherit; font-size: 0.92em;
+    font-weight: 600; cursor: pointer; transition: background 0.15s;
+}
+.decision-foot button:hover { background: #1d4ed8; }
+
+/* -- Toast + reload banner (mirror pr-review) -- */
+.toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #1f2937; color: white; padding: 10px 22px; border-radius: 8px;
+    font-size: 0.88em; box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+    transition: transform 0.25s ease-out; pointer-events: none; z-index: 100;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+.reload-banner {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #fef3c7; color: #78350f; padding: 10px 16px; border-radius: 8px;
+    display: flex; gap: 10px; align-items: center;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.14); border: 1px solid #fcd34d;
+    font-size: 0.88em; z-index: 110;
+}
+.reload-banner button {
+    font: inherit; font-size: 0.85em; padding: 5px 12px; border-radius: 6px;
+    border: 1px solid #b45309; background: #b45309; color: white; cursor: pointer;
+}
+.reload-banner button.ghost { background: transparent; color: #78350f; border-color: #d97706; }
+.hidden { display: none !important; }
+
+@media (max-width: 600px) {
+    .topbar { padding: 10px 16px; }
+    main { padding: 0 14px; margin: 16px auto 90px; }
+    .brief { padding: 22px 18px; }
+    .decision { padding: 18px 16px; }
+}
+
+@media (prefers-color-scheme: dark) {
+    body { background: #18181b; color: #d4d4d8; }
+    .topbar { background: rgba(24,24,27,0.92); border-bottom-color: #2e2e33; }
+    .actions button.ghost { color: #60a5fa; }
+    .actions button.ghost:hover { background: rgba(96,165,250,0.12); }
+    .brief, .decision { background: #27272a; border-color: #3e3e44; }
+    .brief h1 { border-bottom-color: #2e2e33; }
+    .brief h2 { border-bottom-color: #2e2e33; }
+    .brief a { color: #60a5fa; }
+    .brief code { background: #18181b; color: #d4d4d8; }
+    .brief blockquote { border-left-color: #3e3e44; background: #222226; color: #a1a1aa; }
+    .table-wrap { border-color: #3e3e44; }
+    .brief th { background: #222226; border-bottom-color: #3e3e44; }
+    .brief td { border-bottom-color: #2e2e33; }
+    .brief hr { border-top-color: #2e2e33; }
+    .mermaid-shell { background: #1f1f23; border-color: #3e3e44; }
+    .decision .sub { color: #a1a1aa; }
+    .opt { border-color: #3e3e44; }
+    .opt:hover { border-color: #3b5b9a; background: #1f2433; }
+    .opt.selected { border-color: #2563eb; background: #1e2a44; }
+    textarea#notes { background: #1f1f23; border-color: #3e3e44; color: #d4d4d8; }
+    textarea#notes:focus { background: #18181b; }
+    .toast { background: #f5f5f7; color: #1f2937; }
+    .reload-banner { background: #422006; color: #fde68a; border-color: #92400e; }
+    .reload-banner button.ghost { color: #fde68a; }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+    <span class="pill" id="badge">回饋</span>
+    <h1 id="title">載入中…</h1>
+    <div class="actions">
+        <button id="save-btn" title="把你的回饋寫回原始 markdown">儲存回饋</button>
+        <button id="export-btn" class="ghost" title="複製更新後的 markdown">複製</button>
+        <button id="download-btn" class="ghost" title="下載為 .md">下載</button>
+    </div>
+</header>
+
+<main>
+    <article class="brief" id="brief"></article>
+    <section class="decision" id="decision-panel"></section>
+</main>
+
+<div class="toast" id="toast"></div>
+<div class="reload-banner hidden" id="reload-banner">
+    <span>檔案在外部被改動。</span>
+    <button id="reload-yes">重新載入</button>
+    <button id="reload-no" class="ghost">保留我的</button>
+</div>
+
+<script>
+window.SRC_B64 = "DOC_BASE64_PLACEHOLDER";
+window.SRC_NAME = "DOC_NAME_PLACEHOLDER";
+window.SRC_PATH = "SOURCE_PATH_PLACEHOLDER";
+window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
+</script>
+<script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+// @inline feedback.model.js
+</script>
+<script>
+(function () {
+    'use strict';
+
+    var M = window.FeedbackModel;
+
+    // Frontmatter-configurable labels, all optional (sensible defaults).
+    var DEFAULTS = {
+        badge: '回饋',
+        panel: '你的回饋',
+        promptWithOptions: '讀完上面後，選一個，按「儲存回饋」寫回給 agent。',
+        promptNotesOnly: '在下方寫下你的回饋，按「儲存回饋」寫回給 agent。',
+        notes_label: '回饋 / 理由（選填）',
+        hint: '存回後，回終端機確認，agent 會讀取你的回饋。'
+    };
+
+    function decodeB64(b64) {
+        var bin = atob(b64);
+        var bytes = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return new TextDecoder('utf-8').decode(bytes);
+    }
+    function escapeHtml(s) {
+        return String(s).replace(/[<>&]/g, function (c) {
+            return c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&amp;';
+        });
+    }
+    function cfg(model, key) {
+        var v = (model.fm[key] || '').trim();
+        return v || DEFAULTS[key];
+    }
+
+    var currentModel = null;
+    var selected = '';        // chosen option label
+    var notesValue = '';
+    var isDirty = false;
+    var dismissedMtime = 0;
+
+    function markDirty() { isDirty = true; }
+
+    function renderBody(body) {
+        var briefEl = document.getElementById('brief');
+        var html = DOMPurify.sanitize(marked.parse(body), {
+            ADD_TAGS: ['pre', 'span'], ADD_ATTR: ['class', 'language']
+        });
+        briefEl.innerHTML = html;
+        // Wrap tables for horizontal scroll
+        briefEl.querySelectorAll('table').forEach(function (t) {
+            if (t.parentElement.classList.contains('table-wrap')) return;
+            var w = document.createElement('div'); w.className = 'table-wrap';
+            t.parentNode.insertBefore(w, t); w.appendChild(t);
+        });
+        // Convert ```mermaid blocks to shells
+        var mermaidNodes = [];
+        briefEl.querySelectorAll('code.language-mermaid').forEach(function (code) {
+            var pre = code.parentElement;
+            var shell = document.createElement('div'); shell.className = 'mermaid-shell';
+            var div = document.createElement('div'); div.className = 'mermaid';
+            div.textContent = code.textContent;
+            shell.appendChild(div);
+            pre.replaceWith(shell);
+            mermaidNodes.push(div);
+        });
+        if (mermaidNodes.length && window.mermaid) {
+            try {
+                window.mermaid.initialize({
+                    startOnLoad: false,
+                    theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default',
+                    securityLevel: 'strict'
+                });
+                window.mermaid.run({ nodes: mermaidNodes });
+            } catch (e) { /* leave source visible on failure */ }
+        }
+    }
+
+    function renderPanel(model) {
+        var panel = document.getElementById('decision-panel');
+        var opts = M.options(model);
+        var rec = (model.fm.recommend || '').trim();
+        selected = (model.fm.choice || '').trim();
+        notesValue = M.getNotes(model);
+
+        panel.innerHTML = '';
+        var h = document.createElement('h2'); h.textContent = cfg(model, 'panel');
+        var sub = document.createElement('div'); sub.className = 'sub';
+        sub.textContent = (model.fm.prompt || '').trim()
+            || (opts.length ? DEFAULTS.promptWithOptions : DEFAULTS.promptNotesOnly);
+        panel.appendChild(h); panel.appendChild(sub);
+
+        if (opts.length) {
+            var list = document.createElement('div'); list.className = 'opts';
+            opts.forEach(function (label) {
+                var row = document.createElement('div');
+                row.className = 'opt' + (label === selected ? ' selected' : '');
+                row.dataset.label = label;
+                var dot = document.createElement('div'); dot.className = 'dot';
+                var lab = document.createElement('div'); lab.className = 'label'; lab.textContent = label;
+                row.appendChild(dot); row.appendChild(lab);
+                if (rec && label === rec) {
+                    var tag = document.createElement('span'); tag.className = 'rec'; tag.textContent = '建議';
+                    row.appendChild(tag);
+                }
+                row.addEventListener('click', function () {
+                    selected = label; markDirty();
+                    list.querySelectorAll('.opt').forEach(function (o) {
+                        o.classList.toggle('selected', o.dataset.label === selected);
+                    });
+                });
+                list.appendChild(row);
+            });
+            panel.appendChild(list);
+        }
+
+        var nl = document.createElement('label'); nl.className = 'notes-label';
+        nl.textContent = cfg(model, 'notes_label'); nl.setAttribute('for', 'notes');
+        var ta = document.createElement('textarea'); ta.id = 'notes';
+        ta.placeholder = '補充說明、保留意見，或要 agent 接著做的事…';
+        ta.value = notesValue;
+        ta.addEventListener('input', function () { notesValue = ta.value; markDirty(); });
+        panel.appendChild(nl); panel.appendChild(ta);
+
+        var foot = document.createElement('div'); foot.className = 'decision-foot';
+        var hint = document.createElement('span'); hint.className = 'hint';
+        hint.textContent = DEFAULTS.hint;
+        var btn = document.createElement('button'); btn.textContent = '儲存回饋';
+        btn.addEventListener('click', function () { saveToServer(); });
+        foot.appendChild(hint); foot.appendChild(btn);
+        panel.appendChild(foot);
+    }
+
+    function applyMarkdown(md, mtime) {
+        currentModel = M.parse(md);
+        document.getElementById('badge').textContent = cfg(currentModel, 'badge');
+        document.getElementById('title').textContent = currentModel.fm.title || '回饋';
+        document.title = currentModel.fm.title || (window.SRC_NAME || 'feedback');
+        renderBody(currentModel.body);
+        renderPanel(currentModel);
+        if (mtime != null) window.SRC_MTIME = String(mtime);
+        isDirty = false; dismissedMtime = 0;
+    }
+
+    function fetchAndApply() {
+        if (!window.SRC_PATH || location.protocol === 'file:') return Promise.resolve(false);
+        return fetch('/api/read?path=' + encodeURIComponent(window.SRC_PATH))
+            .then(function (res) { return res.json().then(function (d) { return { status: res.status, data: d }; }); })
+            .then(function (r) {
+                if (r.status === 200) { applyMarkdown(r.data.content, r.data.mtime); return true; }
+                return false;
+            })
+            .catch(function () { return false; });
+    }
+
+    function checkRemote() {
+        if (!window.SRC_PATH || location.protocol === 'file:') return;
+        fetch('/api/stat?path=' + encodeURIComponent(window.SRC_PATH))
+            .then(function (res) { return res.ok ? res.json() : null; })
+            .then(function (d) {
+                if (!d || d.mtime == null) return;
+                var local = window.SRC_MTIME ? parseFloat(window.SRC_MTIME) : 0;
+                if (d.mtime - local <= 0.001) return;
+                if (isDirty) {
+                    if (d.mtime > dismissedMtime + 0.001) showReloadBanner(d.mtime);
+                } else {
+                    fetchAndApply().then(function (ok) { if (ok) showToast('↻ 已從磁碟重新載入'); });
+                }
+            })
+            .catch(function () {});
+    }
+
+    function showReloadBanner(remoteMtime) {
+        var b = document.getElementById('reload-banner');
+        b.dataset.remoteMtime = String(remoteMtime); b.classList.remove('hidden');
+    }
+    function hideReloadBanner() { document.getElementById('reload-banner').classList.add('hidden'); }
+
+    function showToast(msg) {
+        var t = document.getElementById('toast');
+        t.textContent = msg; t.classList.add('show');
+        clearTimeout(t._timer);
+        t._timer = setTimeout(function () { t.classList.remove('show'); }, 2000);
+    }
+
+    function downloadMarkdown(md) {
+        var blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = (window.SRC_NAME || 'feedback').replace(/^doc-/, '') + '.md';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    }
+
+    function commitFeedback() { M.setFeedback(currentModel, selected, notesValue); }
+
+    function saveToServer() {
+        if (!currentModel) { showToast('還在載入…'); return; }
+        if (!window.SRC_PATH || window.SRC_PATH.indexOf('/') !== 0) {
+            showToast('沒有來源路徑（file:// 開啟）— 改用「複製」貼回 agent');
+            return;
+        }
+        commitFeedback();
+        var md = M.serialize(currentModel);
+        var clientMtime = window.SRC_MTIME ? parseFloat(window.SRC_MTIME) : null;
+        fetch('/api/save', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: window.SRC_PATH, content: md, mtime: isFinite(clientMtime) ? clientMtime : null })
+        }).then(function (res) {
+            return res.json().then(function (data) { return { status: res.status, data: data }; });
+        }).then(function (r) {
+            if (r.status === 200) {
+                window.SRC_MTIME = String(r.data.mtime); isDirty = false;
+                showToast(selected ? ('已儲存：' + selected + ' — 回終端機確認') : '已儲存回饋 — 回終端機確認');
+            } else if (r.status === 409) {
+                window.SRC_MTIME = String(r.data.current_mtime);
+                showToast('檔案在外部被改動 — 再按一次「儲存回饋」覆蓋');
+            } else {
+                showToast('儲存失敗：' + (r.data.error || r.status));
+            }
+        }).catch(function (e) {
+            showToast('儲存失敗：' + e.message + '（server 沒開？改用「複製」）');
+        });
+    }
+
+    window.addEventListener('load', function () {
+        try {
+            if (location.protocol === 'file:') {
+                document.getElementById('save-btn').style.display = 'none';
+            }
+            document.getElementById('save-btn').addEventListener('click', saveToServer);
+            document.getElementById('export-btn').addEventListener('click', function () {
+                if (!currentModel) return;
+                commitFeedback();
+                var out = M.serialize(currentModel);
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(out)
+                        .then(function () { showToast('已複製更新後的 markdown — 貼回給 agent'); })
+                        .catch(function () { downloadMarkdown(out); showToast('剪貼簿被擋 — 改為下載'); });
+                } else { downloadMarkdown(out); showToast('已下載 markdown'); }
+            });
+            document.getElementById('download-btn').addEventListener('click', function () {
+                if (!currentModel) return;
+                commitFeedback(); downloadMarkdown(M.serialize(currentModel)); showToast('已下載 markdown');
+            });
+
+            // Prefer live fetch; embedded base64 is a render-time snapshot.
+            if (window.SRC_PATH && location.protocol !== 'file:') {
+                fetchAndApply().then(function (ok) { if (!ok) applyMarkdown(decodeB64(window.SRC_B64), null); });
+            } else {
+                applyMarkdown(decodeB64(window.SRC_B64), null);
+            }
+
+            document.getElementById('reload-yes').addEventListener('click', function () {
+                hideReloadBanner();
+                fetchAndApply().then(function (ok) { if (ok) showToast('↻ 已從磁碟重新載入'); });
+            });
+            document.getElementById('reload-no').addEventListener('click', function () {
+                var b = document.getElementById('reload-banner');
+                dismissedMtime = parseFloat(b.dataset.remoteMtime || '0') || 0;
+                hideReloadBanner();
+            });
+
+            if (window.SRC_PATH && location.protocol !== 'file:') {
+                setInterval(function () { if (document.visibilityState === 'visible') checkRemote(); }, 2000);
+                document.addEventListener('visibilitychange', function () {
+                    if (document.visibilityState === 'visible') checkRemote();
+                });
+            }
+        } catch (err) {
+            document.body.innerHTML = '<pre style="padding:24px;color:#dc2626;font-family:monospace">'
+                + escapeHtml('Recipe error: ' + (err && err.message ? err.message : err)) + '</pre>';
+            console.error(err);
+        }
+    });
+})();
+</script>
+</body>
+</html>

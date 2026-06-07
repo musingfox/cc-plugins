@@ -17,6 +17,28 @@ recipe-local.
 Out of scope: ship-quality polish on the second recipe. Goal is to expose
 seams, not to add a second flagship.
 
+> **Update (2026-06-07).** The second recipe that actually landed is the
+> generic **`feedback`** recipe (not the `kanban-board` sketched below). It
+> deliberately breaks the `parseModel`/`serializeModel`/`render` contract
+> stated in this doc: the **body is rendered read-only and kept verbatim** —
+> only the human's `choice`/`notes` round-trip through frontmatter. That is
+> itself the seam this doc was hunting: a recipe whose payload is the author's
+> prose does *not* need to pass the body through a model.
+>
+> This reframes the recipe layer: `feedback` is the **generic** shape
+> (render any markdown → collect a structured response → write back), and
+> `pr-review` is the **exception** that genuinely needs a per-domain grammar +
+> full inline editing. New "human reviews a doc and answers" cases should be
+> frontmatter on `feedback`, not a new recipe file. See
+> `lib/recipes/feedback.{html,model.js}` and
+> `skills/viz-render/references/recipes/feedback.md`.
+>
+> Deliberately **not** done (per the Non-goals below, still in force): no
+> control-DSL / form-builder and no lifecycle-framework extraction — only one
+> use case (choice + text) exists and no shared lifecycle *bug* was found,
+> just drift. Revisit only when a real second feedback shape appears.
+> `kanban-board` remains an unbuilt sketch.
+
 ## Current architecture
 
 ```mermaid
