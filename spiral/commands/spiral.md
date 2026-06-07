@@ -55,21 +55,92 @@ call they can't see. Earn their attention with a brief, render it, *then* ask.
      Divergence holes (each tagged ship-blocking/parkable with a proposed next check) or the
      FORMALIZE one-way-door framing. No option without its consequence.
 
-3. **Render it for review** — a real decision deserves better than a wall of terminal text:
+   **Frontmatter — make the brief an interactive decision surface.** Begin the file with this block
+   so `viz` renders it through the generic `feedback` recipe (a readable document *plus* a decision
+   panel the human fills in-browser, written back to this same file):
+
+   ```
+   ---
+   viz: feedback
+   title: <the decision as a plain-language question or call>
+   panel: <heading for the panel, e.g. 你的決定>
+   options: <label A> | <label B> | <label C>   # the real domain paths, pipe-separated (｜ or |)
+   recommend: <the label you lean to>            # optional
+   choice:                                       # leave empty — the human fills it
+   notes:                                        # leave empty — the human fills it
+   ---
+   ```
+
+   The `options` labels are the *domain* choices (the same the checklist demands), short enough to
+   fit a button; their trade-offs live in the body below. Leave `choice`/`notes` empty.
+
+   **The brief exists to be read by a human — readability is the whole job.** A person who has
+   *not* watched the turns must be able to read it and own the call. Optimise for that person and the
+   machine follows: anything a human reads cleanly, the renderer and any downstream tool read too, so
+   you never trade human clarity for machine-friendliness. Keep the medium plain and convertible —
+   plain prose and light markdown structure (headings, tables, lists); reach for a **mermaid** diagram
+   only when a relationship (a decision tree, a flow, who-depends-on-what) reads clearer drawn than
+   listed, never for decoration. Cite your sources: a short reference list at the end (docs, ADRs,
+   commits) makes the brief checkable without padding the body.
+
+   **Altitude & language — write from the reader's seat, not spiral's.** The failure mode is writing
+   from inside spiral's machinery (turns, gates, the Divergence verdict, the parkable/ship-blocking
+   taxonomy): that is *your* process vocabulary, not the decision-maker's. The abstract rules below
+   are not enough on their own — they have failed before; hold them, then pass the concrete checklist
+   before you render.
+   - **Lead with the domain stakes in plain language**, not the loop's state. Open with what changed
+     in the world, why it bites *this* project, and what is genuinely at risk (money, users blocked,
+     an architecture flip) — never "goal-met" or "turn 3 closed".
+   - **Carry the substance inline.** The decision rests on what was produced — surface it *in the
+     brief* (the real options and their trade-offs, readably), never as a pointer. "5 directions —
+     see ADR-010" forces the reader out to find the meat; file / line / commit refs belong in a
+     closing footnote, not the body.
+   - **Options are the *domain* choice, not spiral's mechanics.** "STOP / Continue / spike" is how
+     *you* proceed; the human is choosing between real-world paths (ship this analysis vs. run a
+     validation vs. polish a gap). Frame each as the path, in plain words, with its consequence.
+   - **No untranslated process or dev jargon.** ship / parkable / spike / toggle / overflow /
+     one-way door / `query()` either get a plain gloss on first use or get cut. If a non-developer
+     stakeholder couldn't read a line, rewrite it.
+
+   Before → after, *same fact*:
+   > ✗ `goal-met` at turn 3 — Divergence judged 可結案, no ship-blocking holes; 5 方向四欄表 see ADR-010.
+   > ✓ The exploration is done: we now have an honest, source-checked analysis of five ways to handle
+   >   the billing change — two cheap stop-gaps you can undo, three that flip the project's design.
+   >   Below is what each costs and commits to. Whether it's *good enough to stop* is your call.
+
+   **Pre-render checklist** — every box must pass, or rewrite before step 3:
+   - [ ] First three lines state the domain stakes, readable by someone who never saw the turns.
+   - [ ] The actual options + trade-offs live *in the brief*, not behind a file / ADR link.
+   - [ ] The options are real-world paths, not spiral's STOP/Continue/spike machinery.
+   - [ ] No untranslated process / dev jargon survives without a plain gloss.
+   - [ ] Medium is plain prose / markdown (mermaid only where it reads clearer than text); nothing
+         needs running code or insider context to understand.
+   - [ ] Sources cited in a closing reference list (docs / ADRs / commits).
+
+3. **Render it for review** — the frontmatter routes it through the generic `feedback` recipe:
 
    ```bash
    bash "${CLAUDE_PLUGIN_ROOT}/scripts/render-decision.sh" \
      .spiral/decision-turn-N.md spiral-decision-turn-N
    ```
 
-   The script locates the sibling `viz` plugin's renderer across install layouts, renders the
-   markdown to HTML, opens it in the browser, and prints the path — report the path. If viz is
-   absent or you are headless, it prints the full brief inline instead: still a complete brief,
-   never bare keywords.
+   The script locates the sibling `viz` plugin, starts its server, and opens an interactive page:
+   the brief renders as a readable document, and a panel lets the human pick an option and
+   write notes — **Save writes the choice back into `choice:`/`notes:` of this same file**
+   (markdown stays the single source of truth). Report the URL. If viz is absent or you are
+   headless, it prints the full brief inline instead — fall through to the terminal path in step 4.
 
-4. **Then ask** — call **AskUserQuestion** with concise labels that *point at the brief* (the
-   brief carries the reasoning; the options carry only the choice). "Other" always lets the human
-   write their own path.
+4. **Then read the human's call back — HTML is the surface, the terminal is the fallback.** After
+   rendering, the human decides in the browser. To collect the call:
+   - **Confirm gate.** Call **AskUserQuestion** with one primary option — *"I've decided in the
+     browser (Saved)"* — plus the real domain options inline as a fallback (for headless, no
+     browser, or a quick keyboard answer), and "Other" for a written-in path.
+   - **On the browser path**, grep `choice:`/`notes:` from `.spiral/decision-turn-N.md` (no need to
+     re-read the whole brief) and take `choice:` (the chosen option) and `notes:` (`\n` is a literal
+     — unescape it) as the human's call. An empty `choice:` means they didn't actually save — fall
+     back to their terminal answer.
+   - Never proceed on bare keywords: the choice always traces to either the saved brief or an
+     explicit terminal answer.
 
 ---
 
