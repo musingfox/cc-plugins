@@ -212,19 +212,29 @@ gap) — do not let it, or yourself, guess the missing criterion.
 
 ### 3 — Converge: BUILD
 
-Invoke the Convergence role to build:
+Check the `$SPIRAL_PI_BUILD` toggle first (the human's knob, set once in settings env — off by
+default). It picks BUILD's *shape* and its *model*, because a relay deserves less capability than a
+builder:
 
-> `Agent(subagent_type: "spiral:convergence")` with a task beginning `BUILD:` then the
-> **approved** Examples and the gate path. It writes code + tests and must NOT commit. It may
-> self-check against the EXAMINE gate (`bash .spiral/gate-turn-N.sh`) but cannot edit it — the
-> gate lives in gitignored `.spiral/`, outside its commit, and a different (earlier, build-blind)
-> instance forged it.
+- **Toggle off → self-write BUILD on `sonnet`.** Invoke the Convergence role to build:
+  > `Agent(subagent_type: "spiral:convergence", model: "sonnet")` with a task beginning `BUILD:` then
+  > the **approved** Examples and the gate path. It writes code + tests and must NOT commit. It may
+  > self-check against the EXAMINE gate (`bash .spiral/gate-turn-N.sh`) but cannot edit it — the gate
+  > lives in gitignored `.spiral/`, outside its commit, and a different (earlier, build-blind)
+  > instance forged it.
 
-Keep the dispatch prompt unchanged whether or not Pi-offload is on: BUILD reads the
-`$SPIRAL_PI_BUILD` toggle (with `$SPIRAL_PI_PROVIDER` / `$SPIRAL_PI_MODEL` for routing) itself and
-offloads only the code-writing labor to Pi when set (the cost-cap rule already permits this),
-keeping the gate check, the scope check, the mis-forge call, and the fallback on Claude. The toggle
-is the human's knob (set once in settings env), not a per-turn decision — leave it off by default.
+- **Toggle on → Pi-courier on `haiku`.** The typing is offloaded to Pi; the dispatched instance is a
+  **pure relay** (assemble the brief, run Pi, revert out-of-scope edits, run the gate) and holds **no
+  judgment** — so it takes the smallest model.
+  > `Agent(subagent_type: "spiral:convergence", model: "haiku")` with a task beginning `BUILD:` then
+  > the **approved** Examples and the gate path, plus a note that `$SPIRAL_PI_BUILD` is set so it runs
+  > the courier path (`$SPIRAL_PI_PROVIDER` / `$SPIRAL_PI_MODEL` route Pi). It returns `DONE` (gate
+  > green, scope clean) or `PI_FAILED` (it has already reverted Pi's edits to a clean baseline).
+  >
+  > On `PI_FAILED`, **re-dispatch BUILD as the self-write instance on `sonnet`** (the bullet above,
+  > toggle treated as off for this one re-dispatch). The courier never writes code itself, so Pi is
+  > an accelerator, never a single point of failure. Only a *self-write* red is a real red worth
+  > classifying in step 4 — a Pi flake is not, so it must never flow into the infeasibility path.
 
 ### 4 — The machine: deterministic gate at commit
 

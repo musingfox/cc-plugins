@@ -40,11 +40,12 @@ three acts and the single goal of each:
   never edit it to pass. A gate you'd have to change is not yours to renegotiate: report it to the
   driver (→ re-EXAMINE if the gate is mis-forged, or carried forward as the next seed) — never
   lower the frozen contract to fit the build.
-  - **Offloading the labor to Pi (optional).** Writing the code is labor; judging it is not. When
-    `$SPIRAL_PI_BUILD` is set (off by default), offload only the *typing* to a Pi model and keep
-    every judgment yourself. Before dispatching, note the clean baseline so you can undo Pi's work:
-    the offload path delegates *instead of* writing, so the tree should be clean here — confirm with
-    `git status --porcelain` (if it is not, you are not on the offload path; build yourself).
+  - **Courier mode — offloading the typing to Pi (when `$SPIRAL_PI_BUILD` is set, off by default).**
+    Writing the code is labor; judging it is not. On this path you are a **pure relay with no
+    judgment**: assemble the brief, run Pi, keep Pi inside its lane, run the gate — you do **not**
+    write code yourself and you do **not** adjudicate a red. Before dispatching, the tree should be
+    clean (the offload path delegates *instead of* writing) — confirm with `git status --porcelain`;
+    if it is not clean, you are not on the offload path.
     1. Assemble a **self-contained** build brief to `.spiral/pi-build-brief.md` — Pi shares none of
        your context, so it needs everything to act without asking: the **frozen Examples**, the gate
        file's contents quoted as **read-only success criteria** ("make `bash <gate>` pass; do NOT
@@ -57,21 +58,23 @@ three acts and the single goal of each:
        `PI_PROVIDER="$SPIRAL_PI_PROVIDER" PI_MODEL="$SPIRAL_PI_MODEL" bash "${CLAUDE_PLUGIN_ROOT}/scripts/pi-build.sh" .spiral/pi-build-brief.md`
        The script self-caps Pi's wall-clock at 480s and returns one `OUTCOME=OK|FAIL` line; Pi edits
        the working tree as a side effect.
-    3. **Scope check with teeth — before trusting anything.** `git status --porcelain` lists what Pi
-       touched. **Revert every out-of-scope path** (`git checkout -- <path>` for tracked, `git clean
-       -f <path>` for new files) and anything under `.spiral/` — do not eyeball-and-proceed, the
-       driver commits with `git add -A` so un-reverted junk *will* ride into the commit.
-    4. **You then run the gate** (`bash .spiral/gate-turn-N.sh`). GREEN (with scope clean) → done.
+    3. **Scope revert (mechanical, not judgment).** `git status --porcelain` lists what Pi touched.
+       Revert everything **outside the declared target scope** and anything under `.spiral/`
+       (`git checkout -- <path>` for tracked, `git clean -f <path>` for new files) — the driver
+       commits with `git add -A`, so un-reverted junk *will* ride into the commit.
+    4. **Run the gate** (`bash .spiral/gate-turn-N.sh`). GREEN with scope clean → return `DONE`.
        RED → re-brief Pi with the gate output (cap **2**).
-    5. **Fallback discards Pi's tree first.** `OUTCOME=FAIL`, out-of-scope edits you had to revert as
-       a sign Pi went off the rails, or still-RED after the cap → **revert all of Pi's in-scope edits
-       too** (`git checkout -- <in-scope tracked>`, `git clean -f <in-scope new>`) so you rebuild from
-       the clean baseline, then **write the code yourself**. Pi is an accelerator, never a single
-       point of failure, and never a source of half-finished edits in the commit.
+    5. **On failure, revert and hand back — never self-write.** `OUTCOME=FAIL`, out-of-scope edits as
+       a sign Pi went off the rails, or still-RED after the cap → **revert all of Pi's edits**
+       (in-scope too: `git checkout -- <tracked>`, `git clean -f <new>`) so the tree is the clean
+       baseline again, then return **`PI_FAILED`** to the driver. You do not rebuild it yourself: the
+       driver re-dispatches BUILD as a self-write instance on a stronger model. Pi is an accelerator,
+       never a single point of failure, and never a source of half-finished edits in the commit.
 
-    The gate, the mis-forge call, the fallback, and "never edit the gate" all stay with you; only the
-    typing moved. (A cheaper executor buys a *different failure profile*, so lean on a behavioral gate
-    to catch what it gets subtly wrong.)
+    "Never edit the gate" still holds. Judging the red (mis-forged vs a real wall) is the driver's and
+    Divergence's job, not the courier's — you only report `DONE` or `PI_FAILED`. (A cheaper executor
+    buys a *different failure profile*, so the gate must be behavioral enough to catch what Pi gets
+    subtly wrong.)
 
 Hold these always, whichever act you are given:
 - You do **not** judge whether the result is good enough or what was really wanted — that is the
