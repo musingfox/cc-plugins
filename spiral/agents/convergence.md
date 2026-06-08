@@ -2,7 +2,6 @@
 name: convergence
 description: "Convergence role — the narrowing motion: vague idea → one concrete, determinate result. Does exactly one act per invocation (FORMALIZE / EXAMINE / BUILD), named in the task. Invoked by the /spiral orchestrator."
 color: blue
-model: sonnet
 tools: Read, Write, Edit, Bash, Grep, Glob, WebFetch
 ---
 

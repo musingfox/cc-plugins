@@ -150,8 +150,8 @@ call they can't see. Earn their attention with a brief, render it, *then* ask.
 
 Invoke the Convergence role to formalize the seed:
 
-> `Agent(subagent_type: "spiral:convergence")` with a task beginning `FORMALIZE:` then the
-> current seed and any `accepted_holes` from prior turns (these become required gate checks).
+> `Agent(subagent_type: "spiral:convergence", model: "opus")` with a task beginning `FORMALIZE:`
+> then the current seed and any `accepted_holes` from prior turns (these become required gate checks).
 
 It returns a VERDICT and EXAMPLES (each with a verifiable handle describing *what* would
 prove it) plus VERIFY_INFO. It does **not** hand you a runnable gate — only the information
@@ -192,8 +192,8 @@ The gate must be forged by neither the build instance (it would test itself) nor
 is to drive, not to construct — concept §8). Dispatch Convergence's **EXAMINE** act — a fresh,
 build-blind instance:
 
-> `Agent(subagent_type: "spiral:convergence")` with a task beginning `EXAMINE:` then the
-> **frozen Examples**, the carried `accepted_holes`, the VERIFY_INFO from FORMALIZE, and the
+> `Agent(subagent_type: "spiral:convergence", model: "opus")` with a task beginning `EXAMINE:` then
+> the **frozen Examples**, the carried `accepted_holes`, the VERIFY_INFO from FORMALIZE, and the
 > gate path `.spiral/gate-turn-N.sh`. It forges the deterministic checks from the spec alone,
 > confirms the gate is RED, and returns the path. It writes only the gate — never implementation,
 > and never reads the build it is gating (that rule holds whether or not a build exists yet). Its
@@ -274,7 +274,7 @@ needed exactly where no commit exists: "red → infeasible" is the driver's infe
 independent role can tell a real wall from the driver's preference wearing a verified-but-irrelevant
 red. Invoke the Divergence role:
 
-> `Agent(subagent_type: "spiral:divergence")` with the goal, the Examples (if any were frozen), and
+> `Agent(subagent_type: "spiral:divergence", model: "opus")` with the goal, the Examples (if any were frozen), and
 > either the **commit ref** (a green turn) or the **EXAMINE-verified infeasibility** — the
 > demonstrated *why*, plus the red gate output for a BUILD-red (a no-commit turn). It is independent
 > — pass it the artifact/claim and goal, not Convergence's notes.
@@ -382,17 +382,19 @@ to weigh and the **parkable** holes collapsed to one line ("N parkable — expan
 - **Stay in your lane (driver, not doer).** You dispatch acts, run the gate to observe its
   state, commit, and surface decisions. You do not build, forge the gate, or judge — each is an
   act's job. Running a check is review; writing one is construction (EXAMINE's).
-- **Cost cap: every act dispatches on `sonnet`** (token control — this caps the by-judgment
-  default below, and the agent definitions pin `model: sonnet` so a dispatch that forgets still
-  lands there). The gate runs no model (it is shell). Within the cap the *relative* rule still
-  governs and is auto-satisfied: Divergence must be **≥ the build instance** or the judge
-  rubber-stamps (sonnet-everywhere clears this), and EXAMINE is high-consequence (a wrong gate
-  passes bad work silently) so never drop it below the builder. BUILD's pure labor may still
-  offload its bulk to an even cheaper executor (e.g. Pi); a janitor spawn whose only purpose is
-  keeping the main context clean (run a script, read a log — no judgment) → the smallest model.
-  The pattern that saves the most: small/fast/parallel agents *gather*, one strong agent
-  *analyses* (the pi-dispatch shape). A cheaper executor buys a *different failure profile*, not
-  the same result cheaper — so the cheaper it is, the more behavioral the gate must be (§2).
+- **Pick each act's model at dispatch — by judgment density × consequence, not by volume.** The
+  gate runs no model (it is shell). The **judgment** acts — FORMALIZE, EXAMINE/re-EXAMINE, and
+  Divergence — take a **strong** model (`opus`): EXAMINE is high-consequence (a wrong gate passes
+  bad work silently) and Divergence is the highest judgment, and Divergence must be **> the build
+  instance** or the judge rubber-stamps. **BUILD** writes code — pure labor — so it takes a **fast**
+  model (`sonnet`), and its bulk may offload to an even cheaper executor (Pi). A spawn whose only
+  purpose is keeping the main context clean (run a script, read a log — no judgment) → the
+  **smallest** model (`haiku`). Allocation follows the *sort* (det labor vs non-det judgment), not
+  the volume of work: a big pile of typing still deserves no judgment, and the one gate-forging call
+  that turns the whole result deserves the most. The pattern that saves the most: small/fast/parallel
+  agents *gather*, one strong agent *analyses* (the pi-dispatch shape). A cheaper executor buys a
+  *different failure profile*, not the same result cheaper — so the cheaper it is, the more
+  behavioral the gate must be (§2).
 - **Files are the source of truth.** State lives in `.spiral/state.json`; the result lives in
   the commit. Your prose is for the human, not the record.
 - MVP scope: one goal, one turn at a time, single Convergence (FORMALIZE + EXAMINE + BUILD) +
