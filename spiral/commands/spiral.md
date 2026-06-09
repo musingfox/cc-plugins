@@ -128,19 +128,27 @@ call they can't see. Earn their attention with a brief, render it, *then* ask.
    the brief renders as a readable document, and a panel lets the human pick an option and
    write notes — **Save writes the choice back into `choice:`/`notes:` of this same file**
    (markdown stays the single source of truth). Report the URL. If viz is absent or you are
-   headless, it prints the full brief inline instead — fall through to the terminal path in step 4.
+   headless, it prints the full brief inline instead. Either way the script ends with a
+   `[spiral] save-mode=browser|inline` marker line — step 4 branches on it.
 
-4. **Then read the human's call back — HTML is the surface, the terminal is the fallback.** After
-   rendering, the human decides in the browser. To collect the call:
-   - **Confirm gate.** Call **AskUserQuestion** with one primary option — *"I've decided in the
-     browser (Saved)"* — plus the real domain options inline as a fallback (for headless, no
-     browser, or a quick keyboard answer), and "Other" for a written-in path.
-   - **On the browser path**, grep `choice:`/`notes:` from `.spiral/decision-turn-N.md` (no need to
-     re-read the whole brief) and take `choice:` (the chosen option) and `notes:` (`\n` is a literal
-     — unescape it) as the human's call. An empty `choice:` means they didn't actually save — fall
-     back to their terminal answer.
-   - Never proceed on bare keywords: the choice always traces to either the saved brief or an
-     explicit terminal answer.
+4. **Read the human's call back — the browser Save is the resume signal.** Branch on the `save-mode`
+   marker from step 3:
+   - **`browser`**: do *not* call AskUserQuestion (that confirm is the redundant keypress). Launch the
+     waiter with the Bash tool's `run_in_background` and end your turn:
+     ```bash
+     bash "${CLAUDE_PLUGIN_ROOT}/scripts/wait-decision.sh" .spiral/decision-turn-N.md
+     ```
+     It exits when the in-browser Save fills `choice:`, and the harness re-invokes you on exit — so
+     Save is the human's only action. Tell them: pick + Save and the turn continues on its own; to
+     answer in the terminal instead, just type it (starts a new turn).
+   - **`inline`** (viz absent / Save unreachable): call **AskUserQuestion** with the domain options
+     (plus "Other") and take that as the call.
+   - **On wake, branch on `choice:`, never on how you woke** — Save, timeout, an abnormal kill, or a
+     typed answer all land here. Grep `choice:`/`notes:` from the brief: non-empty → that is the call
+     (`notes:` `\n` is literal — unescape it); empty → take the terminal answer, or AskUserQuestion if
+     none. A missing exit-0 must never strand the turn.
+   - Proceeding from a terminal answer while the waiter may still poll → `TaskStop` it, else a stale
+     Save wakes you mid next turn.
 
 ---
 

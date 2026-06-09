@@ -28,9 +28,22 @@ render="$(ls "$root"/../viz/lib/render.sh \
              "$root"/../../viz/*/lib/render.sh 2>/dev/null | sort -V | tail -1)"
 
 if [ -n "$render" ] && [ -f "$render" ]; then
-  exec bash "$render" "$brief" "$name"
+  # Capture (don't exec) so we can classify the outcome: a real `URL: http://`
+  # means the viz server is up and the in-browser Save endpoint works, so the
+  # agent can background-wait on the Save. Anything else (server port held →
+  # file://, headless, render failure) means Save is dead — the agent must take
+  # the terminal fallback. stderr still streams straight through.
+  out="$(bash "$render" "$brief" "$name")"
+  printf '%s\n' "$out"
+  if printf '%s\n' "$out" | grep -q 'URL: http://'; then
+    echo "[spiral] save-mode=browser"
+  else
+    echo "[spiral] save-mode=inline   # viz Save unavailable — use terminal fallback"
+  fi
+  exit 0
 fi
 
 echo "[spiral] viz render.sh not found — decision brief (read inline):" >&2
 echo "----------------------------------------------------------------------" >&2
 cat "$brief"
+echo "[spiral] save-mode=inline   # viz absent — use terminal fallback"
