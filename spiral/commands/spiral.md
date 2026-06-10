@@ -23,10 +23,16 @@ Concept: `${CLAUDE_PLUGIN_ROOT}/docs/concept.md`. The goal for this run is `$ARG
 ```bash
 mkdir -p .spiral
 grep -qxF '.spiral/' .gitignore 2>/dev/null || echo '.spiral/' >> .gitignore
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/state.sh" get 2>/dev/null \
+  || bash "${CLAUDE_PLUGIN_ROOT}/scripts/state.sh" init "$ARGUMENTS"
 ```
 
-Read `.spiral/state.json` if it exists (carries `goal`, `turn`, `examples`, `gate_path`,
-`accepted_holes`, `feedback_log`). If absent, this is turn 1 with seed = `$ARGUMENTS`.
+State lives in `.spiral/state.json` (`goal`, `seed`, `turn`, `examples`, `gate_path`,
+`accepted_holes`, `feedback_log`) and moves **only** through `state.sh` (`get` / `set` /
+`append` / `next-turn`) — it validates the schema and writes atomically, so never hand-edit
+the JSON. A fresh `init` is turn 1 with seed = `$ARGUMENTS`; otherwise `get` carries the
+prior turns. Everywhere below, `state.sh …` means
+`bash "${CLAUDE_PLUGIN_ROOT}/scripts/state.sh" …`.
 
 ---
 
@@ -192,7 +198,7 @@ bare value), so the human judges a commitment they actually own — route them t
 decision** (brief → render → ask). If a FORMALIZE "needs X" fact is still open, surface it too — as
 a fact to fetch, not a vote. If there are no one-way doors, present one compact confirm ("freeze
 these N criteria — approve / edit") — no brief needed. On approval, freeze the Examples
-and persist them into `.spiral/state.json`.
+and persist them: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/state.sh" set examples '<JSON array>'`.
 
 ### 2b — EXAMINE: forge the gate from the spec
 
@@ -211,7 +217,8 @@ Point the active marker at the EXAMINE gate and sanity-run it (running a check t
 state is review — yours to do — not authoring):
 
 ```bash
-echo 'bash .spiral/gate-turn-N.sh' > .spiral/active
+echo '.spiral/gate-turn-N.sh' > .spiral/active   # the PATH only — the hook runs it directly, nothing is eval'd
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/state.sh" set gate_path .spiral/gate-turn-N.sh
 bash .spiral/gate-turn-N.sh   # expect RED — a gate green before BUILD is a tautology
 ```
 
@@ -277,7 +284,7 @@ git commit -m "spiral(turn N): <goal one-liner>"
     (rebuild, within the cap) or a want (rejected — never a delivery); if the rebuild cap is already
     spent and there is still no why, the build can neither pass nor prove why it can't — escalate to
     the human (a genuine stuck, step 6's test), do not loop.** With the why verified, the red-discovery
-    *is* a legitimate delivery: write the verified why to `feedback_log` and proceed to Divergence
+    *is* a legitimate delivery: `state.sh append feedback_log "<the verified why>"` and proceed to Divergence
     (step 5) to judge it — do **not** auto-continue on your say-so alone; the claim is judged, not
     self-certified. (A turn needs no green commit to be real — concept §6 — but it does need its
     claim verified and judged.)
@@ -322,8 +329,9 @@ escalate only when the navigation is genuinely the human's (§4). Exactly three 
   the human owns (§7).
 
 **Otherwise — not done, no ship-blocking holes, a clear NEXT_SEED — do not ask.** Auto-continue:
-append parkable holes to `accepted_holes`, set the seed to the chosen NEXT_SEED, increment `turn`,
-append to `feedback_log`, `log` one line on what you are continuing toward, and go to step 1. The
+`state.sh append accepted_holes '<each parkable hole>'`, `state.sh append feedback_log "<turn outcome>"`,
+then `state.sh next-turn '<chosen NEXT_SEED>'` (it advances `turn` and clears the per-turn
+`examples`/`gate_path`), `log` one line on what you are continuing toward, and go to step 1. The
 human can interrupt the loop at any time; **STOP and reframe are never automatic** — only
 "continue with an obvious next seed" is.
 
@@ -334,13 +342,15 @@ to weigh and the **parkable** holes collapsed to one line ("N parkable — expan
 
 - **STOP** — ship. End the spiral. (Feedback is not "fix now"; the human owns when good
   enough is good enough.)
-- **Continue** — start the next turn. Append accepted HOLES to `accepted_holes` (they become
-  required gate checks next turn); on a reframe the decision-maker may also **retire or
-  supersede** an existing accepted_hole when it has become obsolete or self-contradictory
-  (record why — a retirement is itself feedback). Set the seed to a chosen NEXT_SEED,
-  increment `turn`, append to `feedback_log`, then go back to step 1.
+- **Continue** — start the next turn. `state.sh append accepted_holes` each accepted HOLE (they
+  become required gate checks next turn); on a reframe the decision-maker may also **retire or
+  supersede** an existing accepted_hole when it has become obsolete or self-contradictory —
+  rewrite the list with `state.sh set accepted_holes '<JSON array>'` and record why in
+  `feedback_log` (a retirement is itself feedback). Then `state.sh append feedback_log
+  "<turn outcome>"` and `state.sh next-turn '<chosen NEXT_SEED>'`, and go back to step 1.
 - **Reframe** — the layer is a dead end; the human widens the scope. Take their reframed
-  goal as the new seed and go to step 1. (No platform primitive widens scope mid-flow — the
+  goal as the new seed (`state.sh set goal '<reframed goal>'` then `state.sh next-turn
+  '<reframed goal>'`) and go to step 1. (No platform primitive widens scope mid-flow — the
   human does it by giving a larger goal.)
 
 ---
@@ -413,7 +423,8 @@ to weigh and the **parkable** holes collapsed to one line ("N parkable — expan
   agents *gather*, one strong agent *analyses* (the pi-dispatch shape). A cheaper executor buys a
   *different failure profile*, not the same result cheaper — so the cheaper it is, the more
   behavioral the gate must be (§2).
-- **Files are the source of truth.** State lives in `.spiral/state.json`; the result lives in
-  the commit. Your prose is for the human, not the record.
+- **Files are the source of truth.** State lives in `.spiral/state.json` and moves only through
+  `state.sh` (schema-validated, atomic — never hand-edit the JSON); the result lives in the
+  commit. Your prose is for the human, not the record.
 - MVP scope: one goal, one turn at a time, single Convergence (FORMALIZE + EXAMINE + BUILD) +
   single Divergence, no parallel fan-out.

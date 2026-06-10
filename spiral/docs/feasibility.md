@@ -135,13 +135,18 @@ Notes from the run:
 - The self-correction itself is a positive sign — the main-thread orchestrator has the agency
   to handle surprises — but state-hygiene should not depend on it; hence the deterministic fix.
 
-Known sharp edges (acceptable for an experimental, human-in-the-loop MVP; flagged not fixed):
-- `gate.sh` runs `eval "$gate_cmd"`, and later turns concatenate **Divergence-authored**
-  check strings — LLM-authored text reaching `eval`. Mitigated only by the human approving
-  the gate command at step 2; harden before any non-interactive use.
-- The concept's "next turn starts higher" (accepted holes → next-turn gate checks) rests on
-  the orchestrator LLM hand-reading/writing `.spiral/state.json` with no schema or
-  enforcement. Moot at one turn; the multi-turn rise is unexercised — do not claim it works.
+Known sharp edges — both FIXED (2026-06-10) ahead of the first multi-turn exercise:
+- ~~`gate.sh` runs `eval "$gate_cmd"`~~ FIXED: `.spiral/active` now holds only the gate
+  script **path** (validated against `.spiral/gate-*.sh`), which the hook executes directly —
+  no `eval` anywhere. A malformed/empty marker or a missing gate script **blocks** (an armed
+  turn never fails open); a legacy `bash <path>` marker is tolerated. The gate script itself
+  is still LLM-authored bash — that trust boundary is unchanged and still rests on the human
+  approving the criteria at step 2.
+- ~~`.spiral/state.json` hand-read/written with no schema~~ FIXED: all reads/mutations route
+  through `scripts/state.sh` (init / get / set / append / next-turn / validate) — full-schema
+  validation on every write, atomic tmp+mv, key whitelists (`turn` moves only via
+  `next-turn`, which also clears the per-turn `examples`/`gate_path`). The multi-turn rise
+  itself is still unexercised — do not claim it works until a real ≥3-turn run lands.
 
 ---
 
