@@ -143,10 +143,26 @@ Known sharp edges — both FIXED (2026-06-10) ahead of the first multi-turn exer
   is still LLM-authored bash — that trust boundary is unchanged and still rests on the human
   approving the criteria at step 2.
 - ~~`.spiral/state.json` hand-read/written with no schema~~ FIXED: all reads/mutations route
-  through `scripts/state.sh` (init / get / set / append / next-turn / validate) — full-schema
-  validation on every write, atomic tmp+mv, key whitelists (`turn` moves only via
-  `next-turn`, which also clears the per-turn `examples`/`gate_path`). The multi-turn rise
-  itself is still unexercised — do not claim it works until a real ≥3-turn run lands.
+  through `scripts/state.sh` (init / get / set / append / next-turn / validate) — **open
+  schema with a typed core**: the seven core keys are required and type-checked on every
+  write (atomic tmp+mv; `turn` moves only via `next-turn`, which also clears the per-turn
+  `examples`/`gate_path`), while free-form keys pass through untouched. The openness is a
+  real-run lesson, not laxity: the cc-mobile run grew ~50 organic keys (per-turn verdicts,
+  holes, milestones, honest notes) as the orchestrator's cross-turn memory — a strict
+  whitelist would have rejected every write of that run. What hand-editing actually broke
+  was the *core* drifting (`gate_path` fossilized at turn 2 while gates reached turn 15;
+  `examples` forked into `examples_turn2`) — exactly what the typed core + `next-turn`
+  reset now prevent. Legacy states missing core keys self-heal on first mutation.
+
+**Multi-turn rise ✅ EXERCISED (2026-06-07 → 06-09, cc-mobile):** two real runs — ADR-010
+(3 turns, human STOP) and ADR-011 (**15 turns**, spike → spine → real PTY → hardening →
+ws integration → live findings → permission bridge → milestone ready-for-live). Observed
+working at scale: accepted_holes carried across turns as next-gate checks, no-commit turns
+advancing on verified feedback, a human reframe at turn 1, a Divergence meta-stop at turn 11
+(three consecutive fixture-green-realworld-broken turns judged as overfit — gate-level
+correction had stopped converging), and live-boundary surfacing (turn 8 `boundary`: the
+automatable part converged; the rest needs human/live verification). These runs predate
+`state.sh`/the gate-path hardening — they are the evidence that motivated both.
 
 ---
 
