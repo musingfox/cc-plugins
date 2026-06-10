@@ -37,16 +37,24 @@ PI_PID=$!
 - `@file` syntax — Pi's native file-include parameter. **The brief MUST be passed via `@file`, never via `"$(cat $BRIEF_FILE)"`.** Shell command substitution will expand backticks/dollars inside the brief and either hang Pi or corrupt the prompt. Empirically verified.
 - **Run Pi in the background (`&`)** — the orchestrator must keep control to tail the session JSONL and enforce stall detection. Do not let Pi block the Bash tool call.
 
-### What NOT to combine
+### Mode and flags
 
-- `--mode json` with `-p` — empirically hangs (Pi v0.73.1). Use `--mode text` (default) + `--session-dir` instead; the session JSONL provides the same event visibility.
-- `--no-session` — never use it. The session JSONL is the orchestrator's only signal into Pi's runtime state.
+- **`--mode json` with `-p` is the required combination** — stdout is the event stream
+  (one JSON object per line), ending in a terminal `agent_end` event whose last message's
+  `stopReason` carries the outcome (`stop` = clean, `error`/`aborted` = failed, with
+  `errorMessage` inline). Events stream incrementally (verified 2026-06-11, including
+  under a pipe — no block buffering). The earlier "`--mode json` hangs" note was a stale
+  Pi v0.73.1 claim; re-verified working.
+- `--no-session` — never use it. The saved session is what `--session <id>` resume needs
+  for the context-retaining re-brief.
+- Exit codes carry NO signal — Pi exits 0 even on API errors (verified: bogus model →
+  exit 0, `stopReason:"error"` in the stream). Judge `agent_end.stopReason`, never `$?`.
 
 ### Capture & Timeout
 
 - Wall-clock cap: enforced by the orchestrator via `$PI_WALL_CLOCK_S` (default 1800s), not by a Bash tool timeout.
-- Capture stdout to `$PI_STDOUT` (`$SESSION/pi-stdout.log`), stderr to `$PI_STDERR`. Stdout in text mode is human-readable progress; do NOT inline-paste it.
-- Success signal is **Pi process exits 0** + **`$REPORT_FILE` exists and parses**. The text-mode `DONE` sentinel is a hint, not a contract. The session JSONL has no terminal "done" event — Pi simply stops writing when the turn completes.
+- Capture stdout to `$PI_STDOUT` (`$SESSION/pi-stdout.log`), stderr to `$PI_STDERR`. Stdout in json mode is the event stream — machine-read only; do NOT inline-paste it.
+- Success signal is **`agent_end` with `stopReason:"stop"`** + **`$REPORT_FILE` exists and parses**. The `DONE` sentinel in the prompt is a hint, not a contract.
 
 ### 1.5 Session JSONL — the liveness channel
 
@@ -287,12 +295,12 @@ Status surface (one line of stdout per poll):
 
 | Status | Meaning |
 |---|---|
-| `ALIVE <e>s jsonl=<n>B stale=<s>s` | Pi running, JSONL fresh. Continue. |
-| `NO_JSONL <e>s` | Pi launched, no JSONL yet, within 60s grace. Continue. |
-| `NO_JSONL_FAIL <e>s` | JSONL still missing past 60s grace. **Kill, escalate.** |
-| `DONE <e>s [jsonl=<n>B]` | `kill -0 $PI_PID` failed — Pi process gone cleanly. **Exit loop, run §4.2.** |
-| `STALL <e>s stale=<s>s` | JSONL mtime unchanged > `$PI_STALL_THRESHOLD_S`. **Kill, escalate.** |
-| `ERROR <e>s pattern=<...>` | `"errorMessage"` literal present in JSONL. **Kill, classify, escalate.** |
+| `ALIVE <e>s events=<n>B stale=<s>s last=<type>` | Events arriving (or quiet inside a tool call). Continue. |
+| `NO_JSONL <e>s` | Pi launched, no events yet, within 60s grace. Continue. |
+| `NO_JSONL_FAIL <e>s` | No events past 60s grace, or process died with none. **Kill, escalate.** |
+| `DONE <e>s events=<n>B` | `agent_end` with `stopReason:"stop"`. **Exit loop, run §4.2.** |
+| `STALL <e>s stale=<s>s last=<type>` | No event past `$PI_STALL_THRESHOLD_S` (doubled when the last event is `tool_execution_start` — quiet is normal while a tool runs). **Kill, escalate.** |
+| `ERROR <e>s stopReason=<r> <excerpt>` | `agent_end` with error/aborted stopReason, or process died mid-stream. **Kill, classify, escalate.** |
 | `TIMEOUT <e>s` | Wall clock > `$PI_WALL_CLOCK_S`. **Kill, escalate.** |
 | `NO_PID` | `pi.pid` missing. **Dispatch broken; abort flow.** |
 

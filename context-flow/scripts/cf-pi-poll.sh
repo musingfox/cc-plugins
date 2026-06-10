@@ -1,17 +1,22 @@
 #!/usr/bin/env bash
-# Stateless one-shot poll. Emits exactly one status line, then exits.
-# Designed to be called once per ~30s round from the orchestrator via short Bash
-# tool invocations (timeout: 35000). Each call reads state from disk so a failed
-# poll != Pi failure -- just re-poll.
+# Stateless one-shot poll over Pi's json-mode event stream ($PI_STDOUT).
+# Emits exactly one status line, then exits. Each call reads state from disk,
+# so a failed poll != Pi failure -- just re-poll.
+#
+# Completion and errors are read from the stream's terminal `agent_end` event
+# (stopReason), NOT inferred from process death + report existence. Liveness is
+# event arrival (stream mtime), state-aware: a stream whose last event is
+# tool_execution_start is legitimately quiet while the tool runs, so the stall
+# threshold doubles there.
 #
 # Usage:   cf-pi-poll.sh SESSION
 # Statuses (single token prefix; tail is diagnostic):
-#   ALIVE          -- Pi running, JSONL fresh; continue
-#   NO_JSONL       -- Pi launched, JSONL not produced yet (within 60s grace); continue
-#   NO_JSONL_FAIL  -- JSONL missing past 60s grace; kill+escalate
-#   DONE           -- kill -0 failed; Pi exited cleanly; proceed to report check
-#   STALL          -- JSONL mtime unchanged > $PI_STALL_THRESHOLD_S; kill+escalate
-#   ERROR          -- "errorMessage" present in JSONL; kill+classify+escalate
+#   ALIVE          -- Pi running, events arriving (or inside a tool call); continue
+#   NO_JSONL       -- Pi launched, no events yet (within 60s grace); continue
+#   NO_JSONL_FAIL  -- no events past 60s grace, or process died with none; kill+escalate
+#   DONE           -- agent_end with stopReason "stop"; proceed to report check
+#   STALL          -- no event past threshold (2x inside a tool call); kill+escalate
+#   ERROR          -- agent_end with error/aborted stopReason, or process died mid-stream
 #   TIMEOUT        -- elapsed > $PI_WALL_CLOCK_S; kill+escalate
 #   NO_PID         -- pi.pid missing; dispatch broken; abort
 
@@ -33,28 +38,55 @@ NOW=$(date +%s); ELAPSED=$((NOW - START))
 ALIVE=0
 if kill -0 "$PI_PID" 2>/dev/null; then ALIVE=1; fi
 
-JSONL=$(ls -t "$PI_SESSION_DIR"/*.jsonl 2>/dev/null | head -1)
+EVENTS="$PI_STDOUT"
 
-if [ -z "$JSONL" ]; then
-  if [ "$ALIVE" -eq 0 ]; then echo "DONE ${ELAPSED}s no-jsonl"; exit 0; fi
+# --- no events yet -------------------------------------------------------
+if [ ! -s "$EVENTS" ]; then
+  if [ "$ALIVE" -eq 0 ]; then echo "NO_JSONL_FAIL ${ELAPSED}s died-no-events"; exit 0; fi
   if [ "$ELAPSED" -gt 60 ]; then echo "NO_JSONL_FAIL ${ELAPSED}s"; exit 0; fi
   echo "NO_JSONL ${ELAPSED}s"; exit 0
 fi
 
-if grep -q '"errorMessage"' "$JSONL"; then
-  EXCERPT=$(grep -o '"errorMessage":"[^"]\{0,80\}' "$JSONL" | head -1 | cut -c17-)
-  echo "ERROR ${ELAPSED}s pattern=${EXCERPT}"
+SZ=$(wc -c < "$EVENTS")
+
+# --- terminal event ------------------------------------------------------
+# agent_end is the protocol's terminal event; once present, the run's outcome
+# is decided regardless of whether the process has finished flushing.
+AGENT_END=$(grep '"type":"agent_end"' "$EVENTS" | tail -1)
+if [ -n "$AGENT_END" ]; then
+  STOP_REASON=$(printf '%s' "$AGENT_END" | jq -r '.messages[-1].stopReason // "unknown"' 2>/dev/null || echo unparseable)
+  if [ "$STOP_REASON" = "stop" ]; then
+    echo "DONE ${ELAPSED}s events=${SZ}B"
+    exit 0
+  fi
+  EXCERPT=$(printf '%s' "$AGENT_END" | jq -r '.messages[-1].errorMessage // ""' 2>/dev/null | head -c 120 | tr '\n' ' ')
+  echo "ERROR ${ELAPSED}s stopReason=${STOP_REASON} ${EXCERPT}"
   exit 0
 fi
 
-MTIME=$(stat -f %m "$JSONL" 2>/dev/null || stat -c %Y "$JSONL")
-STALE=$((NOW - MTIME))
-SZ=$(wc -c < "$JSONL")
+# --- process died without a terminal event -------------------------------
+if [ "$ALIVE" -eq 0 ]; then
+  echo "ERROR ${ELAPSED}s died-mid-stream events=${SZ}B"
+  exit 0
+fi
 
-# Process-state checks BEFORE wall-clock / stall -- a Pi that already exited is
-# DONE regardless of how long it took or how stale the JSONL looks.
-if [ "$ALIVE" -eq 0 ]; then echo "DONE ${ELAPSED}s jsonl=${SZ}B"; exit 0; fi
+# --- bounds ---------------------------------------------------------------
 if [ "$ELAPSED" -gt "$WALL_CLOCK" ]; then echo "TIMEOUT ${ELAPSED}s"; exit 0; fi
-if [ "$STALE" -gt "$STALL_THRESHOLD" ]; then echo "STALL ${ELAPSED}s stale=${STALE}s"; exit 0; fi
 
-echo "ALIVE ${ELAPSED}s jsonl=${SZ}B stale=${STALE}s"
+MTIME=$(stat -f %m "$EVENTS" 2>/dev/null || stat -c %Y "$EVENTS")
+STALE=$((NOW - MTIME))
+
+# State-aware stall: the last complete event tells us whether quiet is normal.
+# (tail -1 can be a partially-written line; fall back one line if unparseable.)
+LAST_TYPE=$(tail -1 "$EVENTS" | jq -r '.type' 2>/dev/null || true)
+[ -z "$LAST_TYPE" ] && LAST_TYPE=$(tail -2 "$EVENTS" | head -1 | jq -r '.type' 2>/dev/null || true)
+
+EFFECTIVE_THRESHOLD="$STALL_THRESHOLD"
+[ "$LAST_TYPE" = "tool_execution_start" ] && EFFECTIVE_THRESHOLD=$((STALL_THRESHOLD * 2))
+
+if [ "$STALE" -gt "$EFFECTIVE_THRESHOLD" ]; then
+  echo "STALL ${ELAPSED}s stale=${STALE}s last=${LAST_TYPE:-?}"
+  exit 0
+fi
+
+echo "ALIVE ${ELAPSED}s events=${SZ}B stale=${STALE}s last=${LAST_TYPE:-?}"

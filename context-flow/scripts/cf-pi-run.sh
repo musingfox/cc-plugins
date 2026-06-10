@@ -190,10 +190,14 @@ esac
 
 # -------- 4-5. dispatch + poll (factored so step 9 can re-dispatch) -----
 
+# dispatch_and_poll [RESUME_PROMPT_FILE]
+# With an argument, cf-pi-dispatch.sh resumes the prior Pi session and sends the
+# file as the new prompt (context-retaining re-brief); without, fresh dispatch.
 dispatch_and_poll() {
-  echo "[shard $SHARD_ID] dispatching pi"
+  local resume_file="${1:-}"
+  echo "[shard $SHARD_ID] dispatching pi${resume_file:+ (resume re-brief)}"
   local pi_pid
-  pi_pid=$("$SCRIPTS/cf-pi-dispatch.sh" "$SHARD_SESSION")
+  pi_pid=$("$SCRIPTS/cf-pi-dispatch.sh" "$SHARD_SESSION" ${resume_file:+"$resume_file"})
   echo "[shard $SHARD_ID] pi pid=$pi_pid"
 
   local round=0
@@ -348,17 +352,23 @@ fi
 if [ "$TEST_RC" -ne 0 ]; then
   if grep -q '^test_exit=' "$SHARD_SESSION/gate3.out"; then
     # Test runner ran; tests failed twice. One re-dispatch allowed.
-    echo "[shard $SHARD_ID] gate 3 failed twice (rc=$TEST_RC), appending failure detail and re-dispatching"
+    echo "[shard $SHARD_ID] gate 3 failed twice (rc=$TEST_RC), re-briefing pi"
+    REBRIEF_FILE="$SHARD_SESSION/re-brief.md"
     {
-      printf '\n\n## Previous run feedback\n'
+      printf '## Previous run feedback\n'
       printf 'The orchestrator ran the test suite and it failed. Inspect the failures, fix, re-commit per-contract, then print DONE.\n\n'
       printf '### Test output tail (last 30 lines)\n```\n'
       tail -30 "$SHARD_SESSION/gate3-retest.out" 2>/dev/null || tail -30 "$SHARD_SESSION/gate3.out"
       printf '\n```\n'
-    } >> "$BRIEF_FILE"
+    } > "$REBRIEF_FILE"
+    # Also append to the brief: the fresh-dispatch fallback (no prior session id)
+    # re-sends the whole brief, which must then carry the feedback too.
+    { printf '\n\n'; cat "$REBRIEF_FILE"; } >> "$BRIEF_FILE"
 
-    # Re-dispatch. dispatch_and_poll exits on failure paths; on DONE returns.
-    dispatch_and_poll
+    # Re-dispatch resumes the prior Pi session with only the feedback as the new
+    # prompt -- Pi keeps its working context instead of a cold start.
+    # dispatch_and_poll exits on failure paths; on DONE returns.
+    dispatch_and_poll "$REBRIEF_FILE"
 
     set +e
     "$SCRIPTS/cf-pi-test.sh" "$SHARD_SESSION" $TEST_RUNNER > "$SHARD_SESSION/gate3-retry.out" 2>&1
