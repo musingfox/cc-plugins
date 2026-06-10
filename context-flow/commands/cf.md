@@ -287,7 +287,13 @@ SHARD_IDS=$(jq -r '.groups[].id' "$SESSION/shards.json")
 
 - `GOAL_ONELINE` — derived from `$SESSION/goal.md` (one sentence).
 - `CONSTRAINTS` — `sed -n '/^## Constraints/,/^## Key Files/p' "$SESSION/research.md"`, boiled to short lines.
-- `TEST_RUNNER` — from `$SESSION/plan.md` Implementation Plan, or one-shot `AskUserQuestion` with language default.
+- `TEST_RUNNER` — full-suite command, from `$SESSION/plan.md` Implementation Plan §Test
+  Runners, or one-shot `AskUserQuestion` with language default. Used ONLY at the
+  integration gate.
+- `SHARD_TEST_RUNNER` — hermetic subset for per-shard gates, from the same §Test Runners.
+  Must not need live services / shared ports / external daemons (parallel shards each run
+  it in their own worktree — a shared resource makes every first run collide and fail).
+  Missing from plan → fall back to `TEST_RUNNER` and warn the human in one line.
 
 ### 3.2 Fan-out
 
@@ -300,7 +306,8 @@ Agent(
     SHARD_SESSION=$SESSION/shards/A
     GOAL_ONELINE=<one-sentence goal>
     CONSTRAINTS=<short bullet list>
-    TEST_RUNNER=<resolved command>
+    TEST_RUNNER=<resolved SHARD_TEST_RUNNER — per-shard gates run the hermetic subset;
+                 the full suite belongs to the integration gate>
     SCRIPTS=$SCRIPTS
 
     Drive this shard per your agent prompt. Return the rigid 4-section format.

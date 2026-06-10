@@ -119,6 +119,12 @@ Both file paths are provided by the orchestrator's dispatch prompt (`Report path
 (repeat for each contract — at least one test case per contract; for user-facing contracts, include at least one test case per non-trivial state)
 
 ## Implementation Plan
+### Test Runners
+- **TEST_RUNNER**: [full-suite command — runs at the integration gate, after all shards merge]
+- **SHARD_TEST_RUNNER**: [hermetic subset for per-shard gates — MUST pass in an isolated
+  worktree with no live services, no shared ports, no external daemons. Exclude e2e/live
+  tests (they run at integration). If the full suite is already hermetic, repeat TEST_RUNNER.]
+
 ### Step N: [Description] — fulfills [Contract Name]
 - **target**: [file path to create or modify]
 - **approach**: [brief implementation strategy]

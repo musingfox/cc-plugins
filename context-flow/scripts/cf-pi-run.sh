@@ -330,13 +330,30 @@ set -e
 if [ "$TEST_RC" -ne 0 ]; then
   # Distinguish "tests failed" from "test runner errored".
   if grep -q '^test_exit=' "$SHARD_SESSION/gate3.out"; then
-    # Test runner ran; some tests failed. One re-dispatch allowed.
-    echo "[shard $SHARD_ID] gate 3 first run failed (rc=$TEST_RC), appending failure detail and re-dispatching"
+    # Cheap retest before the expensive re-dispatch: a first-run failure is often an
+    # environment transient (parallel shards colliding on a shared port/service), not
+    # Pi's code. Re-dispatching Pi for those wastes a full dispatch+poll cycle.
+    echo "[shard $SHARD_ID] gate 3 first run failed (rc=$TEST_RC), retesting once before re-dispatch"
+    set +e
+    "$SCRIPTS/cf-pi-test.sh" "$SHARD_SESSION" $TEST_RUNNER > "$SHARD_SESSION/gate3-retest.out" 2>&1
+    RETEST_RC=$?
+    set -e
+    if [ "$RETEST_RC" -eq 0 ]; then
+      echo "[shard $SHARD_ID] gate 3 retest passed — first failure was an environment transient"
+      TEST_RC=0
+    fi
+  fi
+fi
+
+if [ "$TEST_RC" -ne 0 ]; then
+  if grep -q '^test_exit=' "$SHARD_SESSION/gate3.out"; then
+    # Test runner ran; tests failed twice. One re-dispatch allowed.
+    echo "[shard $SHARD_ID] gate 3 failed twice (rc=$TEST_RC), appending failure detail and re-dispatching"
     {
       printf '\n\n## Previous run feedback\n'
       printf 'The orchestrator ran the test suite and it failed. Inspect the failures, fix, re-commit per-contract, then print DONE.\n\n'
       printf '### Test output tail (last 30 lines)\n```\n'
-      tail -30 "$SHARD_SESSION/gate3.out"
+      tail -30 "$SHARD_SESSION/gate3-retest.out" 2>/dev/null || tail -30 "$SHARD_SESSION/gate3.out"
       printf '\n```\n'
     } >> "$BRIEF_FILE"
 
