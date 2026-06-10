@@ -25,6 +25,25 @@ Re-source `$SESSION/env.sh` at the top of every subsequent Bash call so paths st
 
 Write the goal to `$SESSION/goal.md`.
 
+### Baton mode (pre-validated contract input)
+
+If the goal references a handoff/baton document (e.g. `docs/handoff-*.md`, typically
+produced by a spiral run via `/spiral:handoff`), this flow runs in **baton mode**: the
+contracts arrive pre-validated and human-approved upstream, so re-approving them here is
+double taxation. Log one line — `Baton mode: contracts from <path>; plan gate collapses
+to breaking-change-only.` — then apply these deltas:
+
+- **Phase 1 (Research)** becomes a **gap-scan**: inventory only the areas the execution
+  will touch that the baton does not cover. Do not re-derive what the baton pins; do not
+  re-litigate feasibility.
+- **Phase 2 (Plan)** consumes the baton's contracts verbatim as the Contract input
+  (the plan maps them to test cases and shards). Every assumption the baton flags as
+  unverified must carry over into the plan's Unresolved as a **tripwire**.
+- **Human Gate** collapses — see the baton branch in §Human Gate.
+- **Phase 3 (Implement)**: if reality contradicts a baton contract, stop that work and
+  surface the contradiction (the NEEDS_REPLAN path) — never quietly work around a
+  pre-validated contract.
+
 ### Implementer pre-flight
 
 After setup, read `$PI_AVAILABLE` from env.sh:
@@ -247,9 +266,24 @@ The plan agent writes its full output to `$SESSION/plan.md` per the agent's Retu
 
 ### Human Gate
 
-When transition validation passes, **read `$PROTOCOL_DIR/human-gate-protocol.md`** and follow it. The protocol covers: gate header framing, Scope Review template, Decisions template (only for High decisions — Medium/Low are plan-agent-decided and do NOT surface at the gate), Gate Action via AskUserQuestion, and Iterative Discussion rules for multi-round dialogue.
+**Baton branch** — when the flow is in baton mode (§Setup), do NOT run the full gate:
+the contracts were already human-approved upstream. Auto-proceed to Phase 3 with one
+log line (plan summary path included). Escalate via `AskUserQuestion` ONLY if at least
+one of these fires:
 
-Do NOT proceed to Phase 3 without explicit human approval.
+- the plan introduces a **breaking change** the baton did not already approve (outward
+  API change, non-rollback migration, dependency major bump, security posture change —
+  the High/Irreversible list from §3),
+- the gap-scan or plan **contradicts a baton contract**,
+- a baton **unverified-assumption tripwire** turned out load-bearing for a chosen design.
+
+Frame that ask around the specific trigger, not as a full plan re-approval.
+
+**Normal mode** — when transition validation passes, **read
+`$PROTOCOL_DIR/human-gate-protocol.md`** and follow it. The protocol covers: gate header framing, Scope Review template, Decisions template (only for High decisions — Medium/Low are plan-agent-decided and do NOT surface at the gate), Gate Action via AskUserQuestion, and Iterative Discussion rules for multi-round dialogue.
+
+Do NOT proceed to Phase 3 without explicit human approval (baton mode's auto-proceed
+carries that approval from the upstream handoff).
 
 ---
 
