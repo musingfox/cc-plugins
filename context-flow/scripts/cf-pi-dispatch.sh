@@ -55,8 +55,12 @@ OUTDIR="${PI_RUNS_DIR:-$HOME/.cache/pi-runs}/context-flow"
 
 # Resume: when a prior RUNDIR was recorded, pass it as the canonical 3rd positional.
 PRIOR_RUNDIR=""
-if [ -n "$resume_prompt" ] && [ -f "$session/pi-rundir" ]; then
-  PRIOR_RUNDIR="$(cat "$session/pi-rundir" 2>/dev/null || true)"
+if [ -n "$resume_prompt" ]; then
+  if [ -f "$session/pi-rundir" ]; then
+    PRIOR_RUNDIR="$(cat "$session/pi-rundir" 2>/dev/null || true)"
+  else
+    echo "cf-pi-dispatch: resume requested for session $session but pi-rundir is absent/stale; starting FRESH dispatch (resume context lost)" >&2
+  fi
 fi
 
 # PI_PROMPT: preserve cf's brief prompt behavior (fresh dispatch suffix).

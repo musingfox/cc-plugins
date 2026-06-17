@@ -24,6 +24,7 @@
 #   STATUS=FAIL ... TIMEOUT               -> TIMEOUT
 #   STATUS=FAIL ... handle=broken/no-pid  -> NO_PID
 #   STATUS=FAIL ... no-rc/died-mid-stream -> NO_JSONL_FAIL (treat as no-events-fail)
+#   STATUS=FAIL ... exit rc=N             -> RC_FAIL (abnormal pi exit, rc preserved)
 #   STATUS=FAIL ... (other)               -> ERROR
 #   RUNNING settling                      -> NO_JSONL (within grace)
 #   RUNNING                               -> ALIVE
@@ -100,13 +101,20 @@ case "$canonical_line" in
     echo "NO_JSONL_FAIL ${ELAPSED}s"
     ;;
   STATUS=FAIL*died-mid-stream*|STATUS=FAIL*died-no-events*)
-    # Died mid-stream: if result.md is empty -> no events at all -> NO_JSONL_FAIL
-    # If result.md has content but no terminal event -> ERROR
-    if [ ! -s "$RUNDIR/result.md" ]; then
-      echo "NO_JSONL_FAIL ${ELAPSED}s died-no-events"
-    else
+    # Canonical died-mid-stream: dead+rc=0+no-agent_end.
+    # If result.md has content, events were written -> ERROR (died mid-stream).
+    # If result.md is empty, no events at all -> NO_JSONL_FAIL (treat as no-events).
+    if [ -s "$RUNDIR/result.md" ]; then
       echo "ERROR ${ELAPSED}s died-mid-stream"
+    else
+      echo "NO_JSONL_FAIL ${ELAPSED}s died-no-events"
     fi
+    ;;
+  *exit\ rc=*)
+    # Abnormal pi exit: canonical emits `STATUS=FAIL ... exit rc=N ...` for nonzero rc.
+    # Extract and surface the rc so callers can distinguish abnormal exits.
+    RC_N="$(printf '%s' "$canonical_line" | grep -oE 'rc=[0-9]+' | head -1 | grep -oE '[0-9]+')"
+    echo "RC_FAIL ${ELAPSED}s exit rc=${RC_N}"
     ;;
   STATUS=FAIL*empty*|STATUS=FAIL*terminal=error*|STATUS=FAIL*)
     # Remaining FAIL sub-classes (empty result, other terminal errors) -> ERROR
