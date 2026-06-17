@@ -1,23 +1,22 @@
 #!/usr/bin/env bash
-# Launch Pi in the background with the assembled brief (json event mode).
-# Records pi.pid + pi-start.ts so cf-pi-poll.sh can monitor the run statelessly.
+# Thin adapter: launch Pi for ONE cf shard via the canonical pi-dispatch.sh.
 #
-# Usage:   cf-pi-dispatch.sh SESSION [RESUME_PROMPT_FILE]
-#   Fresh (no 2nd arg): new Pi session, prompt = @"$BRIEF_FILE".
-#   Resume: re-open the previous Pi session (--session <id>, extracted from the
-#   prior run's event stream) and send RESUME_PROMPT_FILE as the new prompt —
-#   Pi keeps its full working context (re-brief without a cold start). Falls
-#   back to a fresh full-brief dispatch when no prior session id can be found.
-# Stdout:  PI_PID
+# cf-facing interface (unchanged):
+#   Usage:   cf-pi-dispatch.sh SESSION [RESUME_PROMPT_FILE]
+#   Stdout:  PI_PID
 #
-# Hard rules (mirrored from $PI_PROTOCOL §1):
-#   - Pass prompts via @"file"; never via "$(cat file)" (shell expansion hangs Pi).
-#   - Pass --provider/--model only when the user set $PI_PROVIDER / $PI_MODEL.
-#   - `--mode json`: stdout ($PI_STDOUT) is the event stream — one JSON object
-#     per line, terminal `agent_end` event carries stopReason (verified
-#     2026-06-11; the earlier "--mode json hangs" note was a stale v0.73.1 claim).
-#   - Always pass --session-dir (resume needs the session file); never --no-session.
-#   - Background + disown so the Bash tool can return without SIGHUPing Pi.
+# Internally delegates to the resolved canonical pi-dispatch/scripts/pi-dispatch.sh.
+# Records the canonical RUNDIR into $SESSION/pi-rundir so cf-pi-poll.sh,
+# cf-pi-stop.sh, and the readers can locate it without re-parsing dispatch output.
+#
+# Env introspection:
+#   PI_RESOLVE_ONLY=1  — print RESOLVED=<canonical pi-dispatch scripts dir> and
+#                        exit 0 (no dispatch, no session required).
+#
+# Hard rules (inherited from the canonical):
+#   - Pass brief via @"$BRIEF_FILE"; never via "$(cat file)".
+#   - --mode json always; stdout is the json event stream (result.md in RUNDIR).
+#   - Background + disown (canonical does this internally).
 
 set -euo pipefail
 
@@ -25,36 +24,68 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=cf-pi-env.sh
 . "$SCRIPT_DIR/cf-pi-env.sh"
 
+# ---- Sibling resolver (mirror of spiral/scripts/pi-build.sh:40-59) ----------
+root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+
+CANON_DISPATCH="$(ls "$root"/../pi-dispatch/scripts/pi-dispatch.sh \
+                     "$root"/../pi-dispatch/*/scripts/pi-dispatch.sh \
+                     "$root"/../../pi-dispatch/scripts/pi-dispatch.sh \
+                     "$root"/../../pi-dispatch/*/scripts/pi-dispatch.sh 2>/dev/null \
+                  | sort -V | tail -1 || true)"
+
+# PI_RESOLVE_ONLY introspection: print resolved dir and exit (no dispatch needed).
+if [ "${PI_RESOLVE_ONLY:-}" = "1" ]; then
+  if [ -z "${CANON_DISPATCH:-}" ] || [ ! -f "$CANON_DISPATCH" ]; then
+    echo "cf-pi-dispatch: cannot resolve canonical pi-dispatch/scripts dir" >&2
+    exit 1
+  fi
+  echo "RESOLVED=$(dirname "$CANON_DISPATCH")"
+  exit 0
+fi
+
+CANON_DIR="$(dirname "$CANON_DISPATCH")"
+
 session="$1"
 resume_prompt="${2:-}"
 load_cf_pi_env "$session"
 
-# Resume only works if the prior run's event stream still has its session id.
-prior_sid=""
-if [ -n "$resume_prompt" ] && [ -s "$PI_STDOUT" ]; then
-  prior_sid=$(head -1 "$PI_STDOUT" | jq -r 'select(.type=="session") | .id // empty' 2>/dev/null || true)
+# OUTDIR: cf "owns" a context-flow leaf under pi-runs so the index label is
+# context-flow AND the RUNDIR is discoverable by poll/stop adapters + readers.
+OUTDIR="${PI_RUNS_DIR:-$HOME/.cache/pi-runs}/context-flow"
+
+# Resume: when a prior RUNDIR was recorded, pass it as the canonical 3rd positional.
+PRIOR_RUNDIR=""
+if [ -n "$resume_prompt" ] && [ -f "$session/pi-rundir" ]; then
+  PRIOR_RUNDIR="$(cat "$session/pi-rundir" 2>/dev/null || true)"
 fi
 
+# PI_PROMPT: preserve cf's brief prompt behavior (fresh dispatch suffix).
+export PI_PROMPT="${PI_PROMPT:-Read the brief and execute it. When finished, print exactly DONE and nothing else.}"
+
+# Pass cf's env vars to the canonical dispatch.
+export PI_PROVIDER="${PI_PROVIDER:-}"
+export PI_MODEL="${PI_MODEL:-}"
+export PI_WALL_CLOCK_S="${PI_WALL_CLOCK_S:-1800}"
+export PI_STALL_THRESHOLD_S="${PI_STALL_THRESHOLD_S:-180}"
+
+# Invoke canonical pi-dispatch.sh (non-blocking; returns OUTPUT/PID/RUNDIR).
+# Fresh: pi-dispatch.sh BRIEF OUTDIR
+# Resume: pi-dispatch.sh RESUME_PROMPT OUTDIR PRIOR_RUNDIR
+if [ -n "$resume_prompt" ] && [ -n "$PRIOR_RUNDIR" ]; then
+  dispatch_out="$("$CANON_DIR/pi-dispatch.sh" "$resume_prompt" "$OUTDIR" "$PRIOR_RUNDIR")"
+else
+  dispatch_out="$("$CANON_DIR/pi-dispatch.sh" "$BRIEF_FILE" "$OUTDIR")"
+fi
+
+# Extract the canonical RUNDIR and PID from dispatch stdout.
+CANON_RUNDIR="$(printf '%s\n' "$dispatch_out" | sed -n 's/^RUNDIR=//p' | head -1)"
+PI_PID_VAL="$(printf '%s\n' "$dispatch_out" | sed -n 's/^PID=//p' | head -1)"
+
+# Record the canonical RUNDIR for adapters and readers.
+printf '%s\n' "$CANON_RUNDIR" > "$session/pi-rundir"
+
+# Maintain pi-start.ts for cf-pi-status.sh compatibility.
 date +%s > "$PI_START_FILE"
 
-cd "$WORK"
-if [ -n "$prior_sid" ]; then
-  mv -f "$PI_STDOUT" "$PI_STDOUT.prev" 2>/dev/null || true
-  pi -p --mode json \
-     ${PI_ARGS[@]+"${PI_ARGS[@]}"} \
-     --session-dir "$PI_SESSION_DIR" \
-     --session "$prior_sid" \
-     @"$resume_prompt" \
-     > "$PI_STDOUT" 2>> "$PI_STDERR" &
-else
-  pi -p --mode json \
-     ${PI_ARGS[@]+"${PI_ARGS[@]}"} \
-     --session-dir "$PI_SESSION_DIR" \
-     @"$BRIEF_FILE" \
-     "Read the brief and execute it. When finished, print exactly DONE and nothing else." \
-     > "$PI_STDOUT" 2> "$PI_STDERR" &
-fi
-PI_PID=$!
-echo "$PI_PID" > "$PI_PID_FILE"
-disown
-echo "$PI_PID"
+# Echo PID on stdout (cf-pi-run.sh captures this).
+echo "$PI_PID_VAL"

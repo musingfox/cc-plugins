@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Stop the Pi process (text-mode only).
-# Replaces the inline `kill -TERM ... ; sleep 2 ; kill -9` snippet
-# in the orchestrator with a single idempotent wrapper.
+# Thin adapter: stop the Pi process via the canonical pi-stop.sh.
 #
-# Usage:   cf-pi-stop.sh SESSION
-# Idempotent: re-runs are silent no-ops once pi is gone.
+# cf-facing interface (unchanged):
+#   Usage:   cf-pi-stop.sh SESSION [--abort]
+#   Idempotent: re-runs are silent no-ops once pi is gone.
+#
+# Internally reads $SESSION/pi-rundir and delegates to canonical pi-stop.sh RUNDIR.
 
 set -uo pipefail
 
@@ -13,12 +14,34 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/cf-pi-env.sh"
 
 session="$1"
+# --abort flag accepted for interface compatibility; canonical stop is always clean.
 load_cf_pi_env "$session"
 
-PI_PID=$(cat "$PI_PID_FILE" 2>/dev/null || true)
-if [ -n "$PI_PID" ]; then
-  kill -TERM "$PI_PID" 2>/dev/null || true
-  sleep 2
-  kill -9 "$PI_PID" 2>/dev/null || true
+# Resolve the canonical pi-dispatch/scripts dir.
+root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+CANON_DISPATCH="$(ls "$root"/../pi-dispatch/scripts/pi-dispatch.sh \
+                     "$root"/../pi-dispatch/*/scripts/pi-dispatch.sh \
+                     "$root"/../../pi-dispatch/scripts/pi-dispatch.sh \
+                     "$root"/../../pi-dispatch/*/scripts/pi-dispatch.sh 2>/dev/null \
+                  | sort -V | tail -1 || true)"
+CANON_DIR="$(dirname "${CANON_DISPATCH:-/nonexistent}")"
+
+# Read the canonical RUNDIR recorded by cf-pi-dispatch.sh.
+RUNDIR=""
+if [ -f "$session/pi-rundir" ]; then
+  RUNDIR="$(cat "$session/pi-rundir" 2>/dev/null || true)"
 fi
+
+if [ -n "$RUNDIR" ] && [ -f "$CANON_DIR/pi-stop.sh" ]; then
+  "$CANON_DIR/pi-stop.sh" "$RUNDIR" 2>/dev/null || true
+else
+  # Fallback: try the old direct PID kill (idempotent).
+  PI_PID=$(cat "$PI_PID_FILE" 2>/dev/null || true)
+  if [ -n "$PI_PID" ]; then
+    kill -TERM "$PI_PID" 2>/dev/null || true
+    sleep 2
+    kill -9 "$PI_PID" 2>/dev/null || true
+  fi
+fi
+
 echo "stop_done"

@@ -67,7 +67,10 @@ elapsed_s() {
 write_outcome() {
   local status="$1" reason="$2" survived="$3" affected="$4" pm="$5" undecl="$6"
   local jsonl_path="-"
-  local newest; newest=$(ls -t "$PI_SESSION_DIR"/*.jsonl 2>/dev/null | head -1 || true)
+  local _canon_rundir=""; [ -f "$SHARD_SESSION/pi-rundir" ] && _canon_rundir="$(cat "$SHARD_SESSION/pi-rundir" 2>/dev/null || true)"
+  local _jsonl_dir="${_canon_rundir:+$_canon_rundir/sessions}"
+  [ -z "$_jsonl_dir" ] && _jsonl_dir="$PI_SESSION_DIR"
+  local newest; newest=$(ls -t "$_jsonl_dir"/*.jsonl 2>/dev/null | head -1 || true)
   [ -n "$newest" ] && jsonl_path="$newest"
 
   local esc_path="-"

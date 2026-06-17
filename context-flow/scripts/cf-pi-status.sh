@@ -64,13 +64,19 @@ NOW=$(date +%s)
 while IFS= read -r dir; do
   id=$(basename "$dir")
   group=$(group_lookup_for "$id")
-  pid_file="$dir/pi.pid"
   start_file="$dir/pi-start.ts"
-
-  pid=$(cat "$pid_file" 2>/dev/null || true)
   start=$(cat "$start_file" 2>/dev/null || true)
   [ -z "$start" ] && start=$NOW
   elapsed=$((NOW - start))
+
+  # Resolve the canonical RUNDIR (written by cf-pi-dispatch.sh thin adapter).
+  canon_rundir=""
+  [ -f "$dir/pi-rundir" ] && canon_rundir="$(cat "$dir/pi-rundir" 2>/dev/null || true)"
+
+  # PID lives in the canonical RUNDIR; fall back to the shard's own pi.pid.
+  pid_file="${canon_rundir:+$canon_rundir/pi.pid}"
+  [ -z "$pid_file" ] && pid_file="$dir/pi.pid"
+  pid=$(cat "$pid_file" 2>/dev/null || true)
 
   if [ -z "$pid" ]; then
     echo "shard-$id ($group): NO_PID ${elapsed}s"
@@ -80,7 +86,10 @@ while IFS= read -r dir; do
   alive=0
   if kill -0 "$pid" 2>/dev/null; then alive=1; fi
 
-  jsonl=$(ls -t "$dir/pi-sessions"/*.jsonl 2>/dev/null | head -1 || true)
+  # JSONL lives in the canonical RUNDIR's sessions/ dir.
+  jsonl_dir="${canon_rundir:+$canon_rundir/sessions}"
+  [ -z "$jsonl_dir" ] && jsonl_dir="$dir/pi-sessions"
+  jsonl=$(ls -t "$jsonl_dir"/*.jsonl 2>/dev/null | head -1 || true)
 
   if [ -z "$jsonl" ]; then
     if [ "$alive" -eq 0 ]; then
