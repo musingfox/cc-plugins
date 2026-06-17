@@ -9,7 +9,11 @@
 # Usage:
 #   pi-dispatch.sh BRIEF [OUTDIR]
 #     BRIEF   — work description. Either a path to a brief file, or inline text.
-#     OUTDIR  — base dir for run artifacts (default: $TMPDIR/pi-dispatch).
+#     OUTDIR  — base dir for run artifacts
+#               (default: ${PI_RUNS_DIR:-$HOME/.cache/pi-runs}/pi-dispatch — a
+#               PERSISTENT location, so a failed run's stderr/session/rc survive
+#               the $TMPDIR purge and stay diagnosable. pi-poll.sh records each
+#               terminal outcome into $PI_RUNS_DIR/index.log).
 #
 # Stdout (returns instantly, does NOT wait for Pi):
 #   OUTPUT=<absolute path to result file>     <- the handle the caller reads later
@@ -44,7 +48,7 @@
 set -euo pipefail
 
 BRIEF="${1:?usage: pi-dispatch.sh BRIEF [OUTDIR]}"
-OUTDIR="${2:-${TMPDIR:-/tmp}/pi-dispatch}"
+OUTDIR="${2:-${PI_RUNS_DIR:-$HOME/.cache/pi-runs}/pi-dispatch}"
 
 PROVIDER="${PI_PROVIDER:-google}"
 MODEL="${PI_MODEL:-gemini-2.5-flash-lite}"

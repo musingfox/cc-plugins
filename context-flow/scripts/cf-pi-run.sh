@@ -120,6 +120,27 @@ write_outcome() {
     printf -- '- test_log: %s\n' "$test_log_path"
     printf -- '- undeclared_files: %s\n' "$undecl"
   } > "$OUTCOME_FILE"
+
+  # --- persistent run index (survives the /tmp session purge) -------------
+  # The cf working session lives under /tmp (it carries a git worktree) and is
+  # purged on reboot, taking its postmortem/stderr/outcome with it. Mirror a
+  # durable record into $PI_RUNS_DIR so a failed shard stays diagnosable: one
+  # index line per outcome (shared with pi-dispatch/spiral via the `label`
+  # column), plus, on any non-PASS, a copy of the outcome + postmortem bundle.
+  # All best-effort (|| true): observability must never fail the run.
+  local runs_dir="${PI_RUNS_DIR:-$HOME/.cache/pi-runs}"
+  mkdir -p "$runs_dir" 2>/dev/null || true
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$(date +%Y-%m-%dT%H:%M:%S%z)" "context-flow" "$status" "$reason" \
+    "$(elapsed_s)" "$SHARD_SESSION" \
+    >> "$runs_dir/index.log" 2>/dev/null || true
+  if [ "$status" != "PASS" ]; then
+    local bundle="$runs_dir/context-flow/$(basename "$SHARD_SESSION")__${SHARD_ID}"
+    mkdir -p "$bundle" 2>/dev/null || true
+    cp "$OUTCOME_FILE" "$bundle/outcome.md" 2>/dev/null || true
+    [ -f "$SHARD_SESSION/postmortem.log" ] && \
+      cp "$SHARD_SESSION/postmortem.log" "$bundle/postmortem.log" 2>/dev/null || true
+  fi
 }
 
 # Names of contracts declared in this shard (newline-sep).

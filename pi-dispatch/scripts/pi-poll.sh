@@ -83,14 +83,36 @@ START_FILE="$RUNDIR/pi-start.ts"
 STDERR_FILE="$RUNDIR/pi.stderr.log"
 SESSION_DIR="$RUNDIR/sessions"
 
+# --- persistent run index -------------------------------------------------
+# Every TERMINAL outcome (a STATUS=* line) is appended to a durable index that
+# lives OUTSIDE $TMPDIR, so a failed run stays diagnosable long after the (now
+# also persistent) RUNDIR would otherwise have been purged. RUNNING lines are
+# never recorded. The label column is the RUNDIR's parent dir name — i.e. which
+# plugin dispatched it (pi-dispatch / spiral) — so one index serves all callers.
+# All writes are best-effort (|| true): observability must never fail a poll.
+PI_RUNS_DIR="${PI_RUNS_DIR:-$HOME/.cache/pi-runs}"
+emit() {
+  case "$1" in
+    STATUS=*)
+      mkdir -p "$PI_RUNS_DIR" 2>/dev/null || true
+      printf '%s\t%s\t%s\t%s\n' \
+        "$(date +%Y-%m-%dT%H:%M:%S%z)" \
+        "$(basename "$(dirname "$RUNDIR")")" \
+        "$1" "$RUNDIR" \
+        >> "$PI_RUNS_DIR/index.log" 2>/dev/null || true
+      ;;
+  esac
+  echo "$1"
+}
+
 # Broken handle — nothing to poll. Terminal FAIL so the caller doesn't loop forever.
 if [ ! -f "$PID_FILE" ]; then
-  echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE handle=broken"
+  emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE handle=broken"
   exit 0
 fi
 
 PI_PID="$(cat "$PID_FILE" 2>/dev/null)"
-[ -z "$PI_PID" ] && { echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE no-pid"; exit 0; }
+[ -z "$PI_PID" ] && { emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE no-pid"; exit 0; }
 
 # Elapsed wall-clock since dispatch wrote the start file.
 START="$(cat "$START_FILE" 2>/dev/null)"
@@ -137,25 +159,25 @@ if [ "$alive_rc" -ne 0 ]; then
       # terminal) -> NOT a clean success. Surface the real terminal state; never a
       # silent OK. "error" gets the explicit ERROR sub-class for the diagnostic tail.
       if [ "$TERMINAL" = "error" ]; then
-        echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE ERROR terminal=error ${ELAPSED}s"
+        emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE ERROR terminal=error ${ELAPSED}s"
         exit 0
       fi
       if [ "$TERMINAL" != "stop" ]; then
-        echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE terminal=${TERMINAL:-none} not-stop ${ELAPSED}s"
+        emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE terminal=${TERMINAL:-none} not-stop ${ELAPSED}s"
         exit 0
       fi
       # Terminal == stop, but the result file is EMPTY -> rc/terminal say success yet
       # there is no answer. Do NOT pass it off as a clean OK: emit the literal `empty`
       # marker so main can tell the difference from a real, non-empty success.
       if [ "$SZ" -eq 0 ]; then
-        echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE empty 0B terminal=stop ${ELAPSED}s"
+        emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE empty 0B terminal=stop ${ELAPSED}s"
         exit 0
       fi
       # Full whitelist satisfied: rc==0 AND non-empty AND terminal==stop.
-      echo "STATUS=OK OUTPUT=$OUTPUT_FILE ${ELAPSED}s ${SZ}B rc=0 terminal=stop"
+      emit "STATUS=OK OUTPUT=$OUTPUT_FILE ${ELAPSED}s ${SZ}B rc=0 terminal=stop"
       exit 0
     fi
-    echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE exit rc=$PI_RC ${ELAPSED}s"
+    emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE exit rc=$PI_RC ${ELAPSED}s"
     exit 0
   fi
   # Dead with NO rc file = group-killed / crashed before the wrapper could record
@@ -163,7 +185,7 @@ if [ "$alive_rc" -ne 0 ]; then
   # forever. ELAPSED grows monotonically (start-ts is fixed on disk), so it always
   # crosses the grace on a later poll -> terminal FAIL.
   if [ "$ELAPSED" -gt "$NO_MARKER_GRACE" ]; then
-    echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE no-rc ${ELAPSED}s grace=${NO_MARKER_GRACE}s"
+    emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE no-rc ${ELAPSED}s grace=${NO_MARKER_GRACE}s"
     exit 0
   fi
   echo "RUNNING settling ${ELAPSED}s (dead, awaiting rc within grace=${NO_MARKER_GRACE}s)"
@@ -182,7 +204,7 @@ fi
 # whitelist is applied only once the wrapper has EXITED (the dead branch above).
 if [ "$ELAPSED" -gt "$WALL_CLOCK" ]; then
   "$SCRIPT_DIR/pi-stop.sh" "$RUNDIR" >/dev/null 2>&1
-  echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE TIMEOUT ${ELAPSED}s wall=${WALL_CLOCK}s"
+  emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE TIMEOUT ${ELAPSED}s wall=${WALL_CLOCK}s"
   exit 0
 fi
 # Stall: portable mtime of whichever artifact moved most recently.
@@ -192,7 +214,7 @@ MTIME=$(stat -f %m "$NEWEST" 2>/dev/null || stat -c %Y "$NEWEST" 2>/dev/null || 
 STALE=$((NOW - MTIME))
 if [ "$STALE" -gt "$STALL_THRESHOLD" ]; then
   "$SCRIPT_DIR/pi-stop.sh" "$RUNDIR" >/dev/null 2>&1
-  echo "STATUS=FAIL OUTPUT=$OUTPUT_FILE STALL ${ELAPSED}s stale=${STALE}s thr=${STALL_THRESHOLD}s"
+  emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE STALL ${ELAPSED}s stale=${STALE}s thr=${STALL_THRESHOLD}s"
   exit 0
 fi
 
