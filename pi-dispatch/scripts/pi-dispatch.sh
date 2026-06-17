@@ -15,9 +15,10 @@
 #                     the $TMPDIR purge and stay diagnosable. pi-poll.sh records each
 #                     terminal outcome into $PI_RUNS_DIR/index.log).
 #     PRIOR_RUNDIR  — (optional) path to a prior run's RUNDIR for --session resume.
-#                     When given, the prior session id is extracted from
-#                     PRIOR_RUNDIR/result.md first line via
-#                       head -1 … | jq -r 'select(.type=="session").id'
+#                     When given, the prior session id is extracted by scanning
+#                     the WHOLE stream in PRIOR_RUNDIR/pi.stream.jsonl (primary)
+#                     or PRIOR_RUNDIR/result.md (fallback) via
+#                       jq -rs 'map(select(.type=="session"))[0].id // empty'
 #                     and pi is invoked with --session <sid> --mode json passing
 #                     BRIEF via @"$BRIEF_FILE" (the resume brief — NOT the full
 #                     prior brief inlined). Everything else (wrapper, artifacts) is
@@ -96,21 +97,25 @@ fi
 date +%s > "$START_FILE"
 
 # Resolve resume session id when PRIOR_RUNDIR is given.
-# Primary: read from pi.stream.jsonl (raw event stream preserved by pi-poll.sh
+# Primary: scan the WHOLE pi.stream.jsonl (raw event stream preserved by pi-poll.sh
 # after a successful distill round-trip; result.md is rewritten to prose at that
 # point so the session header is no longer in result.md).
-# Fallback: read from result.md first line (covers runs where pi.stream.jsonl is
-# absent, e.g. older runs or a failed prior run where distill did not occur).
+# Fallback: scan the WHOLE result.md (covers runs where pi.stream.jsonl is absent,
+# e.g. older runs or a failed prior run where distill did not occur).
+# If neither yields a session id, emit a warning and proceed FRESH.
 #   {"type":"session","id":"sess-abc"} -> sess-abc
 PRIOR_SESSION_ID=""
 if [ -n "$PRIOR_RUNDIR" ]; then
   PRIOR_STREAM="$PRIOR_RUNDIR/pi.stream.jsonl"
   PRIOR_RESULT="$PRIOR_RUNDIR/result.md"
   if [ -f "$PRIOR_STREAM" ]; then
-    PRIOR_SESSION_ID="$(head -1 "$PRIOR_STREAM" | jq -r 'select(.type=="session").id // empty' 2>/dev/null || true)"
+    PRIOR_SESSION_ID="$(jq -rs 'map(select(.type=="session"))[0].id // empty' "$PRIOR_STREAM" 2>/dev/null || true)"
   fi
   if [ -z "$PRIOR_SESSION_ID" ] && [ -f "$PRIOR_RESULT" ]; then
-    PRIOR_SESSION_ID="$(head -1 "$PRIOR_RESULT" | jq -r 'select(.type=="session").id // empty' 2>/dev/null || true)"
+    PRIOR_SESSION_ID="$(jq -rs 'map(select(.type=="session"))[0].id // empty' "$PRIOR_RESULT" 2>/dev/null || true)"
+  fi
+  if [ -z "$PRIOR_SESSION_ID" ]; then
+    echo "pi-dispatch: warning: PRIOR_RUNDIR=$PRIOR_RUNDIR has no recoverable session id; starting a FRESH dispatch" >&2
   fi
 fi
 

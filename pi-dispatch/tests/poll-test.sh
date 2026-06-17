@@ -29,6 +29,7 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 POLL="$HERE/../scripts/pi-poll.sh"
+DISPATCH="$HERE/../scripts/pi-dispatch.sh"
 
 PASS=0; FAIL=0
 ok()  { PASS=$((PASS+1)); echo "ok   - $1"; }
@@ -47,10 +48,11 @@ dead_pid() {
 }
 
 # Build a fixture RUNDIR. Args: dir, pid, start_offset_secs_ago, rc(""=none),
-# result_stream (the json event stream that goes into result.md).
+# result_stream (the json event stream that goes into result.md),
+# [stream_jsonl] (optional: content for pi.stream.jsonl; omit to skip).
 # sessions/ is intentionally empty — terminal state comes from the stream.
 make_run() {
-  local dir="$1" pid="$2" ago="$3" rc="$4" result_stream="$5"
+  local dir="$1" pid="$2" ago="$3" rc="$4" result_stream="$5" stream_jsonl="${6:-}"
   mkdir -p "$dir/sessions"
   printf '%s\n' "$pid" > "$dir/pi.pid"
   printf '%s\n' "$pid" > "$dir/pi.pgid"
@@ -58,6 +60,7 @@ make_run() {
   printf '%s' "$result_stream" > "$dir/result.md"
   : > "$dir/pi.stderr.log"
   [ -n "$rc" ] && printf '%s\n' "$rc" > "$dir/rc"
+  [ -n "$stream_jsonl" ] && printf '%s' "$stream_jsonl" > "$dir/pi.stream.jsonl"
 }
 
 # --- Canonical json event streams (one JSON object per line) ---
@@ -144,6 +147,124 @@ make_run "$D6" "$ALIVE" 5 "" "$NO_END_STREAM"
 OUT="$(bash "$POLL" "$D6")"
 case "$OUT" in RUNNING*) ok "(5) alive -> $OUT";; *) bad "(5) expected RUNNING, got: $OUT";; esac
 kill "$ALIVE" 2>/dev/null || true
+
+# ===========================================================================
+# Resume coverage — exercises pi-dispatch.sh PRIOR_RUNDIR session-id extraction.
+# Self-contained: embeds an argv-capture PATH-shim `pi` that records args and
+# emits a canned stop stream. Does NOT source anything from .spiral/.
+# Timing pins: tiny grace, huge wall/stall so nothing is flaky.
+# ===========================================================================
+
+export PI_NO_MARKER_GRACE_S=1
+export PI_WALL_CLOCK_S=100000
+export PI_STALL_THRESHOLD_S=100000
+
+# argv-capture PATH-shim `pi`.
+RESUME_SHIMDIR="$TMP/resume-shim"; mkdir -p "$RESUME_SHIMDIR"
+RESUME_CAPTURE="$TMP/resume-pi-argv.txt"
+RESUME_SESSION_LINE='{"type":"session","id":"sess-abc"}'
+cat > "$RESUME_SHIMDIR/pi" <<SHIMEOF
+#!/usr/bin/env bash
+{ for a in "\$@"; do printf '%s\n' "\$a"; done; } >> "$RESUME_CAPTURE"
+printf '%s\n' '{"type":"session","id":"sess-abc"}'
+printf '%s\n' '{"type":"agent_end","messages":[{"role":"assistant","stopReason":"stop","text":"resumed"}]}'
+exit 0
+SHIMEOF
+chmod +x "$RESUME_SHIMDIR/pi"
+
+# Helper: reset capture, run a resume dispatch through the shim, wait for shim to
+# record, return the captured argv lines. Args: prior_rundir [stderr_file].
+resume_via_shim() {
+  local prior="$1"
+  local errfile="${2:-/dev/null}"
+  local brief="$TMP/resume-brief-$RANDOM.md"; printf 'resume prompt\n' > "$brief"
+  local outdir="$TMP/resume-out-$RANDOM"
+  : > "$RESUME_CAPTURE"
+  ( PATH="$RESUME_SHIMDIR:$PATH" bash "$DISPATCH" "$brief" "$outdir" "$prior" ) >/dev/null 2>"$errfile"
+  local _
+  for _ in $(seq 1 50); do [ -s "$RESUME_CAPTURE" ] && break; sleep 0.1; done
+  cat "$RESUME_CAPTURE" 2>/dev/null
+}
+
+# Canonical stop stream with sess-abc as session id.
+RESUME_STOP_STREAM="${RESUME_SESSION_LINE}
+{\"type\":\"agent_end\",\"messages\":[{\"role\":\"assistant\",\"stopReason\":\"stop\",\"text\":\"the answer is 42\"}]}"
+
+# --- (resume-1) distilled round-trip: make_run with stop stream → poll to OK
+#     (pi.stream.jsonl written by poll, result.md distilled) → resume recovers sess-abc ---
+DR1="$TMP/resume-c1"
+make_run "$DR1" "$DEAD" 100 "0" "$RESUME_STOP_STREAM"
+# Distill: run pi-poll.sh to terminal OK (writes pi.stream.jsonl, rewrites result.md).
+bash "$POLL" "$DR1" >/dev/null 2>/dev/null || true
+# After distill, pi.stream.jsonl holds the raw stream; result.md is human prose.
+CAP_R1="$(resume_via_shim "$DR1")"
+r1_ok=0
+printf '%s\n' "$CAP_R1" | grep -qx -- '--session' && \
+  printf '%s\n' "$CAP_R1" | grep -qx 'sess-abc' && r1_ok=1
+if [ "$r1_ok" -eq 1 ]; then
+  ok "(resume-1) distilled round-trip: --session sess-abc recovered from pi.stream.jsonl"
+else
+  bad "(resume-1) distilled round-trip: expected --session sess-abc; argv: $(printf '%s ' $CAP_R1)"
+fi
+
+# --- (resume-2) result.md fallback: raw-stream result.md, no pi.stream.jsonl
+#     → resume recovers sess-abc from result.md ---
+DR2="$TMP/resume-c2"
+make_run "$DR2" "$DEAD" 100 "0" "$RESUME_STOP_STREAM"
+# Ensure no pi.stream.jsonl exists (make_run only writes it when arg 6 is non-empty).
+CAP_R2="$(resume_via_shim "$DR2")"
+r2_ok=0
+printf '%s\n' "$CAP_R2" | grep -qx -- '--session' && \
+  printf '%s\n' "$CAP_R2" | grep -qx 'sess-abc' && r2_ok=1
+if [ "$r2_ok" -eq 1 ]; then
+  ok "(resume-2) result.md fallback: --session sess-abc recovered from result.md"
+else
+  bad "(resume-2) result.md fallback: expected --session sess-abc; argv: $(printf '%s ' $CAP_R2)"
+fi
+
+# --- (resume-3) whole-stream: pi.stream.jsonl line 1 is non-session, session on line 2
+#     → resume still recovers sess-abc ---
+DR3="$TMP/resume-c3"
+NONSES_STREAM='{"type":"message","role":"assistant"}
+'"$RESUME_SESSION_LINE"'
+{"type":"agent_end","messages":[{"role":"assistant","stopReason":"stop","text":"done"}]}'
+make_run "$DR3" "$DEAD" 100 "0" "the answer is 42" "$NONSES_STREAM"
+CAP_R3="$(resume_via_shim "$DR3")"
+r3_ok=0
+printf '%s\n' "$CAP_R3" | grep -qx -- '--session' && \
+  printf '%s\n' "$CAP_R3" | grep -qx 'sess-abc' && r3_ok=1
+if [ "$r3_ok" -eq 1 ]; then
+  ok "(resume-3) whole-stream: --session sess-abc recovered when session NOT on line 1"
+else
+  bad "(resume-3) whole-stream: expected --session sess-abc; argv: $(printf '%s ' $CAP_R3)"
+fi
+
+# --- (resume-4) warn+fresh: truncated result.md fragment, no pi.stream.jsonl
+#     → NO --session in argv AND stderr names the prior rundir ---
+DR4="$TMP/resume-c4"
+mkdir -p "$DR4/sessions"
+printf '%s\n' "$DEAD" > "$DR4/pi.pid"
+printf '%s\n' "$DEAD" > "$DR4/pi.pgid"
+printf '%s\n' "$(( $(date +%s) - 100 ))" > "$DR4/pi-start.ts"
+: > "$DR4/pi.stderr.log"
+printf '%s\n' "0" > "$DR4/rc"
+printf '%s' '{"type":"agent_en' > "$DR4/result.md"   # truncated, no session id
+ERR_R4="$TMP/resume-c4-stderr"
+CAP_R4="$(resume_via_shim "$DR4" "$ERR_R4")"
+r4_fresh=0; r4_warn=0
+# (a) proceeded fresh: shim was called (argv captured) but WITHOUT --session
+if [ -s "$RESUME_CAPTURE" ] && ! printf '%s\n' "$CAP_R4" | grep -qx -- '--session'; then
+  r4_fresh=1
+fi
+# (b) stderr warning names the prior rundir
+if [ -s "$ERR_R4" ] && grep -qF "$DR4" "$ERR_R4"; then
+  r4_warn=1
+fi
+if [ "$r4_fresh" -eq 1 ] && [ "$r4_warn" -eq 1 ]; then
+  ok "(resume-4) warn+fresh: no --session AND stderr names prior rundir"
+else
+  bad "(resume-4) warn+fresh: fresh($r4_fresh) AND warn($r4_warn) both required; argv: $(printf '%s ' $CAP_R4) stderr: $(cat "$ERR_R4" 2>/dev/null | tr '\n' ' ')"
+fi
 
 echo "---"
 echo "poll-test: $PASS passed, $FAIL failed"
