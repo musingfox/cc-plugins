@@ -18,6 +18,6 @@
     "specification-by-example"
   ],
   "license": "MIT",
-  "dependencies": ["viz"],
+  "dependencies": ["viz", "pi-dispatch"],
   "commands": ["./commands/"]
 }
