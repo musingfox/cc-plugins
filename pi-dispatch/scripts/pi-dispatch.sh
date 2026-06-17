@@ -96,12 +96,20 @@ fi
 date +%s > "$START_FILE"
 
 # Resolve resume session id when PRIOR_RUNDIR is given.
-# Extract from the first line of the prior result.md (the session header event):
+# Primary: read from pi.stream.jsonl (raw event stream preserved by pi-poll.sh
+# after a successful distill round-trip; result.md is rewritten to prose at that
+# point so the session header is no longer in result.md).
+# Fallback: read from result.md first line (covers runs where pi.stream.jsonl is
+# absent, e.g. older runs or a failed prior run where distill did not occur).
 #   {"type":"session","id":"sess-abc"} -> sess-abc
 PRIOR_SESSION_ID=""
 if [ -n "$PRIOR_RUNDIR" ]; then
+  PRIOR_STREAM="$PRIOR_RUNDIR/pi.stream.jsonl"
   PRIOR_RESULT="$PRIOR_RUNDIR/result.md"
-  if [ -f "$PRIOR_RESULT" ]; then
+  if [ -f "$PRIOR_STREAM" ]; then
+    PRIOR_SESSION_ID="$(head -1 "$PRIOR_STREAM" | jq -r 'select(.type=="session").id // empty' 2>/dev/null || true)"
+  fi
+  if [ -z "$PRIOR_SESSION_ID" ] && [ -f "$PRIOR_RESULT" ]; then
     PRIOR_SESSION_ID="$(head -1 "$PRIOR_RESULT" | jq -r 'select(.type=="session").id // empty' 2>/dev/null || true)"
   fi
 fi
