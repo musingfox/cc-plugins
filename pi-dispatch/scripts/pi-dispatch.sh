@@ -7,13 +7,21 @@
 # polls for completion with pi-poll.sh instead of blocking on one long Bash call.
 #
 # Usage:
-#   pi-dispatch.sh BRIEF [OUTDIR]
-#     BRIEF   — work description. Either a path to a brief file, or inline text.
-#     OUTDIR  — base dir for run artifacts
-#               (default: ${PI_RUNS_DIR:-$HOME/.cache/pi-runs}/pi-dispatch — a
-#               PERSISTENT location, so a failed run's stderr/session/rc survive
-#               the $TMPDIR purge and stay diagnosable. pi-poll.sh records each
-#               terminal outcome into $PI_RUNS_DIR/index.log).
+#   pi-dispatch.sh BRIEF [OUTDIR [PRIOR_RUNDIR]]
+#     BRIEF         — work description. Either a path to a brief file, or inline text.
+#     OUTDIR        — base dir for run artifacts
+#                     (default: ${PI_RUNS_DIR:-$HOME/.cache/pi-runs}/pi-dispatch — a
+#                     PERSISTENT location, so a failed run's stderr/session/rc survive
+#                     the $TMPDIR purge and stay diagnosable. pi-poll.sh records each
+#                     terminal outcome into $PI_RUNS_DIR/index.log).
+#     PRIOR_RUNDIR  — (optional) path to a prior run's RUNDIR for --session resume.
+#                     When given, the prior session id is extracted from
+#                     PRIOR_RUNDIR/result.md first line via
+#                       head -1 … | jq -r 'select(.type=="session").id'
+#                     and pi is invoked with --session <sid> --mode json passing
+#                     BRIEF via @"$BRIEF_FILE" (the resume brief — NOT the full
+#                     prior brief inlined). Everything else (wrapper, artifacts) is
+#                     identical to a fresh dispatch.
 #
 # Stdout (returns instantly, does NOT wait for Pi):
 #   OUTPUT=<absolute path to result file>     <- the handle the caller reads later
@@ -23,6 +31,11 @@
 # Routing (cheap/fast by default; override via env):
 #   PI_PROVIDER  default: google
 #   PI_MODEL     default: gemini-2.5-flash-lite
+#
+# Pi prompt (env-overridable):
+#   PI_PROMPT    default: "Read the brief above and complete it. Output only the result."
+#                Override this to pass a custom system/user prompt (e.g. spiral's
+#                BUILD brief prompt) without modifying this script.
 #
 # Process-group model (macOS-first; darwin has no `setsid` binary):
 #   We launch pi through a perl POSIX::setsid THIN WRAPPER, backgrounded + disowned.
@@ -34,24 +47,29 @@
 #   The wrapper runs pi via perl system() (NOT exec — exec would replace perl and
 #   leave nobody to record the exit code). When pi exits, the wrapper translates
 #   pi's real wait-status into a shell-convention rc (128+signal if signalled, else
-#   the plain exit code) and writes it to the `rc` file. pi-poll.sh reads `rc` to
-#   judge OK (rc==0) vs FAIL. A group-killed run
-#   never reaches the rc write (the wrapper, as group leader, dies too), so an
-#   ABSENT rc on a dead process is the truncated/killed FAIL signal.
+#   the plain exit code) and writes it to the `rc` file. pi-poll.sh uses the rc
+#   only as an abnormal-death backstop (rc != 0 → FAIL immediately); the primary
+#   terminal-state gate is agent_end.stopReason from the json event stream.
+#   A group-killed run never reaches the rc write (the wrapper, as group leader,
+#   dies too), so an ABSENT rc on a dead process is the truncated/killed FAIL signal.
 #
 # Hard rules:
 #   - Pass the brief via @"$BRIEF_FILE" — never via "$(cat $BRIEF_FILE)";
 #     shell expansion of a large brief hangs Pi.
-#   - stdout (the result) and stderr (diagnostics) go to SEPARATE files.
-#     Never merge them — no 2>and1 here, on purpose.
+#   - stdout (the result stream) and stderr (diagnostics) go to SEPARATE files.
+#     Never merge them — no 2>&1 here, on purpose.
+#   - Pi is always invoked with --mode json so the stdout is the json event stream;
+#     pi-poll.sh reads agent_end.stopReason from that stream for terminal state.
 
 set -euo pipefail
 
-BRIEF="${1:?usage: pi-dispatch.sh BRIEF [OUTDIR]}"
+BRIEF="${1:?usage: pi-dispatch.sh BRIEF [OUTDIR [PRIOR_RUNDIR]]}"
 OUTDIR="${2:-${PI_RUNS_DIR:-$HOME/.cache/pi-runs}/pi-dispatch}"
+PRIOR_RUNDIR="${3:-}"
 
 PROVIDER="${PI_PROVIDER:-google}"
 MODEL="${PI_MODEL:-gemini-2.5-flash-lite}"
+PROMPT="${PI_PROMPT:-Read the brief above and complete it. Output only the result.}"
 
 RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
 RUNDIR="$OUTDIR/run-$RUN_ID"
@@ -77,6 +95,17 @@ fi
 # file to compute elapsed for wall-clock + no-rc-grace decisions.
 date +%s > "$START_FILE"
 
+# Resolve resume session id when PRIOR_RUNDIR is given.
+# Extract from the first line of the prior result.md (the session header event):
+#   {"type":"session","id":"sess-abc"} -> sess-abc
+PRIOR_SESSION_ID=""
+if [ -n "$PRIOR_RUNDIR" ]; then
+  PRIOR_RESULT="$PRIOR_RUNDIR/result.md"
+  if [ -f "$PRIOR_RESULT" ]; then
+    PRIOR_SESSION_ID="$(head -1 "$PRIOR_RESULT" | jq -r 'select(.type=="session").id // empty' 2>/dev/null || true)"
+  fi
+fi
+
 # Launch Pi through the perl POSIX::setsid wrapper, BACKGROUNDED + disowned.
 #
 # The wrapper (perl one-liner):
@@ -89,25 +118,59 @@ date +%s > "$START_FILE"
 #        signalled -> 128 + signal ; otherwise -> exit code (status >> 8).
 #      A group-kill of -$PGID destroys the wrapper too, so it never gets here — an
 #      absent `rc` on a dead process is exactly the killed/truncated FAIL signal.
-perl -MPOSIX -e '
-  POSIX::setsid();
-  my $rcfile = shift @ARGV;
-  my $status = system(@ARGV);
-  my $rc;
-  if ($status == -1)        { $rc = 127; }                 # could not exec pi
-  elsif ($status & 127)     { $rc = 128 + ($status & 127); } # killed by signal
-  else                      { $rc = $status >> 8; }          # normal exit code
-  open(my $fh, ">", $rcfile) or exit 255;
-  print $fh "$rc\n";
-  close($fh);
-' "$RC_FILE" \
-  pi -p \
-     --provider "$PROVIDER" \
-     --model "$MODEL" \
-     --session-dir "$SESSION_DIR" \
-     @"$BRIEF_FILE" \
-     "Read the brief above and complete it. Output only the result." \
-  > "$OUTPUT_FILE" 2> "$STDERR_FILE" &
+#
+# Pi is always invoked with --mode json so stdout is the json event stream.
+# The stream lands in result.md during the run; pi-poll.sh distills the human-
+# readable text from agent_end on terminal OK and saves the raw stream as
+# pi.stream.jsonl.
+
+if [ -n "$PRIOR_SESSION_ID" ]; then
+  # Resume path: --session <sid> --mode json, brief via @file.
+  perl -MPOSIX -e '
+    POSIX::setsid();
+    my $rcfile = shift @ARGV;
+    my $status = system(@ARGV);
+    my $rc;
+    if ($status == -1)        { $rc = 127; }                 # could not exec pi
+    elsif ($status & 127)     { $rc = 128 + ($status & 127); } # killed by signal
+    else                      { $rc = $status >> 8; }          # normal exit code
+    open(my $fh, ">", $rcfile) or exit 255;
+    print $fh "$rc\n";
+    close($fh);
+  ' "$RC_FILE" \
+    pi -p \
+       --mode json \
+       --provider "$PROVIDER" \
+       --model "$MODEL" \
+       --session "$PRIOR_SESSION_ID" \
+       --session-dir "$SESSION_DIR" \
+       @"$BRIEF_FILE" \
+       "$PROMPT" \
+    > "$OUTPUT_FILE" 2> "$STDERR_FILE" &
+else
+  # Fresh dispatch: --mode json, brief via @file.
+  perl -MPOSIX -e '
+    POSIX::setsid();
+    my $rcfile = shift @ARGV;
+    my $status = system(@ARGV);
+    my $rc;
+    if ($status == -1)        { $rc = 127; }                 # could not exec pi
+    elsif ($status & 127)     { $rc = 128 + ($status & 127); } # killed by signal
+    else                      { $rc = $status >> 8; }          # normal exit code
+    open(my $fh, ">", $rcfile) or exit 255;
+    print $fh "$rc\n";
+    close($fh);
+  ' "$RC_FILE" \
+    pi -p \
+       --mode json \
+       --provider "$PROVIDER" \
+       --model "$MODEL" \
+       --session-dir "$SESSION_DIR" \
+       @"$BRIEF_FILE" \
+       "$PROMPT" \
+    > "$OUTPUT_FILE" 2> "$STDERR_FILE" &
+fi
+
 WRAP_PID=$!
 # setsid makes PGID == the wrapper's own pid, and $! is that wrapper pid, so the
 # wrapper pid serves as BOTH the liveness handle (pi.pid) and the kill group

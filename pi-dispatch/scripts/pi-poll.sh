@@ -11,10 +11,10 @@
 #              Every artifact path is derived deterministically from it; no globbing.
 #
 # Stdout — exactly one of:
-#   STATUS=OK   OUTPUT=<path>   CLEAN-SUCCESS WHITELIST: rc==0 AND non-empty result
-#                               AND terminal state == "stop". Terminal.
-#   STATUS=FAIL OUTPUT=<path>   Anything else: rc!=0 / no-rc (killed) / terminal state
-#                               not "stop" (error/aborted/toolUse) / empty result. Terminal.
+#   STATUS=OK   OUTPUT=<path>   CLEAN-SUCCESS WHITELIST: agent_end.stopReason==stop AND
+#                               non-empty result text AND process dead.
+#   STATUS=FAIL OUTPUT=<path>   Anything else: rc!=0 / no-rc (killed) / stopReason!=stop
+#                               (error/aborted/toolUse) / absent agent_end / empty result.
 #   RUNNING                     Pi still alive (or settling within grace); KEEP POLLING.
 #
 # Decision order is PROCESS-STATE-FIRST: once the process has exited we judge the
@@ -22,30 +22,33 @@
 # Pi that already finished is terminal regardless of elapsed time. Only while the
 # wrapper process is still ALIVE do the liveness guards (wall-clock, stall) apply.
 #
-# Success is a WHITELIST, not just rc. The rc FILE (written by the perl setsid wrapper
-# with pi's REAL exit code, see pi-dispatch.sh) is necessary but NOT sufficient.
-# After the wrapper exits, a clean OK requires ALL of:
-#   rc == 0  AND  result non-empty  AND  terminal state == "stop".
-# Otherwise:
-#   rc != 0                 -> STATUS=FAIL (pi exited bad; rc/exit in the tail)
-#   terminal != "stop"      -> STATUS=FAIL (error/aborted/toolUse — not a clean finish;
-#                              "error" gets the ERROR sub-class)
-#   rc==0 + terminal stop + empty result -> STATUS=FAIL empty (success state, no answer)
-#   NO rc file (past grace) -> STATUS=FAIL no-rc  (group-killed / truncated mid-run:
-#                              the wrapper, group leader, died before writing rc —
-#                              the killed/truncated signal — there is no rc to read)
-# The terminal state is the stopReason of the LAST assistant message in the session
-# jsonl, extracted structurally with jq (NOT a whole-file substring scan), so an
-# intermediate error/toolUse turn that later RECOVERS to "stop" is a clean success.
-# The dead-but-no-rc case is bounded by a grace so it can never loop RUNNING forever.
+# Terminal state source (load-bearing for the hybrid stack):
+#   The terminal state is the stopReason of the LAST assistant message in the json
+#   event STREAM captured in result.md (pi invoked with --mode json). We extract it
+#   from the agent_end line with jq:
+#     AGENT_END=$(grep '"type":"agent_end"' result.md | tail -1)
+#     STOP_REASON=$(printf '%s' "$AGENT_END" | jq -r '.messages[-1].stopReason // "unknown"')
+#   The sessions/*.jsonl is NOT the source for terminal state (kept only for debugging).
+#
+# rc demotion: rc is ONLY an abnormal-death backstop. rc==0 NEVER implies OK on its
+# own. An absent agent_end OVERRIDES a clean rc — the process exited but did not
+# emit a terminal event (died mid-stream).
+#
+# Success WHITELIST: agent_end present AND stopReason=="stop" AND result non-empty.
 #
 # Terminal FAIL sub-classes surfaced in the diagnostic tail:
-#   (rc != 0)                    STATUS=FAIL  exit rc=N
+#   (rc != 0)                    STATUS=FAIL  exit rc=N        (rc backstop)
 #   wall-clock exceeded TIMEOUT  STATUS=FAIL  (ALIVE liveness guard)
 #   no fresh output     STALL    STATUS=FAIL  (ALIVE liveness guard)
 #   terminal == error   ERROR    STATUS=FAIL  (dead-branch whitelist)
 #   terminal not "stop"          STATUS=FAIL  not-stop (dead-branch whitelist)
 #   empty result                 STATUS=FAIL  empty    (dead-branch whitelist)
+#   no agent_end + rc==0         STATUS=FAIL  died-mid-stream
+#   no agent_end + no-rc         STATUS=FAIL  no-rc
+#
+# On terminal OK, pi-poll.sh distills the assistant text from the agent_end event
+# and writes it as the canonical human-readable result.md, preserving the raw stream
+# alongside as pi.stream.jsonl.
 #
 # On a terminal FAIL detected while the wrapper is still ALIVE (TIMEOUT / STALL /
 # pi-side ERROR), this script first calls pi-stop.sh to group-kill the orphan pi
@@ -82,6 +85,7 @@ RC_FILE="$RUNDIR/rc"
 START_FILE="$RUNDIR/pi-start.ts"
 STDERR_FILE="$RUNDIR/pi.stderr.log"
 SESSION_DIR="$RUNDIR/sessions"
+STREAM_FILE="$RUNDIR/pi.stream.jsonl"
 
 # --- persistent run index -------------------------------------------------
 # Every TERMINAL outcome (a STATUS=* line) is appended to a durable index that
@@ -126,24 +130,25 @@ ELAPSED=$((NOW - START))
 kill -0 "$PI_PID" 2>/dev/null
 alive_rc=$?
 
-# Result size + the TERMINAL STATE of the run, shared by both branches.
-#
-# TERMINAL STATE (the load-bearing success signal): the stopReason of the LAST
-# assistant message in the session jsonl. Verified across 40 real pi sessions on
-# this darwin host, a run's last-assistant terminal state is one of
-# stop / aborted / error / toolUse — and ONLY "stop" is a clean success. We extract
-# it STRUCTURALLY with jq (host has jq, verified), keying on the final assistant
-# message's terminal state — NOT on any whole-file substring scan and NOT on the
-# free-answer prose. A result that merely quotes an error marker in its text, or a
-# run that hit an intermediate toolUse/error turn but RECOVERED and ended on stop,
-# is judged purely by that final structural state. jq reads the jsonl FILE (never
-# stdin), so it can never block this poll.
-SZ=$(wc -c < "$OUTPUT_FILE" 2>/dev/null || echo 0)
-SESSION_JSONL=$(ls -t "$SESSION_DIR"/*.jsonl 2>/dev/null | head -1)
-TERMINAL=""
-if [ -n "$SESSION_JSONL" ]; then
-  TERMINAL=$(jq -rn '[ inputs | select(.type=="message" and .message.role=="assistant") | .message.stopReason ] | last // empty' "$SESSION_JSONL" 2>/dev/null)
+# --- Terminal state from the json event STREAM (result.md) ----------------
+# The terminal state is read from the json event stream captured in result.md.
+# We look for the agent_end event (the last one if multiple) and extract the
+# stopReason from the last assistant message structurally via jq. This is the
+# HYBRID design: --mode json makes pi emit a stream, agent_end.stopReason is the
+# load-bearing terminal signal. sessions/*.jsonl is NOT the source here.
+AGENT_END_LINE=""
+STOP_REASON=""
+DISTILLED_TEXT=""
+if [ -f "$OUTPUT_FILE" ]; then
+  AGENT_END_LINE="$(grep '"type":"agent_end"' "$OUTPUT_FILE" 2>/dev/null | tail -1 || true)"
+  if [ -n "$AGENT_END_LINE" ]; then
+    STOP_REASON="$(printf '%s' "$AGENT_END_LINE" | jq -r '.messages[-1].stopReason // "unknown"' 2>/dev/null || true)"
+    DISTILLED_TEXT="$(printf '%s' "$AGENT_END_LINE" | jq -r '.messages[-1].text // ""' 2>/dev/null || true)"
+  fi
 fi
+
+# Result size (raw stream bytes while running; will be updated if we distill on OK).
+SZ=$(wc -c < "$OUTPUT_FILE" 2>/dev/null || echo 0)
 
 # Read pi's real exit code if the wrapper has written it.
 PI_RC=""
@@ -151,33 +156,41 @@ PI_RC=""
 
 # ---- PROCESS-STATE-FIRST: the wrapper has EXITED -> judge the result, terminal ----
 if [ "$alive_rc" -ne 0 ]; then
-  # rc file present -> the wrapper recorded pi's real exit. A clean OK requires the
-  # WHOLE whitelist: rc==0 AND a non-empty result AND the terminal state == "stop".
+  # rc file present -> the wrapper recorded pi's real exit.
+  # rc is DEMOTED: it is only an abnormal-death backstop, not the success gate.
+  # The WHITELIST gate is agent_end presence + stopReason=="stop" + non-empty text.
   if [ -n "$PI_RC" ]; then
-    if [ "$PI_RC" -eq 0 ]; then
-      # rc==0 but the run did NOT end cleanly on "stop" (error/aborted/toolUse/empty
-      # terminal) -> NOT a clean success. Surface the real terminal state; never a
-      # silent OK. "error" gets the explicit ERROR sub-class for the diagnostic tail.
-      if [ "$TERMINAL" = "error" ]; then
-        emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE ERROR terminal=error ${ELAPSED}s"
-        exit 0
-      fi
-      if [ "$TERMINAL" != "stop" ]; then
-        emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE terminal=${TERMINAL:-none} not-stop ${ELAPSED}s"
-        exit 0
-      fi
-      # Terminal == stop, but the result file is EMPTY -> rc/terminal say success yet
-      # there is no answer. Do NOT pass it off as a clean OK: emit the literal `empty`
-      # marker so main can tell the difference from a real, non-empty success.
-      if [ "$SZ" -eq 0 ]; then
-        emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE empty 0B terminal=stop ${ELAPSED}s"
-        exit 0
-      fi
-      # Full whitelist satisfied: rc==0 AND non-empty AND terminal==stop.
-      emit "STATUS=OK OUTPUT=$OUTPUT_FILE ${ELAPSED}s ${SZ}B rc=0 terminal=stop"
+    # rc != 0 is an abnormal-death backstop: surface immediately, no further checks.
+    if [ "$PI_RC" -ne 0 ]; then
+      emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE exit rc=$PI_RC ${ELAPSED}s"
       exit 0
     fi
-    emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE exit rc=$PI_RC ${ELAPSED}s"
+    # rc == 0: now check agent_end. Absent agent_end overrides a clean rc —
+    # the process died mid-stream without emitting a terminal event.
+    if [ -z "$AGENT_END_LINE" ]; then
+      emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE died-mid-stream no-terminal ${ELAPSED}s"
+      exit 0
+    fi
+    # agent_end present: judge stopReason. Only "stop" is a clean success.
+    if [ "$STOP_REASON" = "error" ]; then
+      emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE ERROR terminal=error ${ELAPSED}s"
+      exit 0
+    fi
+    if [ "$STOP_REASON" != "stop" ]; then
+      emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE terminal=${STOP_REASON:-none} not-stop ${ELAPSED}s"
+      exit 0
+    fi
+    # stopReason == stop: check result text is non-empty.
+    if [ -z "$DISTILLED_TEXT" ]; then
+      emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE empty 0B terminal=stop ${ELAPSED}s"
+      exit 0
+    fi
+    # Full whitelist satisfied: agent_end + stopReason==stop + non-empty text.
+    # Distill: save raw stream as pi.stream.jsonl, write human-readable result.md.
+    cp "$OUTPUT_FILE" "$STREAM_FILE" 2>/dev/null || true
+    printf '%s\n' "$DISTILLED_TEXT" > "$OUTPUT_FILE" 2>/dev/null || true
+    SZ=$(wc -c < "$OUTPUT_FILE" 2>/dev/null || echo 0)
+    emit "STATUS=OK OUTPUT=$OUTPUT_FILE ${ELAPSED}s ${SZ}B rc=0 terminal=stop"
     exit 0
   fi
   # Dead with NO rc file = group-killed / crashed before the wrapper could record
@@ -197,24 +210,30 @@ fi
 # (group-kill via the sibling pi-stop.sh) BEFORE emitting STATUS=FAIL — closing the
 # loop in the script layer so no orphan pi is left behind for the agent to chase.
 #
-# NOTE: no pi-side ERROR check while ALIVE. Terminal state is the LAST assistant
-# message's stopReason; a still-running pi may be mid-turn on a transient
-# error/toolUse state that it then RECOVERS from and ends on "stop". Judging a live
-# run by an intermediate state would wrongly kill recoverable runs, so the terminal
-# whitelist is applied only once the wrapper has EXITED (the dead branch above).
+# Event-aware stall: if the last line of result.md is a tool_execution_start event,
+# double the stall threshold (pi is actively working on a long tool call).
 if [ "$ELAPSED" -gt "$WALL_CLOCK" ]; then
   "$SCRIPT_DIR/pi-stop.sh" "$RUNDIR" >/dev/null 2>&1
   emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE TIMEOUT ${ELAPSED}s wall=${WALL_CLOCK}s"
   exit 0
 fi
-# Stall: portable mtime of whichever artifact moved most recently.
-NEWEST="$OUTPUT_FILE"
-[ -n "$SESSION_JSONL" ] && NEWEST="$SESSION_JSONL"
-MTIME=$(stat -f %m "$NEWEST" 2>/dev/null || stat -c %Y "$NEWEST" 2>/dev/null || echo "$NOW")
+# Stall: portable mtime of the output file (primary artifact being written).
+MTIME=$(stat -f %m "$OUTPUT_FILE" 2>/dev/null || stat -c %Y "$OUTPUT_FILE" 2>/dev/null || echo "$NOW")
 STALE=$((NOW - MTIME))
-if [ "$STALE" -gt "$STALL_THRESHOLD" ]; then
+
+# Event-aware stall doubling: if pi is in the middle of a tool execution, double
+# the threshold to avoid killing a legitimately long-running tool call.
+EFFECTIVE_STALL="$STALL_THRESHOLD"
+if [ -f "$OUTPUT_FILE" ]; then
+  LAST_TYPE="$(tail -1 "$OUTPUT_FILE" 2>/dev/null | jq -r '.type // ""' 2>/dev/null || true)"
+  if [ "$LAST_TYPE" = "tool_execution_start" ]; then
+    EFFECTIVE_STALL=$((STALL_THRESHOLD * 2))
+  fi
+fi
+
+if [ "$STALE" -gt "$EFFECTIVE_STALL" ]; then
   "$SCRIPT_DIR/pi-stop.sh" "$RUNDIR" >/dev/null 2>&1
-  emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE STALL ${ELAPSED}s stale=${STALE}s thr=${STALL_THRESHOLD}s"
+  emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE STALL ${ELAPSED}s stale=${STALE}s thr=${EFFECTIVE_STALL}s"
   exit 0
 fi
 

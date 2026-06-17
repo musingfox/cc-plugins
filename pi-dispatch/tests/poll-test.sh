@@ -3,19 +3,25 @@
 # network, deterministic. Builds artificial fixture RUNDIRs on disk and asserts the
 # EXACT STATUS= line pi-poll.sh emits for each.
 #
-# Cases (clean-success WHITELIST: rc==0 AND non-empty result AND terminal=="stop"):
-#   (1) rc=0 + non-empty result + terminal stop             -> STATUS=OK
-#   (2) rc=7                                                 -> STATUS=FAIL (rc/exit)
-#   (3) no rc file + dead pid + start-ts past grace          -> STATUS=FAIL ... no-rc
-#   (4a) last assistant stopReason == error                  -> STATUS=FAIL (ERROR)
-#   (4b) result.md QUOTES "stopReason":"error" but the structural terminal state is a
-#        clean stop                                          -> STATUS=OK
-#        (proves we key on the STRUCTURAL terminal state, not the answer's prose)
-#   (new-empty)   rc=0 + EMPTY result + terminal stop        -> STATUS=FAIL ... empty
-#   (new-recover) intermediate stopReason error, LAST assistant == stop, rc=0,
-#                 non-empty result                           -> STATUS=OK (recovered)
-#   (new-aborted) rc=0 + terminal aborted                    -> NOT clean OK (FAIL/not-stop)
-#   (5) alive pid within thresholds                          -> RUNNING
+# Terminal state source: the json event STREAM captured in result.md (pi invoked
+# with --mode json). Fixtures carry the stream in result.md; sessions/ is empty.
+# This matches the hybrid design where agent_end.stopReason in the stream is the
+# load-bearing terminal signal — NOT sessions/*.jsonl.
+#
+# Cases (clean-success WHITELIST: agent_end present AND stopReason=="stop" AND
+#        non-empty text):
+#   (1) stream stop + non-empty text + rc=0          -> STATUS=OK ... terminal=stop
+#   (2) rc=7 (abnormal-death backstop)               -> STATUS=FAIL (rc/exit)
+#   (3) no rc file + dead pid + start-ts past grace  -> STATUS=FAIL ... no-rc
+#   (4a) agent_end stopReason == error               -> STATUS=FAIL (ERROR)
+#   (4b) result.md QUOTES "stopReason":"error" in prose but structural agent_end
+#        stopReason is "stop"                        -> STATUS=OK
+#        (proves we key on agent_end event, not the prose text)
+#   (new-empty)   stream stop + EMPTY text + rc=0   -> STATUS=FAIL ... empty
+#   (new-recover) intermediate toolUse event, agent_end stopReason==stop, rc=0,
+#                 non-empty text                     -> STATUS=OK (recovered)
+#   (new-aborted) agent_end stopReason==aborted      -> NOT clean OK (FAIL/not-stop)
+#   (5) alive pid within thresholds                  -> RUNNING
 #
 # Returns 0 iff every assertion holds.
 
@@ -41,84 +47,92 @@ dead_pid() {
 }
 
 # Build a fixture RUNDIR. Args: dir, pid, start_offset_secs_ago, rc(""=none),
-# result_text, jsonl_body.
+# result_stream (the json event stream that goes into result.md).
+# sessions/ is intentionally empty — terminal state comes from the stream.
 make_run() {
-  local dir="$1" pid="$2" ago="$3" rc="$4" result="$5" jsonl="$6"
+  local dir="$1" pid="$2" ago="$3" rc="$4" result_stream="$5"
   mkdir -p "$dir/sessions"
   printf '%s\n' "$pid" > "$dir/pi.pid"
   printf '%s\n' "$pid" > "$dir/pi.pgid"
   printf '%s\n' "$(( $(date +%s) - ago ))" > "$dir/pi-start.ts"
-  printf '%s' "$result" > "$dir/result.md"
+  printf '%s' "$result_stream" > "$dir/result.md"
   : > "$dir/pi.stderr.log"
   [ -n "$rc" ] && printf '%s\n' "$rc" > "$dir/rc"
-  if [ -n "$jsonl" ]; then printf '%s\n' "$jsonl" > "$dir/sessions/run.jsonl"; fi
 }
 
-# A clean run ends on the real pi terminal state "stop" (verified on this darwin host —
-# NOT "end_turn"). An intermediate toolUse turn before it is normal and must NOT taint
-# the verdict, since we read only the LAST assistant message's stopReason.
-CLEAN_JSONL='{"type":"session","id":"s1"}
-{"type":"message","message":{"role":"assistant","stopReason":"toolUse"}}
-{"type":"message","message":{"role":"assistant","stopReason":"stop"}}'
+# --- Canonical json event streams (one JSON object per line) ---
+SESSION_LINE='{"type":"session","id":"s1"}'
 
-# The LAST assistant message terminated on error -> not a clean success.
-ERROR_JSONL='{"type":"session","id":"s1"}
-{"type":"message","message":{"role":"assistant","stopReason":"error","errorMessage":"boom"}}'
+# CLEAN: ends on agent_end stopReason=stop with non-empty text.
+# An intermediate toolUse event before it is normal and must NOT taint the verdict.
+CLEAN_STREAM="$SESSION_LINE
+{\"type\":\"tool_use\",\"name\":\"bash\"}
+{\"type\":\"agent_end\",\"messages\":[{\"role\":\"assistant\",\"stopReason\":\"stop\",\"text\":\"the answer is 42\"}]}"
 
-# RECOVER: an intermediate turn hit error, but the run RECOVERED and the LAST assistant
-# message ended on stop -> clean success (proves we judge the terminal state, not any
-# intermediate error anywhere in the file).
-RECOVER_JSONL='{"type":"session","id":"s1"}
-{"type":"message","message":{"role":"assistant","stopReason":"error","errorMessage":"transient"}}
-{"type":"message","message":{"role":"assistant","stopReason":"stop"}}'
+# ERROR: agent_end stopReason=error -> not a clean success.
+ERROR_STREAM="$SESSION_LINE
+{\"type\":\"agent_end\",\"messages\":[{\"role\":\"assistant\",\"stopReason\":\"error\",\"errorMessage\":\"boom\"}]}"
 
-# ABORTED: the LAST assistant message terminated on aborted -> NOT a clean stop. The
-# whitelist must reject it even though rc==0 (defends against terminal-state leakage).
-ABORTED_JSONL='{"type":"session","id":"s1"}
-{"type":"message","message":{"role":"assistant","stopReason":"aborted"}}'
+# RECOVER: intermediate event with a non-stop stopReason in a different event type,
+# but the agent_end (the terminal event) has stopReason=stop -> clean success.
+RECOVER_STREAM="$SESSION_LINE
+{\"type\":\"message\",\"messages\":[{\"role\":\"assistant\",\"stopReason\":\"error\",\"errorMessage\":\"transient\"}]}
+{\"type\":\"agent_end\",\"messages\":[{\"role\":\"assistant\",\"stopReason\":\"stop\",\"text\":\"recovered result\"}]}"
+
+# ABORTED: agent_end stopReason=aborted -> NOT a clean stop.
+ABORTED_STREAM="$SESSION_LINE
+{\"type\":\"agent_end\",\"messages\":[{\"role\":\"assistant\",\"stopReason\":\"aborted\"}]}"
+
+# NO_END: no agent_end line at all (mid-stream snapshot).
+NO_END_STREAM="$SESSION_LINE
+{\"type\":\"tool_use\",\"name\":\"bash\"}"
 
 DEAD="$(dead_pid)"
 
-# --- (1) rc=0, non-empty result, clean jsonl -> STATUS=OK ---
-D1="$TMP/c1"; make_run "$D1" "$DEAD" 100 "0" "the answer is 42" "$CLEAN_JSONL"
+# --- (1) stream stop, non-empty text, rc=0 -> STATUS=OK ---
+D1="$TMP/c1"; make_run "$D1" "$DEAD" 100 "0" "$CLEAN_STREAM"
 OUT="$(bash "$POLL" "$D1")"
-case "$OUT" in STATUS=OK*) ok "(1) rc=0 -> $OUT";; *) bad "(1) expected STATUS=OK, got: $OUT";; esac
+case "$OUT" in STATUS=OK*terminal=stop*) ok "(1) stream stop -> $OUT";; *) bad "(1) expected STATUS=OK ... terminal=stop, got: $OUT";; esac
 
-# --- (2) rc=7 -> STATUS=FAIL with rc/exit wording ---
-D2="$TMP/c2"; make_run "$D2" "$DEAD" 100 "7" "partial" "$CLEAN_JSONL"
+# --- (2) rc=7 -> STATUS=FAIL with rc/exit wording (abnormal-death backstop) ---
+D2="$TMP/c2"; make_run "$D2" "$DEAD" 100 "7" "$CLEAN_STREAM"
 OUT="$(bash "$POLL" "$D2")"
 case "$OUT" in STATUS=FAIL*rc=7*) ok "(2) rc=7 -> $OUT";; *) bad "(2) expected STATUS=FAIL ... rc=7, got: $OUT";; esac
 
 # --- (3) no rc + dead + past grace -> STATUS=FAIL ... no-rc ---
-D3="$TMP/c3"; make_run "$D3" "$DEAD" 100 "" "" "$CLEAN_JSONL"
+D3="$TMP/c3"; make_run "$D3" "$DEAD" 100 "" "$NO_END_STREAM"
 OUT="$(PI_NO_MARKER_GRACE_S=30 bash "$POLL" "$D3")"
 case "$OUT" in STATUS=FAIL*no-rc*) ok "(3) no-rc -> $OUT";; *) bad "(3) expected STATUS=FAIL ... no-rc, got: $OUT";; esac
 
-# --- (4a) error EVENT in jsonl -> STATUS=FAIL (ERROR) ---
-D4="$TMP/c4"; make_run "$D4" "$DEAD" 100 "0" "looks fine" "$ERROR_JSONL"
+# --- (4a) agent_end error event -> STATUS=FAIL (ERROR) ---
+D4="$TMP/c4"; make_run "$D4" "$DEAD" 100 "0" "$ERROR_STREAM"
 OUT="$(bash "$POLL" "$D4")"
 case "$OUT" in STATUS=FAIL*ERROR*) ok "(4a) error-event -> $OUT";; *) bad "(4a) expected STATUS=FAIL ... ERROR, got: $OUT";; esac
 
-# --- (4b) result QUOTES "stopReason":"error" in its TEXT but the structural terminal
-#         state is a clean stop -> STATUS=OK (we never scan the answer's prose) ---
+# --- (4b) result QUOTES "stopReason":"error" in its TEXT but the structural
+#         agent_end has stopReason=stop -> STATUS=OK (we key on agent_end event) ---
 D5="$TMP/c5"
-make_run "$D5" "$DEAD" 100 "0" 'Example: a failed turn carries {"stopReason":"error","errorMessage":"sample"}. Use errorMessage to debug.' "$CLEAN_JSONL"
+PROSE_STREAM="$SESSION_LINE
+{\"type\":\"agent_end\",\"messages\":[{\"role\":\"assistant\",\"stopReason\":\"stop\",\"text\":\"Example: a failed turn carries {\\\"stopReason\\\":\\\"error\\\",\\\"errorMessage\\\":\\\"sample\\\"}. Use errorMessage to debug.\"}]}"
+make_run "$D5" "$DEAD" 100 "0" "$PROSE_STREAM"
 OUT="$(bash "$POLL" "$D5")"
 case "$OUT" in STATUS=OK*) ok "(4b) literal stopReason:error in prose, not a false ERROR -> $OUT";; *) bad "(4b) expected STATUS=OK, got: $OUT";; esac
 
-# --- (new-empty) rc=0 + EMPTY result + terminal stop -> must surface 'empty' (H1) ---
-DE="$TMP/c-empty"; make_run "$DE" "$DEAD" 100 "0" "" "$CLEAN_JSONL"
+# --- (new-empty) stream stop + EMPTY text + rc=0 -> must surface 'empty' ---
+EMPTY_STOP_STREAM="$SESSION_LINE
+{\"type\":\"agent_end\",\"messages\":[{\"role\":\"assistant\",\"stopReason\":\"stop\",\"text\":\"\"}]}"
+DE="$TMP/c-empty"; make_run "$DE" "$DEAD" 100 "0" "$EMPTY_STOP_STREAM"
 OUT="$(bash "$POLL" "$DE")"
 case "$OUT" in *empty*) ok "(new-empty) empty result surfaced -> $OUT";; *) bad "(new-empty) expected output containing 'empty', got: $OUT";; esac
 
-# --- (new-recover) intermediate error then LAST assistant == stop, rc=0, non-empty
-#     -> STATUS=OK (recovered; intermediate error must not fail it) (H2) ---
-DR="$TMP/c-recover"; make_run "$DR" "$DEAD" 100 "0" "the answer is 42" "$RECOVER_JSONL"
+# --- (new-recover) intermediate event then agent_end stopReason=stop, rc=0,
+#     non-empty text -> STATUS=OK ---
+DR="$TMP/c-recover"; make_run "$DR" "$DEAD" 100 "0" "$RECOVER_STREAM"
 OUT="$(bash "$POLL" "$DR")"
 case "$OUT" in STATUS=OK*) ok "(new-recover) recovered-then-stop -> $OUT";; *) bad "(new-recover) expected STATUS=OK, got: $OUT";; esac
 
-# --- (new-aborted) rc=0 + terminal aborted -> NOT a clean OK (whitelist rejects) ---
-DA="$TMP/c-aborted"; make_run "$DA" "$DEAD" 100 "0" "partial work" "$ABORTED_JSONL"
+# --- (new-aborted) agent_end stopReason=aborted -> NOT a clean OK (whitelist rejects) ---
+DA="$TMP/c-aborted"; make_run "$DA" "$DEAD" 100 "0" "$ABORTED_STREAM"
 OUT="$(bash "$POLL" "$DA")"
 case "$OUT" in STATUS=FAIL*) ok "(new-aborted) aborted not a clean OK -> $OUT";; *) bad "(new-aborted) expected STATUS=FAIL (not-stop), got: $OUT";; esac
 
@@ -126,7 +140,7 @@ case "$OUT" in STATUS=FAIL*) ok "(new-aborted) aborted not a clean OK -> $OUT";;
 D6="$TMP/c6"
 sleep 60 & ALIVE=$!
 disown 2>/dev/null || true
-make_run "$D6" "$ALIVE" 5 "" "working..." "$CLEAN_JSONL"
+make_run "$D6" "$ALIVE" 5 "" "$NO_END_STREAM"
 OUT="$(bash "$POLL" "$D6")"
 case "$OUT" in RUNNING*) ok "(5) alive -> $OUT";; *) bad "(5) expected RUNNING, got: $OUT";; esac
 kill "$ALIVE" 2>/dev/null || true
