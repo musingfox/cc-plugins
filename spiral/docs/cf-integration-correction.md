@@ -46,7 +46,7 @@ live context is the authority for loop state.
 
 ## E1 — accepted_holes Must Ride the Baton (DEFECT 1: the real bug)
 
-**What is broken.** The current `handoff.md §4b` acceptance step (handoff.md:64-68) passes
+**What is broken.** The current `handoff.md §4b` acceptance step (handoff.md:62-81) passes
 only the original goal and frozen Examples to divergence. It does not carry `accepted_holes`
 forward. When divergence encounters a still-open hole that was accepted and parked in a prior
 spiral turn, it has no way to distinguish it from a fresh ship-blocking defect — so it can
@@ -80,7 +80,7 @@ holes.
    receive the holes ledger as a distinct input. Holes in the ledger are NOT elevated to
    tripwires; they are noted as accepted scope boundaries.
 
-4. **Handed to divergence at acceptance.** The acceptance step in `spiral/commands/handoff.md:64-68`
+4. **Handed to divergence at acceptance.** The acceptance step in `spiral/commands/handoff.md:62-81`
    currently reads: "Dispatch `spiral:divergence` (opus) with the original goal + frozen Examples."
    The correction adds: "and the carried `accepted_holes` list from `.spiral/state.json`." The
    `accepted_holes` LIST is passed at invocation so divergence knows WHICH holes are accepted — but
@@ -98,7 +98,7 @@ classified as parkable by the prior turn's human gate (spiral.md:331-353). It mu
 re-raised as a fresh ship-blocking hole. Carrying the holes without this rule does not fix
 the defect: divergence would still block the loop on a known-accepted item.
 
-**Files this correction changes/constrains:** handoff.md:64-68 (add accepted_holes to
+**Files this correction changes/constrains:** handoff.md:62-81 (add accepted_holes to
 divergence invocation), handoff.md:27-39 (holes ledger is a dedicated section), cf.md:38-45
 (baton-mode consumes holes ledger as a distinct input, not as tripwires).
 
@@ -158,7 +158,7 @@ control-transfer in the spiral↔cf round-trip is either:
 - (a) A **main-orchestrator action** — the `/spiral` orchestrator or `/spiral:handoff`
   orchestrator dispatches `Agent()` calls as the top-level main thread, never from within a
   subagent role; or
-- (b) A **print-don't-run prompt** — the human pastes it, as in handoff.md:52-68 which
+- (b) A **print-don't-run prompt** — the human pastes it, as in handoff.md:51-96 which
   already prints the cf invocation and the acceptance step rather than running them.
 
 Convergence (convergence.md) and divergence (divergence.md) have no `Agent` or `SendMessage`
@@ -173,7 +173,7 @@ No agent's live context is the loop state. A context reset does not lose the loo
 `state.sh` file primitive (state.sh:57-66) writes atomically to disk; every mutation
 validates the schema before committing.
 
-**Files this correction changes/constrains:** handoff.md:52-68 (already print-only; confirm
+**Files this correction changes/constrains:** handoff.md:51-96 (already print-only; confirm
 no new `Agent()` calls are added to the acceptance step), spiral.md (the orchestrator is the
 only entity dispatching `Agent()` calls — subagent roles never dispatch other agents).
 
@@ -240,14 +240,14 @@ writes back to `.spiral/state.json` via `state.sh`:
 - **New parkables appended**: for each divergence-found parkable hole not already in
   `accepted_holes`, `state.sh append accepted_holes '<new hole>'`.
 - **Milestone to feedback_log**: `state.sh append feedback_log '<turn outcome>'` per
-  handoff.md:66-68.
+  handoff.md:80-81.
 
 This is the SAME carrier as E1's holes baton: the `accepted_holes` array in `state.json` is
 the re-entry carrier for E4. The holes that ride the baton (E1) are the holes whose closure
 E4 writes back. Same mechanism, same primitive — the re-entry artifact and the baton source
 are one file.
 
-**Files this correction changes/constrains:** handoff.md:64-68 (acceptance step adds the
+**Files this correction changes/constrains:** handoff.md:62-81 (acceptance step adds the
 3-way routing logic and the state.sh mutations), spiral.md:317-342 (goal-met path), spiral.md:331-353
 (auto-continue / escalate machinery the discriminator maps onto).
 
@@ -256,17 +256,17 @@ are one file.
 ## E5 — De-duplicate the Two Human Gates When cf Built (DEFECT 5)
 
 **What is broken.** When cf builds a turn, the current design has two potential human
-stop/go points: the handoff acceptance gate (handoff.md:62-68) and the spiral step-6 STOP/go
+stop/go points: the handoff acceptance gate (handoff.md:62-81) and the spiral step-6 STOP/go
 gate (spiral.md:317-342). Asking twice for the same decision at the same altitude is the
 rubber-stamp trap spiral.md §2 explicitly forbids.
 
 **The corrected identity — exactly one human stop/go.** When cf built the turn:
 
-> The handoff acceptance gate (handoff.md:62-68) IS the step-6 STOP/go gate
+> The handoff acceptance gate (handoff.md:62-81) IS the step-6 STOP/go gate
 > (spiral.md:317-342). Exactly one human stop/go on the cf-builder path.
 
 The acceptance step already presents the divergence verdict, the ship-blocking holes, and the
-parkable holes (handoff.md:64-68). That presentation is the escalation surface spiral.md:317-342
+parkable holes (handoff.md:62-81). That presentation is the escalation surface spiral.md:317-342
 requires. Spiral does not re-ask.
 
 **The must-not-collapse caveat.** This identity holds ONLY at the same altitude — the final
@@ -278,12 +278,12 @@ acceptance gate is post-cf-execution, judging whether the cf result meets the go
 are not the same question and must not be merged.
 
 Named precisely:
-- **Gate that equals the step-6 gate**: handoff.md:62-68 (the post-cf-execution acceptance
+- **Gate that equals the step-6 gate**: handoff.md:62-81 (the post-cf-execution acceptance
   ask — "approve/edit/abort" on the divergence verdict).
 - **Gate that must stay separate**: handoff.md:46-49 (the pre-cf distillation approval —
   "is this run handoff-ready?").
 
-**Files this correction changes/constrains:** handoff.md:62-68 (the acceptance gate is the
+**Files this correction changes/constrains:** handoff.md:62-81 (the acceptance gate is the
 step-6 gate; spiral does not re-ask), spiral.md:317-342 (the step-6 gate is already
 satisfied by the acceptance; no second prompt), handoff.md:46-49 (explicitly noted as a
 separate altitude, not to be collapsed).
@@ -297,11 +297,11 @@ constrains:
 
 | Defect | Key citations |
 |---|---|
-| E1 | cf.md:38-45, divergence.md:22-26, handoff.md:64-68 |
+| E1 | cf.md:38-45, divergence.md:22-26, handoff.md:62-81 |
 | E2 | convergence.md:79-81, handoff.md (acceptance relay) |
-| E3 | handoff.md:52-68, spiral.md (orchestrator is the sole Agent() dispatcher) |
-| E4 | handoff.md:64-68, spiral.md:317-342, spiral.md:331-353 |
-| E5 | handoff.md:46-49, handoff.md:62-68, spiral.md:317-342 |
+| E3 | handoff.md:51-96, spiral.md (orchestrator is the sole Agent() dispatcher) |
+| E4 | handoff.md:62-81, spiral.md:317-342, spiral.md:331-353 |
+| E5 | handoff.md:46-49, handoff.md:62-81, spiral.md:317-342 |
 
 **E1 and E4 use the SAME carrier.** The accepted_holes that ride the baton (E1: sourced from
 `state.sh get accepted_holes`, carried in the baton's dedicated holes section, consumed at
@@ -335,13 +335,14 @@ constraint); the baton it reads is always current because the main orchestrator 
 **WHERE the regeneration fires (main orchestrator action).** The `/spiral:handoff` prompt
 prints state-read instructions at `spiral/commands/handoff.md:16` (print-only: the human runs
 `bash state.sh get`). The regeneration step fires at the **cf re-dispatch boundary** — the
-acceptance/re-dispatch step (`spiral/commands/handoff.md:62-68`, section 4b, print location),
-on the route E4 labels "cf re-dispatch ... same baton" (this doc, E4 table, the middle row).
-On that route, the main orchestrator (main thread) rewrites the baton's holes-ledger section:
-it runs `bash "${CLAUDE_PLUGIN_ROOT}/scripts/state.sh" get '.accepted_holes'` and writes the
-rendered current array into the ledger before re-pasting the cf prompt.
-`spiral/commands/handoff.md:62-68` is the print location for that prompt — the main thread is
-the actor that executes it, not handoff.md itself. The first (fresh-handoff) write of the
+dedicated re-dispatch step (`spiral/commands/handoff.md:83-96`, section 4c, print location),
+which is distinct from the §4b acceptance step: §4b (`spiral/commands/handoff.md:62-81`) decides
+the route from the divergence verdict, and the "cf re-dispatch ... same baton" branch (this doc,
+E4 table, the middle row) enters §4c. On that route, the main orchestrator (main thread) rewrites
+the baton's holes-ledger section: it runs `bash "${CLAUDE_PLUGIN_ROOT}/scripts/state.sh" get
+'.accepted_holes'` and writes the rendered current array into the ledger before re-pasting the cf
+prompt. `spiral/commands/handoff.md:83-96` is the print location for that prompt — the main thread
+is the actor that executes it, not handoff.md itself. The first (fresh-handoff) write of the
 ledger at distillation time (`spiral/commands/handoff.md:24-43`, section 2) is the turn-1 render
 of the same view; every re-dispatch re-renders it. No new `state.sh` verb is required — the
 render is a main-thread read-then-rewrite of the baton file, using the existing `get` surface.
@@ -370,11 +371,11 @@ while failing goal-fitness; divergence acceptance is the only gate that decides 
 Two turn-kinds exist in the spiral↔cf round-trip, and they have different gate sequences:
 
 - **Fresh handoff turn**: fires distillation approval first (handoff.md:46-49 — "is this run
-  handoff-ready?"), then the acceptance gate after cf executes (handoff.md:62-68). Two gates,
+  handoff-ready?"), then the acceptance gate after cf executes (handoff.md:62-81). Two gates,
   different altitudes, must not be collapsed (E5's must-not-collapse caveat applies).
 
 - **cf re-dispatch turn**: has NO fresh distillation gate. Acceptance gate only
-  (handoff.md:62-68). The distillation approval at handoff.md:46-49 does not re-fire on a
+  (handoff.md:62-81). The distillation approval at handoff.md:46-49 does not re-fire on a
   re-dispatch; the baton already exists and was approved. The re-dispatch enters directly at
   cf execution and proceeds to the acceptance gate.
 
@@ -386,7 +387,7 @@ The suppression rule — that a still-open `accepted_hole` must not be re-raised
 ship-blocking hole, conditionally while its disposition and door-class are unchanged — now
 lives DURABLY in divergence.md's "Hold these always" block (divergence.md:34-38), not as an
 invocation argument. The earlier framing in E1 that the rule is "passed explicitly to the
-divergence invocation" (handoff.md:64-68, "the divergence invocation passes `accepted_holes`
+divergence invocation" (handoff.md:62-81, "the divergence invocation passes `accepted_holes`
 explicitly so divergence can apply the suppression rule") is corrected: the rule is a durable
 prompt invariant in divergence.md:34-38, not something passed per-invocation as an argument.
 Carrying the `accepted_holes` list to divergence at invocation time remains required so
@@ -405,16 +406,39 @@ as ship-blocking"). Suppression-by-silence is no longer permitted: a carried hol
 neither re-opens nor annotates with an explicit `unchanged + evidence` line is a contract violation
 the relay surfaces, not a clean pass.
 
-**Door-class of the H-B change itself (one-way — flagged for the human).** This adds a REQUIRED
+**Door-class of the H-B change itself (one-way — human-approved, now landed).** This adds a REQUIRED
 output field to divergence's outward contract. The relay's acceptance step
-(`spiral/commands/handoff.md:62-68`) and the human gate consume divergence's output; once they parse
+(`spiral/commands/handoff.md:62-81`) and the human gate consume divergence's output; once they parse
 and rely on the `door-class re-evaluated` line, removing or renaming it later breaks them. That makes
-the `spiral/agents/divergence.md` edit a ONE-WAY door — an outward contract later turns build atop —
-so it is NOT made silently and NOT made in this doc-only turn. THIS TURN specifies the field as the
-contract-to-be (the text above is the spec a gate can check the doc against); the actual
-`divergence.md` "Hold these always" edit that adds the required field is flagged for the human to
-approve before a later turn sinks cost into parsing it. The door it opens: every future divergence
-output must carry the field, and the relay may begin enforcing its presence. Rationale for not
-deferring silently: the spare is already live in `divergence.md` and is applied today by silence;
-leaving the gap unnamed lets a missed door-class re-eval ship unnoticed — exactly the H-A class of
-self-contradiction this turn exists to close.
+the `spiral/agents/divergence.md` edit a ONE-WAY door — an outward contract later turns build atop.
+Because it is one-way it was NOT made silently: the human explicitly approved walking this door before
+the edit. The field is now LANDED, producer and consumer together in one turn — producer at
+`spiral/agents/divergence.md:38-43` (the "Hold these always" carried-holes bullet now requires the
+`door-class re-evaluated: unchanged | changed + evidence` line per suppressed carried hole), consumer
+at `spiral/commands/handoff.md:74-79` (the §4b acceptance step parses that line and surfaces any
+carried hole that is neither re-opened nor annotated as a contract violation, not a clean pass). The
+door it opens: every future divergence output must carry the field, and the relay enforces its
+presence. Rationale this could not defer silently: the spare was already live in `divergence.md` and
+applied by silence; leaving the gap unnamed let a missed door-class re-eval ship unnoticed — exactly
+the H-A class of self-contradiction this turn exists to close.
+
+---
+
+## Implementation Status — Doc → Real Files (LANDED)
+
+The three corrections this doc specified beyond the prose are now edited into the real plugin
+files (prior turns shipped E1's carrier and the suppression spare; this turn lands the remaining
+three). Each row points to the actual file:line that realizes it — the doc is no longer the only
+artifact carrying the correction.
+
+| Correction | What landed | Real location |
+|---|---|---|
+| **H-NEW** (E4/H5 re-entry: regenerate the holes ledger before every cf re-dispatch) | New `§4c. The cf re-dispatch` print step: main runs `state.sh get '.accepted_holes'`, rewrites the baton Holes ledger, re-pastes the §4a cf prompt. Print-only — no `Agent()`, no auto-loop. | `spiral/commands/handoff.md:83-96` |
+| **H-obs** (E2 structural coverage pre-check) | `§4b` gains a mechanical `{frozen Examples} ⊆ {plan test cases}` + `{carried holes} ⊆ {plan dispositions}` pre-check (binary covered/not-covered, main thread, no new human gate, not a fitness verdict). | `spiral/commands/handoff.md:64-72` |
+| **H-B** (door-class re-eval REQUIRED field — one-way door, human-approved) | Producer: divergence's carried-holes bullet now REQUIRES a `door-class re-evaluated: unchanged \| changed + evidence` line per suppressed carried hole. Consumer: §4b parses it and surfaces suppression-by-silence as a contract violation. Producer and consumer landed in the same turn. | producer `spiral/agents/divergence.md:38-43`; consumer `spiral/commands/handoff.md:74-79` |
+
+Invariants held: `handoff.md` is still print-only (zero `Agent()`/`SendMessage`); `spiral.md` step-6
+next-turn remains the only state machine; `state.json` (via `state.sh`) is the single source of truth
+and the baton holes ledger is its regenerated view; divergence/convergence remain Write/SendMessage-free
+subagents. The existing H1/H2 suppression spare (`divergence.md:34-38`) is preserved unchanged — H-B
+only appends the output-contract requirement, it does not relax the conditional `放過`.

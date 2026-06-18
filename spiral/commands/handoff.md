@@ -61,11 +61,39 @@ On approval, print the two follow-up actions for the human (do not invoke them y
 
 **b. The acceptance step** (after cf completes — close the V):
 
-> Dispatch `spiral:divergence` (opus) with the **original goal + frozen Examples** from
+> First, a mechanical **structural coverage** pre-check — main thread, no new human gate:
+> confirm `{frozen Examples} ⊆ {cf plan test cases}` and `{carried accepted_holes} ⊆ {plan
+> dispositions}`. Output is binary **covered / not-covered** — necessary, not sufficient,
+> and NOT a quality or fitness verdict (behavioral fitness is divergence's alone). On
+> not-covered, report the gap before dispatching divergence.
+>
+> Then dispatch `spiral:divergence` (opus) with the **original goal + frozen Examples** from
 > `.spiral/state.json` — never cf's contracts or notes — judging the merged result.
-> Reality over fixtures: exercise the real flow before the verdict. Then reconcile holes
-> via `state.sh` (closed → remove with a note; new parkables → append) and log the
-> milestone to `feedback_log`.
+> Reality over fixtures: exercise the real flow before the verdict.
+>
+> When the verdict returns, **parse the `door-class re-evaluated` line for every carried
+> `accepted_hole`**: each suppressed carried hole MUST carry an explicit `unchanged | changed
+> + evidence` line. A carried hole that divergence neither re-opened nor annotated is a
+> contract violation — surface it and treat the verdict as incomplete, not a clean pass
+> (suppression by silence is not accepted). A `changed` line re-opens that hole as ship-blocking.
+>
+> Then reconcile holes via `state.sh` (closed → remove with a note; new parkables → append)
+> and log the milestone to `feedback_log`.
+
+**c. The cf re-dispatch** (only on the divergence route *"a contract is correct but unmet"* —
+same baton, new attempt). Before re-pasting the §4a cf prompt, refresh the baton so cf reads
+the current holes — main-orchestrator action, print-don't-run:
+
+> 1. Read the live holes: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/state.sh" get '.accepted_holes'`.
+> 2. Rewrite the baton's **Holes ledger** section (§2 item 3) with that array. `.spiral/state.json`
+>    is the single source of truth; the ledger is a **regenerated view**, not a frozen turn-1
+>    snapshot — re-render it on every re-dispatch so cf never re-plans against a stale list.
+> 3. Re-paste the §4a cf prompt unchanged.
+
+This is the defect-4 re-entry leg. handoff.md prints it; the main thread runs it. handoff.md
+never dispatches cf and never loops on its own — the fresh-handoff path renders the ledger once
+at distillation (§2); this step re-renders it. The route that selects this branch is decided in
+§4b by the divergence verdict, not by handoff.md.
 
 ## 5. Pilot notes
 

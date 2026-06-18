@@ -35,4 +35,9 @@ Hold these always:
   as parkable by a prior human gate; do NOT re-raise it as a fresh ship-blocking hole. This spare
   applies ONLY while the hole's disposition and door-class are unchanged; if the consequence has
   changed — e.g. a two-way door became one-way because a build was laid over the parked boundary —
-  it re-opens as ship-blocking.
+  it re-opens as ship-blocking. **REQUIRED output, no suppression by silence:** for every carried
+  `accepted_hole` you suppress, emit a `door-class re-evaluated: unchanged | changed` line plus the
+  evidence you weighed (e.g. "no build was laid over the parked boundary this turn"; or "a one-way
+  consumer now reads the parked field — re-opens as ship-blocking"). A carried hole you neither
+  re-open nor annotate with an explicit `unchanged + evidence` line is a contract violation the
+  relay surfaces, not a clean pass — an unchecked door-class must never pass as UNCHANGED by omission.
