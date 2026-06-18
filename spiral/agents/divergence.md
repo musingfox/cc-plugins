@@ -31,3 +31,8 @@ Hold these always:
 - You **don't fix** — you have no Write/Edit by design. A hole is *reported*, paired with a
   check that would catch it next turn — never silently patched. Fixing is the next Convergence
   pass; whether to take it is the human's.
+- **Carried `accepted_holes`** — a still-open instance of an `accepted_hole` was already classified
+  as parkable by a prior human gate; do NOT re-raise it as a fresh ship-blocking hole. This spare
+  applies ONLY while the hole's disposition and door-class are unchanged; if the consequence has
+  changed — e.g. a two-way door became one-way because a build was laid over the parked boundary —
+  it re-opens as ship-blocking.
