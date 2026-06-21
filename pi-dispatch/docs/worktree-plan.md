@@ -202,10 +202,14 @@ administrative state. Removing the worktree while a live descendant still holds
    (`kill -$PGID`). This terminates Pi and every descendant spawned under it.
 
 2. **Confirm-dead poll** — after issuing the kill, poll until the process group is
-   gone. The pgid is read from `$rundir/pi.pgid` (written by pi-dispatch.sh at
-   lines :124/:235 into the `RUNDIR=` path returned on stdout at :119):
+   gone. The pgid is sourced from `$rundir/pi.pgid` (written by pi-dispatch.sh at
+   lines :124/:235 into the `RUNDIR=` path returned on stdout at :119). At clean
+   time, `$rundir` is read back from the caller-persisted path — see the H-A binding
+   mechanism documented in EX-12 below. The full clean-time poll reads:
 
    ```bash
+   # At clean time: read rundir from the caller-persisted file (cf-pi-dispatch.sh:87 pattern)
+   rundir="$(cat "$session/pi-rundir")"
    pgid="$(cat "$rundir/pi.pgid")"
    until ! kill -0 "$pgid" 2>/dev/null; do sleep 0.2; done
    ```
@@ -390,6 +394,21 @@ any path outside the repository), the call either errors or returns a wrong
 toplevel, causing the wrong git tree to be used for all subsequent worktree
 operations. Making `repo_root` caller-supplied closes this failure mode entirely.
 
+### H-B: env.sh write-back — decision: DROP
+
+`cf-pi-worktree.sh:89-94` writes `REPO_ROOT`, `BASE_BRANCH`, and `BASE_HEAD` back
+into `$session/env.sh` after the worktree is created. This write-back allows the
+idempotency check (lines :29-39) and the re-source in `cf-pi-run.sh:180-182` to
+recover those values from a persistent file if the session is resumed.
+
+**Decision: DROP.** The create-time derivation inversion described above already
+promotes all three values (`repo_root`, `base_branch`, `base_ref`) to
+caller-supplied parameters — the caller provides them explicitly at every invocation.
+There is nothing to write back: the primitive derives nothing at create time that the
+caller does not already hold. The write-back to `$session/env.sh` is therefore
+eliminated. Callers that need to persist these values for later steps do so in their
+own session state, not via an implicit side-effect on `env.sh`.
+
 ### Preconditions before worktree create
 
 `cf-pi-worktree.sh:49-61` checks git identity before creating the worktree. If
@@ -436,6 +455,31 @@ would mask configuration errors and deprive callers of the lifecycle guarantees 
 expect. Scratch mode is a distinct use-case that warrants its own flag if ever
 adopted, not a transparent fallback.
 
+### H-C: Idempotent re-entry — decision: RETAIN
+
+`cf-pi-worktree.sh:24-39` implements an idempotency guard: if the worktree path
+`$WORK` is already a live worktree when `create` is called again, the script echoes
+a notice and exits 0 without re-running the create steps.
+
+The liveness check is **on-disk**, using:
+
+```bash
+git -C "$WORK" rev-parse --is-inside-work-tree 2>/dev/null
+```
+
+This probes git's own view of whether the directory is an active worktree on disk.
+It is intentionally **not** an env-grep (searching `$session/env.sh` or similar for
+a recorded variable). An env-grep would produce a shard-seed false-positive: if
+`env.sh` was written by a prior run (or seeded from another shard), a grep might
+indicate "already created" even when no on-disk worktree actually exists at `$WORK`.
+The on-disk check avoids this false-positive entirely — the directory either passes
+`rev-parse --is-inside-work-tree` or it does not, regardless of any env.sh contents.
+
+**Decision: RETAIN.** The hoisted primitive keeps the idempotent re-entry behavior.
+Callers that call `create` on an already-live worktree get a clean exit 0, not an
+error. This is safe and useful: in retry/resume scenarios the caller should not have
+to track whether `create` already ran.
+
 ### merge-base diff-base policy: generic-with-param
 
 The diff capture in `cf-pi-worktree.sh:64-80` uses `merge-base HEAD $BASE_BRANCH`
@@ -445,7 +489,7 @@ advancing-base case — *diff from the merge-base of the working branch and the
 integration branch, so that only the consumer's own commits appear in the diff
 regardless of whether the base has advanced since the worktree was created*. That
 rationale is general value that belongs in the hoisted primitive. Single-branch
-Single-branch consumers that do not supply `base_branch` use the base_ref fallback
+consumers that do not supply `base_branch` use the base_ref fallback
 (HEAD by default), which is safe for their read-your-own-commits use-case.
 
 ---
@@ -472,20 +516,56 @@ The orchestrator runs this cleanup.sh separately, after the Pi session ends. The
 (around line 236) calls only `cf-pi-stop.sh --abort` then exits — there is no
 `worktree remove` and no `kill -0` confirm-poll inside `fail_kill`.
 
+### H-A: The ordering problem — why a bare `$rundir` inside the cleanup heredoc is unbound
+
+The cleanup block is authored as a heredoc appended to `$CLEANUP_SCRIPT` at create
+time (cf-pi-worktree.sh:73-82). The orchestrator later executes it via
+`bash "$CLEANUP_SCRIPT"` (cf.md:601) in a **fresh bash shell that sources only
+`env.sh`** — no ambient variables from the dispatch session are present.
+
+Meanwhile, `RUNDIR` (the path produced by pi-dispatch.sh on stdout) only exists
+**after** dispatch runs. The lifecycle order in `cf-pi-run.sh` is: create runs first
+(lines :16-20, :178) and dispatch runs later (:227). The heredoc is written during
+create — at that point, `RUNDIR` does not yet exist. At cleanup execution time,
+`RUNDIR` is not in scope either, because the fresh bash has only `env.sh`. A bare
+`$rundir` variable inside the heredoc body would therefore be **unbound at run time**,
+producing an empty or erroneous path.
+
+### H-A: Binding mechanism — option (a) caller-persisted path
+
+The fix mirrors the pattern cf already uses for its stop adapter: `cf-pi-dispatch.sh`
+writes the rundir into a well-known persisted file at `$session/pi-rundir`
+(cf-pi-dispatch.sh:87), and `cf-pi-stop.sh` reads it back at stop time
+(cf-pi-stop.sh:27) to obtain `$RUNDIR` before delegating to canonical `pi-stop.sh`
+(:30-31).
+
+The hoisted primitive applies the **same caller-persisted path mechanism** (option a):
+after dispatch, the caller writes the `RUNDIR=` value into `$session/pi-rundir`
+(mirroring cf-pi-dispatch.sh:87). The cleanup script reads it back at run time to
+obtain the live `rundir` value. This eliminates the unbound-variable problem without
+requiring any change to the frozen trio.
+
 ### Net-new hardening: confirm-poll before cleanup remove
 
 cf currently has no confirm-poll at the cleanup remove site. The hoisted primitive
 adds net-new hardening: a confirm-poll placed **immediately before** the `worktree
-remove` call inside the cleanup block. The pgid is sourced from `$rundir/pi.pgid`
-(the path written by pi-dispatch.sh at :124/:235, where `rundir` is the `RUNDIR=`
-value returned on stdout at :119):
+remove` call inside the cleanup block. At clean time, `rundir` is obtained from the
+caller-persisted file (written at dispatch time, mirroring cf-pi-dispatch.sh:87;
+read back here mirroring cf-pi-stop.sh:27). The pgid is then read from
+`$rundir/pi.pgid` (the path written by pi-dispatch.sh at :124/:235):
 
 ```bash
 # confirm-poll — placed immediately before worktree remove
+# rundir is bound at run time by reading the caller-persisted path
+rundir="$(cat "$session/pi-rundir")"
 pgid="$(cat "$rundir/pi.pgid")"
 until ! kill -0 "$pgid" 2>/dev/null; do sleep 0.2; done
 git worktree remove --force "$work_path"
 ```
+
+The `rundir="$(cat "$session/pi-rundir")"` line is what binds `$rundir` at clean
+time — without it (or the equivalent caller-persisted mechanism), the variable is
+unbound in the fresh bash context.
 
 This makes worktree removal race-free by ensuring the process group is fully dead
 before the remove runs. cf currently has no such poll at the cleanup.sh remove site —
