@@ -217,13 +217,23 @@ an administrative file under `.git/worktrees/<id>`. Removing the worktree with a
 live descendant holding `$WORK` produces unpredictable behavior — the kernel may
 block the remove or leave stale refs.
 
-**This confirm poll is an addition over the current cf behavior.** Today,
+**This confirm poll is net-new hardening, not present in cf today.** Today,
 `cf-pi-stop.sh` (the thin adapter) falls back to only `sleep 2` before issuing
-the final `kill -9` — it does not poll for confirmed group death. The sequence in
-`cf-pi-run.sh:236` (the `fail_kill` / abort-then-cleanup ordering) already models
-the correct intent: call `cf-pi-stop.sh --abort` first, then proceed with cleanup.
-The hoisted primitive hardens this by replacing the fixed `sleep 2` with an active
-`kill -0` poll loop, making worktree removal race-free.
+the final `kill -9` — it does not poll for confirmed group death.
+
+**RETRACTED / WRONG — the following prior-art claim was false and is no longer asserted:**
+~~The sequence in `cf-pi-run.sh:236` (the `fail_kill` / abort-then-cleanup ordering)
+already models the correct intent: call `cf-pi-stop.sh --abort` first, then proceed
+with cleanup.~~
+
+**Ground truth:** `fail_kill` in `cf-pi-run.sh` (around line 236) calls only
+`cf-pi-stop.sh --abort` then exits. There is no `worktree remove` and no `kill -0`
+confirm-poll in `fail_kill`. The `git worktree remove --force "$WORK"` executes
+inside the appended `cleanup.sh` (CLEANUP_SCRIPT, cf-pi-worktree.sh:81), which the
+orchestrator runs separately, time-decoupled from `fail_kill`. cf currently has no
+confirm-poll at that cleanup remove site. The hoisted primitive adds an active
+`kill -0 $PGID` poll loop immediately before that `worktree remove` call, making
+worktree removal race-free.
 
 ---
 
@@ -322,4 +332,174 @@ as a STATUS→token case table) appears in this document as a live mechanism. Th
 layer was retired at commit b4dda64.
 
 **Internal cross-references:** Every EX-N reference in this document (EX-1 through
-EX-10) corresponds to a section defined here. No dangling references.
+EX-15) corresponds to a section defined here. No dangling references.
+
+---
+
+## EX-11 — Parameterized Interface Contract: Named Params Replace cf-env Vars
+
+### Why a param table matters
+
+`cf-pi-worktree.sh` sources its inputs from `load_cf_pi_env` — a cf-specific
+environment loader. The hoisted helper `pi-worktree.sh` must run without that
+loader; all inputs become explicit, named primitive parameters.
+
+### cf-env var → named parameter mapping
+
+| cf-env variable    | cf script citation              | Named parameter in pi-worktree.sh |
+|--------------------|---------------------------------|-----------------------------------|
+| `REPO_ROOT`        | cf-pi-worktree.sh:41, :81, :91 | `repo_root`                       |
+| `CF_BRANCH`        | cf-pi-worktree.sh:63            | `branch_name`                     |
+| `BASE_HEAD`        | cf-pi-worktree.sh:71            | `base_ref`                        |
+| `BASE_BRANCH`      | cf-pi-worktree.sh:72, :77      | `base_branch`                     |
+| `WORK`             | cf-pi-env.sh:58                 | `work_path`                       |
+| `DIFF_FILE`        | cf-pi-env.sh:58 / worktree:80  | `diff_out`                        |
+| `CLEANUP_SCRIPT`   | cf-pi-worktree.sh:73            | `cleanup_out`                     |
+
+With these named parameters the helper has no dependency on `load_cf_pi_env` or any
+cf session convention. Any consumer (spiral, or a future plugin) can call
+`pi-worktree.sh` by passing plain strings.
+
+### merge-base diff-base policy: generic-with-param
+
+The diff capture in `cf-pi-worktree.sh:64-80` uses `merge-base HEAD $BASE_BRANCH`
+(with fallback to `$BASE_HEAD` when the branch is unavailable). This policy is
+classified as **generic-with-param** (default TW-5): it is not cf-specific logic
+but a universally correct rebase-tracking strategy. The rationale — *diff from the
+merge-base of the working branch and the integration branch, so that only the
+consumer's own commits appear in the diff regardless of whether the base has
+advanced since the worktree was created* — is general value that belongs in the
+hoisted primitive. The caller supplies `base_branch` and `base_ref`; the helper
+applies the merge-base policy. Any consumer that omits `base_branch` falls back to
+`base_ref` (HEAD by default), which is safe for single-branch consumers.
+
+---
+
+## EX-12 — Retraction of False kill-confirm Prior-Art; Real Remove Site Located
+
+### Where `git worktree remove` actually executes
+
+**RETRACTED — the prior claim that `cf-pi-run.sh:236` already models
+confirm-then-remove is wrong and is no longer asserted.**
+
+The real remove site is the **appended `cleanup.sh`** (CLEANUP_SCRIPT). In
+`cf-pi-worktree.sh:73-82`, the create path appends a shell block to `$CLEANUP_SCRIPT`.
+That block contains:
+
+```bash
+git -C "$WORK" diff "$_diff_base" > "$DIFF_FILE" 2>/dev/null || true
+git -C "$REPO_ROOT" worktree remove --force "$WORK" 2>/dev/null || true
+```
+
+The orchestrator runs this cleanup.sh separately, after the Pi session ends. The
+`git worktree remove --force "$WORK"` call (cf-pi-worktree.sh:81) is
+**time-decoupled from `fail_kill`**. The `fail_kill` function in `cf-pi-run.sh`
+(around line 236) calls only `cf-pi-stop.sh --abort` then exits — there is no
+`worktree remove` and no `kill -0` confirm-poll inside `fail_kill`.
+
+### Net-new hardening: confirm-poll before cleanup remove
+
+cf currently has no confirm-poll at the cleanup remove site. The hoisted primitive
+adds net-new hardening: a `kill -0 $PGID` confirm-poll placed **immediately before**
+the `worktree remove` call inside the cleanup block:
+
+```bash
+# confirm-poll — placed immediately before worktree remove
+until ! kill -0 "$PGID" 2>/dev/null; do sleep 0.2; done
+git worktree remove --force "$work_path"
+```
+
+This makes worktree removal race-free by ensuring the process group is fully dead
+before the remove runs. cf currently has no such poll at the cleanup.sh remove site —
+this is a net-new addition in the hoisted primitive, not a reimplementation of
+existing cf behavior.
+
+---
+
+## EX-13 — Named Net-New Helper; Frozen Trio Stays Byte-Unchanged
+
+### New file: `pi-dispatch/scripts/pi-worktree.sh` (net-new)
+
+The hoisted worktree lifecycle lives in a single net-new file:
+
+```
+pi-dispatch/scripts/pi-worktree.sh    ← NET-NEW; does not exist yet on disk
+```
+
+This file will implement the `create` and `clean` lifecycle phases (parameterized
+per EX-11). It is not a rename or move of any existing file.
+
+### Frozen trio: byte-unchanged (OWD-A, migration-plan.md:95)
+
+The three canonical dispatchers in `pi-dispatch/scripts/` stay **byte-unchanged**
+(untouched) by this work:
+
+| Script            | Status   | Reason                                                        |
+|-------------------|----------|---------------------------------------------------------------|
+| `pi-dispatch.sh`  | frozen   | Canonical launcher; OUTPUT=/PID=/RUNDIR= contract is closed.  |
+| `pi-poll.sh`      | frozen   | Canonical poller; no worktree awareness needed.               |
+| `pi-stop.sh`      | frozen   | Canonical group-kill; used as-is by the cleanup sequence.     |
+
+No `--worktree` flag, no new parameters, no modifications of any kind are proposed
+for these three files. The worktree create/clean logic lives entirely in the new
+`pi-worktree.sh` helper, leaving the frozen trio byte-unchanged.
+
+---
+
+## EX-14 — Per-Consumer Branch Namespace; Exact-Path Prune/Remove Disambiguation
+
+### Per-consumer prefix parameter
+
+Each consumer supplies a branch prefix parameter (default: `<consumer>/<session>`).
+The hoisted primitive does not hard-code a prefix — the caller provides it:
+
+```bash
+pi-worktree.sh create \
+  --repo_root "$REPO_ROOT" \
+  --branch_name "${prefix}/${session_basename}" \
+  --work_path "$session/work" \
+  ...
+```
+
+**Namespace reservation:** `ctxflow/` is reserved for cf-only use. A spiral consumer
+must not use `ctxflow/...` — it would collide with cf's branch namespace. Spiral
+would pass its own prefix (e.g. `spiral/<session>`). The consumer/ prefix
+convention ensures per-consumer namespaces remain inspectable and non-overlapping.
+
+### Prune and remove: by exact `$work_path`, not prefix scan
+
+When removing or pruning worktrees the primitive disambiguates by **exact
+`$work_path`**, not by branch prefix scan. This mirrors cf's real implementation:
+
+- **Existence check (cf-pi-integrate.sh:78):** `git worktree list --porcelain | grep -Fq "worktree $path"` — matches the exact registered path via porcelain output.
+- **Remove (cf-pi-worktree.sh:81):** `git worktree remove --force "$WORK"` — removes by the exact `$work_path`.
+
+This is not a prefix scan. No worktree is removed based on branch name pattern
+matching. The exact `$work_path` is the single key for all prune and remove
+operations, ensuring that removing one consumer's worktree cannot accidentally
+affect another consumer's worktrees that happen to share a branch prefix.
+
+---
+
+## EX-15 — No-Regression: Turn-2 Corrected Content (EX-1..EX-10) Preserved
+
+This section is an invariant: EX-11..EX-14 only add or refine; they do not retract
+any turn-2 correction.
+
+**EX-1 stance (cwd does NOT sandbox/confine):** The working directory does not
+sandbox or confine absolute-path writes. Pi has shell and edit tools — it can write
+to any absolute path the brief names, regardless of cwd. This stance is not reverted.
+
+**EX-8 stance (commit-or-discard, not defer-if-unmerged):** No commits are lost by
+worktree removal; the branch is kept. The only dangerous state is uncommitted local
+edits. Defer-if-unmerged is a rejected anti-pattern and is not reasserted anywhere
+in this document.
+
+**EX-9 stances (OWD-A + OWD-B):** `pi-dispatch.sh` stays frozen and byte-unchanged
+(OWD-A). One-worktree-one-branch is the concurrency contract (OWD-B). Neither
+one-way door is reopened by EX-11..EX-14.
+
+**EX-10 retired translation-layer note:** The legacy STATUS→token case-table
+(see EX-10 above for the vocabulary) was retired at commit b4dda64. It does not
+appear as a live mechanism in this document. The `cf-pi-poll.sh` basename is still
+live (thin adapter); the translation layer it replaced is gone (no longer asserted).
