@@ -78,35 +78,47 @@ the load-bearing structural change, so it is staged last and behind its own roll
 |---|---|---|---|
 | `pi-run-sync.sh` (new) | ADD — runs Pi to completion + self-distills to paths-only `outcome.md`; this is what MAIN backgrounds | two-way | new |
 | `pi-driver.md` | RETIRE as waiter — dispatch moves to MAIN; an optional one-shot distiller agent may replace it later if extra isolation is wanted | two-way (last step) | `context-flow/agents/pi-driver.md:1-12` |
-| `cf-pi-run.sh` | SHRINK — `dispatch_and_poll` sleep/translate loop removed; lifecycle (write_outcome, gate pipeline) folds into `pi-run-sync.sh` or MAIN orchestration | two-way | `context-flow/scripts/cf-pi-run.sh:220-311` |
-| `cf-pi-poll.sh` | REMOVE — translation layer is dead once nothing polls legacy tokens | two-way | `context-flow/scripts/cf-pi-poll.sh:82-152` |
-| `cf-pi-dispatch.sh` | KEEP + dedup resolver into `cf-pi-env.sh`; gains `--profile` pass-through | two-way | `context-flow/scripts/cf-pi-dispatch.sh:27-34` |
+| `cf-pi-run.sh` | SHRINK — `dispatch_and_poll` (70×30s loop, `:228-303`) removed; lifecycle (write_outcome `:67-147`, gate pipeline `:326-465`) folds into `pi-run-sync.sh` | two-way | `context-flow/scripts/cf-pi-run.sh:220-311` |
+| `cf-pi-poll.sh` | REMOVE — translation layer is dead once nothing polls legacy tokens | two-way | `context-flow/scripts/cf-pi-poll.sh:83-152` |
+| `cf-pi-dispatch.sh` | KEEP + dedup resolver into `cf-pi-env.sh`; gains `--profile` (needs arg-parse edit, not passthrough) | two-way | `context-flow/scripts/cf-pi-dispatch.sh:30-34` |
+| `cf.md` | CHANGE — the `Agent(pi-driver)` fan-out becomes MAIN-driven `run_in_background` + resume/gather | two-way | `context-flow/commands/cf.md:334-351,388-391,445` |
 | `cf-pi-status.sh` | OUT-OF-SCOPE — re-derives tokens from disk independently | n/a | `context-flow/scripts/cf-pi-status.sh:82-120` |
-| `pi-dispatch.sh` | KEEP frozen — setsid/pgid + `OUTPUT=/PID=/RUNDIR=` (OWD-2) untouched; still used by spiral | frozen | `pi-dispatch/scripts/pi-dispatch.sh:196-198` |
-| `pi-build.sh` (spiral) | OUT-OF-SCOPE — short blocking run inside spiral BUILD; no fanout, finishes before ceiling | n/a | `spiral/scripts/pi-build.sh:44-48` |
+| `pi-dispatch.sh` | KEEP frozen — setsid/pgid (`:142-184`) + `OUTPUT=/PID=/RUNDIR=` (OWD-2, `:196-198`) untouched; still used by spiral | frozen | `pi-dispatch/scripts/pi-dispatch.sh:142-198` |
+| `pi-build.sh` (spiral) | OUT-OF-SCOPE — short blocking run inside spiral BUILD; no fanout, finishes before ceiling | n/a | `spiral/scripts/pi-build.sh:97,113-130` |
 
 ## Migration sequence (cheapest-to-reverse first)
 
 ### Step 1 — resolver dedup (two-way)
-Extract the duplicated sibling-resolver (`cf-pi-dispatch.sh:27-34`, `cf-pi-poll.sh:44-49`,
-`cf-pi-stop.sh:22-26`) into a `resolve_canon_dispatch` helper in `cf-pi-env.sh` (already
-sourced by all three). Each caller keeps its own distinct failure branch (`PI_RESOLVE_ONLY`
-lives only in dispatch; poll echoes `NO_PID` fail-soft; stop falls through to a direct kill).
-Pure refactor, no behavior change. **Rollback:** restore inline blocks.
+Extract the duplicated sibling-resolver (`cf-pi-dispatch.sh:30-34`, `cf-pi-poll.sh:44-54`,
+`cf-pi-stop.sh:22-27`) into a `resolve_canon_dispatch` helper in `cf-pi-env.sh` (already
+sourced by all three — `cf-pi-dispatch.sh:25`, `cf-pi-poll.sh:38`, `cf-pi-stop.sh:14`; it
+currently holds only `load_cf_pi_env`/`load_cf_flow_env`, no resolver). Each caller keeps its
+own distinct failure branch (`PI_RESOLVE_ONLY` lives only in dispatch `:37-44`; poll echoes
+`NO_PID` fail-soft; stop falls through to `/nonexistent` + a direct `kill`). Pure refactor, no
+behavior change. **Rollback:** restore inline blocks.
 
 ### Step 2 — add `--profile` selection (two-way, additive)
-Add `--profile NAME` to `pi-dispatch.sh` (and pass-through in `cf-pi-dispatch.sh`) that reads a
-small `profiles` file (model / provider / tool-set / permissions). Default profile = today's
-behavior, so existing callers are unaffected. **Rollback:** ignore the flag; default path is
-unchanged.
+Add `--profile NAME` resolving model / provider / tool-set / permissions from a small `profiles`
+file, with the default profile = today's behavior so existing callers are unaffected. Note both
+scripts parse **fixed positionals today** (`pi-dispatch.sh` `$1/$2/$3` at `:67-69`;
+`cf-pi-dispatch.sh` `$1/$2` at `:48-49`) with no getopts and no passthrough — extra args are
+silently ignored. So `--profile` is a real arg-parsing edit in both, not a free passthrough;
+keep it backward-compatible (positionals still work when the flag is absent). **Rollback:**
+ignore the flag; default path is unchanged.
 
 ### Step 3 — add `pi-run-sync.sh` + migrate cf to MAIN-driven background (two-way)
 Add `pi-run-sync.sh`: run Pi to completion (stdout → `raw.jsonl`), apply the existing
-`agent_end` success whitelist, distill to paths-only `outcome.md`, exit. Change the context-flow
-implement flow so **MAIN** fires one `run_in_background` Bash per shard calling
-`pi-run-sync.sh --profile X`, and reads each `outcome.md` on its completion ping (optionally
-`Monitor` for progress). Set `BASH_MAX_TIMEOUT_MS` in settings as the safety ceiling.
-**Rollback:** revert the flow to spawning `pi-driver`; `pi-run-sync.sh` is additive and can sit
+`agent_end` success whitelist (reuse `pi-poll.sh` `judge_agent_end:164-186` — do not
+reimplement), run the gate pipeline, distill to paths-only `outcome.md`, exit. Then change
+`cf.md:334-351` so **MAIN** fires one `run_in_background` Bash per shard calling
+`pi-run-sync.sh --profile X` (instead of `Agent(pi-driver)`), and on each completion ping reads
+that shard's `outcome.md`, proceeding once all shards' `outcome.md` exist (optionally `Monitor`
+for live progress). This is the substantive step: `cf.md` gains a **resume-and-gather** loop
+(MAIN ends its turn after firing, is re-invoked per completion — same mechanism as
+`wait-decision.sh`), not a one-line swap. Set `BASH_MAX_TIMEOUT_MS` in settings as the safety
+ceiling. **Feasibility caveat:** the gate pipeline (`cf-pi-run.sh:326-465`) must be pure shell
+to fold into the background runner; if any gate needs agent judgment it stays MAIN-side.
+**Rollback:** revert `cf.md` to spawning `pi-driver`; `pi-run-sync.sh` is additive and can sit
 unused.
 
 ### Step 4 — remove the dead poll path (two-way, cleanup)
