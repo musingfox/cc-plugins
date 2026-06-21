@@ -12,6 +12,62 @@ Everything downstream — `pi-poll.sh`, `cf-pi-dispatch.sh`, `cf-pi-poll.sh`, `c
 
 ---
 
+## First-Principles Re-Derivation
+
+The goal here is to derive the dispatch mechanism FROM the irreducible constraints — not from the current setsid/disown/pgid/poll design. The existing machinery is an answer; this section asks what answer the constraints force.
+
+### Irreducible constraints
+
+- **C1 — Bash 600s ceiling.** Any single Bash tool call is killed at 10 min (`context-flow/agents/pi-driver.md:35`). No single blocking call can safely hold a Pi run of unknown duration.
+- **C2 — Star topology.** Sub-agents cannot spawn sub-agents; only MAIN can fan out (project constraint). Parallelism is therefore a MAIN-level capability, never a sub-agent capability.
+- **C3 — F3 unknown.** Harness auto-re-invoke-on-background-exit is PROVEN for the MAIN agent (`spiral/scripts/wait-decision.sh`, `spiral/commands/spiral.md:142-148`) but UNVERIFIED for a restricted sub-agent. This unknown is the load-bearing gate on the cheapest improvement path.
+- **C4 — Pi's terminal signal.** Pi is a CLI emitting a `--mode json` event stream; `agent_end` is the only terminal truth; the process exit code carries no semantics (`pi-dispatch/scripts/pi-poll.sh:28-50`). Cancel = group-kill the detached pgid.
+- **C5 — Shared primitive.** The canonical dispatch is shared by 3 plugins via a frozen stdout contract `OUTPUT=/PID=/RUNDIR=`. Any change to this interface is a 3-plugin blast.
+- **C6 — Work shape.** Pi work is long, token-heavy, possibly parallel, and needs result filter to keep MAIN context clean. The filter must happen outside main context and yield a small artifact.
+
+### Decomposition into five sub-problems and constraint-derivation
+
+**SP1 — Who holds the wait across the 600s ceiling?**
+Given the C1 ceiling, whoever holds the wait must either (a) finish under 600s or (b) be re-invoked by the harness on background-process exit. From C1+C3, the proven holder of pattern (b) is MAIN via `run_in_background`/Task. A sub-agent can only satisfy C1 by self-polling within ≤600s slices — which is exactly what the legacy design does — and that design exists ONLY because F3 (C3) was never tested. The first-principles holder is the harness (background), not a hand-rolled poll loop. The sub-agent self-poll is accidental complexity, not a constraint-derived necessity.
+
+**SP2 — Who provides parallelism?**
+Since sub-agents cannot spawn sub-agents (C2), only MAIN can fan out. The legacy "sub-agent drives one shard" yields parallelism solely because MAIN already fans out N pi-driver sub-agents — the parallel point is MAIN regardless. Minimal mechanism: MAIN fans out N background dispatches (or N sub-agents); parallelism is never a sub-agent capability and should not be encoded there.
+
+**SP3 — Who filters the result?**
+Given C6, filtering must happen outside main context and yield a small artifact. The shell already does this: the paths-only `write_outcome`/`outcome.md` in `cf-pi-run.sh:67-126` is the filter. A sub-agent is NOT required to filter — the shell filters; a sub-agent is just one optional reader. Minimal mechanism: shell-writes-outcome + an OPTIONAL post-completion distiller sub-agent only when cross-artifact narrative synthesis is needed (FAIL/NEEDS_REPLAN). The double token-translation path (Pi JSON stream → `outcome.md` → sub-agent distillation → main) exists because a sub-agent was used; it follows from no constraint.
+
+**SP4 — How are cancel/stall/timeout bounded?**
+Since the exit code carries no semantics (C4), `agent_end` is the only terminal truth; timeout = wall-clock bound, stall = stream staleness, cancel = group-kill the detached pgid. The current process-state-first check + `agent_end` whitelist in `pi-poll.sh:28-50` + group-kill in `pi-stop.sh` is first-principles-correct. This machinery should be KEPT regardless of which SP1 path is chosen; it encodes the constraint directly.
+
+**SP5 — How does the shared primitive stay stable?**
+Given C5, the stdout grammar `OUTPUT=/PID=/RUNDIR=` is the interface. Stability follows from freezing it (OWD-2) and letting consumers evolve independently. Any improvement that preserves this contract is plugin-local and safe; any change to it is a 3-plugin coordinated blast. This is a constraint, not a preference.
+
+### Judgement: mapping the derivation onto the existing options
+
+- **`run_in_background`**: CONFIRMED as the right SP1 wait-mechanism for MAIN-driven dispatch; gated on F3 (C3) for sub-agent-driven dispatch. The real variable is "who drives — MAIN or sub-agent," not "background vs poll." Since the C2 star topology already means MAIN is the parallelism point (SP2), driving from MAIN with `run_in_background` is the first-principles shape. Viable for MAIN today; blocked for sub-agent until F3 is resolved.
+
+- **`subagent-fanout`**: REFRAMED — parallelism is always MAIN's job (SP2/C2), so this option is really "MAIN-fanout of sub-agents each self-polling." It is consistent with the derivation's conclusion (MAIN holds the wait), but it is the heavier shape: each sub-agent still self-polls in ≤600s slices because F3 is untested. The one-way door classification is therefore correct and unchanged; this requires coordinated rewrites across all three plugins before any benefit is realized.
+
+- **`status-quo`**: CONSISTENT with the constraints but carries accidental complexity that follows from no constraint. The sub-agent self-poll exists only because F3 is untested (SP1); if F3 is confirmed, the poll loop has no constraint-derived justification. The double token-translation and 4× resolver duplication likewise follow from no constraint and are pure accidental cost. Status-quo is defensible only as "we have not yet tested F3."
+
+- **`chunked-session-resume`**: CONFIRMED as the cheapest C1-dissolving lever for SP1. Chunking under 600s via existing `--session` (`pi-dispatch.sh:99-120`, `cf-pi-run.sh:412`) removes the need for a long wait-holder entirely for well-bounded shards. SP4 still needs a short poll, but the 70-round ceiling pressure is removed. This is the minimal door since door class is two-way (chunk sizing is tunable). Consistent with preserving SP4 and SP5.
+
+### Native affordances
+
+- **`run_in_background`**: viable for MAIN (proven C3 — MAIN path confirmed), gated for sub-agent (F3 open unknown).
+- **Task tools (TaskCreate/Monitor)**: harness-native wait+notify, same MAIN-level family as `run_in_background`; viable and possibly cleaner than the self-rolled background/poll. Worth evaluating alongside `run_in_background` once F3 is resolved.
+- **MCP (pi-as-MCP-server)**: if Pi exposed an MCP server, dispatch becomes a native tool call — the cleanest protocol match for SP1. However, this is pi-side work to build; it is gated and currently unknown feasibility. Attractive long-term, not free.
+
+### Revised recommendation — explicit supersession
+
+The first-principles derivation SUPERSEDES the prior framing. The prior framing weighed `run_in_background` vs `subagent-fanout` vs `status-quo` vs `chunked-session-resume` as roughly co-equal options differentiated by door class and ceiling risk. That framing obscured the load-bearing variable.
+
+The derivation shows the load-bearing variable is "who holds the wait — MAIN or sub-agent," not "background vs poll." SP1+SP2 establish that the target shape is MAIN-holds-the-wait (via `run_in_background`/Task) + shell-writes-outcome (SP3) + optional distiller, with SP4 (poll whitelist + group-kill) and SP5 (frozen stdout contract) already first-principles-correct and kept unchanged. The sub-agent-driver complexity is the accidental cost of the choice to drive from a sub-agent; F3 only matters if we insist on sub-agent-driving.
+
+The revised recommendation therefore reorders priorities: resolve F3 first (empirical test, no architectural commitment); if F3 confirms MAIN re-invoke, migrate to MAIN-driven `run_in_background` shape (OWD-1 still gated on human approval); if F3 does not confirm, `chunked-session-resume` is the cheapest structural improvement (shrinks C1 exposure, no one-way doors). Keep SP4 and SP5 in every path. The `## Recommendation` section below is updated accordingly.
+
+---
+
 ## Options
 
 ### `run_in_background` (native background-task)
