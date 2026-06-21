@@ -242,10 +242,20 @@ dispatch_and_poll() {
       DONE)
         return 0
         ;;
+      NO_OUTPUT)
+        # Agent cleanly ended its turn but wrote no report/diff (e.g. thinking-only,
+        # never emitted tool calls). NOT a stall — detectable at once, fail fast and
+        # label it accurately so the postmortem points at the real cause.
+        "$SCRIPTS/cf-pi-stop.sh" "$SHARD_SESSION" --abort >/dev/null 2>&1 || true
+        local pm; pm=$(do_postmortem)
+        write_outcome FAIL no-output "" "(all): agent ended turn without output ($status_line)" "$pm" "-"
+        echo "[shard $SHARD_ID] FAIL no-output"
+        exit 1
+        ;;
       NO_JSONL_FAIL)
         "$SCRIPTS/cf-pi-stop.sh" "$SHARD_SESSION" --abort >/dev/null 2>&1 || true
         local pm; pm=$(do_postmortem)
-        write_outcome FAIL stall "" "(all): poll NO_JSONL_FAIL" "$pm" "-"
+        write_outcome FAIL no-jsonl "" "(all): poll NO_JSONL_FAIL" "$pm" "-"
         echo "[shard $SHARD_ID] FAIL NO_JSONL_FAIL"
         exit 1
         ;;
@@ -259,15 +269,22 @@ dispatch_and_poll() {
       ERROR)
         "$SCRIPTS/cf-pi-stop.sh" "$SHARD_SESSION" --abort >/dev/null 2>&1 || true
         local pm; pm=$(do_postmortem)
-        write_outcome FAIL stall "" "(all): poll ERROR ($status_line)" "$pm" "-"
+        write_outcome FAIL error "" "(all): poll ERROR ($status_line)" "$pm" "-"
         echo "[shard $SHARD_ID] FAIL ERROR"
         exit 1
         ;;
       TIMEOUT)
         "$SCRIPTS/cf-pi-stop.sh" "$SHARD_SESSION" --abort >/dev/null 2>&1 || true
         local pm; pm=$(do_postmortem)
-        write_outcome FAIL stall "" "(all): poll TIMEOUT" "$pm" "-"
+        write_outcome FAIL timeout "" "(all): poll TIMEOUT" "$pm" "-"
         echo "[shard $SHARD_ID] FAIL TIMEOUT"
+        exit 1
+        ;;
+      RC_FAIL)
+        "$SCRIPTS/cf-pi-stop.sh" "$SHARD_SESSION" --abort >/dev/null 2>&1 || true
+        local pm; pm=$(do_postmortem)
+        write_outcome FAIL rc-fail "" "(all): poll RC_FAIL ($status_line)" "$pm" "-"
+        echo "[shard $SHARD_ID] FAIL RC_FAIL"
         exit 1
         ;;
       NO_PID)
@@ -278,7 +295,7 @@ dispatch_and_poll() {
       *)
         "$SCRIPTS/cf-pi-stop.sh" "$SHARD_SESSION" --abort >/dev/null 2>&1 || true
         local pm; pm=$(do_postmortem)
-        write_outcome FAIL stall "" "(all): poll unknown ($status_line)" "$pm" "-"
+        write_outcome FAIL poll-unknown "" "(all): poll unknown ($status_line)" "$pm" "-"
         echo "[shard $SHARD_ID] FAIL poll unknown: $status_line"
         exit 1
         ;;
@@ -288,7 +305,7 @@ dispatch_and_poll() {
   # Exhausted rounds without DONE.
   "$SCRIPTS/cf-pi-stop.sh" "$SHARD_SESSION" --abort >/dev/null 2>&1 || true
   local pm; pm=$(do_postmortem)
-  write_outcome FAIL stall "" "(all): poll loop ceiling (70 rounds)" "$pm" "-"
+  write_outcome FAIL poll-ceiling "" "(all): poll loop ceiling (70 rounds)" "$pm" "-"
   echo "[shard $SHARD_ID] FAIL poll ceiling"
   exit 1
 }

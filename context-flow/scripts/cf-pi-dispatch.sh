@@ -64,7 +64,11 @@ if [ -n "$resume_prompt" ]; then
 fi
 
 # PI_PROMPT: preserve cf's brief prompt behavior (fresh dispatch suffix).
-export PI_PROMPT="${PI_PROMPT:-Read the brief and execute it. When finished, print exactly DONE and nothing else.}"
+# Nudge: Pi on high thinking can spend its whole first turn planning and end it
+# with zero tool calls (no write/edit/bash, no report) — a clean stop that produces
+# nothing. Tell it to act before ending the turn, so planning never substitutes for
+# the first concrete tool call.
+export PI_PROMPT="${PI_PROMPT:-Read the brief and execute it. Act now: make your first tool call (read/edit/bash) before ending your turn — do not end a turn on planning alone. When finished, print exactly DONE and nothing else.}"
 
 # Pass cf's env vars to the canonical dispatch.
 export PI_PROVIDER="${PI_PROVIDER:-}"

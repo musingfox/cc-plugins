@@ -19,8 +19,11 @@
 #
 # Decision order is PROCESS-STATE-FIRST: once the process has exited we judge the
 # RESULT (OK/FAIL) before ever considering wall-clock TIMEOUT or stall STALL — a
-# Pi that already finished is terminal regardless of elapsed time. Only while the
-# wrapper process is still ALIVE do the liveness guards (wall-clock, stall) apply.
+# Pi that already finished is terminal regardless of elapsed time. The same intent
+# applies even while ALIVE: if an agent_end is already in the stream the agent loop
+# is over, so we group-kill the lingering wrapper and judge the result immediately
+# rather than burning the stall window. Only when ALIVE *and* no agent_end yet do
+# the liveness guards (wall-clock, stall) apply.
 #
 # Terminal state source (load-bearing for the hybrid stack):
 #   The terminal state is the stopReason of the LAST assistant message in the json
@@ -154,6 +157,34 @@ SZ=$(wc -c < "$OUTPUT_FILE" 2>/dev/null || echo 0)
 PI_RC=""
 [ -f "$RC_FILE" ] && PI_RC="$(cat "$RC_FILE" 2>/dev/null)"
 
+# Judge an already-present agent_end against the success WHITELIST and emit a
+# terminal line. Assumes $AGENT_END_LINE is non-empty (caller checked). Shared by
+# the dead branch (rc==0) and the ALIVE short-circuit — an agent_end means the
+# agent loop is OVER, so the result is terminal regardless of process liveness.
+judge_agent_end() {
+  if [ "$STOP_REASON" = "error" ]; then
+    emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE ERROR terminal=error ${ELAPSED}s"
+    exit 0
+  fi
+  if [ "$STOP_REASON" != "stop" ]; then
+    emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE terminal=${STOP_REASON:-none} not-stop ${ELAPSED}s"
+    exit 0
+  fi
+  # stopReason == stop: check result text is non-empty. Empty text == the agent
+  # ended its turn (e.g. thinking-only) without producing any actionable output.
+  if [ -z "$DISTILLED_TEXT" ]; then
+    emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE empty 0B terminal=stop ${ELAPSED}s"
+    exit 0
+  fi
+  # Full whitelist satisfied: agent_end + stopReason==stop + non-empty text.
+  # Distill: save raw stream as pi.stream.jsonl, write human-readable result.md.
+  cp "$OUTPUT_FILE" "$STREAM_FILE" 2>/dev/null || true
+  printf '%s\n' "$DISTILLED_TEXT" > "$OUTPUT_FILE" 2>/dev/null || true
+  SZ=$(wc -c < "$OUTPUT_FILE" 2>/dev/null || echo 0)
+  emit "STATUS=OK OUTPUT=$OUTPUT_FILE ${ELAPSED}s ${SZ}B rc=0 terminal=stop"
+  exit 0
+}
+
 # ---- PROCESS-STATE-FIRST: the wrapper has EXITED -> judge the result, terminal ----
 if [ "$alive_rc" -ne 0 ]; then
   # rc file present -> the wrapper recorded pi's real exit.
@@ -171,27 +202,8 @@ if [ "$alive_rc" -ne 0 ]; then
       emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE died-mid-stream no-terminal ${ELAPSED}s"
       exit 0
     fi
-    # agent_end present: judge stopReason. Only "stop" is a clean success.
-    if [ "$STOP_REASON" = "error" ]; then
-      emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE ERROR terminal=error ${ELAPSED}s"
-      exit 0
-    fi
-    if [ "$STOP_REASON" != "stop" ]; then
-      emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE terminal=${STOP_REASON:-none} not-stop ${ELAPSED}s"
-      exit 0
-    fi
-    # stopReason == stop: check result text is non-empty.
-    if [ -z "$DISTILLED_TEXT" ]; then
-      emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE empty 0B terminal=stop ${ELAPSED}s"
-      exit 0
-    fi
-    # Full whitelist satisfied: agent_end + stopReason==stop + non-empty text.
-    # Distill: save raw stream as pi.stream.jsonl, write human-readable result.md.
-    cp "$OUTPUT_FILE" "$STREAM_FILE" 2>/dev/null || true
-    printf '%s\n' "$DISTILLED_TEXT" > "$OUTPUT_FILE" 2>/dev/null || true
-    SZ=$(wc -c < "$OUTPUT_FILE" 2>/dev/null || echo 0)
-    emit "STATUS=OK OUTPUT=$OUTPUT_FILE ${ELAPSED}s ${SZ}B rc=0 terminal=stop"
-    exit 0
+    # agent_end present: judge stopReason via the shared whitelist.
+    judge_agent_end
   fi
   # Dead with NO rc file = group-killed / crashed before the wrapper could record
   # the exit (truncated). Bound it with the no-rc grace so we never loop RUNNING
@@ -203,6 +215,17 @@ if [ "$alive_rc" -ne 0 ]; then
   fi
   echo "RUNNING settling ${ELAPSED}s (dead, awaiting rc within grace=${NO_MARKER_GRACE}s)"
   exit 0
+fi
+
+# ---- ALIVE: agent already finished? then it's terminal, don't wait for death ----
+# An agent_end in the stream means the agent loop is OVER; a wrapper that lingers
+# alive afterwards will produce nothing more. Judging now (after group-killing the
+# orphan) avoids burning the whole stall window on a run that already ended — this
+# is the "a finished Pi is terminal regardless of elapsed time" intent applied even
+# while the wrapper is still up.
+if [ -n "$AGENT_END_LINE" ]; then
+  "$SCRIPT_DIR/pi-stop.sh" "$RUNDIR" >/dev/null 2>&1
+  judge_agent_end
 fi
 
 # ---- ALIVE: liveness guards (wall-clock TIMEOUT, stall STALL) ----

@@ -9,6 +9,7 @@
 #     NO_JSONL       -- Pi launched, no events yet (within grace); continue
 #     NO_JSONL_FAIL  -- no events past grace, or process died with none; kill+escalate
 #     DONE           -- agent_end stopReason "stop"; proceed to report check
+#     NO_OUTPUT      -- agent ended turn (stop) with no actionable output; fail fast
 #     STALL          -- no event past threshold; kill+escalate
 #     ERROR          -- agent_end error/aborted, or process died mid-stream
 #     TIMEOUT        -- elapsed > $PI_WALL_CLOCK_S; kill+escalate
@@ -20,6 +21,7 @@
 # Token translation:
 #   STATUS=OK                             -> DONE
 #   STATUS=FAIL ... ERROR                 -> ERROR (preserve errorMessage excerpt)
+#   STATUS=FAIL ... empty ... terminal=stop -> NO_OUTPUT (clean turn-end, no output)
 #   STATUS=FAIL ... STALL                 -> STALL
 #   STATUS=FAIL ... TIMEOUT               -> TIMEOUT
 #   STATUS=FAIL ... handle=broken/no-pid  -> NO_PID
@@ -115,6 +117,12 @@ case "$canonical_line" in
     # Extract and surface the rc so callers can distinguish abnormal exits.
     RC_N="$(printf '%s' "$canonical_line" | grep -oE 'rc=[0-9]+' | head -1 | grep -oE '[0-9]+')"
     echo "RC_FAIL ${ELAPSED}s exit rc=${RC_N}"
+    ;;
+  STATUS=FAIL*empty*terminal=stop*)
+    # Agent cleanly ended its turn (stopReason=stop) but produced no actionable
+    # output (e.g. a thinking-only turn that never emitted tool calls / report).
+    # Distinct from a hang: detectable immediately, label it accurately.
+    echo "NO_OUTPUT ${ELAPSED}s terminal=stop"
     ;;
   STATUS=FAIL*empty*|STATUS=FAIL*terminal=error*|STATUS=FAIL*)
     # Remaining FAIL sub-classes (empty result, other terminal errors) -> ERROR
