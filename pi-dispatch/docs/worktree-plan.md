@@ -201,11 +201,13 @@ administrative state. Removing the worktree while a live descendant still holds
 1. **Group-kill** via `pi-stop.sh` — sends SIGTERM then SIGKILL to process group
    (`kill -$PGID`). This terminates Pi and every descendant spawned under it.
 
-2. **Confirm-dead poll** — after issuing the kill, poll until
-   `kill -0 $PGID` returns non-zero (the group is gone):
+2. **Confirm-dead poll** — after issuing the kill, poll until the process group is
+   gone. The pgid is read from `$rundir/pi.pgid` (written by pi-dispatch.sh at
+   lines :124/:235 into the `RUNDIR=` path returned on stdout at :119):
 
    ```bash
-   until ! kill -0 "$PGID" 2>/dev/null; do sleep 0.2; done
+   pgid="$(cat "$rundir/pi.pgid")"
+   until ! kill -0 "$pgid" 2>/dev/null; do sleep 0.2; done
    ```
 
    This poll ensures the process group is fully dead before proceeding.
@@ -227,13 +229,13 @@ already models the correct intent: call `cf-pi-stop.sh --abort` first, then proc
 with cleanup.~~
 
 **Ground truth:** `fail_kill` in `cf-pi-run.sh` (around line 236) calls only
-`cf-pi-stop.sh --abort` then exits. There is no `worktree remove` and no `kill -0`
+`cf-pi-stop.sh --abort` then exits. There is no `worktree remove` and no
 confirm-poll in `fail_kill`. The `git worktree remove --force "$WORK"` executes
 inside the appended `cleanup.sh` (CLEANUP_SCRIPT, cf-pi-worktree.sh:81), which the
 orchestrator runs separately, time-decoupled from `fail_kill`. cf currently has no
 confirm-poll at that cleanup remove site. The hoisted primitive adds an active
-`kill -0 $PGID` poll loop immediately before that `worktree remove` call, making
-worktree removal race-free.
+poll loop (reading pgid from `$rundir/pi.pgid`) immediately before that
+`worktree remove` call, making worktree removal race-free.
 
 ---
 
@@ -332,7 +334,10 @@ as a STATUS→token case table) appears in this document as a live mechanism. Th
 layer was retired at commit b4dda64.
 
 **Internal cross-references:** Every EX-N reference in this document (EX-1 through
-EX-15) corresponds to a section defined here. No dangling references.
+EX-15) corresponds to a section defined here. Completeness holes for turns beyond
+turn-3 are documented as named subsections within EX-11/EX-12 rather than as
+separate EX-N headings, to avoid introducing forward-dangling references. No
+dangling EX-N references exist in this document.
 
 ---
 
@@ -346,32 +351,102 @@ loader; all inputs become explicit, named primitive parameters.
 
 ### cf-env var → named parameter mapping
 
-| cf-env variable    | cf script citation              | Named parameter in pi-worktree.sh |
-|--------------------|---------------------------------|-----------------------------------|
-| `REPO_ROOT`        | cf-pi-worktree.sh:41, :81, :91 | `repo_root`                       |
-| `CF_BRANCH`        | cf-pi-worktree.sh:63            | `branch_name`                     |
-| `BASE_HEAD`        | cf-pi-worktree.sh:71            | `base_ref`                        |
-| `BASE_BRANCH`      | cf-pi-worktree.sh:72, :77      | `base_branch`                     |
-| `WORK`             | cf-pi-env.sh:58                 | `work_path`                       |
-| `DIFF_FILE`        | cf-pi-env.sh:58 / worktree:80  | `diff_out`                        |
-| `CLEANUP_SCRIPT`   | cf-pi-worktree.sh:73            | `cleanup_out`                     |
+| cf-env variable    | cf script citation              | Named parameter in pi-worktree.sh | Notes                              |
+|--------------------|---------------------------------|-----------------------------------|------------------------------------|
+| `REPO_ROOT`        | cf-pi-worktree.sh:41, :81, :91 | `repo_root`                       | derived-in-cf → becomes caller-supplied (see below) |
+| `CF_BRANCH`        | cf-pi-worktree.sh:63            | `branch_name`                     |                                    |
+| `BASE_HEAD`        | cf-pi-worktree.sh:71            | `base_ref`                        | derived-in-cf → becomes caller-supplied (see below) |
+| `BASE_BRANCH`      | cf-pi-worktree.sh:72, :77      | `base_branch`                     | derived-in-cf → becomes caller-supplied (see below) |
+| `WORK`             | cf-pi-env.sh:58                 | `work_path`                       |                                    |
+| `DIFF_FILE`        | cf-pi-env.sh:58 / worktree:80  | `diff_out`                        |                                    |
+| `CLEANUP_SCRIPT`   | cf-pi-worktree.sh:73            | `cleanup_out`                     |                                    |
+| `RUNDIR` (from pi-dispatch stdout) | pi-dispatch.sh:119; pi.pgid written :124/:235 | `rundir` | caller passes the RUNDIR= value; pgid read as `$rundir/pi.pgid` |
 
 With these named parameters the helper has no dependency on `load_cf_pi_env` or any
 cf session convention. Any consumer (spiral, or a future plugin) can call
 `pi-worktree.sh` by passing plain strings.
 
+### Create-time derivation inversion
+
+In `cf-pi-worktree.sh`, three values are **derived at create time** from the
+current shell's context:
+
+- **`REPO_ROOT`** — `git rev-parse --show-toplevel` (cf-pi-worktree.sh:41)
+- **`BASE_BRANCH`** — `git symbolic-ref --quiet --short HEAD` (cf-pi-worktree.sh:46)
+- **`BASE_HEAD`** — `git rev-parse HEAD` (cf-pi-worktree.sh:47)
+
+These are safe to derive inside cf because cf guarantees its scripts are always
+invoked from within the repository root. In the hoisted primitive this guarantee
+does not hold — a consumer could call `pi-worktree.sh` from any working directory.
+
+**Inversion:** All three values are promoted from derived-in-cf to caller-supplied
+parameters. The primitive does NOT re-derive them from the calling environment;
+it accepts them as explicit inputs.
+
+**Failure mode avoided:** A consumer calling from outside the repo root would
+resolve a wrong toplevel — `git rev-parse --show-toplevel` walks up the filesystem
+tree from the current working directory, so if the caller's cwd is `/tmp/work` (or
+any path outside the repository), the call either errors or returns a wrong
+toplevel, causing the wrong git tree to be used for all subsequent worktree
+operations. Making `repo_root` caller-supplied closes this failure mode entirely.
+
+### Preconditions before worktree create
+
+`cf-pi-worktree.sh:49-61` checks git identity before creating the worktree. If
+neither a repo-level nor a global `user.email` is configured, the script prints a
+diagnostic and exits with **exit 2** (hard-fail):
+
+```
+cf-pi-worktree: git user.email is not configured.
+Per-contract commits in $WORK will fail. ...
+```
+
+This guard exists because per-contract commits issued from `$WORK` later in the
+lifecycle would fail mid-flow with a cryptic "Please tell me who you are" error —
+far harder to diagnose than an upfront precondition check.
+
+**Decision (DEC-1):** Keep hard-fail unconditionally. The hoisted primitive retains
+the exit 2 hard-fail with no opt-out mechanism. Failing early with a clear message
+is strictly better than failing silently mid-lifecycle. A commit-mode opt-out param
+is not adopted: callers that genuinely do not commit anything do not trigger the
+git-identity path, so the guard is inert for them.
+
+### git-vs-scratch dual-mode selection
+
+`cf-pi-worktree.sh:83-86` implements a dual-mode path:
+
+- **git-branch mode** (lines 63-82): when `$REPO_ROOT` is non-empty (the caller is
+  inside a git repository), the script runs `git worktree add -B $CF_BRANCH $WORK HEAD`
+  and appends a cleanup block (diff capture + `worktree remove --force`).
+- **scratch mode** (lines 83-86): when `$REPO_ROOT` is empty (non-git directory),
+  the script falls back to `mkdir -p "$WORK"` and appends only a comment to the
+  cleanup script — no worktree registration, no cleanup, `$WORK` is retained for
+  inspection.
+
+**Mode selection:** The presence of `$REPO_ROOT` (derived from `git rev-parse
+--show-toplevel`) selects the mode. A non-empty `$REPO_ROOT` → git-branch mode.
+Empty → scratch mode.
+
+**Decision (DEC-3):** The hoisted primitive **requires git** — callers in a non-git
+directory receive a hard error. Scratch mode (`mkdir -p`, no cleanup, dir retained)
+is documented as an explicit opt-in future extension, not the current default.
+Rationale: the value proposition of the hoisted primitive is the full git lifecycle
+(isolated branch, clean diff, safe removal). Silently falling back to scratch mode
+would mask configuration errors and deprive callers of the lifecycle guarantees they
+expect. Scratch mode is a distinct use-case that warrants its own flag if ever
+adopted, not a transparent fallback.
+
 ### merge-base diff-base policy: generic-with-param
 
 The diff capture in `cf-pi-worktree.sh:64-80` uses `merge-base HEAD $BASE_BRANCH`
 (with fallback to `$BASE_HEAD` when the branch is unavailable). This policy is
-classified as **generic-with-param** (default TW-5): it is not cf-specific logic
-but a universally correct rebase-tracking strategy. The rationale — *diff from the
-merge-base of the working branch and the integration branch, so that only the
-consumer's own commits appear in the diff regardless of whether the base has
-advanced since the worktree was created* — is general value that belongs in the
-hoisted primitive. The caller supplies `base_branch` and `base_ref`; the helper
-applies the merge-base policy. Any consumer that omits `base_branch` falls back to
-`base_ref` (HEAD by default), which is safe for single-branch consumers.
+classified as **generic-with-param** (default TW-5): it is correct for the
+advancing-base case — *diff from the merge-base of the working branch and the
+integration branch, so that only the consumer's own commits appear in the diff
+regardless of whether the base has advanced since the worktree was created*. That
+rationale is general value that belongs in the hoisted primitive. Single-branch
+Single-branch consumers that do not supply `base_branch` use the base_ref fallback
+(HEAD by default), which is safe for their read-your-own-commits use-case.
 
 ---
 
@@ -400,12 +475,15 @@ The orchestrator runs this cleanup.sh separately, after the Pi session ends. The
 ### Net-new hardening: confirm-poll before cleanup remove
 
 cf currently has no confirm-poll at the cleanup remove site. The hoisted primitive
-adds net-new hardening: a `kill -0 $PGID` confirm-poll placed **immediately before**
-the `worktree remove` call inside the cleanup block:
+adds net-new hardening: a confirm-poll placed **immediately before** the `worktree
+remove` call inside the cleanup block. The pgid is sourced from `$rundir/pi.pgid`
+(the path written by pi-dispatch.sh at :124/:235, where `rundir` is the `RUNDIR=`
+value returned on stdout at :119):
 
 ```bash
 # confirm-poll — placed immediately before worktree remove
-until ! kill -0 "$PGID" 2>/dev/null; do sleep 0.2; done
+pgid="$(cat "$rundir/pi.pgid")"
+until ! kill -0 "$pgid" 2>/dev/null; do sleep 0.2; done
 git worktree remove --force "$work_path"
 ```
 
