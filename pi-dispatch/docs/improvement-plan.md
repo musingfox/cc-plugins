@@ -51,7 +51,7 @@ Keep `pi-dispatch.sh` (perl `POSIX::setsid` wrapper, `disown`, pgid file), `pi-p
 
 ### `chunked-session-resume` (Option d: chunk shards to stay under 600s, resume context via `--session`)
 
-Decompose each Pi invocation so each chunk stays under 600 seconds wall-clock. With shards kept under the ceiling, the Bash tool returns before timeout and no background/poll machinery is needed — the sub-agent blocks synchronously on each chunk, then resumes the Pi session context for the next chunk using the existing `--session` resume mechanism (`pi-dispatch.sh:99-120` implements `PRIOR_SESSION_ID` resume; `cf-pi-run.sh:412` re-dispatches using a session ID to resume context). This potentially removes the need for any background/poll at all.
+Decompose each Pi invocation so each chunk stays under 600 seconds wall-clock. `pi-dispatch.sh` always backgrounds and disowns the Pi process (lines 184/193) — there is no synchronous dispatch mode. What chunking each shard under the ceiling buys is removing the 70×30s long-poll loop: a short pi-build.sh-style poll suffices for chunks that return well under the ceiling. The sub-agent then resumes the Pi session context for the next chunk using the existing `--session` resume mechanism (`pi-dispatch.sh:99-120` implements `PRIOR_SESSION_ID` resume; `cf-pi-run.sh:412` re-dispatches using a session ID to resume context). This removes the long poll, not background/polling itself.
 
 **Trade-off.** The approach works only when workloads can be reliably segmented below the 600s ceiling without breaking Pi's internal reasoning continuity. Session resume preserves context across chunks but does not guarantee mid-task coherence if a chunk cuts across a logical boundary. Monitoring and re-chunking logic must handle the case where a chunk nears the limit and must hand off cleanly. The `run_in_background` + pgid wrapper machinery could be retired entirely for well-bounded shards.
 
@@ -74,7 +74,7 @@ Three plugins are affected by changes to the Pi dispatch machinery:
 | Field    | spiral (`pi-build.sh`) | context-flow (cf)                         |
 |----------|------------------------|-------------------------------------------|
 | OUTPUT   | yes                    | yes                                       |
-| PID      | **no** (never reads PID — `pi-build.sh:98-99` parses RUNDIR/OUTPUT only) | yes (`cf-pi-dispatch.sh:90`, `cf-pi-stop.sh:39`) |
+| PID      | **no** (never reads PID — `pi-build.sh:98-99` parses RUNDIR/OUTPUT only) | yes (`cf-pi-dispatch.sh:90`) |
 | RUNDIR   | yes                    | yes                                       |
 
 spiral never reads PID. cf reads PID to enable `cf-pi-stop.sh` to send a SIGTERM to the process group. Any change to the PID field's format or semantics therefore has no impact on spiral but requires coordinated migration of all cf consumers.
