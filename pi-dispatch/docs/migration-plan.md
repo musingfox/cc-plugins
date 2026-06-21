@@ -6,6 +6,15 @@
 > **non-blocking** dispatch (MAIN keeps working while Pi runs). All claims below are backed
 > by the receipts in the Evidence appendix.
 
+## Implementation status
+
+- **Step 1 — resolver dedup: SHIPPED** (`be2fae6`). `resolve_canon_dispatch` in `cf-pi-env.sh`; three callers deduped.
+- **Step 3 — MAIN-driven background dispatch: SHIPPED** (`d76141d`). Key discovery during implementation: `cf-pi-run.sh` **already is** the synchronous run-to-completion + paths-only-outcome unit the plan called `pi-run-sync.sh`, so **no new script was added** — Step 3 only changed the *invoker* (MAIN `run_in_background` per shard, instead of a `pi-driver` sub-agent) and retired `pi-driver.md`. This also fixed a latent bug: `cf-pi-run.sh`'s ~35-min internal poll inside a sub-agent's Bash would hit the 10-min ceiling; as a background task it does not.
+- **Step 2 — `--profile`: DEFERRED** (YAGNI). Only one profile in use today; the tools/permissions dimension also depends on unverified pi-CLI support. Additive when a 2nd profile appears.
+- **Step 4 — remove `cf-pi-poll` translation layer: DEFERRED** (low value now). `cf-pi-run.sh` keeps its internal poll, which still consumes `cf-pi-poll.sh`; the poll now runs harmlessly inside a background task. Removing the layer is an independent refactor of `dispatch_and_poll`, not required for the non-blocking goal.
+
+Verification note: Step 3 changed `cf.md` (MAIN instructions) — inspection-verified only; a live end-to-end `cf` run is still the real receipt.
+
 ## What changed since Option B
 
 Option B existed to dodge the Bash tool's 10-minute ceiling by polling inside a sub-agent.
