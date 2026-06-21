@@ -177,24 +177,34 @@ No `phase=reinvoked` line ever appeared for ARM-SUBJECT. The sub-agent was not r
 
 ### ARM-CONTROL — MAIN + `run_in_background`
 
-MAIN launched the identical pattern via `run_in_background`, ended its turn, and WAS re-invoked by the harness on the bg task's completion. `control-marker.txt`:
+MAIN wrote `phase=launched`, launched a REAL background command (`sleep 5 && echo phase=reinvoked`) via Bash `run_in_background`, ended its turn, and WAS genuinely re-invoked by the harness on the bg task's exit (task-notification fired). The 13s gap between `launched` and `reinvoked` proves the background command (not a foreground echo) wrote the reinvoked line. `control-marker.txt`:
 
 ```
-phase=launched ts=1782018435
-phase=reinvoked ts=1782018435
+phase=launched ts=1782019044
+phase=reinvoked ts=1782019057
 ```
 
 ARM-CONTROL reached `phase=reinvoked` — **control PASSED / rig valid**. The marker mechanism and MAIN re-invoke are both confirmed working. The asymmetry is unambiguous: MAIN is re-woken, the sub-agent is not.
 
+> **Note:** An earlier turn-5 control block showing `ts=1782018435` twice (0s gap) was a FALSE control — both lines were written synchronously, not via background re-invoke. That block is VOID / superseded by the proper control above.
+
 ### ARM-TASK — Task-tool / Monitor wait from sub-agent
 
-Not separately run. ARM-TASK asks whether a sub-agent can be re-woken via a Task-tool or Monitor wait rather than raw `run_in_background`. This is not-applicable-as-a-re-wake: the demonstrated single-shot lifecycle (ARM-SUBJECT) shows a returned sub-agent cannot be re-woken by ANY external mechanism — the constraint is the lifecycle, not the signaling channel. What DOES work is a sub-agent polling WITHIN its single invocation (Monitor or a poll loop). This is already proven in production by `cf-pi-run.sh`'s pi-driver poll loop; in-invocation polling is the working alternative to re-wake.
+ARM-TASK was run: a sub-agent, within its single invocation, launched a background task and polled it to completion. Marker block from `task-marker.txt`:
+
+```
+phase=launched
+phase=bg_done
+phase=observed_within_invocation
+```
+
+ARM-TASK confirms **in-invocation polling, NOT re-wake**: a sub-agent cannot be re-woken after returning, but CAN poll within its single invocation — the `cf-pi-run.sh` / `cf-pi-run.sh` pi-driver poll-loop pattern. The demonstrated single-shot lifecycle (ARM-SUBJECT) shows a returned sub-agent cannot be re-woken by ANY external mechanism — the constraint is the lifecycle, not the signaling channel. What works is a sub-agent polling WITHIN its single invocation (Monitor or a poll loop). This is the working alternative to re-wake.
 
 ### Outcome enumeration
 
 - **(a) re-invoke on bg exit (ARM-SUBJECT):** not-observed — no `phase=reinvoked` appeared for the sub-agent arm despite `phase=bg_exited` confirming the bg task ran to completion.
 - **(b) no re-invoke (ARM-SUBJECT):** observed — sub-agent returned after launching the bg task and was never re-invoked.
-- **(c) Task-tool / Monitor re-wake from sub-agent (ARM-TASK):** not-applicable-as-a-re-wake — same single-shot lifecycle constraint; in-invocation polling (Monitor, poll loop) is the viable in-invocation alternative.
+- **(c) Task-tool / Monitor re-wake from sub-agent (ARM-TASK):** OBSERVED — in-invocation polling (`phase=bg_done`, `phase=observed_within_invocation` confirmed), NOT re-wake; a sub-agent cannot be re-woken after returning but CAN poll within its single invocation; in-invocation polling is the viable alternative to re-wake.
 
 **F3 RESULT: NO**
 
@@ -204,7 +214,9 @@ A sub-agent's `run_in_background` task outlives the sub-agent: `phase=bg_exited`
 
 ### C1 refinement
 
-`BASH_MAX_TIMEOUT_MS` is user-configurable but hard-capped at 10 minutes — raising it does NOT dissolve the 600s/10-min ceiling for ~35-min work. C1 is "configurable-but-capped," still a real wall (not a fixed 600s, but bounded at 10 min regardless of user config).
+`BASH_MAX_TIMEOUT_MS` is user-configurable; a 10-minute absolute ceiling is believed but `cap unverified` — no official doc citation establishes an absolute 10-min maximum. Raising the setting beyond 600s may or may not dissolve the ceiling for ~35-min work; the cap's existence cannot be asserted without a docs reference. C1 is therefore "configurable, cap unverified" — a real practical wall for long Pi runs, but the precise bound is not confirmed from the env-vars docs alone.
+
+The 600s working-ceiling is a separate, in-repo established fact: `context-flow/agents/pi-driver.md:35` states "harness max is 600s so request `timeout: 600000`." This in-repo ceiling is cited and kept regardless of whether a higher absolute cap exists.
 
 ### Consequent dispatch-shape decision
 
@@ -222,6 +234,6 @@ Ordered steps — each independently actionable, later steps may depend on earli
 
 3. **If F3 confirms sub-agent re-invoke: migrate cf to `run_in_background` + collapse `pi-driver`.** Replace the `cf-pi-dispatch.sh` + `cf-pi-poll.sh` + `cf-pi-stop.sh` adapter trio and the 70-round poll loop in `cf-pi-run.sh:228–303` with a single blocking `pi` invocation inside `pi-driver`, launched with `run_in_background`. Retain `write_outcome` in `cf-pi-run.sh:67–126` as the `outcome.md` interface — the post-completion distiller reads it on FAIL/NEEDS_REPLAN only. Keep the canonical `OUTPUT=/PID=/RUNDIR=` stdout contract frozen (OWD-2). This is a one-way door (OWD-1): flag for human approval before crossing.
 
-4. **If F3 does NOT confirm sub-agent re-invoke: choose from this two-rung ladder (cheap first, larger second).** (1) Cheap rung — status-quo tightened: keep the in-sub-agent poll loop as-is, shrink the ceiling (tighten the timeout and round count so the 70 × 30s exposure is reduced). This requires no architectural change and is immediately actionable. (2) Larger rung — main-driven fanout (separate initiative, not a drop-in): relocate the fan-out point to MAIN and adopt synchronous blocking `pi` calls fanned out from the main orchestrator, one per sub-agent. This is a separate initiative requiring coordinated rewrites across all three plugins (see `subagent-fanout` section above for the star-topology constraint). Do not conflate these two rungs — the larger rung is not a symmetric alternative to the smaller; it is an unscoped architecture change.
+4. **If F3 does NOT confirm sub-agent re-invoke: choose from this three-rung ladder (cheap first, larger second, MAIN-driven third).** (1) Cheap rung — status-quo tightened: keep the in-sub-agent poll loop as-is, shrink the ceiling (tighten the timeout and round count so the 70 × 30s exposure is reduced). This requires no architectural change and is immediately actionable. (2) Larger rung — main-driven fanout (separate initiative, not a drop-in): relocate the fan-out point to MAIN and adopt synchronous blocking `pi` calls fanned out from the main orchestrator, one per sub-agent. This is a separate initiative requiring coordinated rewrites across all three plugins (see `subagent-fanout` section above for the star-topology constraint). Do not conflate these two rungs — the larger rung is not a symmetric alternative to the smaller; it is an unscoped architecture change. (3) MAIN-driven `run_in_background` + Monitor — the official long-running pattern: drive dispatch from MAIN using Bash `run_in_background: true` and the Monitor tool for reactive polling/collection. Viable because MAIN re-invoke IS proven (ARM-CONTROL), even though sub-agent re-invoke is not. This eliminates the in-sub-agent poll loop entirely by keeping the wait at the MAIN level; it is the F3=NO path to background dispatch without a hand-rolled poll loop. Requires relocating the orchestration point to MAIN (same prerequisite as rung 2, but lighter — no sub-agent fanout rewrite needed if Pi shards run sequentially).
 
 5. **Regardless of option chosen: freeze the canonical stdout contract `OUTPUT=/PID=/RUNDIR=` (OWD-2).** Any consumer that parses this format must be enumerated before any change to `pi-dispatch.sh`'s stdout format. Changing this contract is a separate one-way door that requires coordinated migration of all three plugins.
