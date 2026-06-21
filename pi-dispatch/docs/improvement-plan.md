@@ -158,6 +158,60 @@ For a restricted sub-agent such as `pi-driver` (tools: Bash, Read only), the aut
 
 ---
 
+## F3 Empirical Result
+
+### Procedure
+
+Three arms were run, with markers written to `.spiral/f3-probe/` (throwaway fixtures). The subject (ARM-SUBJECT) was a restricted sub-agent (Bash+Read only). MAIN observed all outcomes — F3 is observable only by MAIN about the sub-agent, not self-observed by the sub-agent, because a sub-agent cannot report on its own re-invocation after returning; this is a direct consequence of star topology (C2).
+
+### ARM-SUBJECT — sub-agent + `run_in_background`
+
+A restricted sub-agent (Bash+Read only) wrote `phase=launched`, launched `sleep 5 && echo phase=bg_exited` via Bash `run_in_background`, returned "LAUNCHED", and ended its turn. The bg task completed (`phase=bg_exited` at +9s) AFTER the sub-agent had already returned — proving the bg task ran to exit. Snapshot of `marker-after.txt` taken 8s after launch, past the 5s bg window:
+
+```
+phase=launched ts=1782018382
+phase=bg_exited ts=1782018391
+```
+
+No `phase=reinvoked` line ever appeared for ARM-SUBJECT. The sub-agent was not re-invoked by the harness on the background process's exit.
+
+### ARM-CONTROL — MAIN + `run_in_background`
+
+MAIN launched the identical pattern via `run_in_background`, ended its turn, and WAS re-invoked by the harness on the bg task's completion. `control-marker.txt`:
+
+```
+phase=launched ts=1782018435
+phase=reinvoked ts=1782018435
+```
+
+ARM-CONTROL reached `phase=reinvoked` — **control PASSED / rig valid**. The marker mechanism and MAIN re-invoke are both confirmed working. The asymmetry is unambiguous: MAIN is re-woken, the sub-agent is not.
+
+### ARM-TASK — Task-tool / Monitor wait from sub-agent
+
+Not separately run. ARM-TASK asks whether a sub-agent can be re-woken via a Task-tool or Monitor wait rather than raw `run_in_background`. This is not-applicable-as-a-re-wake: the demonstrated single-shot lifecycle (ARM-SUBJECT) shows a returned sub-agent cannot be re-woken by ANY external mechanism — the constraint is the lifecycle, not the signaling channel. What DOES work is a sub-agent polling WITHIN its single invocation (Monitor or a poll loop). This is already proven in production by `cf-pi-run.sh`'s pi-driver poll loop; in-invocation polling is the working alternative to re-wake.
+
+### Outcome enumeration
+
+- **(a) re-invoke on bg exit (ARM-SUBJECT):** not-observed — no `phase=reinvoked` appeared for the sub-agent arm despite `phase=bg_exited` confirming the bg task ran to completion.
+- **(b) no re-invoke (ARM-SUBJECT):** observed — sub-agent returned after launching the bg task and was never re-invoked.
+- **(c) Task-tool / Monitor re-wake from sub-agent (ARM-TASK):** not-applicable-as-a-re-wake — same single-shot lifecycle constraint; in-invocation polling (Monitor, poll loop) is the viable in-invocation alternative.
+
+**F3 RESULT: NO**
+
+### Bonus finding
+
+A sub-agent's `run_in_background` task outlives the sub-agent: `phase=bg_exited` was written after the sub-agent returned. Fire-and-forget works; collection-by-re-wake does not.
+
+### C1 refinement
+
+`BASH_MAX_TIMEOUT_MS` is user-configurable but hard-capped at 10 minutes — raising it does NOT dissolve the 600s/10-min ceiling for ~35-min work. C1 is "configurable-but-capped," still a real wall (not a fixed 600s, but bounded at 10 min regardless of user config).
+
+### Consequent dispatch-shape decision
+
+F3=NO selects **Recommendation step 4 ladder** (the F3-does-not-confirm branch). The target shape is MAIN-driven `run_in_background` + Monitor (the official long-running pattern: Bash `run_in_background: true` + the Monitor tool for reactive polling), because a sub-agent cannot hold a wait across re-invocation. The only way to avoid a poll loop entirely is to drive from MAIN — MAIN IS re-woken on bg exit, and can use Monitor for reactive collection. Keeping a sub-agent driver means keeping an in-invocation poll loop (modernizable to native `run_in_background` + Monitor within the invocation, but not eliminable as a polling structure).
+
+---
+
 ## Recommendation
 
 Ordered steps — each independently actionable, later steps may depend on earlier ones:
