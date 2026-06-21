@@ -227,6 +227,19 @@ dispatch_and_poll() {
   pi_pid=$("$SCRIPTS/cf-pi-dispatch.sh" "$SHARD_SESSION" ${resume_file:+"$resume_file"})
   echo "[shard $SHARD_ID] pi pid=$pi_pid"
 
+  local rundir
+  rundir="$(cat "$SHARD_SESSION/pi-rundir" 2>/dev/null || true)"
+
+  # Terminal FAIL while pi may still be alive: cancel the orphan tree, capture a
+  # postmortem, record the outcome with its reason, and exit.
+  fail_kill() {  # reason  diagnostic
+    "$SCRIPTS/cf-pi-stop.sh" "$SHARD_SESSION" --abort >/dev/null 2>&1 || true
+    local pm; pm=$(do_postmortem)
+    write_outcome FAIL "$1" "" "(all): $2" "$pm" "-"
+    echo "[shard $SHARD_ID] FAIL $1"
+    exit 1
+  }
+
   local round=0
   local max_rounds=70
   while [ "$round" -lt "$max_rounds" ]; do
@@ -234,74 +247,36 @@ dispatch_and_poll() {
     sleep 30
     local status_line
     status_line=$("$SCRIPTS/cf-pi-poll.sh" "$SHARD_SESSION" 2>&1)
-    local first
-    first=$(echo "$status_line" | awk '{print $1}')
-    echo "[shard $SHARD_ID] round $round/$max_rounds status=$status_line"
+    echo "[shard $SHARD_ID] round $round/$max_rounds $status_line"
 
-    case "$first" in
-      ALIVE|NO_JSONL)
-        continue
-        ;;
-      DONE)
-        return 0
-        ;;
-      NO_OUTPUT)
-        # Agent cleanly ended its turn but wrote no report/diff (e.g. thinking-only,
-        # never emitted tool calls). NOT a stall — detectable at once, fail fast and
-        # label it accurately so the postmortem points at the real cause.
-        "$SCRIPTS/cf-pi-stop.sh" "$SHARD_SESSION" --abort >/dev/null 2>&1 || true
-        local pm; pm=$(do_postmortem)
-        write_outcome FAIL no-output "" "(all): agent ended turn without output ($status_line)" "$pm" "-"
-        echo "[shard $SHARD_ID] FAIL no-output"
-        exit 1
-        ;;
-      NO_JSONL_FAIL)
-        "$SCRIPTS/cf-pi-stop.sh" "$SHARD_SESSION" --abort >/dev/null 2>&1 || true
-        local pm; pm=$(do_postmortem)
-        write_outcome FAIL no-jsonl "" "(all): poll NO_JSONL_FAIL" "$pm" "-"
-        echo "[shard $SHARD_ID] FAIL NO_JSONL_FAIL"
-        exit 1
-        ;;
-      STALL)
-        "$SCRIPTS/cf-pi-stop.sh" "$SHARD_SESSION" --abort >/dev/null 2>&1 || true
-        local pm; pm=$(do_postmortem)
-        write_outcome FAIL stall "" "(all): poll STALL" "$pm" "-"
-        echo "[shard $SHARD_ID] FAIL STALL"
-        exit 1
-        ;;
-      ERROR)
-        "$SCRIPTS/cf-pi-stop.sh" "$SHARD_SESSION" --abort >/dev/null 2>&1 || true
-        local pm; pm=$(do_postmortem)
-        write_outcome FAIL error "" "(all): poll ERROR ($status_line)" "$pm" "-"
-        echo "[shard $SHARD_ID] FAIL ERROR"
-        exit 1
-        ;;
-      TIMEOUT)
-        "$SCRIPTS/cf-pi-stop.sh" "$SHARD_SESSION" --abort >/dev/null 2>&1 || true
-        local pm; pm=$(do_postmortem)
-        write_outcome FAIL timeout "" "(all): poll TIMEOUT" "$pm" "-"
-        echo "[shard $SHARD_ID] FAIL TIMEOUT"
-        exit 1
-        ;;
-      RC_FAIL)
-        "$SCRIPTS/cf-pi-stop.sh" "$SHARD_SESSION" --abort >/dev/null 2>&1 || true
-        local pm; pm=$(do_postmortem)
-        write_outcome FAIL rc-fail "" "(all): poll RC_FAIL ($status_line)" "$pm" "-"
-        echo "[shard $SHARD_ID] FAIL RC_FAIL"
-        exit 1
-        ;;
-      NO_PID)
-        write_outcome FAIL dispatch-broken "" "(all): poll NO_PID" "-" "-"
+    # Match the canonical pi-poll.sh STATUS= grammar directly (legacy tokens retired).
+    case "$status_line" in
+      STATUS=OK*)              return 0 ;;
+      RUNNING*)                continue ;;   # includes "RUNNING settling"
+      *exit\ rc=*)             fail_kill rc-fail "poll $status_line" ;;
+      *TIMEOUT*)               fail_kill timeout "poll $status_line" ;;
+      *STALL*)                 fail_kill stall "poll $status_line" ;;
+      *empty*terminal=stop*)
+        # Agent cleanly ended its turn (stopReason=stop) but produced no report/diff
+        # (e.g. thinking-only). NOT a stall — detectable at once, fail fast.
+        fail_kill no-output "agent ended turn without output ($status_line)" ;;
+      *ERROR*|*not-stop*)      fail_kill error "poll $status_line" ;;
+      *died-mid-stream*)
+        # rc==0 but no agent_end: events present -> died mid-stream (error);
+        # no events at all -> no actionable jsonl.
+        if [ -n "$rundir" ] && [ -s "$rundir/result.md" ]; then
+          fail_kill error "died mid-stream ($status_line)"
+        else
+          fail_kill no-jsonl "died with no events ($status_line)"
+        fi ;;
+      *no-rc*)                 fail_kill no-jsonl "poll $status_line" ;;
+      *no-pid*|*handle=broken*)
+        # Dispatch handle missing/broken — process already gone, nothing to kill.
+        write_outcome FAIL dispatch-broken "" "(all): poll $status_line" "-" "-"
         echo "[shard $SHARD_ID] FAIL dispatch-broken"
-        exit 1
-        ;;
-      *)
-        "$SCRIPTS/cf-pi-stop.sh" "$SHARD_SESSION" --abort >/dev/null 2>&1 || true
-        local pm; pm=$(do_postmortem)
-        write_outcome FAIL poll-unknown "" "(all): poll unknown ($status_line)" "$pm" "-"
-        echo "[shard $SHARD_ID] FAIL poll unknown: $status_line"
-        exit 1
-        ;;
+        exit 1 ;;
+      STATUS=FAIL*)            fail_kill error "poll $status_line" ;;
+      *)                       fail_kill poll-unknown "poll unknown ($status_line)" ;;
     esac
   done
 

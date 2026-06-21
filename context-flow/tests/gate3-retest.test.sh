@@ -61,7 +61,7 @@ EOF
   printf '#!/bin/bash\necho OK\n' > "$STUBS/cf-pi-probe.sh"
   printf '#!/bin/bash\necho "pm"\n' > "$STUBS/cf-pi-postmortem.sh"
   printf '#!/bin/bash\necho 1 >> "%s/dispatch.count"\necho 12345\n' "$FLOW" > "$STUBS/cf-pi-dispatch.sh"
-  printf '#!/bin/bash\necho DONE\n' > "$STUBS/cf-pi-poll.sh"
+  printf '#!/bin/bash\necho "STATUS=OK"\n' > "$STUBS/cf-pi-poll.sh"
 
   # Test stub: counts invocations; behavior per scenario.
   if [ "$mode" = transient ]; then

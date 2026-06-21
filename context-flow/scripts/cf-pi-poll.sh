@@ -1,35 +1,17 @@
 #!/usr/bin/env bash
-# Thin adapter: stateless one-shot poll over the canonical pi-poll.sh STATUS= grammar,
-# translated back into cf's legacy token vocabulary.
+# Thin adapter: resolve this cf shard's canonical RUNDIR and run the canonical
+# pi-poll.sh over it, passing its STATUS= grammar STRAIGHT THROUGH. No token
+# translation — cf-pi-run.sh's dispatch_and_poll matches the canonical
+# `STATUS=OK… | STATUS=FAIL… | RUNNING…` grammar directly. The legacy cf token
+# vocabulary (DONE/ALIVE/ERROR/STALL/NO_OUTPUT/NO_JSONL/…) is retired.
 #
-# cf-facing interface (unchanged):
+# cf-facing interface:
 #   Usage:   cf-pi-poll.sh SESSION
-#   Statuses (single token prefix; tail is diagnostic):
-#     ALIVE          -- Pi running, events arriving; continue
-#     NO_JSONL       -- Pi launched, no events yet (within grace); continue
-#     NO_JSONL_FAIL  -- no events past grace, or process died with none; kill+escalate
-#     DONE           -- agent_end stopReason "stop"; proceed to report check
-#     NO_OUTPUT      -- agent ended turn (stop) with no actionable output; fail fast
-#     STALL          -- no event past threshold; kill+escalate
-#     ERROR          -- agent_end error/aborted, or process died mid-stream
-#     TIMEOUT        -- elapsed > $PI_WALL_CLOCK_S; kill+escalate
-#     NO_PID         -- pi.pid missing; dispatch broken; abort
+#   Stdout:  one canonical pi-poll.sh status line, verbatim, or
+#            `STATUS=FAIL … no-pid` when the dispatch handle is missing/broken.
 #
-# Internally reads $SESSION/pi-rundir (written by cf-pi-dispatch.sh), delegates to
-# the canonical "$CANON_DIR/pi-poll.sh" "$RUNDIR", and translates STATUS= grammar.
-#
-# Token translation:
-#   STATUS=OK                             -> DONE
-#   STATUS=FAIL ... ERROR                 -> ERROR (preserve errorMessage excerpt)
-#   STATUS=FAIL ... empty ... terminal=stop -> NO_OUTPUT (clean turn-end, no output)
-#   STATUS=FAIL ... STALL                 -> STALL
-#   STATUS=FAIL ... TIMEOUT               -> TIMEOUT
-#   STATUS=FAIL ... handle=broken/no-pid  -> NO_PID
-#   STATUS=FAIL ... no-rc/died-mid-stream -> NO_JSONL_FAIL (treat as no-events-fail)
-#   STATUS=FAIL ... exit rc=N             -> RC_FAIL (abnormal pi exit, rc preserved)
-#   STATUS=FAIL ... (other)               -> ERROR
-#   RUNNING settling                      -> NO_JSONL (within grace)
-#   RUNNING                               -> ALIVE
+# Internally reads $SESSION/pi-rundir (written by cf-pi-dispatch.sh) and delegates
+# to "$CANON_DIR/pi-poll.sh" "$RUNDIR".
 
 set -uo pipefail
 
@@ -38,110 +20,31 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/cf-pi-env.sh"
 
 SESSION="$1"
-load_cf_pi_env "$SESSION" || { echo "NO_PID"; exit 0; }
+load_cf_pi_env "$SESSION" || { echo "STATUS=FAIL no-pid (session env missing)"; exit 0; }
 
 # Resolve the canonical pi-dispatch/scripts dir via the shared helper.
 CANON_DISPATCH="$(resolve_canon_dispatch)"
 if [ -z "${CANON_DISPATCH:-}" ] || [ ! -f "$CANON_DISPATCH" ]; then
-  echo "NO_PID"
+  echo "STATUS=FAIL no-pid (canonical pi-dispatch unresolved)"
   exit 0
 fi
 CANON_DIR="$(dirname "$CANON_DISPATCH")"
 
 # Read the canonical RUNDIR recorded by cf-pi-dispatch.sh.
 if [ ! -f "$SESSION/pi-rundir" ]; then
-  # Fallback: check old pi.pid for broken-dispatch guard.
-  [ -f "$PI_PID_FILE" ] || { echo "NO_PID"; exit 0; }
-  echo "NO_PID"
+  echo "STATUS=FAIL no-pid (pi-rundir absent)"
   exit 0
 fi
 RUNDIR="$(cat "$SESSION/pi-rundir" 2>/dev/null || true)"
 if [ -z "$RUNDIR" ]; then
-  echo "NO_PID"
+  echo "STATUS=FAIL no-pid (pi-rundir empty)"
   exit 0
 fi
 
-# Delegate to the canonical pi-poll.sh.
-# Pass through cf's tunable env vars so the canonical script respects cf's settings.
+# Pass cf's tunables through so the canonical script respects cf's settings.
 export PI_WALL_CLOCK_S="${PI_WALL_CLOCK_S:-1800}"
 export PI_STALL_THRESHOLD_S="${PI_STALL_THRESHOLD_S:-180}"
 
-canonical_line="$("$CANON_DIR/pi-poll.sh" "$RUNDIR" 2>/dev/null || true)"
-
-# Compute elapsed for diagnostic tails (best-effort).
-START=$(cat "$PI_START_FILE" 2>/dev/null || true)
-[ -z "$START" ] && START=$(date +%s)
-NOW=$(date +%s)
-ELAPSED=$((NOW - START))
-
-# Translate STATUS= grammar -> cf tokens.
-case "$canonical_line" in
-  STATUS=OK*)
-    echo "DONE ${ELAPSED}s"
-    ;;
-  STATUS=FAIL*ERROR*)
-    # Preserve errorMessage excerpt if present in the line.
-    EXCERPT="$(printf '%s' "$canonical_line" | grep -oE 'errorMessage[^|]*' | head -c 120 | tr '\n' ' ' || true)"
-    echo "ERROR ${ELAPSED}s stopReason=error ${EXCERPT}"
-    ;;
-  STATUS=FAIL*STALL*)
-    echo "STALL ${ELAPSED}s"
-    ;;
-  STATUS=FAIL*TIMEOUT*)
-    echo "TIMEOUT ${ELAPSED}s"
-    ;;
-  STATUS=FAIL*handle=broken*|STATUS=FAIL*no-pid*)
-    echo "NO_PID"
-    ;;
-  STATUS=FAIL*no-rc*)
-    # Died without recording exit code (killed/crashed with no events) -> NO_JSONL_FAIL
-    echo "NO_JSONL_FAIL ${ELAPSED}s"
-    ;;
-  STATUS=FAIL*died-mid-stream*|STATUS=FAIL*died-no-events*)
-    # Canonical died-mid-stream: dead+rc=0+no-agent_end.
-    # If result.md has content, events were written -> ERROR (died mid-stream).
-    # If result.md is empty, no events at all -> NO_JSONL_FAIL (treat as no-events).
-    if [ -s "$RUNDIR/result.md" ]; then
-      echo "ERROR ${ELAPSED}s died-mid-stream"
-    else
-      echo "NO_JSONL_FAIL ${ELAPSED}s died-no-events"
-    fi
-    ;;
-  *exit\ rc=*)
-    # Abnormal pi exit: canonical emits `STATUS=FAIL ... exit rc=N ...` for nonzero rc.
-    # Extract and surface the rc so callers can distinguish abnormal exits.
-    RC_N="$(printf '%s' "$canonical_line" | grep -oE 'rc=[0-9]+' | head -1 | grep -oE '[0-9]+')"
-    echo "RC_FAIL ${ELAPSED}s exit rc=${RC_N}"
-    ;;
-  STATUS=FAIL*empty*terminal=stop*)
-    # Agent cleanly ended its turn (stopReason=stop) but produced no actionable
-    # output (e.g. a thinking-only turn that never emitted tool calls / report).
-    # Distinct from a hang: detectable immediately, label it accurately.
-    echo "NO_OUTPUT ${ELAPSED}s terminal=stop"
-    ;;
-  STATUS=FAIL*empty*|STATUS=FAIL*terminal=error*|STATUS=FAIL*)
-    # Remaining FAIL sub-classes (empty result, other terminal errors) -> ERROR
-    echo "ERROR ${ELAPSED}s"
-    ;;
-  RUNNING\ settling*)
-    # Dead process within no-rc grace, or other settling states -> NO_JSONL
-    echo "NO_JSONL ${ELAPSED}s"
-    ;;
-  RUNNING*)
-    # Check if there are any events yet to distinguish ALIVE from NO_JSONL.
-    OUTPUT_FILE="$RUNDIR/result.md"
-    if [ -s "$OUTPUT_FILE" ]; then
-      echo "ALIVE ${ELAPSED}s"
-    else
-      echo "NO_JSONL ${ELAPSED}s"
-    fi
-    ;;
-  "")
-    # Empty output from canonical poll (shouldn't happen) -> treat as NO_PID.
-    echo "NO_PID"
-    ;;
-  *)
-    # Unknown output -> escalate as ERROR.
-    echo "ERROR ${ELAPSED}s unknown-poll-output"
-    ;;
-esac
+line="$("$CANON_DIR/pi-poll.sh" "$RUNDIR" 2>/dev/null || true)"
+[ -z "$line" ] && line="STATUS=FAIL OUTPUT=$RUNDIR/result.md poll-empty"
+echo "$line"
