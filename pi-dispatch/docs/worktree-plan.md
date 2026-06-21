@@ -202,19 +202,13 @@ administrative state. Removing the worktree while a live descendant still holds
    (`kill -$PGID`). This terminates Pi and every descendant spawned under it.
 
 2. **Confirm-dead poll** — after issuing the kill, poll until the process group is
-   gone. The pgid is sourced from `$rundir/pi.pgid` (written by pi-dispatch.sh at
-   lines :124/:235 into the `RUNDIR=` path returned on stdout at :119). At clean
-   time, `$rundir` is read back from the caller-persisted path — see the H-A binding
-   mechanism documented in EX-12 below. The full clean-time poll reads:
-
-   ```bash
-   # At clean time: read rundir from the caller-persisted file (cf-pi-dispatch.sh:87 pattern)
-   rundir="$(cat "$session/pi-rundir")"
-   pgid="$(cat "$rundir/pi.pgid")"
-   until ! kill -0 "$pgid" 2>/dev/null; do sleep 0.2; done
-   ```
-
-   This poll ensures the process group is fully dead before proceeding.
+   fully dead before proceeding. The pgid is obtained from `$rundir/pi.pgid`
+   (written by pi-dispatch.sh at lines :124/:235 into the `RUNDIR=` path returned
+   on stdout at :119). How `$rundir` is bound at clean time — and why a naive
+   variable reference would be unbound in the child bash — is the subject of the
+   H-A section in EX-12 below. The exact poll bash (the `until ! kill -0` loop)
+   lives in the implementation-time test at
+   `pi-dispatch/tests/worktree-cleanup-test.sh`, not in this plan.
 
 3. **`git worktree remove --force`** — only after the confirm-dead poll returns.
 
@@ -531,41 +525,70 @@ create — at that point, `RUNDIR` does not yet exist. At cleanup execution time
 `$rundir` variable inside the heredoc body would therefore be **unbound at run time**,
 producing an empty or erroneous path.
 
-### H-A: Binding mechanism — option (a) caller-persisted path
+### H-A: Binding mechanism — create-time literal freeze (not run-time read-back)
 
-The fix mirrors the pattern cf already uses for its stop adapter: `cf-pi-dispatch.sh`
-writes the rundir into a well-known persisted file at `$session/pi-rundir`
-(cf-pi-dispatch.sh:87), and `cf-pi-stop.sh` reads it back at stop time
-(cf-pi-stop.sh:27) to obtain `$RUNDIR` before delegating to canonical `pi-stop.sh`
-(:30-31).
+**Why read-back is wrong.** The superseded option (a) proposed that the caller writes
+`RUNDIR=` into `$session/pi-rundir` after dispatch, and the cleanup script reads it back
+at run time (`rundir="$(cat "$session/pi-rundir")"`) to obtain the live value. That
+approach is rejected. The `$session/pi-rundir` path itself is derived from `$session`,
+which is a session-scoped uppercase variable. `SESSION` is defined in `cf-pi-setup.sh:39`
+(`SESSION="$SESSION"` in the written env.sh) but is **not exported** — `grep -q 'export SESSION' cf-pi-setup.sh` returns nothing. When the orchestrator runs the cleanup
+script as `bash "$CLEANUP_SCRIPT"` (cf.md:600-601), the child bash does not inherit
+non-exported session variables from the parent. Any reference to `$session` or
+`$pi-rundir` as a bare variable inside the heredoc body would therefore be **unbound**
+in the child bash — producing an empty or erroneous path at run time. Read-back of a
+runtime variable in the heredoc is not the correct mechanism and must not be reinstated.
 
-The hoisted primitive applies the **same caller-persisted path mechanism** (option a):
-after dispatch, the caller writes the `RUNDIR=` value into `$session/pi-rundir`
-(mirroring cf-pi-dispatch.sh:87). The cleanup script reads it back at run time to
-obtain the live `rundir` value. This eliminates the unbound-variable problem without
-requiring any change to the frozen trio.
+**The correct mechanism: create-time literal freeze.** The exemplar is
+`cf-pi-worktree.sh:73-82`. In that heredoc, values known at create time — `$WORK`,
+`$REPO_ROOT`, `$DIFF_FILE`, `$diff_base_fallback`, `$diff_base_branch` — are written
+as unescaped `$VAR` tokens, so the shell expands them immediately when the heredoc is
+appended. Run-time values — `$_mb`, `$_diff_base` — are written as escaped `\$_mb`,
+`\$_diff_base` so they remain as literal dollar-signs in the output file and are
+evaluated later when the cleanup script runs. This is the freeze pattern: the PATH is
+frozen as a create-time literal (the exact string is baked in when the heredoc is
+written); the FILE CONTENTS of that path are read at run time (after dispatch, the file
+exists and holds the rundir value).
+
+**Application to the hoisted primitive.** For `pi-worktree.sh` (which has no
+`load_cf_pi_env`, no `$session`, no `$pi-rundir` convention), the rundir path is
+supplied via an explicit parameter named `rundir-file` (or `--rundir-file`). The
+caller, who knows the full path at create time, passes that path as the `rundir-file`
+parameter. The create phase then freezes that path as a create-time literal into the
+heredoc. The child bash (cf.md:600-601) reads only the file contents at run time —
+obtaining the actual rundir string only after dispatch has produced it. This is
+distinct from cf's `$session/pi-rundir` convention; it does not require a session
+variable at all, only the literal file path baked in at create time.
+
+The `rundir-file` parameter is added to the param table in EX-11 alongside the other
+create-time-frozen parameters.
+
+### Heredoc-scope invariant (forward guard)
+
+To prevent the unbound-variable class from being re-introduced in any future
+implementation, the following one-time correctness invariant applies to every
+heredoc-authored cleanup block:
+
+**Every variable referenced inside a cleanup heredoc must be EITHER (a) frozen as a
+create-time literal at heredoc-write time, OR (b) defined by something the cleanup
+script itself sources (e.g. `env.sh` or an equivalent source step) before use.**
+Any variable that is neither (a) nor (b) is unbound in the child bash and must not
+appear. There is no third option: the child bash does not inherit non-exported
+variables from the parent (cf-pi-setup.sh:39; cf.md:600-601).
 
 ### Net-new hardening: confirm-poll before cleanup remove
 
-cf currently has no confirm-poll at the cleanup remove site. The hoisted primitive
-adds net-new hardening: a confirm-poll placed **immediately before** the `worktree
-remove` call inside the cleanup block. At clean time, `rundir` is obtained from the
-caller-persisted file (written at dispatch time, mirroring cf-pi-dispatch.sh:87;
-read back here mirroring cf-pi-stop.sh:27). The pgid is then read from
-`$rundir/pi.pgid` (the path written by pi-dispatch.sh at :124/:235):
+cf currently has no confirm-poll at the cleanup remove site. The hoisted primitive adds
+net-new hardening: a confirm-poll placed **immediately before** the `worktree remove`
+call inside the cleanup block. The pgid is obtained from `$rundir/pi.pgid` (the path
+written by pi-dispatch.sh at :124/:235), where `$rundir` is the contents of the
+frozen `rundir-file` path — read from disk at run time after the literal file path
+was baked in at create time.
 
-```bash
-# confirm-poll — placed immediately before worktree remove
-# rundir is bound at run time by reading the caller-persisted path
-rundir="$(cat "$session/pi-rundir")"
-pgid="$(cat "$rundir/pi.pgid")"
-until ! kill -0 "$pgid" 2>/dev/null; do sleep 0.2; done
-git worktree remove --force "$work_path"
-```
-
-The `rundir="$(cat "$session/pi-rundir")"` line is what binds `$rundir` at clean
-time — without it (or the equivalent caller-persisted mechanism), the variable is
-unbound in the fresh bash context.
+The exact confirm-poll bash (the `kill -0` loop pattern) lives in the
+implementation-time test at `pi-dispatch/tests/worktree-cleanup-test.sh`, not in this
+plan. That test pins the exact poll bash and confirms the kill-confirm-BEFORE-remove
+ordering at implementation time.
 
 This makes worktree removal race-free by ensuring the process group is fully dead
 before the remove runs. cf currently has no such poll at the cleanup.sh remove site —
