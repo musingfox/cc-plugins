@@ -177,7 +177,7 @@ No `phase=reinvoked` line ever appeared for ARM-SUBJECT. The sub-agent was not r
 
 ### ARM-CONTROL — MAIN + `run_in_background`
 
-MAIN wrote `phase=launched`, launched a REAL background command (`sleep 5 && echo phase=reinvoked`) via Bash `run_in_background`, ended its turn, and WAS genuinely re-invoked by the harness on the bg task's exit (task-notification fired). The 13s gap between `launched` and `reinvoked` proves the background command (not a foreground echo) wrote the reinvoked line. `control-marker.txt`:
+MAIN wrote `phase=launched`, launched a REAL background command (`sleep 5 && echo phase=reinvoked`) via Bash `run_in_background`, ended its turn, and WAS genuinely re-invoked by the harness on the bg task's exit (task-notification fired). The 13s gap between `launched` and `reinvoked` proves the background command (not a foreground echo) wrote the reinvoked line. `control2-marker.txt`:
 
 ```
 phase=launched ts=1782019044
@@ -198,7 +198,7 @@ phase=bg_done
 phase=observed_within_invocation
 ```
 
-ARM-TASK confirms **in-invocation polling, NOT re-wake**: a sub-agent cannot be re-woken after returning, but CAN poll within its single invocation — the `cf-pi-run.sh` / `cf-pi-run.sh` pi-driver poll-loop pattern. The demonstrated single-shot lifecycle (ARM-SUBJECT) shows a returned sub-agent cannot be re-woken by ANY external mechanism — the constraint is the lifecycle, not the signaling channel. What works is a sub-agent polling WITHIN its single invocation (Monitor or a poll loop). This is the working alternative to re-wake.
+ARM-TASK confirms **in-invocation polling, NOT re-wake**: a sub-agent cannot be re-woken after returning, but CAN poll within its single invocation — the `cf-pi-run.sh` pi-driver poll-loop pattern. The demonstrated single-shot lifecycle (ARM-SUBJECT) shows a returned sub-agent cannot be re-woken by ANY external mechanism — the constraint is the lifecycle, not the signaling channel. What works is a sub-agent polling WITHIN its single invocation (Monitor or a poll loop). This is the working alternative to re-wake.
 
 ### Outcome enumeration
 
