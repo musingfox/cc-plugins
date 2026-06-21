@@ -7,7 +7,9 @@
 # polls for completion with pi-poll.sh instead of blocking on one long Bash call.
 #
 # Usage:
-#   pi-dispatch.sh BRIEF [OUTDIR [PRIOR_RUNDIR]]
+#   pi-dispatch.sh [--profile NAME] BRIEF [OUTDIR [PRIOR_RUNDIR]]
+#     --profile NAME — (optional, leading) a provider/model preset from profiles.conf
+#                     (or PI_PROFILE env). Explicit PI_PROVIDER/PI_MODEL still win.
 #     BRIEF         — work description. Either a path to a brief file, or inline text.
 #     OUTDIR        — base dir for run artifacts
 #                     (default: ${PI_RUNS_DIR:-$HOME/.cache/pi-runs}/pi-dispatch — a
@@ -29,9 +31,12 @@
 #   PID=<background wrapper pid (== PGID)>     <- the perl setsid wrapper's pid
 #   RUNDIR=<per-run dir holding result/stderr/pid/pgid/rc/start>
 #
-# Routing (cheap/fast by default; override via env):
+# Routing (cheap/fast by default; precedence: env > --profile/PI_PROFILE > default):
 #   PI_PROVIDER  default: google
 #   PI_MODEL     default: gemini-2.5-flash-lite
+#   PI_PROFILE / --profile NAME   named preset from profiles.conf (NAME PROVIDER MODEL)
+#   PI_PROFILES_FILE              override the profiles.conf path
+#   PI_RESOLVE_PROFILE_ONLY=1     print resolved "PROVIDER=… MODEL=…" and exit (no launch)
 #
 # Pi prompt (env-overridable):
 #   PI_PROMPT    default: "Read the brief above and complete it. Output only the result."
@@ -64,12 +69,50 @@
 
 set -euo pipefail
 
-BRIEF="${1:?usage: pi-dispatch.sh BRIEF [OUTDIR [PRIOR_RUNDIR]]}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Optional leading --profile NAME: a named provider/model preset (see profiles.conf).
+# Selectable here or via the PI_PROFILE env var. Explicit PI_PROVIDER/PI_MODEL win.
+PI_PROFILE="${PI_PROFILE:-}"
+if [ "${1:-}" = "--profile" ]; then
+  PI_PROFILE="${2:?--profile needs a NAME}"
+  shift 2
+fi
+
+# Resolve the profile preset (if any). profiles.conf rows: `NAME PROVIDER MODEL`
+# (whitespace-separated; # comments and blank lines ignored). An unknown profile
+# warns and falls through to the built-in defaults rather than failing the launch.
+_PROF_PROVIDER=""; _PROF_MODEL=""
+if [ -n "$PI_PROFILE" ]; then
+  PROFILES_FILE="${PI_PROFILES_FILE:-$SCRIPT_DIR/../profiles.conf}"
+  if [ -f "$PROFILES_FILE" ]; then
+    _row="$(awk -v n="$PI_PROFILE" '!/^[[:space:]]*#/ && NF>=3 && $1==n {print $2, $3; exit}' "$PROFILES_FILE")"
+    if [ -n "$_row" ]; then
+      _PROF_PROVIDER="${_row%% *}"
+      _PROF_MODEL="${_row#* }"
+    else
+      echo "pi-dispatch: warning: profile '$PI_PROFILE' not in $PROFILES_FILE; using defaults" >&2
+    fi
+  else
+    echo "pi-dispatch: warning: PI_PROFILE='$PI_PROFILE' set but $PROFILES_FILE is absent; using defaults" >&2
+  fi
+fi
+
+# Precedence: explicit env PI_PROVIDER/PI_MODEL > profile preset > built-in default.
+PROVIDER="${PI_PROVIDER:-${_PROF_PROVIDER:-google}}"
+MODEL="${PI_MODEL:-${_PROF_MODEL:-gemini-2.5-flash-lite}}"
+
+# Introspection seam (no launch): print the resolved routing and exit. Lets callers
+# and tests verify profile resolution without invoking pi.
+if [ "${PI_RESOLVE_PROFILE_ONLY:-}" = "1" ]; then
+  echo "PROVIDER=$PROVIDER MODEL=$MODEL"
+  exit 0
+fi
+
+BRIEF="${1:?usage: pi-dispatch.sh [--profile NAME] BRIEF [OUTDIR [PRIOR_RUNDIR]]}"
 OUTDIR="${2:-${PI_RUNS_DIR:-$HOME/.cache/pi-runs}/pi-dispatch}"
 PRIOR_RUNDIR="${3:-}"
 
-PROVIDER="${PI_PROVIDER:-google}"
-MODEL="${PI_MODEL:-gemini-2.5-flash-lite}"
 PROMPT="${PI_PROMPT:-Read the brief above and complete it. Output only the result.}"
 
 RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
