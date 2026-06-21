@@ -111,10 +111,16 @@ function. Each of the three callers replaces its inline block with a single func
 `spiral/scripts/pi-build.sh:44-48` carries its own twin of this resolver and is out-of-scope
 — it is not touched.
 
-The extracted `resolve_canon_dispatch` helper preserves the PI_RESOLVE_ONLY introspection for
-both contracts: fail-hard (`cf-pi-dispatch.sh:37-43` prints `RESOLVED=` and exits nonzero when
-no canonical is found) and fail-soft (`cf-pi-poll.sh:50-53` / `cf-pi-stop.sh` echo `NO_PID`
-and exit zero). Both behaviors are reproduced identically by the shared helper.
+The extracted `resolve_canon_dispatch` helper returns the resolved path to the canonical dispatch
+directory; each caller
+keeps its own distinct resolution-failure branch — the helper does not unify them.
+
+- **dispatch** (`cf-pi-dispatch.sh:37-43`): keeps the `PI_RESOLVE_ONLY` introspection branch —
+  prints `RESOLVED=<dir>` on success, exit 1 when unresolved (fail-hard). `PI_RESOLVE_ONLY` lives
+  only here; `cf-pi-poll` and `cf-pi-stop` do not use it.
+- **poll** (`cf-pi-poll.sh:50-53`): keeps its own guard — echoes `NO_PID`, exit 0 (fail-soft).
+- **stop** (`cf-pi-stop.sh:27,35-45`): keeps its own fallback — sets `CANON_DIR=/nonexistent` and
+  falls through to a direct PID kill (`kill`). It emits no `NO_PID`.
 
 **Why first:** Pure internal refactor; no protocol or behavioral change. Confirms the shared
 helper works across all three callers before any behavioral steps.
