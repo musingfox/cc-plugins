@@ -1,175 +1,139 @@
-# Pi-Dispatch Migration Plan: Option B — Internal Modernization
+# Pi-Dispatch Migration Plan: MAIN-driven background dispatch
 
-## Background
+> Supersedes the earlier "Option B — Internal Modernization" plan. That plan kept the
+> `pi-driver` sub-agent as a long-lived in-invocation poller. This plan instead moves the
+> wait to the harness, driven by MAIN, because that is the only shape that delivers a
+> **non-blocking** dispatch (MAIN keeps working while Pi runs). All claims below are backed
+> by the receipts in the Evidence appendix.
 
-The current cf (context-flow) Pi dispatch runs its poll loop inside `cf-pi-run.sh`, invoked
-by the `pi-driver` sub-agent (`context-flow/agents/pi-driver.md:1-12`). The sub-agent is a
-distiller, not a driver: it invokes `cf-pi-run.sh` and reads `$SHARD_SESSION/outcome.md`
-(`pi-driver.md:12-15`). Internally, `cf-pi-run.sh` polls via `cf-pi-poll.sh`, which is a
-hand-rolled translation layer that converts canonical `STATUS=` grammar emitted by
-`pi-dispatch/scripts/pi-poll.sh` back into cf's legacy token vocabulary (DONE, ALIVE, ERROR,
-etc.) so the `dispatch_and_poll` loop in `cf-pi-run.sh:220-311` can match against those tokens.
+## What changed since Option B
 
-That translation layer is unnecessary overhead. The canonical `pi-dispatch.sh` (`:142-193`)
-already owns setsid/pgid and the background launch, returning the PID instantly — so
-`dispatch_and_poll` never backgrounds anything itself. The primary, substantive win is
-Steps 1-2: resolver dedup and dropping the translation layer. Step 3 (poll transport swap)
-is marginal by comparison and can happen entirely within `cf-pi-run.sh`'s dispatch-and-poll
-internals, without relocating the lifecycle or the token firewall.
+Option B existed to dodge the Bash tool's 10-minute ceiling by polling inside a sub-agent.
+Three facts collapse that premise:
 
----
+1. **The 10-minute ceiling is configurable, not a hard wall.** `BASH_MAX_TIMEOUT_MS` raises
+   the per-call ceiling with no documented upper limit. The entire setsid/pgid/sleep-poll
+   edifice was built to dodge a wall that a setting removes.
+2. **`run_in_background` already firewalls heavy output.** A background Bash task's stdout
+   goes to an output file; the completion notification injected into MAIN is metadata only
+   (exit code + path). Measured: 801 lines of heavy stdout landed in the file, **zero** lines
+   entered MAIN context. The §17 token firewall is therefore automatic on this path — no
+   distiller sub-agent is required for it.
+3. **Monitoring is native.** Claude Code's `Monitor` / `TaskOutput` / `TaskGet` tools watch a
+   `run_in_background` task directly. "Non-blocking + watch progress" needs no MCP and no
+   custom machinery.
 
-## Architecture Invariants (no OWD-1, no one-way doors)
+The one constraint that shapes the architecture (finding F3): **only MAIN is re-invoked when
+a background task completes; a sub-agent is not.** So a non-blocking dispatch must originate
+from MAIN.
 
-This plan introduces **no OWD-1**. Every step is two-way. The §17 token **firewall** is
-**preserved unchanged**: `pi-driver.md` remains the sole agent boundary, `outcome.md` remains
-paths-only, and MAIN reads only `outcome.md` (at `$SHARD_SESSION/outcome.md`) — unchanged
-from the current contract.
+## Decision: two orthogonal layers
 
----
+The four mechanisms considered (background task, sub-agent, MCP, loop) are not competitors —
+they sit on two independent axes.
 
-## Target Architecture
+| Layer | Choice now | Future upgrade |
+|---|---|---|
+| **Wait** (survive a long run without blocking MAIN) | `run_in_background` Bash from MAIN + harness completion notification (`Monitor` for live progress) | — (native, sufficient) |
+| **Selection** (pick the right agent profile per task) | `pi-dispatch.sh --profile NAME` reading a small profiles file | MCP server exposing one tool per profile, when ≥3 profiles are in regular use or a non-shell consumer appears |
 
-The post-migration dispatch model keeps pi-driver as the **sole driver of one shard within its
-single invocation**. The `pi-driver` sub-agent (`context-flow/agents/pi-driver.md:1-12`)
-continues to invoke `cf-pi-run.sh` and distill its structured result into the fixed return
-schema. What changes is inside `cf-pi-run.sh`'s `dispatch_and_poll` function:
+`loop` (ScheduleWakeup) is redundant with the completion notification for a harness-observable
+task and is not used. **MCP code-execution / sandbox** (Anthropic "Code execution with MCP",
+Cloudflare "Code Mode") is **not available in the Claude Code CLI** (SDK/API only) and, even
+where available, addresses only token efficiency — not long-running or monitoring. It is a
+future option *if* this stack ever moves onto an SDK-based host; it is not a current lever.
 
-1. `dispatch_and_poll` (`cf-pi-run.sh:220-311`) replaces the hand-rolled 70×30s sleep loop
-   and the `cf-pi-poll.sh` token-translation calls with Monitor reactive polling on canonical
-   `STATUS=` grammar, within the sub-agent invocation. No new `run_in_background` wraps the
-   dispatch — canonical `pi-dispatch.sh` (`:142-193`) already owns setsid/pgid and returns the
-   PID instantly. The whole lifecycle stays in the sub-agent — no phase relocates to MAIN.
-2. `write_outcome` (`cf-pi-run.sh:67-147`) and the gate pipeline (`cf-pi-run.sh:326-465`)
-   are unchanged; they still produce `$SHARD_SESSION/outcome.md` in paths-only format.
-3. MAIN reads ONLY `outcome.md` — the paths-only boundary artifact at
-   `$SHARD_SESSION/outcome.md`. This is unchanged from today.
-4. The §17 token firewall (agent boundary = pi-driver sub-agent; no inline log content
-   crosses the boundary; MAIN sees only paths) is **preserved unchanged**.
+## Target architecture
 
----
+```
+MAIN
+ ├─ Bash(run_in_background) → pi-run-sync.sh --profile X   (one per shard, fired together)
+ │                              └─ runs pi to completion, stdout → rundir/raw.jsonl
+ │                              └─ self-distills → outcome.md (paths-only)
+ ├─ (free to do other work; optional Monitor for progress)
+ └─ on completion ping → Read outcome.md (small, paths-only) → proceed
+```
 
-## Component Fate Table
+- **Wait:** MAIN fires N background dispatches in one message; the harness pings MAIN as each
+  completes. No sleep-poll, no setsid in the cf path, no translation layer, no waiting
+  sub-agent.
+- **Firewall:** the heavy `raw.jsonl` stays in the run dir; the background task's completion
+  notification carries metadata only; MAIN reads the small `outcome.md`. The boundary that
+  `pi-driver` used to enforce by being a sub-agent is now enforced by the run_in_background
+  output split + a paths-only `outcome.md`. (A one-shot distiller sub-agent remains available
+  as belt-and-suspenders but is not needed for the firewall.)
+- **Selection:** `--profile` resolves model / provider / tool-set / permissions from a small
+  config before launching Pi, so each dispatch picks the right profile.
 
-| Component | Fate | Reversibility | Cite |
+## The one significant change: collapse the pi-driver waiter (reversible)
+
+This plan retires `pi-driver` as the *waiter/driver* of a shard. That was the OWD-1 door the
+prior spiral gated behind F3 + human approval; choosing a non-blocking dispatch is what opens
+it deliberately. It is **not** irreversible — it is a refactor revertable by git — but it is
+the load-bearing structural change, so it is staged last and behind its own rollback.
+
+## Component fate
+
+| Component | Fate | Reversible | Cite |
 |---|---|---|---|
-| `pi-driver.md` | KEEP — firewall boundary; the pi-driver sub-agent stays as the sole orchestrator of one Pi run per invocation; outcome.md contract is the only cross-boundary artifact | two-way | `context-flow/agents/pi-driver.md:1-12` |
-| `cf-pi-poll.sh` | REMOVE translation layer — the STATUS→legacy-token table (82 lines) becomes unnecessary once `dispatch_and_poll` reads canonical STATUS= grammar directly via Monitor | two-way | `context-flow/scripts/cf-pi-poll.sh:82-152` |
-| `cf-pi-run.sh` | CHANGE — only `dispatch_and_poll` internals (`cf-pi-run.sh:220-311`, loop `:228-231`) swap from sleep+legacy-poll to Monitor reactive wait; all other lifecycle steps stay | two-way | `context-flow/scripts/cf-pi-run.sh:220-311` |
-| `cf-pi-dispatch.sh` | CHANGE — resolver dedup; collapses the duplicated sibling-search block into a shared helper | two-way | `context-flow/scripts/cf-pi-dispatch.sh:27-34` |
-| `cf-pi-status.sh` | out-of-scope — re-derives tokens from disk (`cat pi.pid` / `kill -0` / `ls jsonl` / `stat mtime`) at `:82-120`, independent of cf-pi-poll's translation path; a reconcile follow-up is the alternative | n/a | `context-flow/scripts/cf-pi-status.sh:82-120` |
-| `pi-dispatch.sh` | KEEP — canonical always-background launcher; stdout contract `OUTPUT=/PID=/RUNDIR=` (OWD-2) and group-kill unchanged; frozen | frozen | `pi-dispatch/scripts/pi-dispatch.sh:196-198` |
-| `pi-build.sh` | STAY — spiral's BUILD act; out-of-scope for this migration (explained below) | n/a | `spiral/scripts/pi-build.sh:44-48` |
+| `pi-run-sync.sh` (new) | ADD — runs Pi to completion + self-distills to paths-only `outcome.md`; this is what MAIN backgrounds | two-way | new |
+| `pi-driver.md` | RETIRE as waiter — dispatch moves to MAIN; an optional one-shot distiller agent may replace it later if extra isolation is wanted | two-way (last step) | `context-flow/agents/pi-driver.md:1-12` |
+| `cf-pi-run.sh` | SHRINK — `dispatch_and_poll` sleep/translate loop removed; lifecycle (write_outcome, gate pipeline) folds into `pi-run-sync.sh` or MAIN orchestration | two-way | `context-flow/scripts/cf-pi-run.sh:220-311` |
+| `cf-pi-poll.sh` | REMOVE — translation layer is dead once nothing polls legacy tokens | two-way | `context-flow/scripts/cf-pi-poll.sh:82-152` |
+| `cf-pi-dispatch.sh` | KEEP + dedup resolver into `cf-pi-env.sh`; gains `--profile` pass-through | two-way | `context-flow/scripts/cf-pi-dispatch.sh:27-34` |
+| `cf-pi-status.sh` | OUT-OF-SCOPE — re-derives tokens from disk independently | n/a | `context-flow/scripts/cf-pi-status.sh:82-120` |
+| `pi-dispatch.sh` | KEEP frozen — setsid/pgid + `OUTPUT=/PID=/RUNDIR=` (OWD-2) untouched; still used by spiral | frozen | `pi-dispatch/scripts/pi-dispatch.sh:196-198` |
+| `pi-build.sh` (spiral) | OUT-OF-SCOPE — short blocking run inside spiral BUILD; no fanout, finishes before ceiling | n/a | `spiral/scripts/pi-build.sh:44-48` |
 
----
-
-## Frozen Contracts: KEEP
-
-### agent_end Whitelist (pi-poll.sh)
-
-`pi-dispatch/scripts/pi-poll.sh` enforces the SUCCESS WHITELIST: `agent_end` present AND `stopReason=="stop"` AND result non-empty (see `pi-poll.sh:40-49`).
-This whitelist is NOT changed by this migration. After the swap, `dispatch_and_poll` reads
-`STATUS=OK` / `STATUS=FAIL` directly from Monitor output — the whitelist's meaning of
-`STATUS=OK` is identical; only the translation hop is removed.
-
-### Frozen Stdout Contract (OWD-2)
-
-`pi-dispatch.sh` emits exactly three lines on stdout (`pi-dispatch.sh:196-198`):
-
-```
-OUTPUT=<absolute path to result file>
-PID=<background wrapper pid (== PGID)>
-RUNDIR=<per-run dir>
-```
-
-`OUTPUT=`, `PID=`, and `RUNDIR=` are marked **frozen / OWD-2**. `cf-pi-dispatch.sh` already
-captures `RUNDIR=` and `PID=` from this output. Post-migration, no new consumer reads these
-lines — the OWD-2 contract is never modified.
-
----
-
-## Spiral Consumer: pi-build.sh
-
-`spiral/scripts/pi-build.sh:44-48` is **out-of-scope** for this migration. It runs inside
-spiral's BUILD convergence sub-agent, which is single-shot with no N-shard fanout. Its
-blocking poll loop (short interval) terminates before the Bash tool ceiling. Migrating
-`pi-build.sh` would add complexity with no benefit; it calls `pi-dispatch.sh` (OWD-2),
-which is unchanged.
-
----
-
-## Migration Sequence
-
-Steps are ordered cheapest-to-reverse first. All steps are two-way.
+## Migration sequence (cheapest-to-reverse first)
 
 ### Step 1 — resolver dedup (two-way)
+Extract the duplicated sibling-resolver (`cf-pi-dispatch.sh:27-34`, `cf-pi-poll.sh:44-49`,
+`cf-pi-stop.sh:22-26`) into a `resolve_canon_dispatch` helper in `cf-pi-env.sh` (already
+sourced by all three). Each caller keeps its own distinct failure branch (`PI_RESOLVE_ONLY`
+lives only in dispatch; poll echoes `NO_PID` fail-soft; stop falls through to a direct kill).
+Pure refactor, no behavior change. **Rollback:** restore inline blocks.
 
-**What:** The sibling-resolver block (`ls ... | sort -V | tail -1`) is duplicated in three cf
-scripts: `cf-pi-dispatch.sh:27-34`, `cf-pi-poll.sh:44-49`, and `cf-pi-stop.sh:22-26`. Extract
-it into `cf-pi-env.sh` (already sourced by all three) as a shared `resolve_canon_dispatch`
-function. Each of the three callers replaces its inline block with a single function call.
-`spiral/scripts/pi-build.sh:44-48` carries its own twin of this resolver and is out-of-scope
-— it is not touched.
+### Step 2 — add `--profile` selection (two-way, additive)
+Add `--profile NAME` to `pi-dispatch.sh` (and pass-through in `cf-pi-dispatch.sh`) that reads a
+small `profiles` file (model / provider / tool-set / permissions). Default profile = today's
+behavior, so existing callers are unaffected. **Rollback:** ignore the flag; default path is
+unchanged.
 
-The extracted `resolve_canon_dispatch` helper returns the resolved path to the canonical dispatch
-directory; each caller
-keeps its own distinct resolution-failure branch — the helper does not unify them.
+### Step 3 — add `pi-run-sync.sh` + migrate cf to MAIN-driven background (two-way)
+Add `pi-run-sync.sh`: run Pi to completion (stdout → `raw.jsonl`), apply the existing
+`agent_end` success whitelist, distill to paths-only `outcome.md`, exit. Change the context-flow
+implement flow so **MAIN** fires one `run_in_background` Bash per shard calling
+`pi-run-sync.sh --profile X`, and reads each `outcome.md` on its completion ping (optionally
+`Monitor` for progress). Set `BASH_MAX_TIMEOUT_MS` in settings as the safety ceiling.
+**Rollback:** revert the flow to spawning `pi-driver`; `pi-run-sync.sh` is additive and can sit
+unused.
 
-- **dispatch** (`cf-pi-dispatch.sh:37-43`): keeps the `PI_RESOLVE_ONLY` introspection branch —
-  prints `RESOLVED=<dir>` on success, exit 1 when unresolved (fail-hard). `PI_RESOLVE_ONLY` lives
-  only here; `cf-pi-poll` and `cf-pi-stop` do not use it.
-- **poll** (`cf-pi-poll.sh:50-53`): keeps its own guard — echoes `NO_PID`, exit 0 (fail-soft).
-- **stop** (`cf-pi-stop.sh:27,35-45`): keeps its own fallback — sets `CANON_DIR=/nonexistent` and
-  falls through to a direct PID kill (`kill`). It emits no `NO_PID`.
+### Step 4 — remove the dead poll path (two-way, cleanup)
+Once Step 3 is proven, delete `cf-pi-poll.sh`'s translation table and the `dispatch_and_poll`
+sleep loop in `cf-pi-run.sh`; retire `pi-driver.md` (or replace with a one-shot distiller if
+extra isolation is wanted). Migrate the two affected tests: `poll-json.test.sh` (assert on
+canonical `STATUS=` grammar) and `gate3-retest.test.sh:64` (stub emits `STATUS=OK`).
+**Rollback:** git revert; no persistent state is touched.
 
-**Why first:** Pure internal refactor; no protocol or behavioral change. Confirms the shared
-helper works across all three callers before any behavioral steps.
+## Out of scope
+- **spiral `pi-build.sh`** — short blocking run, no fanout; leave on the frozen `pi-dispatch.sh`
+  path. The same MAIN-driven pattern could apply later if spiral wants non-blocking BUILD.
+- **MCP server** — defer until ≥3 profiles are in regular rotation or a non-shell consumer
+  needs dispatch as a first-class tool. The `--profile` file is forward-compatible: an MCP
+  server would expose one tool per profile entry.
+- **MCP code-execution / sandbox** — not in the CLI; revisit only on an SDK-based host.
 
-**Rollback:** Revert `cf-pi-env.sh` and restore the inline resolver in each of the three
-callers (`cf-pi-dispatch.sh`, `cf-pi-poll.sh`, `cf-pi-stop.sh`). No state migration needed.
-
----
-
-### Step 2 — retire cf-pi-poll translation layer (two-way)
-
-**What:** Delete the STATUS→legacy-token translation table in `cf-pi-poll.sh:82-152`. Update
-`dispatch_and_poll` in `cf-pi-run.sh:220-311` to match canonical `STATUS=OK` / `STATUS=FAIL`
-/ `RUNNING` grammar directly, bypassing the adapter.
-
-Two test files must migrate alongside this step:
-
-- `poll-json.test.sh` — its asserts exercise the legacy token vocabulary; migrate all
-  assertions to the canonical `STATUS=` grammar, since the legacy tokens will no longer exist
-  in the translation path (note: `cf-pi-status.sh` re-derives tokens from disk independently
-  and is out-of-scope for this step).
-- `gate3-retest.test.sh` — at `:64` it stubs `cf-pi-poll.sh` to `echo DONE`; update the
-  stub to emit `STATUS=OK` so the retest behavior continues to be exercised against the
-  canonical grammar.
-
-**Why:** Eliminates the translation layer entirely. The canonical STATUS= grammar is complete
-and stable; the legacy tokens existed only because cf predated pi-poll.sh.
-
-**Rollback:** Restore the translation table in `cf-pi-poll.sh`, revert the `dispatch_and_poll`
-case statement in `cf-pi-run.sh`, and revert both test files. Git revert is sufficient; no
-persistent state is affected.
-
----
-
-### Step 3 — swap dispatch_and_poll poll transport to Monitor reactive wait (two-way, MARGINAL)
-
-**What:** Replace the `sleep 30` poll loop inside `dispatch_and_poll`
-(`cf-pi-run.sh:220-311`, core loop `:228-231`) with a Monitor reactive wait on the canonical
-`STATUS=` grammar. This step swaps ONLY the poll transport; it wraps NO new `run_in_background`
-call because the canonical `pi-dispatch.sh` (`:142-193`) already owns setsid/pgid, backgrounds
-Pi, and returns the PID instantly — the dispatch is already non-blocking before this step
-touches anything. `write_outcome` (`cf-pi-run.sh:67-147`) and the gate pipeline
-(`cf-pi-run.sh:326-465`) are not moved. Only `dispatch_and_poll`'s poll internals change.
-
-**Why (MARGINAL):** The substantive win is in Steps 1-2 (resolver dedup and translation-layer
-removal). This step is marginal: it reduces wall-clock latency from fixed 30s intervals to
-event-driven, but introduces no new lifecycle change. ARM-TASK proved a sub-agent can poll
-its own background task with Monitor within one invocation.
-
-**Rollback:** Restore the `sleep 30` / `cf-pi-poll.sh` loop in `dispatch_and_poll`. `cf-pi-poll.sh`
-is still present at this point (removed in a later cleanup pass if desired). Git revert is
-sufficient; the token firewall and outcome.md contract are unchanged.
+## Evidence (receipts)
+- **bg firewall:** 801-line heavy stdout → output file; MAIN completion notification = metadata
+  only (exit code + path), 0 heavy lines. Measured this session.
+- **Bash ceiling configurable:** `BASH_MAX_TIMEOUT_MS` overrides the 600000ms ceiling, no
+  documented upper bound — `https://code.claude.com/docs/en/tools-reference.md`.
+- **MCP call timeout:** per-server `timeout` (default ~28h), hard wall-clock —
+  `https://code.claude.com/docs/en/mcp.md`.
+- **F3:** only MAIN is re-invoked on background completion; a sub-agent is not (a sub-agent can
+  Monitor its own bg task within one invocation, but cannot be re-woken). See
+  `project-pi-dispatch-f3-and-migration` memory.
+- **code-execution-MCP:** token efficiency only, no monitoring; CLI-unsupported —
+  `https://www.anthropic.com/engineering/code-execution-with-mcp`,
+  `https://blog.cloudflare.com/code-mode-mcp/`, `https://code.claude.com/docs/en/sandboxing.md`.

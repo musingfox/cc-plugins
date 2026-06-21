@@ -1,6 +1,6 @@
 {
   "name": "pi-dispatch",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "description": "[Experimental] Offload heavy work to Pi's cheap/fast models — a dispatcher subagent + a dispatch.sh script so Claude only issues briefs and collects summaries, saving tokens",
   "author": {
     "name": "Nick Huang"
