@@ -90,3 +90,17 @@ load_cf_flow_env() {
   PLAN_ATTACHMENTS_DIR="$flow_session/plan-attachments"
   return 0
 }
+
+# resolve_canon_dispatch
+#   Echoes the absolute path to the canonical pi-dispatch.sh (highest version), or
+#   nothing if unresolved. Always returns 0 -- each caller keeps its own distinct
+#   failure branch (dispatch: fail-hard; poll: NO_PID fail-soft; stop: /nonexistent
+#   fallback). Mirror of spiral/scripts/pi-build.sh's resolver.
+resolve_canon_dispatch() {
+  local root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+  ls "$root"/../pi-dispatch/scripts/pi-dispatch.sh \
+     "$root"/../pi-dispatch/*/scripts/pi-dispatch.sh \
+     "$root"/../../pi-dispatch/scripts/pi-dispatch.sh \
+     "$root"/../../pi-dispatch/*/scripts/pi-dispatch.sh 2>/dev/null \
+   | sort -V | tail -1 || true
+}

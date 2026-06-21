@@ -24,14 +24,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=cf-pi-env.sh
 . "$SCRIPT_DIR/cf-pi-env.sh"
 
-# ---- Sibling resolver (mirror of spiral/scripts/pi-build.sh:40-59) ----------
-root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-
-CANON_DISPATCH="$(ls "$root"/../pi-dispatch/scripts/pi-dispatch.sh \
-                     "$root"/../pi-dispatch/*/scripts/pi-dispatch.sh \
-                     "$root"/../../pi-dispatch/scripts/pi-dispatch.sh \
-                     "$root"/../../pi-dispatch/*/scripts/pi-dispatch.sh 2>/dev/null \
-                  | sort -V | tail -1 || true)"
+# ---- Sibling resolver (shared helper in cf-pi-env.sh) -----------------------
+CANON_DISPATCH="$(resolve_canon_dispatch)"
 
 # PI_RESOLVE_ONLY introspection: print resolved dir and exit (no dispatch needed).
 if [ "${PI_RESOLVE_ONLY:-}" = "1" ]; then

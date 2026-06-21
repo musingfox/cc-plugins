@@ -17,13 +17,8 @@ session="$1"
 # --abort flag accepted for interface compatibility; canonical stop is always clean.
 load_cf_pi_env "$session"
 
-# Resolve the canonical pi-dispatch/scripts dir.
-root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-CANON_DISPATCH="$(ls "$root"/../pi-dispatch/scripts/pi-dispatch.sh \
-                     "$root"/../pi-dispatch/*/scripts/pi-dispatch.sh \
-                     "$root"/../../pi-dispatch/scripts/pi-dispatch.sh \
-                     "$root"/../../pi-dispatch/*/scripts/pi-dispatch.sh 2>/dev/null \
-                  | sort -V | tail -1 || true)"
+# Resolve the canonical pi-dispatch/scripts dir via the shared helper.
+CANON_DISPATCH="$(resolve_canon_dispatch)"
 CANON_DIR="$(dirname "${CANON_DISPATCH:-/nonexistent}")"
 
 # Read the canonical RUNDIR recorded by cf-pi-dispatch.sh.
