@@ -2,7 +2,7 @@
 
 Status: draft (architecture proposal, not yet implemented)
 Scope: context-flow Phase 3 (Implement) overhaul + Plan phase additions
-Author intent: let `cf` run a large goal to completion inside a single main-context budget by fanning out Pi work in parallel, distilling per-shard outcomes, and routing structured escalations without bouncing through the user.
+Author intent: let `cf` run a large goal to completion inside a single main-context budget by fanning out Pi work in parallel as main-launched background tasks, reading each shard's paths-only outcome directly, and routing structured escalations without bouncing through the user.
 
 ---
 
@@ -31,23 +31,19 @@ flowchart TB
     Plan --> Graph[cf-pi-shard.sh:<br/>build file-touch graph,<br/>derive parallel_group<br/>by connected components]
     Graph --> Shard{Shard by<br/>parallel_group}
 
-    Shard -->|group A| AgA[pi-driver sub-agent A]
-    Shard -->|group B| AgB[pi-driver sub-agent B]
-    Shard -->|group C| AgC[pi-driver sub-agent C]
-
-    AgA --> ShA[cf-pi-run.sh<br/>worktree A,<br/>branch cf/.../shard-A]
-    AgB --> ShB[cf-pi-run.sh<br/>worktree B,<br/>branch cf/.../shard-B]
-    AgC --> ShC[cf-pi-run.sh<br/>worktree C,<br/>branch cf/.../shard-C]
+    Shard -->|group A| ShA[cf-pi-run.sh A<br/>background task<br/>worktree A, branch cf/.../shard-A]
+    Shard -->|group B| ShB[cf-pi-run.sh B<br/>background task<br/>worktree B, branch cf/.../shard-B]
+    Shard -->|group C| ShC[cf-pi-run.sh C<br/>background task<br/>worktree C, branch cf/.../shard-C]
 
     ShA --> PiA[Pi process]
     ShB --> PiB[Pi process]
     ShC --> PiC[Pi process]
 
-    PiA --> OutA[outcome A:<br/>PASS / PARTIAL /<br/>FAIL / NEEDS_REPLAN]
-    PiB --> OutB[outcome B]
-    PiC --> OutC[outcome C]
+    PiA --> OutA[outcome.md A:<br/>paths-only<br/>PASS / FAIL / NEEDS_REPLAN]
+    PiB --> OutB[outcome.md B]
+    PiC --> OutC[outcome.md C]
 
-    OutA --> Collect[Main collects all,<br/>updates dispatch-state.json]
+    OutA --> Collect[Main reads each outcome.md directly,<br/>updates dispatch-state.json]
     OutB --> Collect
     OutC --> Collect
 
@@ -66,9 +62,8 @@ flowchart TB
 
 | Layer | Owns | Token cost source |
 |---|---|---|
-| Main orchestrator | Goal interpretation, shard fan-out decisions, outcome routing, integration gate, user-facing summary | Initial goal + shard returns + integration + final summary |
-| pi-driver sub-agent (per shard) | Invoke `cf-pi-run.sh`, read OUTCOME_FILE, distill into rigid-format summary, optional Notes narrative on non-PASS | Per-shard ~2–5K (after slimming) |
-| `cf-pi-run.sh` (pure shell) | Full Pi lifecycle: brief → worktree → probe → dispatch → poll → gates → outcome write | Zero Claude tokens |
+| Main orchestrator | Goal interpretation, shard fan-out decisions, reading each shard's paths-only `outcome.md`, outcome routing, integration gate, user-facing summary | Initial goal + per-shard `outcome.md` reads + integration + final summary |
+| `cf-pi-run.sh` (per shard, main-launched **background task**) | Full Pi lifecycle: worktree → brief → probe → dispatch → poll → gates → outcome write. No sub-agent. Heavy stdout goes to the task's own output file; main reads only the resulting `outcome.md` | Zero Claude tokens (background task; main reads only `outcome.md`) |
 | Pi | Implement contracts, per-contract commit, write `$REPORT_FILE` or `$ESCALATE_FILE` | Zero Claude tokens (separate billing) |
 
 ---
@@ -149,7 +144,7 @@ Output: `$SESSION/shards.json`:
 
 Same-file ⇒ same group, deterministically. Physical merge conflicts at integration become structurally impossible (semantic regressions are still possible — integration gate is their safety net).
 
-If `fan_out_count == 1`, the single-Pi case is identical in code path — just one Agent call.
+If `fan_out_count == 1`, the single-Pi case is identical in code path — just one background `cf-pi-run.sh` task.
 
 ---
 
@@ -337,44 +332,50 @@ Main reads/writes this between rounds via Bash; never holds the JSON in context.
 |---|---|---|
 | Per-contract replan attempts | 2 | Third NEEDS_REPLAN for the same contract ⇒ escalate to user |
 | Per-flow rollback cycles | 2 | Third rollback ⇒ escalate to user |
-| FAIL retries (per shard, per round) | 1 | Second consecutive FAIL ⇒ escalate to user |
-| Sub-agent distillation size | 200 words in `## Notes` | Overrun ⇒ pi-driver must compress and retry; main rejects oversize returns |
+| FAIL retries (per shard, per round) | 1 | Second consecutive FAIL ⇒ re-launch `cf-pi-run.sh` once; second FAIL ⇒ escalate to user |
 
 ---
 
-## 11. Distillation Contract (sub-agent → main)
+## 11. Outcome Contract (`outcome.md`, main reads directly)
 
-Rigid 4-section header + optional free-form Notes.
+There is no distillation sub-agent. `cf-pi-run.sh` writes a **paths-only** `outcome.md` at `$SESSION/shards/<id>/outcome.md`; main reads it directly. Every value is either a short enum/identifier or a filesystem path — never inlined report/log/diff content — so the read is bounded by construction.
 
 ```markdown
 ## Status
 {PASS|FAIL|NEEDS_REPLAN}
 
-## Run
-- group: {parallel_group id}
-- elapsed: {Xs}
-- contracts: {N completed}/{M total}
-- artifacts: outcome={path} | report={path} | escalate={path|-}
+## Reason
+{enum string, e.g. none | escalate | test-fail-persistent | undeclared_file_touched | stall | timeout | ...}
 
-## Survived
+## Run
+- shard: {SHARD_ID}
+- elapsed: {Xs}
+- report: {path|-}
+- diff: {path|-}
+- session_jsonl: {path|-}
+- escalate: {path|-}
+
+## Survived contracts
 - {ContractName}
 - ...
 
-## Affected
+## Affected contracts
 - {ContractName}: {one-line reason, gate# or "escalate"}
 
-## Notes
-{≤200 words; only when status ≠ PASS; narrative, pattern, suggested direction; never code or log content}
+## Artifacts
+- postmortem: {path|-}
+- test_log: {path|-}
+- undeclared_files: {csv|-}
 ```
 
-Main parses Status + Survived + Affected deterministically. Notes is consumed only on routing decisions for non-PASS.
+Main parses Status + Reason + Survived/Affected contracts deterministically. There is no narrative `## Notes` section and no word cap: any deeper context lives on disk behind the paths in `## Run` / `## Artifacts`, which main pulls (bounded) only when a routing decision needs it.
 
 ---
 
 ## 12. File-by-file Change Inventory
 
 ### New
-- `scripts/cf-pi-run.sh` — full Phase 3 lifecycle in shell (brief, worktree, probe, dispatch, poll loop, gates 1/2/3, outcome write, escalate detection, `actual_touched ⊆ declared` post-validation).
+- `scripts/cf-pi-run.sh` — full Phase 3 lifecycle for ONE shard in shell, run by main as a **background task** (no sub-agent): worktree, brief, probe, dispatch, poll loop, gates 1/3, escalate detection, `actual_touched ⊆ declared` post-validation, paths-only `outcome.md` write. Runs to completion synchronously, so as a background task it is exempt from the foreground Bash ceiling; its heavy stdout is captured to the task's own output file, never main's context.
 - `scripts/cf-pi-shard.sh` — read `contracts.json`, build file-touch graph via `jq`, emit `shards.json` with connected-component group assignments. **No markdown parsing.**
 - `scripts/cf-pi-integrate.sh` — merge all shard branches into `cf/<flow>/integrated`, run full test suite, classify result.
 - `scripts/cf-pi-rollback.sh` — rollback a list of shard branches; preserve their checkpoint tags.
@@ -382,8 +383,10 @@ Main parses Status + Survived + Affected deterministically. Notes is consumed on
 - `scripts/cf-pi-status.sh` — operator-facing read-only liveness view across all shards; reads each worktree's JSONL mtime/elapsed and prints a one-line-per-shard summary. (Added for mid-run observability — see §18.)
 - `docs/parallel-sharded-design.md` — this file.
 
+### Deleted
+- `agents/pi-driver.md` — the per-shard distillation sub-agent is gone. Phase 3 now launches `cf-pi-run.sh` directly as a main-launched background task and reads each shard's paths-only `outcome.md` itself (§2, §11). The §17 token firewall it used to enforce is now enforced by the background-task output split.
+
 ### Modified
-- `agents/pi-driver.md` — slimmed to: invoke `cf-pi-run.sh`, read OUTCOME_FILE, distill per §11 contract.
 - `agents/plan.md` — emits paired `plan.md` (prose) + `contracts.json` (structured). New partial-replan mode outputs `contracts-revision-<n>.json` OR `replan-status.json` with REPLAN_REQUIRES_ROLLBACK. `parallel_group` is script-derived, not Plan-declared.
 - `docs/pi-implementer-protocol.md` — adds escalation contract (§6 here), ENVIRONMENT block expectation.
 - `scripts/cf-pi-brief.sh` — consumes `contracts.json` (not plan.md) for contract data; emits `## Environment` block; expands `attachments` paths into brief.
@@ -403,7 +406,7 @@ Realistic estimate accounts for integration-gate failures auto-triggering NEEDS_
 |---|---|---|---|
 | Phase 1 research | Research sub-agent return | ~3K | ~3K |
 | Phase 2 plan | Plan sub-agent return + main reads anchors | ~5K | ~5K |
-| Phase 3 fan-out, round 1 | 5 shard sub-agents × ~150 words | ~3K | ~3K |
+| Phase 3 fan-out, round 1 | main reads 5 shards' paths-only `outcome.md` | ~3K | ~3K |
 | Phase 3 replan cycles | Plan partial-replan return + re-fan-out per cycle (~5K each) | ~6K (1 cycle) | ~15K (3 cycles) |
 | Phase 3 integration | Integration script summary | ~1K | ~3K (multiple attempts) |
 | Phase 4 review | Review sub-agent return | ~5K | ~5K |
@@ -421,8 +424,8 @@ Both well under compaction threshold for a 200K-context model. The 40–60K typi
 - **`contracts.json` schema drift**: the JSON sidecar is now load-bearing. Mitigation: `schema_version` field; every consumer script validates it and refuses on mismatch. Schema changes go through a versioned migration, never silent.
 - **Disk pressure**: N worktrees can balloon for large repos with many shards. Mitigation: worktree cleanup post-integration; cap fan-out to N ≤ 6 by default.
 - **Cross-shard semantic regressions**: file-graph sharding prevents physical conflicts but two shards can still break each other's invariants by editing different files. Integration-gate full-test-suite is the only safety net; no upstream prevention.
-- **Distillation under-reports**: 200-word cap could hide nuance the Notes section can't fit. Mitigation: artifacts always available on disk; main can pull on demand for ambiguous outcomes. Enforcement: pi-driver runs `wc -w` on its own Notes pre-return; over-cap triggers self-rewrite.
-- **Operator blindness mid-run**: with N parallel shards, no built-in stdout heartbeat to terminal. Mitigation: `cf-pi-status.sh` (§18) gives on-demand snapshot; operator polls when they want a status, no streaming required.
+- **Outcome under-reports**: a paths-only `outcome.md` carries no narrative, so a subtle non-PASS cause may not be obvious from the enum reason alone. Mitigation: every artifact (report, postmortem, escalate, diff, test log, JSONL) is referenced by path in `## Run` / `## Artifacts` and stays on disk; main pulls on demand (bounded) for ambiguous outcomes. No information is lost — only deferred behind a path.
+- **Operator blindness mid-run**: with N parallel background tasks, no built-in stdout heartbeat to terminal. Mitigation: each background task's progress goes to its own output file (pull via `TaskOutput`/`Read`); `cf-pi-status.sh` (§18) gives an on-demand cross-shard snapshot. Operator polls when they want a status, no streaming required.
 
 ---
 
@@ -435,7 +438,7 @@ D. Plan agent emits paired `plan.md` (prose) + `contracts.json` (machine-readabl
 E. Replan limit per contract: 2; rollback limit per flow: 2.
 F. Integration gate failure auto-injects NEEDS_REPLAN (2a).
 G. Single flow only; N=1 walks the same path.
-H. Distillation: rigid 3-section header (PASS/FAIL/NEEDS_REPLAN) + ≤200-word Notes; `wc -w` self-check before return.
+H. No distillation sub-agent: each shard is a main-launched background `cf-pi-run.sh` that writes a paths-only `outcome.md` (Status/Reason/Run/Survived/Affected/Artifacts); main reads it directly. The §17 token firewall is enforced by the background-task output split, not by a sub-agent.
 I. In-place revision via `cf-pi-merge-revision.sh` using `jq` (shell, not main's Edit tool); operates on `contracts.json`, not markdown.
 J. Rich prose escape hatch: `attachments` array in `contracts.json` points to markdown files under `plan-attachments/`; brief assembly includes their content verbatim. Default empty.
 
@@ -451,19 +454,19 @@ J. Rich prose escape hatch: `attachments` array in `contracts.json` points to ma
 
 ## 17. Context & Token Discipline (non-negotiable)
 
-Token economics are guarded by **convention + scripts**, not by Claude Code automatically. Every loop in this design is sized to keep main < 60K tokens for a typical flow. If implementation deviates, that budget evaporates silently. This section lists every leak vector and the explicit countermeasure.
+Token economics are guarded by **convention + scripts + the background-task boundary**, not by Claude Code automatically. Every loop in this design is sized to keep main < 60K tokens for a typical flow. The structural guarantee: each shard runs as a main-launched background task, so its heavy stdout (progress lines, JSONL, test output) is captured to the task's OWN output file and never enters main's context — main reads only the paths-only `outcome.md` plus bounded peeks. `cf-pi-run.sh` additionally does its own bounded reads / truncation internally. If implementation deviates, that budget evaporates silently. This section lists every leak vector and the explicit countermeasure.
 
 ### What MUST NOT enter main's context (ever)
 
 | Artifact | Why dangerous | Where it lives |
 |---|---|---|
 | `contracts.json` full content | Can be 20KB+ for large plans | `$SESSION/contracts.json` — main passes the **path** only |
-| Pi's `$REPORT_FILE` full content | Verbose; only `## Summary` is meaningful | sub-agent reads `head -20`; main never reads |
-| Pi's JSONL session files | Per-event chatter, MB scale | sub-agent never reads in-context; `cf-pi-poll.sh` does mtime/size checks only |
-| Test runner full output | Failure logs can be huge | `cf-pi-test.sh` already bounds; main reads only its tail |
-| Postmortem full content | ~5KB cap exists; still too big for casual read | sub-agent only references path; main reads only on explicit deep-debug |
-| Brief content (per shard) | Each ~3–10KB | File-based; sub-agent passes path to Pi |
-| `escalate.md` full content (Pi-authored) | Pi could write anything | Hard-capped: pi-driver truncates to ≤80 lines / 2KB before its own read; over-cap → flagged as malformed |
+| Pi's `$REPORT_FILE` full content | Verbose; only `## Summary` is meaningful | `cf-pi-run.sh` reads `head -20` internally; `outcome.md` carries only the path; main never reads it |
+| Pi's JSONL session files | Per-event chatter, MB scale | Live inside the background task; `cf-pi-poll.sh` does mtime/size checks only; `outcome.md` carries only the path |
+| Test runner full output | Failure logs can be huge | `cf-pi-test.sh` already bounds; captured to the task's output file; main reads only a tail on demand |
+| Postmortem full content | ~5KB cap exists; still too big for casual read | `outcome.md` references the path only; main reads only on explicit deep-debug |
+| Brief content (per shard) | Each ~3–10KB | File-based; `cf-pi-brief.sh` writes it, Pi reads it; never reaches main |
+| `escalate.md` full content (Pi-authored) | Pi could write anything | `cf-pi-run.sh` bounds it internally (`head -80` into a snippet); `outcome.md` carries only the path; main reads bounded on demand |
 | Plan revision JSON content | Schema artifact, can be large | `cf-pi-merge-revision.sh` applies via `jq` from path; main never holds |
 | Integration test logs | Can match test-runner verbosity | `cf-pi-integrate.sh` writes `integration-result.json` with top-K failures only |
 
@@ -484,11 +487,11 @@ Forbidden: `Read(file)` with no limit on any artifact > 1KB.
 
 | Scenario | Naive cost | Mitigation |
 |---|---|---|
-| Re-dispatch same shard's Pi after gate-3 fail | Full sub-agent spawn re-loads brief, re-reads OUTCOME_FILE | Prefer `SendMessage(to=pi-driver-id)` to existing sub-agent — context already warm. Only spawn fresh if previous sub-agent exited |
+| Re-dispatch same shard's Pi after gate-3 fail | A full extra dispatch+poll cycle | Handled INSIDE `cf-pi-run.sh`: one in-script resume re-brief (`dispatch_and_poll "$REBRIEF_FILE"`) reuses Pi's warm session before giving up. Main does not re-launch for gate-3 fails — only for FAIL infrastructure failures |
 | Plan partial-replan | Plan re-investigates same files | Pass `base_contracts` + `escalations` paths only; do NOT re-include research output (Plan reads from disk if needed) |
 | Main re-reads dispatch-state per round | Each round, file accumulates history | Main reads via `jq '.rounds[-1]'` (latest round only); full history is archive |
-| Sub-agent return validation | Bloated Notes blows distillation cap | Sub-agent runs `wc -w` self-check pre-return; main rejects oversize and uses `SendMessage` to request compression (no respawn) |
-| pi-driver re-running gates | gates re-execute each round | Acceptable — gates ARE the validation, not waste |
+| Reading a shard's outcome | Verbose narrative would bloat the read | `outcome.md` is paths-only by construction — no narrative to bloat; deeper context is pulled (bounded) from the referenced paths only when routing needs it |
+| `cf-pi-run.sh` re-running gates | gates re-execute each round | Acceptable — gates ARE the validation, not waste |
 
 ### dispatch-state.json structure (anti-growth)
 
@@ -511,7 +514,7 @@ Per-round history goes to `$SESSION/dispatch-state-archive.jsonl` (append-only, 
 | Source | Per-occurrence | × N | Subtotal |
 |---|---|---|---|
 | Phase 1+2 (research + plan returns) | ~4K | 1 | 4K |
-| pi-driver returns | ~250 tokens (200 words) | 5 shards × 3 rounds = 15 | ~4K |
+| `outcome.md` reads (paths-only) | ~250 tokens | 5 shards × 3 rounds = 15 | ~4K |
 | Plan partial-replan returns | ~300 tokens | 3 | ~1K |
 | State file reads (jq-bounded) | ~50 tokens | ~10 | 0.5K |
 | Integration script returns | ~200 tokens | 2 (1 fail + 1 retry) | 0.5K |
@@ -524,8 +527,8 @@ Plenty of headroom even on a pathological flow. If a real flow approaches 80K, t
 
 ### Implementation checklist (block PR merge until all green)
 
-- [ ] `pi-driver.md` says "NEVER read $REPORT_FILE, $BRIEF_FILE, JSONL — always use bounded helper scripts"
-- [ ] `cf-pi-run.sh` writes OUTCOME_FILE with structured, bounded fields (no log dumps)
+- [ ] Phase 3 launches `cf-pi-run.sh` as a background task (`Bash` `run_in_background: true`), NEVER via a sub-agent; main never reads $REPORT_FILE, $BRIEF_FILE, or JSONL — only `outcome.md` + bounded peeks
+- [ ] `cf-pi-run.sh` writes the paths-only `outcome.md` with structured, bounded fields (no log dumps)
 - [ ] `cf-pi-integrate.sh` emits `integration-result.json` with explicit top-K failure cap
 - [ ] `cf-pi-status.sh` is read-only and bounded (one line per shard)
 - [ ] `cf.md` (main orchestrator) Phase 3 section explicitly lists bounded-read calls for state inspection
@@ -548,7 +551,7 @@ shard-C (g3): ALIVE 180s jsonl=1.8KB stale=120s ⚠ near stall
 
 Reads each `$SESSION/shards/<id>/` JSONL mtime + size + last status from cf-pi-poll.sh's own bookkeeping. Pure read — never alters state. Safe to run any time, by any process.
 
-The pi-driver sub-agents do NOT emit heartbeats to terminal anymore (with N parallel sub-agents, terminal interleaving is unreadable). Liveness moves from push (heartbeat) to pull (operator runs `cf-pi-status.sh` when curious). This is a deliberate trade: clean main-context vs always-visible status.
+Shards do NOT emit heartbeats to the terminal. Each `cf-pi-run.sh` background task's progress lines go to that task's own output file (pull via `TaskOutput`/`Read`), and `cf-pi-status.sh` gives a cross-shard snapshot. Liveness is pull (operator queries when curious), not push (heartbeat) — a deliberate trade: clean main-context vs always-visible status. Same spirit as before; only the source moved from a sub-agent's stdout to the background task's output file.
 
 ---
 
@@ -570,6 +573,8 @@ These primitives are load-bearing and assumed but unverified.
 - Critical: `B.START (524) << A.END (530)` — B did not wait for A
 
 Parallel execution confirmed. Spawn skew ~2s per agent, run-time identical to a serial sub-agent. The fan-out model is structurally sound.
+
+> Note (architecture update): this experiment verified parallel `Agent()` dispatch, the original fan-out primitive when each shard was a `pi-driver` sub-agent. The current design fans out one main-launched background `Bash` task (`run_in_background: true`) per shard instead of a sub-agent. The "multiple independent units in a single message run concurrently" property carries over; background tasks additionally are exempt from the foreground Bash ceiling.
 
 ### V2 — Plan agent `touches_files` assignment quality ⚠ PARTIAL (2026-05-24, N=1)
 

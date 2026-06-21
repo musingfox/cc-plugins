@@ -51,7 +51,7 @@ After setup, read `$PI_AVAILABLE` from env.sh:
 - `PI_AVAILABLE=1` → Phase 3 uses Pi (default).
 - `PI_AVAILABLE=0` → Phase 3 falls back to Claude `context-flow:implement` agent. Log: `Pi CLI not on PATH — Phase 3 will use Claude implement agent. Install pi from pi.dev to use the Pi implementer.` Do NOT abort.
 
-The fallback path is also reachable mid-flow (pi-driver `Status: FAIL` with unrecoverable probe error, or the human selects "Fall back to Claude implement agent" at a recovery prompt). See §Phase 3.
+The fallback path is also reachable mid-flow (a shard's `Status: FAIL` with unrecoverable probe error, or the human selects "Fall back to Claude implement agent" at a recovery prompt). See §Phase 3.
 
 ---
 
@@ -61,7 +61,7 @@ The fallback path is also reachable mid-flow (pi-driver `Status: FAIL` with unre
 |-------|-------|-------|
 | Research | `context-flow:research` | Read, Grep, Glob, Bash, WebFetch |
 | Plan | `context-flow:plan` | Read, Write, Grep, Glob |
-| **Implement (default)** | **Pi via `context-flow:pi-driver`** | Pi's own tools + driver's Bash/Read/Write |
+| **Implement (default)** | **Pi via background `cf-pi-run.sh`** | Pi's own tools + main's Bash/Read |
 | Implement (fallback) | `context-flow:implement` | Read, Edit, Write, Bash, Glob, Grep, WebFetch |
 | Review | `context-flow:review` | Read, Write, Grep, Glob, Bash |
 
@@ -291,7 +291,7 @@ carries that approval from the upstream handoff).
 
 State to the human upfront: `Phase 3: parallel-sharded Pi fan-out on <N> contract(s). Parent branch ctxflow/$SESSION_BASENAME; per-shard branches under cf/$SESSION_BASENAME/shard-<id>.`
 
-Phase 3 splits the contract set by file-touch graph and runs one `pi-driver` sub-agent per shard in parallel. The full per-shard lifecycle (brief → worktree → probe → dispatch → poll → gates → outcome) lives in `cf-pi-run.sh`; main only fans out, collects rigid-format returns, and routes. Token discipline (design §17) is non-negotiable: main NEVER reads `report.md`, `contracts.json`, `escalate.md`, postmortems, or test logs — only bounded `Read(file, limit=…)`, `jq '.field'`, and `head -N` peeks.
+Phase 3 splits the contract set by file-touch graph and runs one `cf-pi-run.sh` per shard in parallel, each as a **main-launched background task** (no sub-agent). The full per-shard lifecycle (brief → worktree → probe → dispatch → poll → gates → outcome) lives in `cf-pi-run.sh`; main only fans out, collects each shard's paths-only `outcome.md`, and routes. Token discipline (design §17) is non-negotiable and is enforced by the boundary itself: a background task's heavy stdout (progress lines, JSONL) goes to its own output file, never into main's context — main reads only the paths-only `outcome.md` plus bounded `Read(file, limit=…)`, `jq '.field'`, and `head -N` peeks, and NEVER `report.md`, `contracts.json`, `escalate.md`, postmortems, or test logs.
 
 ### 3.0 Parent worktree setup (idempotent)
 
@@ -331,36 +331,32 @@ SHARD_IDS=$(jq -r '.groups[].id' "$SESSION/shards.json")
 
 ### 3.2 Fan-out
 
-Spawn N `pi-driver` sub-agents in PARALLEL — all `Agent()` calls in a **single message**:
+Launch N shards in PARALLEL — one `cf-pi-run.sh` per shard as a **background task** (`Bash` with `run_in_background: true`), all in a **single message**:
 
 ```
-Agent(
-  subagent_type: "context-flow:pi-driver",
-  prompt: "
-    SHARD_SESSION=$SESSION/shards/A
-    GOAL_ONELINE=<one-sentence goal>
-    CONSTRAINTS=<short bullet list>
-    TEST_RUNNER=<resolved SHARD_TEST_RUNNER — per-shard gates run the hermetic subset;
-                 the full suite belongs to the integration gate>
-    SCRIPTS=$SCRIPTS
-
-    Drive this shard per your agent prompt. Return the rigid 4-section format.
-  "
-),
-Agent(
-  subagent_type: "context-flow:pi-driver",
-  prompt: "SHARD_SESSION=$SESSION/shards/B ..."
-),
-... (one Agent() per id in $SHARD_IDS)
+Bash(run_in_background: true, command:
+  "$SCRIPTS/cf-pi-run.sh $SESSION/shards/A '<one-sentence goal>' '<short constraints>' '<resolved SHARD_TEST_RUNNER>'")
+Bash(run_in_background: true, command:
+  "$SCRIPTS/cf-pi-run.sh $SESSION/shards/B '<one-sentence goal>' '<short constraints>' '<resolved SHARD_TEST_RUNNER>'")
+... (one background Bash per id in $SHARD_IDS)
 ```
 
-Do NOT pass research output, decision alternatives, plan prose, or rejected approaches. Each driver derives everything else from its `SHARD_SESSION/env.sh`.
+The 4 positionals are `SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER`; `TEST_RUNNER` is the resolved `SHARD_TEST_RUNNER` (per-shard gates run the hermetic subset — the full suite belongs to the integration gate). `cf-pi-run.sh` runs the entire per-shard lifecycle to completion in pure shell and writes only the paths-only `$SESSION/shards/<id>/outcome.md`; its progress stdout is captured to the background task's output file, never into main's context. Running as a background task, it is exempt from the 10-minute Bash ceiling (set `BASH_MAX_TIMEOUT_MS` as a safety net) and main stays free while shards run. Do NOT pass research output, decision alternatives, plan prose, or rejected approaches — each shard derives everything else from its `SHARD_SESSION/env.sh`.
 
 ### 3.3 Collect
 
-Wait for ALL N replies before routing (round-collection rule, design §7) — this lets NEEDS_REPLAN coalesce into a single Plan invocation and prevents interleaved replans.
+The harness re-invokes main when each background task completes. Wait for ALL N shards before routing (round-collection rule, design §7) — this lets NEEDS_REPLAN coalesce into a single Plan invocation and prevents interleaved replans. A shard is done when `$SESSION/shards/<id>/outcome.md` exists and is non-empty (or check the tasks via `TaskList`/`Monitor`). End your turn after fan-out; on each completion notification, check whether every id in `$SHARD_IDS` now has an outcome.md — if not, end the turn again and wait for the rest. (Main does no work between completions; it is not blocked.)
 
-Parse each reply via its rigid 3-section format (`## Status`, `## Survived`, `## Affected`, optional `## Notes`; see `agents/pi-driver.md` §11). Status is one of `PASS | FAIL | NEEDS_REPLAN`. If a reply violates the format or its Notes exceeds 200 words, use `SendMessage` to ask the same sub-agent for a compressed re-return — do NOT respawn.
+Once all are done, read each shard's status from its paths-only outcome (never the report/diff/JSONL it points to):
+
+```bash
+for id in $SHARD_IDS; do
+  printf '%s=' "$id"
+  sed -n '/^## Status/{n;p;q;}' "$SESSION/shards/$id/outcome.md"   # PASS|FAIL|NEEDS_REPLAN
+done
+```
+
+`outcome.md` carries `## Status`, `## Reason`, `## Run`, `## Survived contracts`, `## Affected contracts`, `## Artifacts` — all paths-only; pull `## Survived contracts` / `## Affected contracts` only when routing needs them. If a shard's outcome.md is missing or empty (its background task crashed before writing it), treat that shard as `FAIL` with reason `outcome-missing`.
 
 Persist round results to disk (main never holds the JSON in context):
 
@@ -385,10 +381,11 @@ Precedence within one round: **FAIL retries are resolved first, then NEEDS_REPLA
 
 #### Any FAIL
 
-A FAIL means Pi infrastructure failure (probe error, dispatch broken, stall after in-script retry, outcome missing/malformed). Re-spawn `pi-driver` for that shard with the same inputs — one message, one Agent() call per failed shard if multiple:
+A FAIL means Pi infrastructure failure (probe error, dispatch broken, stall after in-script retry, outcome missing/malformed). Re-launch `cf-pi-run.sh` for that shard with the same inputs — one message, one background `Bash` per failed shard if multiple:
 
 ```
-Agent(subagent_type: "context-flow:pi-driver", prompt: "SHARD_SESSION=$SESSION/shards/<id> ...")
+Bash(run_in_background: true, command:
+  "$SCRIPTS/cf-pi-run.sh $SESSION/shards/<id> '<one-sentence goal>' '<short constraints>' '<resolved SHARD_TEST_RUNNER>'")
 ```
 
 If the second attempt still returns FAIL, escalate via `AskUserQuestion` (peek context with `head -80 "$SESSION/shards/<id>/escalate.md"` if present):
@@ -442,7 +439,7 @@ Read only the reply's first Summary bullet to branch:
   ```bash
   "$SCRIPTS/cf-pi-merge-revision.sh" "$SESSION" "$SESSION/contracts-revision-${ROUND}.json"
   "$SCRIPTS/cf-pi-shard.sh"          "$SESSION"   # re-emits shards.json; affected shards get new env
-  # then re-fan-out: one Agent(pi-driver) per affected shard id, single message (back to §3.2)
+  # then re-fan-out: one background cf-pi-run.sh per affected shard id, single message (back to §3.2)
   ```
 - `Status: REPLAN_REQUIRES_ROLLBACK (...)` → Plan declines partial-replan; the preserved interface itself is the problem. Bounded read of the rollback list:
   ```bash
@@ -473,7 +470,7 @@ Replan budget = 2 attempts per contract (third NEEDS_REPLAN escalates). Rollback
 
 Dispatch a single review agent.
 
-Capture the diff to a file before dispatching review — never into a shell variable, which would inject the full diff into the orchestrator's context. For Pi the diff is already at `$SESSION/implement.diff` (written by pi-driver). For Claude-fallback, capture it from the worktree now:
+Capture the diff to a file before dispatching review — never into a shell variable, which would inject the full diff into the orchestrator's context. For Pi the diff is already at `$SESSION/implement.diff` (written by the integration gate). For Claude-fallback, capture it from the worktree now:
 
 ```bash
 . "$SESSION/env.sh"

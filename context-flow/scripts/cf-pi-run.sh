@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Full Phase-3 lifecycle for ONE shard, end-to-end, in pure shell.
-# The Claude pi-driver sub-agent invokes this and only reads the resulting
-# OUTCOME_FILE -- it never sees brief/report/JSONL/test logs directly.
+# Main launches this as a background task (run_in_background) and only reads the
+# resulting OUTCOME_FILE -- it never sees brief/report/JSONL/test logs directly
+# (the background task's stdout is captured to its own output file, not main's
+# context). Runs to completion synchronously here, so it is exempt from the
+# foreground Bash ceiling.
 #
 # Usage:   cf-pi-run.sh SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER
 # Stdout:  operator-facing progress lines (one per major event)
@@ -22,7 +25,7 @@
 #   9. gate 3 test execute   cf-pi-test.sh; one in-shard re-dispatch on fail
 #  10. actual ⊆ declared     git diff name-only ⊆ shard's declared files
 #  11. capture diff          git diff $BASE_HEAD > $DIFF_FILE
-#  12. write OUTCOME_FILE    structured result for pi-driver
+#  12. write OUTCOME_FILE    structured paths-only result main reads back
 
 set -euo pipefail
 
