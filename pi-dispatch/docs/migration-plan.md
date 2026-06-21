@@ -10,10 +10,10 @@
 
 - **Step 1 — resolver dedup: SHIPPED** (`be2fae6`). `resolve_canon_dispatch` in `cf-pi-env.sh`; three callers deduped.
 - **Step 3 — MAIN-driven background dispatch: SHIPPED** (`d76141d`). Key discovery during implementation: `cf-pi-run.sh` **already is** the synchronous run-to-completion + paths-only-outcome unit the plan called `pi-run-sync.sh`, so **no new script was added** — Step 3 only changed the *invoker* (MAIN `run_in_background` per shard, instead of a `pi-driver` sub-agent) and retired `pi-driver.md`. This also fixed a latent bug: `cf-pi-run.sh`'s ~35-min internal poll inside a sub-agent's Bash would hit the 10-min ceiling; as a background task it does not.
-- **Step 2 — `--profile`: DEFERRED** (YAGNI). Only one profile in use today; the tools/permissions dimension also depends on unverified pi-CLI support. Additive when a 2nd profile appears.
-- **Step 4 — remove `cf-pi-poll` translation layer: DEFERRED** (low value now). `cf-pi-run.sh` keeps its internal poll, which still consumes `cf-pi-poll.sh`; the poll now runs harmlessly inside a background task. Removing the layer is an independent refactor of `dispatch_and_poll`, not required for the non-blocking goal.
+- **Step 2 — `--profile` / `PI_PROFILE` presets: SHIPPED** (`aa33592`). `profiles.conf` (NAME PROVIDER MODEL) resolved by a leading `--profile` flag or `PI_PROFILE` env; precedence env > profile > default; unknown profile warns + falls through. Backward-compatible (no flag = unchanged positionals). `PI_RESOLVE_PROFILE_ONLY` seam gives a pi-free resolution test (5/5). tools/permissions presets still deferred (pi-CLI support TBD).
+- **Step 4 — retire `cf-pi-poll` translation layer: SHIPPED** (`b4dda64`). `cf-pi-poll.sh` collapsed from a 70-line STATUS→legacy-token table to a thin passthrough adapter (echoes canonical `STATUS=` verbatim); `dispatch_and_poll` matches `STATUS=OK/FAIL/RUNNING` directly via a `fail_kill` helper. The legacy vocabulary (DONE/ALIVE/ERROR/STALL/NO_OUTPUT/NO_JSONL/NO_JSONL_FAIL/RC_FAIL/TIMEOUT/NO_PID) is gone. Kept the adapter (vs full inline) so both tests' stub points survive; migrated to canonical grammar.
 
-Verification note: Step 3 changed `cf.md` (MAIN instructions) — inspection-verified only; a live end-to-end `cf` run is still the real receipt.
+Verification note: Step 3 changed `cf.md` (MAIN instructions) — inspection-verified only; a live end-to-end `cf` run is still the real receipt. Steps 1/2/4 have passing tests (cf suite 6/6 + pi-dispatch profile 5/5).
 
 ## What changed since Option B
 
