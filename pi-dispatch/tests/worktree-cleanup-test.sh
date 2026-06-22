@@ -1,0 +1,263 @@
+#!/usr/bin/env bash
+# worktree-cleanup-test.sh — behavioral tests for pi-worktree.sh create+clean.
+#
+# Pins EX-E2 (a)(b)(c):
+#   (a) confirm-poll reads pgid from the frozen rundir-file path CONTENTS (EX-C2)
+#   (b) kill-confirm BEFORE remove ordering race (EX-D1)
+#   (c) cleanup block has no unbound variable under env -i bash -u (EX-C1c/EX-C3)
+#
+# Pure-local, real git in mktemp repos. No Pi, no network.
+# Convention: ok/bad lines; final "pass: N, fail: 0"; exit nonzero iff any fail.
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WT="$SCRIPT_DIR/../scripts/pi-worktree.sh"
+
+PASS=0; FAIL=0
+ok()  { PASS=$((PASS+1)); echo "ok   - $1"; }
+bad() { FAIL=$((FAIL+1)); echo "FAIL - $1"; }
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+# ---------------------------------------------------------------------------
+# Canonicalize path (resolve macOS /var -> /private/var symlinks).
+# ---------------------------------------------------------------------------
+canon() {
+  local p="$1"
+  if [ -d "$p" ]; then
+    ( cd "$p" 2>/dev/null && pwd -P ) || echo "$p"
+  else
+    local d b
+    d="$(dirname "$p")"; b="$(basename "$p")"
+    if [ -d "$d" ]; then echo "$(cd "$d" && pwd -P)/$b"; else echo "$p"; fi
+  fi
+}
+
+# Is work_path registered in repo_root's worktree list?
+wt_registered() {
+  local repo_root="$1" work_path="$2"
+  local want; want="$(canon "$work_path")"
+  git -C "$repo_root" worktree list --porcelain 2>/dev/null \
+    | sed -n 's/^worktree //p' | while IFS= read -r wp; do
+        [ "$(canon "$wp")" = "$want" ] && { echo HIT; break; }
+      done | grep -q HIT
+}
+
+# Build a fresh disposable git repo with one commit and identity configured.
+fresh_repo() {
+  local d; d="$(mktemp -d "$TMP/repo.XXXXXX")"
+  git -C "$d" init -q
+  git -C "$d" config user.email "test@example.com"
+  git -C "$d" config user.name  "Test User"
+  git -C "$d" commit -q --allow-empty -m "init"
+  echo "$d"
+}
+
+# Invoke pi-worktree.sh create.
+# Args: repo_root branch base_ref base_branch work_path diff_out cleanup_out rundir_file
+wt_create() {
+  local repo_root="$1" branch="$2" base_ref="$3" base_branch="$4" \
+        work="$5" diff_out="$6" cleanup_out="$7" rundir_file="$8"
+  bash "$WT" create \
+    --repo_root    "$repo_root" \
+    --branch_name  "$branch" \
+    --base_ref     "$base_ref" \
+    --base_branch  "$base_branch" \
+    --work_path    "$work" \
+    --diff_out     "$diff_out" \
+    --cleanup_out  "$cleanup_out" \
+    --rundir-file  "$rundir_file" \
+    >/dev/null 2>&1
+}
+
+echo "=== worktree-cleanup-test: behavioral coverage for pi-worktree.sh ==="
+
+# ===========================================================================
+# Test (a): confirm-poll reads pgid from frozen rundir-file PATH CONTENTS (EX-C2)
+#
+# Proof: write a known RUNDIR into the rundir-file, put pi.pgid with a known
+# (already-dead) PGID under it, run cleanup under set -x, and assert the
+# poll's `kill -0` targets that exact PGID (not an empty or unbound value).
+# ===========================================================================
+R_A="$(fresh_repo)"
+WORK_A="$R_A/work"
+RUNDIR_A="$TMP/rundir_a"; mkdir -p "$RUNDIR_A"
+RUNFILE_A="$TMP/runfile_a.path"
+printf '%s\n' "$RUNDIR_A" > "$RUNFILE_A"
+
+# Use a genuinely dead PID (spawn+wait a subshell, reuse its pid).
+( exit 0 ) &
+KNOWN_PGID=$!
+wait "$KNOWN_PGID" 2>/dev/null || true
+printf '%s\n' "$KNOWN_PGID" > "$RUNDIR_A/pi.pgid"
+
+CO_A="$TMP/cleanup_a.sh"
+if wt_create "$R_A" "test/branch-a" "$(git -C "$R_A" rev-parse HEAD)" \
+     "$(git -C "$R_A" symbolic-ref --short HEAD 2>/dev/null || echo master)" \
+     "$WORK_A" "$TMP/diff_a.patch" "$CO_A" "$RUNFILE_A"; then
+
+  # Run under bash -x so we can inspect the trace for kill -0 <pgid>.
+  env -i PATH="$PATH" HOME="$HOME" bash -x "$CO_A" \
+    >"$TMP/clean_a.out" 2>"$TMP/clean_a.trace" || true
+
+  if grep -Eq "kill -0 .*\b${KNOWN_PGID}\b" "$TMP/clean_a.trace"; then
+    ok "(a) confirm-poll kill -0 targets the PGID read from frozen rundir-file contents"
+  else
+    bad "(a) poll did not kill -0 the file-contents PGID ${KNOWN_PGID} (path not frozen or not read)"
+  fi
+else
+  bad "(a) create failed; cannot trace confirm-poll"
+fi
+
+# ===========================================================================
+# Test (b): kill-confirm BEFORE remove ordering race (EX-D1)
+#
+# A live process group (SIGTERM-ignoring, own process group via perl setsid)
+# holds an open handle inside $WORK. While alive: cleanup must BLOCK at the
+# confirm-poll and NOT remove (worktree still listed). After SIGKILL: cleanup
+# proceeds and remove succeeds (worktree gone).
+# ===========================================================================
+R_B="$(fresh_repo)"
+WORK_B="$R_B/work"
+RUNDIR_B="$TMP/rundir_b"; mkdir -p "$RUNDIR_B"
+RUNFILE_B="$TMP/runfile_b.path"
+printf '%s\n' "$RUNDIR_B" > "$RUNFILE_B"
+CO_B="$TMP/cleanup_b.sh"
+
+if wt_create "$R_B" "test/branch-b" "$(git -C "$R_B" rev-parse HEAD)" \
+     "$(git -C "$R_B" symbolic-ref --short HEAD 2>/dev/null || echo master)" \
+     "$WORK_B" "$TMP/diff_b.patch" "$CO_B" "$RUNFILE_B"; then
+
+  # Spawn a SIGTERM-ignoring process in its own process group (mimics Pi dispatch).
+  HOLDER_B="$WORK_B/.test-holder"
+  GATE_PGID="$(ps -o pgid= -p $$ 2>/dev/null | tr -d ' ')"
+
+  perl -e '
+    use POSIX qw(setsid);
+    setsid();
+    $SIG{TERM} = "IGNORE";
+    open(my $h, ">", $ARGV[0]) or die;
+    print $h "held\n"; close $h;
+    sleep 30;
+    exit 0;
+  ' "$HOLDER_B" &
+  LEADER_B=$!
+
+  # Wait until leader is in its own process group (setsid runs slightly after fork).
+  LEADER_PGID_B=""
+  _s=0
+  while [ "$_s" -lt 50 ]; do
+    LEADER_PGID_B="$(ps -o pgid= -p "$LEADER_B" 2>/dev/null | tr -d ' ')"
+    [ -n "$LEADER_PGID_B" ] && [ "$LEADER_PGID_B" != "$GATE_PGID" ] && break
+    sleep 0.1; _s=$((_s+1))
+  done
+  [ -z "$LEADER_PGID_B" ] && LEADER_PGID_B="$LEADER_B"
+
+  if [ -n "$GATE_PGID" ] && [ "$LEADER_PGID_B" = "$GATE_PGID" ]; then
+    # Failed to isolate process group — environment limitation.
+    kill -KILL "$LEADER_B" 2>/dev/null || true
+    bad "(b) holder did not isolate its process group (environment limitation) — skipped"
+    bad "(b) kill-confirm-before-remove race (group isolation unavailable)"
+  else
+    # Write the leader's PGID into pi.pgid (simulates what pi-dispatch.sh writes).
+    printf '%s\n' "$LEADER_PGID_B" > "$RUNDIR_B/pi.pgid"
+
+    # Wait until holder file appears (process is live and running).
+    _i=0
+    while [ ! -f "$HOLDER_B" ] && [ "$_i" -lt 50 ]; do sleep 0.1; _i=$((_i+1)); done
+
+    # Phase 1: run cleanup in the background; checkpoint at t=1s.
+    # pi-stop.sh sends SIGTERM then waits 2s then SIGKILL.
+    # Our leader ignores SIGTERM, so at t=1s it is still alive.
+    # A correct (confirm-before-remove) build has NOT removed yet.
+    env -i PATH="$PATH" HOME="$HOME" bash "$CO_B" \
+      >"$TMP/clean_b.out" 2>&1 &
+    CLEAN_PID_B=$!
+    sleep 1
+
+    leader_alive_b=0; kill -0 "$LEADER_B" 2>/dev/null && leader_alive_b=1
+    still_listed_b=0; wt_registered "$R_B" "$WORK_B" && still_listed_b=1
+
+    # Phase 2: SIGKILL (uncatchable) ends the leader; cleanup should proceed.
+    kill -KILL "$LEADER_B" 2>/dev/null || true
+    _j=0
+    while kill -0 "$CLEAN_PID_B" 2>/dev/null && [ "$_j" -lt 120 ]; do
+      sleep 0.25; _j=$((_j+1))
+    done
+    kill -0 "$CLEAN_PID_B" 2>/dev/null && { kill -KILL "$CLEAN_PID_B" 2>/dev/null || true; }
+
+    gone_b=1; wt_registered "$R_B" "$WORK_B" && gone_b=0
+
+    if [ "$leader_alive_b" -eq 1 ] && [ "$still_listed_b" -eq 1 ]; then
+      ok "(b) live PGID blocks cleanup at confirm-poll; remove NOT executed while alive"
+    else
+      bad "(b) cleanup removed worktree before confirming death (leader_alive=$leader_alive_b still_listed=$still_listed_b)"
+    fi
+    if [ "$gone_b" -eq 1 ]; then
+      ok "(b) after process dies, cleanup proceeds and remove succeeds"
+    else
+      bad "(b) worktree not removed after process death"
+    fi
+  fi
+else
+  bad "(b) create failed; cannot run the ordering race"
+  bad "(b) kill-confirm-before-remove race (create failed)"
+fi
+
+# ===========================================================================
+# Test (c): cleanup block has no unbound variable under env -i bash -u (EX-C1c/EX-C3)
+#
+# Create a new worktree (dead PGID so cleanup resolves immediately), then run
+# the cleanup script under `env -i bash -u` with no ambient dispatch vars.
+# Must not raise 'unbound variable'.
+# ===========================================================================
+R_C="$(fresh_repo)"
+WORK_C="$R_C/work"
+RUNDIR_C="$TMP/rundir_c"; mkdir -p "$RUNDIR_C"
+RUNFILE_C="$TMP/runfile_c.path"
+printf '%s\n' "$RUNDIR_C" > "$RUNFILE_C"
+
+# Dead PGID so the confirm-poll exits immediately.
+( exit 0 ) &
+DEAD_PGID_C=$!
+wait "$DEAD_PGID_C" 2>/dev/null || true
+printf '%s\n' "$DEAD_PGID_C" > "$RUNDIR_C/pi.pgid"
+
+CO_C="$TMP/cleanup_c.sh"
+if wt_create "$R_C" "test/branch-c" "$(git -C "$R_C" rev-parse HEAD)" \
+     "$(git -C "$R_C" symbolic-ref --short HEAD 2>/dev/null || echo master)" \
+     "$WORK_C" "$TMP/diff_c.patch" "$CO_C" "$RUNFILE_C"; then
+
+  # Also verify the literal rundir-file path is frozen into the cleanup script.
+  if ! grep -Fq "$RUNFILE_C" "$CO_C"; then
+    bad "(c) cleanup_out does not contain the literal rundir-file path (not frozen)"
+  else
+    ok "(c) cleanup_out contains the literal frozen rundir-file path"
+  fi
+
+  # Verify no bare session-scoped variable.
+  if grep -Eq '\$\{?(session|rundir|SESSION)\b' "$CO_C"; then
+    bad "(c) cleanup_out contains a bare session-scoped variable (\$session/\$rundir/\$SESSION)"
+  else
+    ok "(c) no bare session-scoped variable in cleanup_out"
+  fi
+
+  # Run under env -i bash -u: must not raise 'unbound variable'.
+  env -i PATH="$PATH" HOME="$HOME" bash -u "$CO_C" \
+    >"$TMP/clean_c.out" 2>&1 || true
+  if grep -q 'unbound variable' "$TMP/clean_c.out"; then
+    bad "(c) env -i bash -u raised 'unbound variable' in cleanup script"
+  else
+    ok "(c) env -i bash -u cleanup: no unbound variable"
+  fi
+else
+  bad "(c) create failed; cannot run unbound-variable check"
+  bad "(c) literal path freeze check (create failed)"
+  bad "(c) bare session-var check (create failed)"
+fi
+
+echo "---"
+echo "pass: $PASS, fail: $FAIL"
+[ "$FAIL" -eq 0 ]
