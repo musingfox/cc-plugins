@@ -20,3 +20,4 @@ yarn-error.log*
 .claude/worktrees/
 .obsidian.yaml
 .spiral/
+.serena/
