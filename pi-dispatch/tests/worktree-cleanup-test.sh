@@ -470,30 +470,66 @@ _d_test() {
   ok "(d) $pname: no injection breakout (SENTINEL absent after create and after clean)"
 }
 
-# EX-D-NEWLINE (work_path with embedded newline — the gate's canonical injection vector).
+# EX-D-NL-WORK: work_path newline breakout (gate's canonical injection vector).
 # Payload: 'wp\ntouch SENTINEL\n#'  — if un-escaped, newline breaks out of comment line,
 # `touch SENTINEL` runs as a command, then `#` comments the rest.
-S_WORK_NL="$TMP/d_sentinel_work_nl"
-PAYLOAD_WORK_NL="$(printf 'wp\ntouch %s\n#' "$S_WORK_NL")"
+S_WORK_NL="$(mktemp -u "$TMP/sent_work.XXXXXX")"
+PAYLOAD_WORK_NL="$(printf 'x\ntouch %s\n#' "$S_WORK_NL")"
 _d_test "work_path" "$PAYLOAD_WORK_NL" "$S_WORK_NL"
 
-# EX-D-MATRIX: remaining 5 params with a semicolon/command-sub breakout payload.
-# Pattern: 'x"; touch SENTINEL; echo "'  — if un-escaped in double-quoted assignment,
-# this closes the quote, injects a command, then reopens.
-S_DIFF="$TMP/d_sentinel_diff_out"
-_d_test "diff_out" "x\"; touch $S_DIFF; echo \"" "$S_DIFF"
+# EX-D-NL-DIFF: diff_out newline breakout (per-param, self-discriminating).
+# Payload: 'x\ntouch SENTINEL\n#'  — if _q_diff_out un-escaped, breakout fires in cleanup.
+S_DIFF_NL="$(mktemp -u "$TMP/sent_diff.XXXXXX")"
+PAYLOAD_DIFF_NL="$(printf 'x\ntouch %s\n#' "$S_DIFF_NL")"
+_d_test "diff_out" "$PAYLOAD_DIFF_NL" "$S_DIFF_NL"
 
-S_RF="$TMP/d_sentinel_rundir_file"
-_d_test "rundir_file" "x\"; touch $S_RF; echo \"" "$S_RF"
+# EX-D-NL-RUNDIR: rundir_file newline breakout (per-param, self-discriminating).
+# Payload: 'x\ntouch SENTINEL\n#'  — if _q_rundir_file un-escaped, breakout fires in cleanup.
+S_RF_NL="$(mktemp -u "$TMP/sent_rf.XXXXXX")"
+PAYLOAD_RF_NL="$(printf 'x\ntouch %s\n#' "$S_RF_NL")"
+_d_test "rundir_file" "$PAYLOAD_RF_NL" "$S_RF_NL"
 
-S_REPO="$TMP/d_sentinel_repo_root"
-_d_test "repo_root" "x\"; touch $S_REPO; echo \"" "$S_REPO"
+# EX-D-REPO-REJECT: repo_root recorded-rejection assertion.
+# repo_root set to a newline payload (non-git path) — create must reject with nonzero
+# exit AND produce no cleanup script. This assertion depends on the rev-parse --git-dir
+# guard and flips RED when that guard is removed (gate MG-REPO-REJECT).
+S_REPO_NL="$(mktemp -u "$TMP/sent_repo.XXXXXX")"
+PAYLOAD_REPO_NL="$(printf 'x\ntouch %s\n#' "$S_REPO_NL")"
+D_REPO_NL="$(mktemp -d "$TMP/d_repo_rej.XXXXXX")"
+CO_REPO_NL="$D_REPO_NL/cleanup.sh"
+RD_REPO_NL="$D_REPO_NL/rundir"; mkdir -p "$RD_REPO_NL"
+RF_REPO_NL="$D_REPO_NL/runfile.path"
+printf '%s\n' "$RD_REPO_NL" > "$RF_REPO_NL"
+printf '%s\n' "$DEAD_PGID_D" > "$RD_REPO_NL/pi.pgid"
+R_REPO_NL="$(fresh_repo)"
+rm -f "$CO_REPO_NL" "$S_REPO_NL"
+( cd "$D_REPO_NL" && bash "$WT" create \
+    --repo_root    "$PAYLOAD_REPO_NL" \
+    --branch_name  "d/repo-rej-test" \
+    --base_ref     "$(git -C "$R_REPO_NL" rev-parse HEAD)" \
+    --base_branch  "$(git -C "$R_REPO_NL" symbolic-ref --short HEAD 2>/dev/null || echo master)" \
+    --work_path    "$R_REPO_NL/work" \
+    --diff_out     "$D_REPO_NL/diff.patch" \
+    --cleanup_out  "$CO_REPO_NL" \
+    --rundir-file  "$RF_REPO_NL" \
+    >/dev/null 2>&1 ); repo_rej_rc=$?
+if [ "$repo_rej_rc" -ne 0 ] && [ ! -s "$CO_REPO_NL" ] && [ ! -e "$S_REPO_NL" ]; then
+  ok "(d) repo_root: create rejected non-git repo_root (exit nonzero, no cleanup emitted)"
+else
+  bad "(d) repo_root: create did NOT reject non-git repo_root (rc=$repo_rej_rc cleanup_exists=$([ -s "$CO_REPO_NL" ] && echo yes || echo no))"
+fi
 
-S_REF="$TMP/d_sentinel_base_ref"
-_d_test "base_ref" "x\"; touch $S_REF; echo \"" "$S_REF"
+# EX-D-NL-REF: base_ref newline breakout (per-param, self-discriminating).
+# Payload: 'x\ntouch SENTINEL\n#'  — if _q_diff_base_fallback un-escaped, breakout fires.
+S_REF_NL="$(mktemp -u "$TMP/sent_ref.XXXXXX")"
+PAYLOAD_REF_NL="$(printf 'x\ntouch %s\n#' "$S_REF_NL")"
+_d_test "base_ref" "$PAYLOAD_REF_NL" "$S_REF_NL"
 
-S_BB="$TMP/d_sentinel_base_branch"
-_d_test "base_branch" "x\"; touch $S_BB; echo \"" "$S_BB"
+# EX-D-NL-BB: base_branch newline breakout (per-param, self-discriminating).
+# Payload: 'x\ntouch SENTINEL\n#'  — if _q_diff_base_branch un-escaped, breakout fires.
+S_BB_NL="$(mktemp -u "$TMP/sent_bb.XXXXXX")"
+PAYLOAD_BB_NL="$(printf 'x\ntouch %s\n#' "$S_BB_NL")"
+_d_test "base_branch" "$PAYLOAD_BB_NL" "$S_BB_NL"
 
 # ===========================================================================
 # Test (d-benign): anti-overcorrection — metachar path preserved as literal (EX-D-BENIGN)
