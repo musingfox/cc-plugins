@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 # worktree-cleanup-test.sh — behavioral tests for pi-worktree.sh create+clean.
 #
-# Pins EX-E2 (a)(b)(c):
+# Pins EX-E2 (a)(b)(c)(d)(d-benign):
 #   (a) confirm-poll reads pgid from the frozen rundir-file path CONTENTS (EX-C2)
-#   (b) kill-confirm BEFORE remove ordering race (EX-D1)
+#   (b) kill-confirm BEFORE remove ordering race (EX-D1) + trace-based confirm-poll
+#       order assertion against delete-poll mutant (EX-B-SHARP-MUTANT)
 #   (c) cleanup block has no unbound variable under env -i bash -u (EX-C1c/EX-C3)
+#   (d) injection guard for all 6 bakeable params: breakout payload must not land
+#       in generated cleanup — covers matrix (EX-D-MATRIX) + newline vector (EX-D-NEWLINE)
+#   (d-benign) anti-overcorrection: metachar-bearing path preserved exactly (EX-D-BENIGN)
 #
 # Pure-local, real git in mktemp repos. No Pi, no network.
 # Convention: ok/bad lines; final "pass: N, fail: 0"; exit nonzero iff any fail.
@@ -112,12 +116,19 @@ else
 fi
 
 # ===========================================================================
-# Test (b): kill-confirm BEFORE remove ordering race (EX-D1)
+# Test (b): kill-confirm BEFORE remove ordering race (EX-D1) +
+#           trace-based: kill -0 appears BEFORE git worktree remove (EX-B-SHARP-MUTANT)
 #
-# A live process group (SIGTERM-ignoring, own process group via perl setsid)
-# holds an open handle inside $WORK. While alive: cleanup must BLOCK at the
-# confirm-poll and NOT remove (worktree still listed). After SIGKILL: cleanup
-# proceeds and remove succeeds (worktree gone).
+# Part 1 (race-based, preserved): A live process group (SIGTERM-ignoring, own
+# process group via perl setsid) holds an open handle inside $WORK. While alive:
+# cleanup must BLOCK at the confirm-poll and NOT remove (worktree still listed).
+# After SIGKILL: cleanup proceeds and remove succeeds (worktree gone).
+#
+# Part 2 (trace-based, NEW): Run cleanup under bash -x with a dead PGID. The
+# generated cleanup must show `kill -0` targeting the file-contents PGID BEFORE
+# the `git worktree remove` line in the trace. Against the delete-poll mutant
+# (kill -0 loop stripped), no `kill -0` appears -> this assertion FAILS -> the
+# FAIL line is labeled (b) -> gate MG-DELETE-POLL satisfied.
 # ===========================================================================
 R_B="$(fresh_repo)"
 WORK_B="$R_B/work"
@@ -130,7 +141,9 @@ if wt_create "$R_B" "test/branch-b" "$(git -C "$R_B" rev-parse HEAD)" \
      "$(git -C "$R_B" symbolic-ref --short HEAD 2>/dev/null || echo master)" \
      "$WORK_B" "$TMP/diff_b.patch" "$CO_B" "$RUNFILE_B"; then
 
-  # Spawn a SIGTERM-ignoring process in its own process group (mimics Pi dispatch).
+  # ------------------------------------------------------------------
+  # Part 1 (race-based): live SIGTERM-ignoring process in its own pgid.
+  # ------------------------------------------------------------------
   HOLDER_B="$WORK_B/.test-holder"
   GATE_PGID="$(ps -o pgid= -p $$ 2>/dev/null | tr -d ' ')"
 
@@ -201,9 +214,58 @@ if wt_create "$R_B" "test/branch-b" "$(git -C "$R_B" rev-parse HEAD)" \
       bad "(b) worktree not removed after process death"
     fi
   fi
+
+  # ------------------------------------------------------------------
+  # Part 2 (trace-based): kill -0 must appear BEFORE git worktree remove
+  # in the bash -x trace of a dead-PGID cleanup.
+  #
+  # We use a separate repo/cleanup so Part 1's state does not interfere.
+  # A dead PGID lets the poll resolve immediately (no live wait needed).
+  # The trace line ordering is the discriminator:
+  #   correct build  -> kill -0 <pgid> line appears before worktree remove
+  #   delete-poll mutant -> NO kill -0 line -> assertion FAILS -> (b) FAIL
+  # ------------------------------------------------------------------
+  R_BT="$(fresh_repo)"
+  WORK_BT="$R_BT/work"
+  RUNDIR_BT="$TMP/rundir_bt"; mkdir -p "$RUNDIR_BT"
+  RUNFILE_BT="$TMP/runfile_bt.path"
+  printf '%s\n' "$RUNDIR_BT" > "$RUNFILE_BT"
+
+  ( exit 0 ) &
+  DEAD_PGID_BT=$!
+  wait "$DEAD_PGID_BT" 2>/dev/null || true
+  printf '%s\n' "$DEAD_PGID_BT" > "$RUNDIR_BT/pi.pgid"
+
+  CO_BT="$TMP/cleanup_bt.sh"
+  if wt_create "$R_BT" "test/branch-bt" "$(git -C "$R_BT" rev-parse HEAD)" \
+       "$(git -C "$R_BT" symbolic-ref --short HEAD 2>/dev/null || echo master)" \
+       "$WORK_BT" "$TMP/diff_bt.patch" "$CO_BT" "$RUNFILE_BT"; then
+
+    env -i PATH="$PATH" HOME="$HOME" bash -x "$CO_BT" \
+      >"$TMP/clean_bt.out" 2>"$TMP/clean_bt.trace" || true
+
+    # Extract line numbers from the trace for kill -0 and worktree remove.
+    # bash -x emits "+ <cmd>" lines in execution order; grep -n gives line positions.
+    kill0_line="$(grep -n 'kill -0' "$TMP/clean_bt.trace" 2>/dev/null | head -1 | cut -d: -f1)"
+    remove_line="$(grep -n 'worktree remove' "$TMP/clean_bt.trace" 2>/dev/null | head -1 | cut -d: -f1)"
+
+    if [ -z "$kill0_line" ]; then
+      bad "(b) trace-based: no kill -0 found in cleanup trace (confirm-poll absent or stripped)"
+    elif [ -z "$remove_line" ]; then
+      bad "(b) trace-based: no worktree remove found in cleanup trace"
+    elif [ "$kill0_line" -lt "$remove_line" ]; then
+      ok "(b) trace-based: kill -0 (line $kill0_line) appears before worktree remove (line $remove_line)"
+    else
+      bad "(b) trace-based: kill -0 (line $kill0_line) does NOT precede worktree remove (line $remove_line)"
+    fi
+  else
+    bad "(b) trace-based: create failed; cannot run trace ordering check"
+  fi
+
 else
   bad "(b) create failed; cannot run the ordering race"
   bad "(b) kill-confirm-before-remove race (create failed)"
+  bad "(b) trace-based: kill -0 appears before worktree remove (create failed)"
 fi
 
 # ===========================================================================
@@ -256,6 +318,250 @@ else
   bad "(c) create failed; cannot run unbound-variable check"
   bad "(c) literal path freeze check (create failed)"
   bad "(c) bare session-var check (create failed)"
+fi
+
+# ===========================================================================
+# Test (d): injection guard for all 6 bakeable params (EX-D-MATRIX + EX-D-NEWLINE)
+#
+# For each bakeable parameter, set it to a breakout payload and run create+clean.
+# Assert the SENTINEL file is absent BOTH after create and after clean.
+#
+# Bakeable params (frozen as create-time literals via printf %q):
+#   work_path, diff_out, rundir-file, repo_root, base_ref, base_branch
+#
+# The newline vector (EX-D-NEWLINE): work_path set to a value with an embedded
+# newline that, if un-escaped, would break out of the comment line in the
+# generated cleanup and execute `touch SENTINEL`. This is the exact vector the
+# gate's injection mutant (stripping printf %q on work_path) exploits.
+#
+# Correct build: printf %q escapes all values -> SENTINEL never created.
+# Un-escaped mutant: newline lands in comment -> extra line executed -> SENTINEL exists.
+# ===========================================================================
+
+echo "--- (d) injection guard matrix ---"
+
+# Dead pgid for all (d) tests so cleanup can run fully.
+( exit 0 ) &
+DEAD_PGID_D=$!
+wait "$DEAD_PGID_D" 2>/dev/null || true
+
+# Helper: run one param injection test.
+# $1=param_name $2=value_for_param $3=sentinel_abs_path $4=use_as_work (1=work_path,0=normal)
+# When work_path has payload: repo's base work_path needs to differ (payload IS the work_path).
+# For params other than work_path: use a safe work_path.
+_d_test() {
+  local pname="$1" payload="$2" sentinel="$3"
+  local R_D; R_D="$(fresh_repo)"
+  local D_D; D_D="$(mktemp -d "$TMP/d_${pname}.XXXXXX")"
+  local RUNDIR_D="$D_D/rundir"; mkdir -p "$RUNDIR_D"
+  printf '%s\n' "$DEAD_PGID_D" > "$RUNDIR_D/pi.pgid"
+  local RUNFILE_D="$D_D/runfile.path"
+  printf '%s\n' "$RUNDIR_D" > "$RUNFILE_D"
+  local CO_D="$D_D/cleanup.sh"
+  local SAFE_WORK="$R_D/work"
+  local SAFE_DIFF="$D_D/diff.patch"
+  local SAFE_RUNFILE="$RUNFILE_D"
+  local SAFE_REPO="$R_D"
+  local HEAD_D; HEAD_D="$(git -C "$R_D" rev-parse HEAD)"
+  local BRANCH_D; BRANCH_D="$(git -C "$R_D" symbolic-ref --short HEAD 2>/dev/null || echo master)"
+  local CREATE_OK=0
+
+  rm -f "$sentinel"
+
+  case "$pname" in
+    work_path)
+      # payload IS the work_path — create will likely fail (path with newline is invalid on most FS)
+      # or succeed on the repo but generate an escaped form. Either way SENTINEL must be absent.
+      ( cd "$D_D" && bash "$WT" create \
+          --repo_root    "$SAFE_REPO" \
+          --branch_name  "d/work-payload" \
+          --base_ref     "$HEAD_D" \
+          --base_branch  "$BRANCH_D" \
+          --work_path    "$payload" \
+          --diff_out     "$SAFE_DIFF" \
+          --cleanup_out  "$CO_D" \
+          --rundir-file  "$SAFE_RUNFILE" \
+          >/dev/null 2>&1 ) && CREATE_OK=1
+      ;;
+    diff_out)
+      ( cd "$D_D" && bash "$WT" create \
+          --repo_root    "$SAFE_REPO" \
+          --branch_name  "d/diff-payload" \
+          --base_ref     "$HEAD_D" \
+          --base_branch  "$BRANCH_D" \
+          --work_path    "$SAFE_WORK" \
+          --diff_out     "$payload" \
+          --cleanup_out  "$CO_D" \
+          --rundir-file  "$SAFE_RUNFILE" \
+          >/dev/null 2>&1 ) && CREATE_OK=1
+      ;;
+    rundir_file)
+      # payload is the rundir-file path: provide a structurally valid file with the payload name
+      # The content still points to RUNDIR_D so pgid resolves.
+      # But if the filename has injection chars the generated cleanup may misbehave.
+      ( cd "$D_D" && bash "$WT" create \
+          --repo_root    "$SAFE_REPO" \
+          --branch_name  "d/rf-payload" \
+          --base_ref     "$HEAD_D" \
+          --base_branch  "$BRANCH_D" \
+          --work_path    "$SAFE_WORK" \
+          --diff_out     "$SAFE_DIFF" \
+          --cleanup_out  "$CO_D" \
+          --rundir-file  "$payload" \
+          >/dev/null 2>&1 ) && CREATE_OK=1
+      ;;
+    repo_root)
+      # repo_root with payload: create will reject (not a git repo) -> exit 1, no cleanup generated
+      # That IS the safe behavior (injection can't escape if create fails).
+      ( cd "$D_D" && bash "$WT" create \
+          --repo_root    "$payload" \
+          --branch_name  "d/repo-payload" \
+          --base_ref     "$HEAD_D" \
+          --base_branch  "$BRANCH_D" \
+          --work_path    "$SAFE_WORK" \
+          --diff_out     "$SAFE_DIFF" \
+          --cleanup_out  "$CO_D" \
+          --rundir-file  "$SAFE_RUNFILE" \
+          >/dev/null 2>&1 ) && CREATE_OK=1
+      ;;
+    base_ref)
+      ( cd "$D_D" && bash "$WT" create \
+          --repo_root    "$SAFE_REPO" \
+          --branch_name  "d/ref-payload" \
+          --base_ref     "$payload" \
+          --base_branch  "$BRANCH_D" \
+          --work_path    "$SAFE_WORK" \
+          --diff_out     "$SAFE_DIFF" \
+          --cleanup_out  "$CO_D" \
+          --rundir-file  "$SAFE_RUNFILE" \
+          >/dev/null 2>&1 ) && CREATE_OK=1
+      ;;
+    base_branch)
+      ( cd "$D_D" && bash "$WT" create \
+          --repo_root    "$SAFE_REPO" \
+          --branch_name  "d/bb-payload" \
+          --base_ref     "$HEAD_D" \
+          --base_branch  "$payload" \
+          --work_path    "$SAFE_WORK" \
+          --diff_out     "$SAFE_DIFF" \
+          --cleanup_out  "$CO_D" \
+          --rundir-file  "$SAFE_RUNFILE" \
+          >/dev/null 2>&1 ) && CREATE_OK=1
+      ;;
+  esac
+
+  # Check SENTINEL after create.
+  if [ -e "$sentinel" ]; then
+    bad "(d) $pname: SENTINEL created during create (injection breakout at create stage)"
+    rm -f "$sentinel"
+    return
+  fi
+
+  # Run cleanup if it was generated (some params cause create to exit 1 = safe by itself).
+  if [ "$CREATE_OK" -eq 1 ] && [ -f "$CO_D" ]; then
+    ( cd "$D_D" && bash "$CO_D" >/dev/null 2>&1 ) || true
+    if [ -e "$sentinel" ]; then
+      bad "(d) $pname: SENTINEL created during cleanup (injection breakout at clean stage)"
+      rm -f "$sentinel"
+      return
+    fi
+  fi
+
+  ok "(d) $pname: no injection breakout (SENTINEL absent after create and after clean)"
+}
+
+# EX-D-NEWLINE (work_path with embedded newline — the gate's canonical injection vector).
+# Payload: 'wp\ntouch SENTINEL\n#'  — if un-escaped, newline breaks out of comment line,
+# `touch SENTINEL` runs as a command, then `#` comments the rest.
+S_WORK_NL="$TMP/d_sentinel_work_nl"
+PAYLOAD_WORK_NL="$(printf 'wp\ntouch %s\n#' "$S_WORK_NL")"
+_d_test "work_path" "$PAYLOAD_WORK_NL" "$S_WORK_NL"
+
+# EX-D-MATRIX: remaining 5 params with a semicolon/command-sub breakout payload.
+# Pattern: 'x"; touch SENTINEL; echo "'  — if un-escaped in double-quoted assignment,
+# this closes the quote, injects a command, then reopens.
+S_DIFF="$TMP/d_sentinel_diff_out"
+_d_test "diff_out" "x\"; touch $S_DIFF; echo \"" "$S_DIFF"
+
+S_RF="$TMP/d_sentinel_rundir_file"
+_d_test "rundir_file" "x\"; touch $S_RF; echo \"" "$S_RF"
+
+S_REPO="$TMP/d_sentinel_repo_root"
+_d_test "repo_root" "x\"; touch $S_REPO; echo \"" "$S_REPO"
+
+S_REF="$TMP/d_sentinel_base_ref"
+_d_test "base_ref" "x\"; touch $S_REF; echo \"" "$S_REF"
+
+S_BB="$TMP/d_sentinel_base_branch"
+_d_test "base_branch" "x\"; touch $S_BB; echo \"" "$S_BB"
+
+# ===========================================================================
+# Test (d-benign): anti-overcorrection — metachar path preserved as literal (EX-D-BENIGN)
+#
+# diff_out set to a benign path with spaces + literal $() + parens.
+# After create+clean: the diff file EXISTS at that EXACT literal path (zero-byte
+# is fine — cleanup runs git diff which may produce empty output), no mangled
+# siblings, worktree removed.
+# ===========================================================================
+echo "--- (d-benign) anti-overcorrection ---"
+
+R_DB="$(fresh_repo)"
+D_DB="$(mktemp -d "$TMP/d_benign.XXXXXX")"
+RUNDIR_DB="$D_DB/rundir"; mkdir -p "$RUNDIR_DB"
+RUNFILE_DB="$D_DB/runfile.path"
+printf '%s\n' "$RUNDIR_DB" > "$RUNFILE_DB"
+
+( exit 0 ) &
+DEAD_PGID_DB=$!
+wait "$DEAD_PGID_DB" 2>/dev/null || true
+printf '%s\n' "$DEAD_PGID_DB" > "$RUNDIR_DB/pi.pgid"
+
+# Benign path: space + literal $() + parens — must survive printf %q round-trip.
+BENIGN_DIFF="$D_DB/di ff\$(echo nope) (x).patch"
+CO_DB="$D_DB/cleanup.sh"
+WORK_DB="$R_DB/work"
+
+if ( cd "$D_DB" && bash "$WT" create \
+       --repo_root    "$R_DB" \
+       --branch_name  "d/benign-test" \
+       --base_ref     "$(git -C "$R_DB" rev-parse HEAD)" \
+       --base_branch  "$(git -C "$R_DB" symbolic-ref --short HEAD 2>/dev/null || echo master)" \
+       --work_path    "$WORK_DB" \
+       --diff_out     "$BENIGN_DIFF" \
+       --cleanup_out  "$CO_DB" \
+       --rundir-file  "$RUNFILE_DB" \
+       >/dev/null 2>&1 ); then
+
+  ( cd "$D_DB" && bash "$CO_DB" >/dev/null 2>&1 ) || true
+
+  # The diff file must exist at the EXACT literal path (zero-byte is fine).
+  if [ -e "$BENIGN_DIFF" ]; then
+    ok "(d-benign) diff file exists at exact literal path with spaces/metachar"
+  else
+    bad "(d-benign) diff file missing at literal path '$BENIGN_DIFF' (path mangled or not written)"
+  fi
+
+  # No mangled siblings: $D_DB/di and $D_DB/nope.patch must NOT exist.
+  mangled=0
+  [ -e "$D_DB/di" ] && mangled=1
+  [ -e "$D_DB/nope.patch" ] && mangled=1
+  [ -e "$D_DB/di ff" ] && mangled=1
+  if [ "$mangled" -eq 0 ]; then
+    ok "(d-benign) no mangled sibling files (metachar not word-split)"
+  else
+    bad "(d-benign) mangled sibling file(s) present (path was word-split or over-escaped)"
+  fi
+
+  # Worktree must be removed.
+  if wt_registered "$R_DB" "$WORK_DB"; then
+    bad "(d-benign) worktree still registered after cleanup (remove not executed)"
+  else
+    ok "(d-benign) worktree removed after cleanup"
+  fi
+else
+  bad "(d-benign) create failed; cannot verify metachar path preservation"
+  bad "(d-benign) mangled sibling check (create failed)"
+  bad "(d-benign) worktree removed check (create failed)"
 fi
 
 echo "---"
