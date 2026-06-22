@@ -129,6 +129,14 @@ fi
 # the `git worktree remove` line in the trace. Against the delete-poll mutant
 # (kill -0 loop stripped), no `kill -0` appears -> this assertion FAILS -> the
 # FAIL line is labeled (b) -> gate MG-DELETE-POLL satisfied.
+#
+# Design note (EX-CLR-2): Part-2 (trace: kill -0 before worktree remove) is the
+# DISCRIMINATING assertion vs the delete-poll mutant — a stripped confirm-poll
+# leaves no kill -0 in the trace, making Part-2 fail immediately.
+# Part-1 (live-PGID race) is redundant/secondary vs that mutant: a delete-poll
+# build completes fast without blocking on the live process, so the 1-second
+# checkpoint may still see the worktree listed by coincidence (false-green vs
+# that mutant). Both parts keep running unchanged — intentional design.
 # ===========================================================================
 R_B="$(fresh_repo)"
 WORK_B="$R_B/work"
@@ -538,6 +546,14 @@ _d_test "base_branch" "$PAYLOAD_BB_NL" "$S_BB_NL"
 # After create+clean: the diff file EXISTS at that EXACT literal path (zero-byte
 # is fine — cleanup runs git diff which may produce empty output), no mangled
 # siblings, worktree removed.
+#
+# Design note (EX-CLR-1): (d-benign) drives diff_out as its metachar param and
+# shares the SAME _q_diff_out escape path as the (d) diff_out line above. If
+# _q_diff_out were un-escaped, BOTH (d) diff_out AND (d-benign) would turn RED —
+# one root cause, a cascade, not three independent failures. The (d) diff_out
+# _d_test call above retains its own labeled sentinel assertion (S_DIFF_NL) and
+# is separately discriminating; the cascade is an additional consequence, not a
+# replacement.
 # ===========================================================================
 echo "--- (d-benign) anti-overcorrection ---"
 
@@ -598,6 +614,69 @@ else
   bad "(d-benign) create failed; cannot verify metachar path preservation"
   bad "(d-benign) mangled sibling check (create failed)"
   bad "(d-benign) worktree removed check (create failed)"
+fi
+
+# ===========================================================================
+# Test (d) branch_name: cleanup-heredoc exclusion verified (EX-CLR-3)
+#
+# branch_name (the 8th create param) is intentionally absent from the (d)
+# injection matrix above. It is never baked into the cleanup heredoc: it is
+# consumed only at create time by `git worktree add -B "$branch_name"` (see
+# pi-worktree.sh:124) and never written into the generated cleanup script.
+# The create-time literals frozen into the cleanup are work_path, diff_out,
+# rundir_file, repo_root, base_ref, base_branch — branch_name is not among
+# them, so no printf %q escaping is needed for it in the cleanup context.
+#
+# Behavioral assertion: pass a newline-bearing branch_name payload at create
+# time; grep the GENERATED cleanup script ($CO) for the payload; run it; assert
+# SENTINEL absent. Reads a real generated artifact — capable of failing if
+# branch_name ever enters the cleanup heredoc.
+# ===========================================================================
+echo "--- (d) branch_name exclusion assertion ---"
+
+R_BN="$(fresh_repo)"
+D_BN="$(mktemp -d "$TMP/d_bn.XXXXXX")"
+RUNDIR_BN="$D_BN/rundir"; mkdir -p "$RUNDIR_BN"
+RUNFILE_BN="$D_BN/runfile.path"
+printf '%s\n' "$RUNDIR_BN" > "$RUNFILE_BN"
+
+# Dead PGID so cleanup can run fully.
+( exit 0 ) &
+DEAD_PGID_BN=$!
+wait "$DEAD_PGID_BN" 2>/dev/null || true
+printf '%s\n' "$DEAD_PGID_BN" > "$RUNDIR_BN/pi.pgid"
+
+# Newline-bearing payload: if branch_name were ever baked into the heredoc,
+# the newline would break out of any comment line and run `touch SENTINEL`.
+S_BN="$(mktemp "$TMP/sent_bn.XXXXXX")"
+rm -f "$S_BN"
+PAYLOAD_BN="$(printf 'x\ntouch %s\n#' "$S_BN")"
+CO_BN="$D_BN/cleanup.sh"
+
+( cd "$D_BN" && bash "$WT" create \
+    --repo_root    "$R_BN" \
+    --branch_name  "$PAYLOAD_BN" \
+    --base_ref     "$(git -C "$R_BN" rev-parse HEAD)" \
+    --base_branch  "$(git -C "$R_BN" symbolic-ref --short HEAD 2>/dev/null || echo master)" \
+    --work_path    "$R_BN/work" \
+    --diff_out     "$D_BN/diff.patch" \
+    --cleanup_out  "$CO_BN" \
+    --rundir-file  "$RUNFILE_BN" \
+    >/dev/null 2>&1 ) || true
+
+# Run the cleanup if it was generated.
+[ -f "$CO_BN" ] && ( cd "$D_BN" && bash "$CO_BN" >/dev/null 2>&1 ) || true
+
+# Assert: payload not in generated cleanup AND SENTINEL not created.
+bn_payload_in_cleanup=0
+[ -f "$CO_BN" ] && grep -Fq "touch $S_BN" "$CO_BN" && bn_payload_in_cleanup=1
+bn_sentinel_created=0
+[ -e "$S_BN" ] && bn_sentinel_created=1
+
+if [ "$bn_payload_in_cleanup" -eq 0 ] && [ "$bn_sentinel_created" -eq 0 ]; then
+  ok "(d) branch_name: payload absent from generated cleanup + no SENTINEL (not a cleanup-injection surface)"
+else
+  bad "(d) branch_name: payload leaked into generated cleanup (in_cleanup=$bn_payload_in_cleanup) OR SENTINEL created (sentinel=$bn_sentinel_created) — branch_name baked into heredoc"
 fi
 
 echo "---"
