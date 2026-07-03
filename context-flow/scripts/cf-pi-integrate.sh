@@ -5,14 +5,14 @@
 # Usage:   cf-pi-integrate.sh FLOW_SESSION TEST_RUNNER
 # Reads:   $SHARDS_FILE (group -> contracts), $DISPATCH_STATE_FILE (which shards PASS).
 # Writes:  $INTEGRATION_RESULT (json), integration branch cf/<flow-slug>-integrated.
-# Exit:    0 PASS, 2 NEEDS_REPLAN (per decision 2a), 3 merge conflict (structurally
+# Exit:    0 PASS, 2 NEEDS_REPLAN (design §5: integration failure injects NEEDS_REPLAN), 3 merge conflict (structurally
 #          impossible but guarded), 4 misuse.
 # Stdout:  short progress lines + final status word.
 #
 # Behavior:
 #   - Snapshot main cf-branch HEAD as base for the integration branch.
 #   - For each PASS shard (from $DISPATCH_STATE_FILE.checkpoints), merge its
-#     branch in --no-ff. File-graph sharding (design §3) makes physical conflicts
+#     branch in --no-ff. File-graph sharding (design §2) makes physical conflicts
 #     structurally impossible -- if any merge produces conflicts, exit 3.
 #   - After all merges, run TEST_RUNNER inside the integrated checkout.
 #   - If tests pass: write INTEGRATION_RESULT with status PASS.
@@ -55,7 +55,7 @@ if [ ! -f "$DISPATCH_STATE_FILE" ]; then
   exit 4
 fi
 
-# Top-K failure cap (per design §17 bounded reads).
+# Top-K failure cap (design §7 token discipline).
 TOP_K_FAILURES="${PI_INTEGRATE_TOP_K:-10}"
 
 # Determine which shards passed and need merging.

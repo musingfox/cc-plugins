@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Selectively roll back shard branches (per design §4 recoverability ladder).
+# Selectively roll back shard branches (design §3 recoverability ladder).
 # Removes the worktrees and force-deletes the branches; preserves any
 # cf-checkpoint/<flow>/shard-<id>@<sha> tags so the work remains retrievable.
 #

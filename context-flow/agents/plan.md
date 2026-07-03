@@ -168,7 +168,7 @@ Field rules:
 - **`name`**: matches the contract heading in `plan.md` exactly. Stable identifier — used as merge key for partial-replan, anchor in prose, branch label hint.
 - **`summary`**: one-line restatement of the contract's Effect.
 - **`touches_files`** (load-bearing): SUPERSET of every file the contract creates or modifies. **Test files count. Doc files count if the contract changes docs.** Underset is a bug — `cf-pi-run.sh` post-validates `actual_touched ⊆ declared_touched` and emits NEEDS_REPLAN with `reason: undeclared_file_touched` on violation. Use repo-relative paths.
-- **`test_cases`**: structured form of the markdown Test Cases — drives shell-side grep-guard generation.
+- **`test_cases`**: structured form of the markdown Test Cases.
 - **`attachments`**: ESCAPE HATCH for rich design discussion (decision logs, diagrams). Default `[]`. Use only when contract-body prose is too long; place files under `$SESSION/plan-attachments/`. Brief assembly includes attachment contents verbatim for the implementer.
 
 The orchestrator's `cf-pi-shard.sh` derives parallel groups from the file-touch graph (connected components over `touches_files`). **Plan does NOT assign `parallel_group`** — it is script-derived.

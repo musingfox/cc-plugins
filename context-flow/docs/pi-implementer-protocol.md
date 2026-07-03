@@ -1,258 +1,114 @@
 # OMP Implementer Protocol
 
-This protocol governs the Phase 3 (Implement) handoff when the orchestrator delegates to **OMP** (via the pi-dispatch canonical scripts) instead of the Claude `context-flow:implement` agent. It defines:
+Governs the Phase 3 handoff when the orchestrator delegates to **OMP** (dispatched via the pi-dispatch canonical scripts) instead of the Claude `context-flow:implement` agent. Four parts: brief assembly, worker methodology, report contract, and the transition validation that protects against self-grading.
 
-1. How the orchestrator assembles and delivers the implementation brief.
-2. The OMP-side methodology (faithful executor; three valid outcomes).
-3. The report-file contract OMP must write back.
-4. Transition validation that protects against self-grading.
+Core stance: the orchestrator never trusts the worker's stdout or report. The worker reports via files; the orchestrator verifies independently (gates + test execution). Stdout is log noise.
 
-The orchestrator never reads OMP's stdout to determine success. OMP reports via a file; the orchestrator independently verifies. Stdout is treated as untrusted log noise.
-
-**Transport**: text mode only. OMP is launched as a backgrounded `pi -p` process; the orchestrator polls the session JSONL for liveness. There is no RPC channel.
-
-**Paths**: every per-session artifact lives directly under `$SESSION/` (flat layout, no per-ticket subdirectories). Resolve them via `load_cf_pi_env "$SESSION"` from `scripts/cf-pi-env.sh`.
+**Paths**: every per-session artifact lives flat under `$SESSION/`; resolve via `load_cf_pi_env "$SESSION"` (`scripts/cf-pi-env.sh`).
 
 ---
 
-## 1. Invocation Contract (orchestrator → OMP)
+## 1. Invocation
 
-### Command Shape
+`scripts/cf-pi-dispatch.sh` is the authoritative launcher — it delegates to the canonical `pi-dispatch.sh` (sibling pi-dispatch plugin), which runs `omp --mode json` detached with the brief attached via `@file`. Do not hand-roll worker invocations. Load-bearing facts:
 
-```bash
-cd "$WORK" && \
-pi -p \
-   "${PI_ARGS[@]}" \
-   --session-dir "$PI_SESSION_DIR" \
-   @"$BRIEF_FILE" \
-   "Read the brief and execute it. When finished, print exactly DONE and nothing else." \
-   > "$PI_STDOUT" 2> "$PI_STDERR" &
-PI_PID=$!
-```
+- **Brief goes in via `@file`, never `"$(cat brief)"`** — shell substitution expands backticks/dollars inside the brief and corrupts the prompt (empirically verified).
+- **Exit codes carry NO signal** — the worker exits 0 even on API errors. Outcome = the JSONL stream's terminal `agent_end` event: `stopReason: "stop"` is clean, `error`/`aborted` failed (with `errorMessage` inline).
+- **Success = `agent_end stopReason:"stop"` AND `$REPORT_FILE` exists and parses.** The `DONE` sentinel in stdout is a hint, not a contract.
+- Provider/model: `$PI_PROVIDER`/`$PI_MODEL` env → flags; unset → the worker resolves from its own config (host-dependent — set both for cross-machine reproducibility).
 
-- `$WORK` — the directory OMP operates in. For isolated runs (default) it is a fresh git worktree (`$SESSION/work/`); see "Isolation" below.
-- `$BRIEF_FILE` — `$SESSION/implement-brief.md`.
-- `${PI_ARGS[@]}` — orchestrator-assembled provider/model flags. Empty by default → OMP resolves provider/model from its own config (`pi config` → `defaultProvider` / `defaultModel` → CLI fallback `google`). When the user sets `$PI_PROVIDER` and/or `$PI_MODEL`, `PI_ARGS` expands to `--provider <p> --model <m>`. Reproducibility caveat: if a flow needs the same provider/model across machines, set both env vars; relying on the host's `pi config` means a run on a different machine may resolve to a different model.
-- `$PI_SESSION_DIR` — `$SESSION/pi-sessions/`. Mandatory. This is where OMP writes the session JSONL the orchestrator monitors for liveness + errors. See §1.5.
-- `@file` syntax — OMP's native file-include parameter. **The brief MUST be passed via `@file`, never via `"$(cat $BRIEF_FILE)"`.** Shell command substitution will expand backticks/dollars inside the brief and either hang OMP or corrupt the prompt. Empirically verified.
-- **Run OMP in the background (`&`)** — the orchestrator must keep control to tail the session JSONL and enforce stall detection. Do not let OMP block the Bash tool call.
+### Liveness channel
 
-### Mode and flags
+The worker writes one JSON event per line to its session JSONL. Any new event (`text`, `thinking`, `toolCall`, …) means it is alive; `cf-pi-poll.sh` watches file mtime and declares STALL after `$PI_STALL_THRESHOLD_S` of silence. Failure detection = grep the JSONL for `"errorMessage"`; common patterns: `usage_limit_reached` (quota; extract `resets_at`), `status_code":401`/`unauthorized` (auth), `403` (provider misconfig), `ECONNRESET`/`ETIMEDOUT` (network), `model_not_found` (bad model id).
 
-- **`--mode json` with `-p` is the required combination** — stdout is the event stream
-  (one JSON object per line), ending in a terminal `agent_end` event whose last message's
-  `stopReason` carries the outcome (`stop` = clean, `error`/`aborted` = failed, with
-  `errorMessage` inline). Events stream incrementally (verified 2026-06-11, including
-  under a pipe — no block buffering). The earlier "`--mode json` hangs" note was a stale
-  Pi v0.73.1 claim; re-verified working.
-- `--no-session` — never use it. The saved session is what `--session <id>` resume needs
-  for the context-retaining re-brief.
-- Exit codes carry NO signal — OMP exits 0 even on API errors (verified: bogus model →
-  exit 0, `stopReason:"error"` in the stream). Judge `agent_end.stopReason`, never `$?`.
+### Context discipline (worker artifacts → orchestrator)
 
-### Capture & Timeout
+Default is **path only**; content only via bounded reads. Per surface:
 
-- Wall-clock cap: enforced by the orchestrator via `$PI_WALL_CLOCK_S` (default 1800s), not by a Bash tool timeout.
-- Capture stdout to `$PI_STDOUT` (`$SESSION/pi-stdout.log`), stderr to `$PI_STDERR`. Stdout in json mode is the event stream — machine-read only; do NOT inline-paste it.
-- Success signal is **`agent_end` with `stopReason:"stop"`** + **`$REPORT_FILE` exists and parses**. The `DONE` sentinel in the prompt is a hint, not a contract.
+| Surface | Allowed read |
+|---|---|
+| Poll status | full (1 line by design) |
+| Worker stdout / stderr | `tail -20` / `tail -10`, failure paths only |
+| Session JSONL | `grep -m 5 '"errorMessage"'` + `tail -3`; never `cat` |
+| Report | `head -20` (the `## Summary` block); full Read only if Summary flags something |
+| Test output | `tail -30` on failure; nothing on pass |
+| Diff | never read — pass the path to Phase 4 review |
 
-### 1.5 Session JSONL — the liveness channel
+Failure-path post-mortem: `scripts/cf-pi-postmortem.sh "$SESSION"` (bounded ~5KB). Do not invent ad-hoc dumps.
 
-OMP writes a per-session JSONL to `$PI_SESSION_DIR/<timestamp>_<uuid>.jsonl`. Each line is a JSON event. Empirically validated event types (Pi v0.73.1):
+### Brief anatomy
 
-| Event `type` | Meaning | Orchestrator action |
-|---|---|---|
-| `session` | OMP started, working dir captured | Liveness confirmed; record session UUID |
-| `model_change` | Provider/model bound | Verify it matches what we requested; mismatch → fail |
-| `thinking_level_change` | Reasoning budget configured | Informational |
-| `message` (role `user`) | Brief/turn input echoed | Informational — confirms brief was read |
-| `message` (role `assistant`) | LLM response — text, tool call, or error | Examine `message.stopReason` and `message.content`; `stopReason: "error"` → fail fast (see below) |
-| `text` | Streamed assistant text chunk | Reset stall timer (OMP is generating) |
-| `thinking` | Extended thinking chunk | Reset stall timer (OMP is reasoning) |
-| `toolCall` | OMP invoked a tool (read/write/edit/bash) | Reset stall timer (OMP is working) |
-
-**Liveness rule**: any new event line (especially `text` / `thinking` / `toolCall`) means OMP is alive. The orchestrator's stall detector watches the file's mtime — when no new line has been appended for `$PI_STALL_THRESHOLD_S` (default 180s), the run is hung.
-
-**Failure detection**: grep the JSONL for the literal `"errorMessage"` (the field appears in `message` events when an API call fails). Common patterns to match:
-
-- `usage_limit_reached` → quota exhausted; extract `resets_at` epoch from headers
-- `"status_code":401` or `unauthorized` → auth failure
-- `"status_code":403` → permission denied (often misconfigured provider)
-- `ECONNRESET` / `ETIMEDOUT` / `ENOTFOUND` → network issue
-- `model_not_found` → invalid model ID for provider
-
-### 1.6 Context discipline (OMP → orchestrator)
-
-OMP produces several artifact streams. Most of them belong on disk; only a small subset is allowed into the orchestrator's conversation context. The rule for every OMP-side surface:
-
-- **Default: file path only.** State `$SESSION/<file>` to the human; do NOT `cat` it.
-- **When content is needed: bounded read.** Use `head` / `tail` / `grep -m N` with explicit caps, never raw `cat` on OMP-produced logs.
-- **OMP's verbose stdout, JSONL events, test-runner output, build logs**: these can run to tens of thousands of lines on a single bad run. A naive `cat` inflates orchestrator context by an order of magnitude and crowds out the work the orchestrator actually needs to do.
-
-The allowed reads, per surface:
-
-| Surface | Path | Allowed read | Notes |
-|---|---|---|---|
-| Status polls | `cf-pi-poll.sh` stdout | full (1 line) | already bounded by design |
-| OMP stdout | `$PI_STDOUT` (`$SESSION/pi-stdout.log`) | `tail -20 "$PI_STDOUT"` | the `DONE` sentinel lives in the last few lines |
-| OMP stderr | `$PI_STDERR` (`$SESSION/pi-stderr.log`) | `tail -10 "$PI_STDERR"` | usually empty; tail only on failure paths |
-| Session JSONL | `$PI_SESSION_DIR/<ts>_<uuid>.jsonl` | `grep -m 5 '"errorMessage"' "$JSONL"` + `tail -3 "$JSONL"` | never `cat`; the latest 3 events plus matched error lines are enough for post-mortem |
-| Implement report | `$REPORT_FILE` (`$SESSION/implement-report.md`) | `head -20 "$REPORT_FILE"` (reads OMP's `## Summary` block) | OMP writes a ≤ 5-bullet `## Summary` at the top of the report. Read only that by default. If Summary flags concerns or unresolved items, escalate to `Read $REPORT_FILE` for full content — but only then. |
-| Test runner output | `$TEST_LOG` (`$SESSION/test-output.log`) | `tail -30 "$TEST_LOG"` on failure, **nothing** on pass beyond the pass/fail summary | run the test runner with stdout/stderr redirected to a file; do not stream it through the orchestrator |
-| Grep guard output | `cf-pi-guard.sh` stdout | full (one PASS/FAIL line per pattern, ~10 lines) | already bounded |
-| Diff for review | `$DIFF_FILE` (`$SESSION/implement.diff`) | **never read** — pass as file path to Phase 4 reviewers | reviewers consume it via their own Read tool |
-
-**Failure-path bounded post-mortem**: use `scripts/cf-pi-postmortem.sh "$SESSION"` (~5 KB output: error count + JSONL errorMessage matches + tails of JSONL/stderr/stdout). Do not invent ad-hoc dumps. Path echoes are deliberate: bounded tail is the default surface, the full file is opt-in via the orchestrator's `Read` tool only when the tail leaves the cause ambiguous.
-
-### Brief Anatomy
-
-The brief is a single markdown file assembled by `scripts/cf-pi-brief.sh`. The layout — OMP has been smoke-tested against it:
-
-```markdown
-# Implementation Brief
-
-## Methodology
-
-{the "OMP Methodology" section from this protocol, extracted via the METHODOLOGY markers}
-
-## Context Summary
-- **Goal**: {one-line compressed goal}
-- **Key constraints**: {constraints from research that affect implementation}
-- **Working directory**: {absolute path of $WORK}
-- **Test runner**: {exact command, e.g. `node --test test/contracts.test.mjs`}
-
-## Behavioral Contracts
-
-{copied from $SESSION/plan.md, section "## Behavioral Contracts"}
-
-## Implementation Plan
-
-{copied from $SESSION/plan.md, section "## Implementation Plan" — guidance, not binding}
-
-## Output Requirements
-
-You MUST write a report to `$REPORT_FILE` using EXACTLY this schema:
-
-{the "Report Schema" section from this protocol, extracted via the SCHEMA markers}
-
-After writing the report and only after all tests pass, your stdout must print exactly: `DONE`
-```
-
-- `$REPORT_FILE` is the absolute path the orchestrator assigns; default `$SESSION/implement-report.md`.
-- The methodology and report schema are **embedded verbatim** in every brief — OMP has no persistent memory of this protocol between runs. (Even though we pass `--session-dir`, that flag only writes the JSONL for orchestrator monitoring; it does not load prior conversation context.)
+`scripts/cf-pi-brief.sh` assembles one markdown file: `## Methodology` (METHODOLOGY fence below, verbatim), `## Context Summary` (goal, constraints, workdir, test runner), `## Environment` (absolute paths + rules, §5), `## Behavioral Contracts` + `## Implementation Plan` (from contracts.json / plan.md), `## Escalation Contract` (§4), `## Output Requirements` (SCHEMA fence below, verbatim). The fences are embedded in every brief — the worker has no memory of this protocol between runs.
 
 ### Isolation
 
-By default, OMP runs **isolated in a git worktree** to prevent it from polluting the host working tree if something goes wrong.
-
-```bash
-WORK="$SESSION/work"
-CF_BRANCH="cf/$CF_SLUG"
-git worktree add -B "$CF_BRANCH" "$WORK" HEAD
-# ... run pi inside $WORK ...
-# on success: capture diff via `git -C "$WORK" diff "$BASE_HEAD" > "$DIFF_FILE"` for review handoff (NOT `diff HEAD` — after per-contract commits, HEAD == cf-branch tip → empty diff)
-# always: git worktree remove --force "$WORK"
-# the cf branch SURVIVES the flow — it carries per-contract commits the
-# orchestrator rebases onto BASE_BRANCH for the human to ff at their convenience.
-```
-
-`scripts/cf-pi-worktree.sh` handles setup and appends the cleanup commands to `$CLEANUP_SCRIPT` so they run even if Phase 3 aborts.
-
-If the host is not a git repo, fall back to an isolated scratch directory: `mkdir -p "$WORK"`. In that mode there is no merge-back path; OMP's output must be self-contained (used for greenfield generation, demos, or smoke tests).
+The worker runs in a fresh git worktree (`$SESSION/work`, branch `cf/$CF_SLUG`) created by `scripts/cf-pi-worktree.sh`, which also registers cleanup (capture diff against `$BASE_HEAD`, remove worktree) in `$CLEANUP_SCRIPT`. The cf branch survives the flow — it carries the per-contract commits. Diffs are always taken against `$BASE_HEAD`, never `HEAD` (after per-contract commits, HEAD == branch tip → `diff HEAD` is empty). Non-git host → scratch directory, no merge-back path.
 
 ---
 
-## 2. OMP Methodology (paste into every brief)
+## 2. Worker Methodology (embedded in every brief)
 
-> The block below is the system-prompt content OMP must follow. Embed it verbatim in the brief under `## Methodology`. The fenced `<!-- METHODOLOGY-{BEGIN,END} -->` markers below are extraction anchors used by `scripts/cf-pi-brief.sh` — do not remove them.
+The fenced block is extracted verbatim by `cf-pi-brief.sh` — do not remove the markers.
 
 <!-- METHODOLOGY-BEGIN -->
-You are a **faithful executor**. You implement the behavioral contracts in this brief, write tests that verify them, and report results to a file. You do NOT question the design — that was the planning phase's job upstream.
+You are a **faithful executor**: implement the behavioral contracts in this brief, verify them with tests, and report to a file. Do not question the design — that was the planning phase's job.
 
-### Tools available
+### Method
 
-You have `read`, `write`, `edit`, and `bash` enabled by default. If you need to search the working tree, run `grep`, `find`, or `ls` via `bash`.
-
-### Methodology
-
-1. **Read before writing**: understand existing code in target files before modifying. Check imports, conventions, adjacent code.
-2. **Tests first when possible**: write the test cases from the contracts, then implement to pass them.
-3. **Follow the Implementation Plan as guidance, not as binding**: the binding constraint is the behavioral contract. If the plan suggests file X but file Y is the right place, use Y.
-4. **Run tests after each contract**: don't batch — verify incrementally with the test runner specified in Context Summary.
-5. **Commit after each contract passes**: once a contract's tests pass, commit before moving on. The working tree is a fresh git worktree on a per-flow branch, so commits stay isolated. One commit per contract; impl + tests in the same commit.
+1. Read the target files before writing. Match existing conventions, imports, and style.
+2. Write the contract's test cases first, then implement to pass them.
+3. The behavioral contract is binding; the Implementation Plan is only guidance. If the plan suggests file X but file Y is the right place, use Y.
+4. Run the test runner (named in Context Summary) after each contract — never batch verification.
+5. **Commit exactly once per contract**, when its tests pass, impl + tests together:
    ```bash
-   git add -A
-   git commit -m "<ContractName>: <one-line behavioral outcome>"
+   git add -A && git commit -m "<ContractName>: <one-line behavioral outcome>"
    ```
-   If a contract requires multiple logical steps that you want separately traceable, you may split into 2–3 commits — never bundle multiple contracts into one commit.
-6. **Use the Context Summary**: the one-line goal and key constraints give you directional awareness for micro-decisions (naming, error messages, organization). Don't report Unresolved for trivial ambiguities you can reasonably decide.
+   Never bundle two contracts into one commit; never split one contract across commits. Fixing a contract after its commit? Fold the fix into that commit — `git commit --amend` at the tip, otherwise `git commit --fixup=<sha> && GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash <BASE_HEAD>`. This branch is a private worktree; rewriting it is safe.
+6. Decide trivial ambiguities (naming, error text, file organization) yourself from the goal and constraints. Do not report Unresolved for anything you can reasonably decide.
 
-### Three valid outcomes per contract
+### Outcome per contract — exactly one of
 
-#### 1. Completed
-Contract implemented, tests pass, no concerns. Report with `confidence: high`.
+- **Completed** — implemented, tests pass on this run. `confidence: high` always (there is no low-confidence Completed: if unsure, run the test; if you cannot write a meaningful test, that is a Concern).
+- **Completed with Concerns** — implemented, tests pass, but you see a real risk (fragile adaptation, performance cliff, implicit coupling). Ship it AND log the concern. Concerns are forwarded to review; they never block.
+- **Unresolved** — technically infeasible in this codebase (required API absent, type system forbids it without unsafe casts, incompatible dependency, architectural conflict). State what you attempted, why it failed, and a resolution path.
 
-#### 2. Completed with Concerns
-Contract implemented, tests pass, but you observe a risk (fragile type adaptation, performance cliff at scale, implicit coupling, type safety gap requiring runtime assertion). Ship it AND log the concern. Concerns do NOT block — they're forwarded to the review phase.
+### Never
 
-#### 3. Unresolved
-Contract is **technically infeasible** in the current codebase (required API doesn't exist, type system makes the contract impossible without unsafe casts, dependency version incompatible, fundamental architectural conflict). Explain what you attempted, why it failed, and suggest a resolution path.
-
-### What you do NOT do
-
-- Question whether a contract is the right approach.
-- Suggest alternative designs that weren't contracted.
-- Refuse to implement a feasible contract because you consider it suboptimal.
-- Optimize beyond what the contract requires.
-- Add features, tests, or abstractions not specified in the contracts.
-
-If a contract is feasible but you believe it produces risky code → implement it AND log a Concern. That is the correct channel.
+- Question whether a contract is the right approach, or propose uncontracted alternatives.
+- Refuse a feasible contract because you consider it suboptimal — implement it and log a Concern.
+- Add features, tests, abstractions, or optimization beyond what the contracts specify.
+- Modify code outside the contracts' scope unless the implementation requires it.
 
 ### Reporting style
 
-Lead each entry with **what the caller/system can now do**, in plain language. The contract name is a trailing tag for traceability, not the headline.
-
-| Code-itself framing (avoid) | Consequence framing (use) |
-|---|---|
-| "Added `validateEmail()`" | "Signup now rejects malformed emails per RFC 5322" |
-| "Modified `ORDER BY` clause" | "Query results now reverse-chronological — callers relying on old order will break" |
-| "Bumped cache TTL 60s→300s" | "Hot-data hit rate rises; writes can take up to 5 min to surface" |
-
-### Rules
-
-- All test cases from the contracts must be **executed**, not just written.
-- Do not modify code outside the contracts' scope unless required for the implementation to work.
-- There is no "low confidence" Completed. If you're uncertain whether the implementation satisfies the contract, run the test. If it passes, it's high confidence. If you cannot write a meaningful test, report as a Concern.
-- Only report Completed for a contract when its tests actually pass on this run.
+Lead each entry with what the caller/system can now do; the contract name is a trailing tag. "Signup now rejects malformed emails" — not "Added `validateEmail()`". Every test case from the contracts must be **executed**, not just written; report Completed only when its tests pass on this run.
 <!-- METHODOLOGY-END -->
 
 ---
 
-## 3. Report Schema (paste into every brief)
-
-> The block below is the output schema. Embed it verbatim in the brief under `## Output Requirements`. The `<!-- SCHEMA-{BEGIN,END} -->` markers are extraction anchors used by `scripts/cf-pi-brief.sh` — do not remove them.
+## 3. Report Schema (embedded in every brief)
 
 <!-- SCHEMA-BEGIN -->
 ```markdown
 ## Summary
-- [N of M contracts completed] — [one-line characterization, e.g. "all behavioral contracts green; no concerns"]
-- Concerns: [N, see § Concerns below — OR "none"]
-- Unresolved: [N, see § Unresolved below — OR "none"]
+- [N of M contracts completed] — [one-line characterization]
+- Concerns: [N — OR "none"]
+- Unresolved: [N — OR "none"]
 - [optional: one non-obvious decision the human should know about]
 
 ## Completed
 - **[one-sentence behavioral outcome — what the user/system can now do]** _(contract: ContractName)_
-  - Tests: [comma-separated list of test cases that passed, paraphrased from the brief]
+  - Tests: [test cases that passed, paraphrased]
   - confidence: high
 
 ## Concerns
 - **[risk in concrete user/system terms]** _(contract: ContractName)_
   - What I built: [one line]
   - Why it's risky: [the failure mode]
-  - Why I shipped anyway: [why it's still feasible/acceptable]
+  - Why I shipped anyway: [why it's still acceptable]
 
 ## Unresolved
-- **[plain-language description of what couldn't be done]** _(contract: ContractName)_
+- **[what couldn't be done, plain language]** _(contract: ContractName)_
   - What was attempted: [specific approach]
   - Why it failed: [technical reason]
   - Suggested resolution: [what would unblock this]
@@ -260,153 +116,20 @@ Lead each entry with **what the caller/system can now do**, in plain language. T
 
 Rules:
 
-- **Write `## Summary` LAST**, after all tests pass and Completed/Concerns/Unresolved are written. Keep it to ≤ 5 plain-text bullets — this is the **only section the orchestrator reads by default**, so every line must carry signal. The orchestrator opens the full file only if Summary surfaces something that needs investigation.
-- One Completed entry per contract that succeeded.
-- Omit the `## Concerns` section entirely if there are no concerns. Same for `## Unresolved`. (Summary's `Concerns:`/`Unresolved:` lines still appear, just say "none".)
+- Write `## Summary` LAST, after all tests pass. ≤ 5 bullets — it is the only section the orchestrator reads by default.
+- One Completed entry per succeeded contract. Omit `## Concerns` / `## Unresolved` sections entirely when empty (Summary's count lines still say "none").
 - Report what's observable to the caller, not which files you edited.
-- Run all tests before writing Completed. Tests must actually pass.
 <!-- SCHEMA-END -->
 
 ---
 
-## 4. Transition Validation: Implement → Review
+## 4. Escalation Contract (worker → orchestrator)
 
-The orchestrator performs these checks. The OMP report is **untrusted input** — every claim is verified independently.
+The structured upward channel for "the spec is wrong, not my implementation". The worker writes `$ESCALATE_FILE` (path in the brief's Environment block), prints `DONE`, and exits. `cf-pi-run.sh` surfaces it as `NEEDS_REPLAN` (distinct from `FAIL`), routing to Plan for partial revision instead of retrying the same brief.
 
-### 4.0 Pre-flight model probe (before dispatching the brief)
+**Escalate when**: a contract is internally inconsistent, contradicts another contract in the shard, or is infeasible as specified; a `touches_files` module is missing AND creating it would change the codebase's architectural shape; a required dependency cannot be installed safely; the same test failure recurs across two distinct fix attempts. Ordinary naming/design uncertainty is NOT an escalation — decide it from the Context Summary.
 
-Before assembling and sending the actual brief, run `scripts/cf-pi-probe.sh "$SESSION"` to confirm OMP's resolved provider/model actually works on this machine. The script:
-
-- Writes a `say ok` prompt to `$PI_PROBE_DIR`.
-- Enforces the 30-second cap via the **Bash tool's `timeout` parameter** (`timeout: 30000`), not the GNU `timeout` command — macOS does not ship one by default.
-- Emits one of: `OK` | `NO_JSONL` | `ERROR:<excerpt>`.
-
-If probe fails → abort Phase 3, surface the **exact errorMessage** to the human along with the resolved provider/model (look for the `model_change` event in the JSONL; essential when OMP resolved from its own config and the orchestrator didn't pass flags). Suggest concrete remediation (`wait for quota reset at <timestamp>`, `run pi auth <resolved-provider>`, `verify model ID via pi --list-models`, or `pi config` to inspect/change defaults). A probe that hangs > 30 seconds with no stdout is the classic "OMP -p + invalid combination" symptom — abort and recommend running `/cf` with Claude implementer instead.
-
-The probe cost is ~1-5 cents per OMP run. Worth it: a failed brief dispatch wastes vastly more.
-
-### 4.1 Stall detection — re-entrant short poll
-
-**Design principle**: the poll loop lives INSIDE `cf-pi-run.sh`, not in main's conversation. Main launches one `cf-pi-run.sh` per shard as a **background task** (`Bash` with `run_in_background: true`); that script runs the entire per-shard lifecycle synchronously to completion — and its `dispatch_and_poll` function contains the poll loop: a shell `while` loop that, once per round, `sleep 30` then calls `scripts/cf-pi-poll.sh "$SESSION"` and acts on the one status line it emits, for up to 70 rounds. Each poll reads its state from disk (`pi.pid`, `pi-start.ts`, latest JSONL) and emits one status line, then exits. Main does NOT drive per-round Bash calls; it only reads the paths-only `outcome.md` the script writes on completion.
-
-**Why a background task.** Because `cf-pi-run.sh` is launched with `run_in_background: true`, it is exempt from the 10-minute foreground Bash ceiling (set `BASH_MAX_TIMEOUT_MS` as a safety net), so the in-script poll loop can run the full OMP lifecycle without the harness killing it. This is what made the in-script loop viable. Production data (Pi v0.73.1, May 2026, 20-minute Rust task) showed that a polling loop run as a *foreground* Bash call fails when the harness times it out, when `wait $PID` is called cross-shell on a disowned PID, or when a background-task monitor exits 1 — every one of those failures used to be misread as "OMP hung", with the conversation summary then falsely claiming OMP was killed and Claude fell back, even though OMP was still running detached and completed on its own. Moving the loop into a background-task script eliminates all of those failure modes while keeping main's context free.
-
-Status surface (one line of stdout per poll):
-
-| Status | Meaning |
-|---|---|
-| `ALIVE <e>s events=<n>B stale=<s>s last=<type>` | Events arriving (or quiet inside a tool call). Continue. |
-| `NO_JSONL <e>s` | OMP launched, no events yet, within 60s grace. Continue. |
-| `NO_JSONL_FAIL <e>s` | No events past 60s grace, or process died with none. **Kill, escalate.** |
-| `DONE <e>s events=<n>B` | `agent_end` with `stopReason:"stop"`. **Exit loop, run §4.2.** |
-| `STALL <e>s stale=<s>s last=<type>` | No event past `$PI_STALL_THRESHOLD_S` (doubled when the last event is `tool_execution_start` — quiet is normal while a tool runs). **Kill, escalate.** |
-| `ERROR <e>s stopReason=<r> <excerpt>` | `agent_end` with error/aborted stopReason, or process died mid-stream. **Kill, classify, escalate.** |
-| `TIMEOUT <e>s` | Wall clock > `$PI_WALL_CLOCK_S`. **Kill, escalate.** |
-| `NO_PID` | `pi.pid` missing. **Dispatch broken; abort flow.** |
-
-**Threshold defaults and tuning.** The orchestrator sets two env-tunable thresholds at session setup (via `scripts/cf-pi-setup.sh`):
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `PI_STALL_THRESHOLD_S` | `180` | JSONL mtime gap before declaring STALL. Empirically, single long-running tool calls inside OMP (`sleep 90`, `cargo build`, `bun install`, `docker build`) produce JSONL gaps approaching this duration, so values below 120s reliably false-positive on real-world briefs. |
-| `PI_WALL_CLOCK_S` | `1800` (30 min) | Hard cap on total OMP runtime. Calibrated to the May 2026 tallytape Rust task (~20 min) with margin; shorter caps would kill genuine cold-build flows. |
-
-Bump higher for Rust/Docker-heavy briefs (`export PI_STALL_THRESHOLD_S=300 PI_WALL_CLOCK_S=3600`). The cost of waiting a bit longer to detect a true stall is small; the cost of false-positive killing OMP during a legit long tool call is losing all in-progress work.
-
-**Progress visibility.** There is no heartbeat-to-parent and no sub-agent. `cf-pi-run.sh` prints one progress line per round to its own stdout (`[shard X] round N/70 status=...`), which the harness captures to the background task's output file — NOT into main's context. When curious, the operator pulls that progress on demand via `TaskOutput`/`Read` on the task's output file, or via `scripts/cf-pi-status.sh`. On completion, main reads only the paths-only `outcome.md`; the §1.6 context firewall is now enforced structurally by this background-task output split, so the per-round chatter can never leak into main.
-
-**Monitor-failure tolerance — non-negotiable.** If a poll Bash call itself fails (exit ≠ 0 with no recognizable status word, harness timeout, Task crash) the orchestrator MUST re-poll on the next round. **OMP is only declared failed when one of the kill-status lines is read from a successful poll.** A failed poll is silent evidence — it tells you nothing about OMP. The orchestrator should re-poll up to 3 times consecutively before manual escalation, and even then verify with a fresh `kill -0 $(cat "$PI_PID_FILE")` Bash call.
-
-This rule is what separates v0.2.1 from v0.2.0: in v0.2.0 a monitor exit-1 cascade incorrectly attributed work-product failures to OMP when OMP had actually completed the task. Never again.
-
-### 4.2 Report-file exists & parseable
-
-- `$REPORT_FILE` exists and is non-empty.
-- Contains a `## Completed` heading. (Concerns/Unresolved may be absent — that means none.)
-- If missing: treat the OMP run as failed. Do NOT promote any contracts to Completed. Loop back to plan via the `## Implement Failure` channel (see `agents/plan.md`).
-
-### 4.3 Survivors: declared ∩ reported (no test-content grep)
-
-A contract claimed in `## Completed` is recorded as a **survivor** iff it was also
-declared in this shard. The orchestrator does NOT grep the test source for the
-contract's expected literals.
-
-A prior "grep guard" did exactly that — matching each contract's prose `expect`
-from `contracts.json` literally against the test file — and was **removed**. It
-mechanically checked a *non-deterministic validation* question ("does this test
-capture the intent?"), a category error: no well-written assertion contains the
-prose `expect` verbatim, so it spuriously demoted virtually every real test.
-
-The correct split:
-- **Verification** ("do the tests pass") is deterministic — §4.4 runs the suite.
-- **Whether the tests meaningfully cover the contract** is a *judgement*, deferred
-  to the Review phase (`agents/review.md`), not a per-shard grep.
-
-### 4.4 Test execution check
-
-Run the test runner specified in the brief's Context Summary via `scripts/cf-pi-test.sh "$SESSION" <test_cmd> [args...]`. **The orchestrator runs it, not OMP.**
-
-- All tests pass → Completed claims survive.
-- Any test fails → demote the failing contract(s) to Unresolved with the failure output as evidence. Loop back to plan via `## Implement Failure` with the failure details. The plan agent decides whether to split/restate/drop the failed contract.
-- Test runner errors out (compile error, missing dependency, etc.) → treat as OMP-run failure; escalate to human.
-
-### 4.5 Worktree cleanup
-
-After Phase 3 transitions out (success OR escalation), run `bash "$CLEANUP_SCRIPT"` which `scripts/cf-pi-worktree.sh` populated at session setup:
-
-```bash
-git -C "$WORK" add --intent-to-add -- . 2>/dev/null || true
-git -C "$WORK" diff "$BASE_HEAD" > "$DIFF_FILE" 2>/dev/null || true     # NOT diff HEAD — see below
-git -C "$REPO_ROOT" worktree remove --force "$WORK" 2>/dev/null || true
-```
-
-- Diff is taken against `$BASE_HEAD` (the user's HEAD at flow start), NOT `HEAD`. With per-contract commits, `$WORK`'s HEAD == cf-branch tip → `diff HEAD` is empty. `$BASE_HEAD..HEAD` is the full cf delta. `cf-pi-worktree.sh` resolves `$BASE_HEAD` at append-time so the cleanup script captures the correct range even if `$BASE_BRANCH` later moves.
-- `--intent-to-add` surfaces untracked new files in the range diff.
-- The captured `$DIFF_FILE` (`$SESSION/implement.diff`) is what feeds into Phase 4 review's `## Changes` section.
-- The `$CF_BRANCH` (`cf/$CF_SLUG`) intentionally survives cleanup; the orchestrator rebases it onto `$BASE_BRANCH` after Phase 4 PASS so the user can fast-forward at will.
-
----
-
-## 5. Failure Modes & Recovery
-
-Diagnose primarily from `$PI_SESSION_DIR/*.jsonl` (rich event stream), then from `$PI_STDERR` (OMP startup errors only). Use `scripts/cf-pi-postmortem.sh "$SESSION"` for a bounded ~5KB dump.
-
-| Symptom | Likely cause | Action |
-|---|---|---|
-| Pre-flight probe times out > 30s with no stdout | `pi -p` + invalid flag combo; or provider auth missing; or OMP installation broken | Abort Phase 3. Inspect `$PI_PROBE_DIR/probe-stdout.log` and `$PI_PROBE_DIR/*.jsonl`. Recommend fallback to Claude implement agent. |
-| Session JSONL `errorMessage` matches `usage_limit_reached` | Provider quota exhausted | Extract `resets_at` from event headers; tell human "quota resets at <timestamp>"; offer fallback to `/cf` Claude implementer or different provider |
-| Session JSONL `errorMessage` matches `unauthorized` / `status_code:401` | Provider auth missing or expired | Recommend `pi auth <provider>`; do not silently switch providers |
-| Session JSONL `errorMessage` matches `model_not_found` | Invalid model ID for provider | Recommend `pi --list-models <provider>`; abort Phase 3 |
-| No JSONL file appears in `$PI_SESSION_DIR` after 60s | OMP failed to start or wrong `--session-dir` plumbing | Check `$PI_STDERR` for startup errors; verify directory permissions; retry once |
-| JSONL exists but mtime stale > `$PI_STALL_THRESHOLD_S` | OMP stall — either network hang or internal lockup | Kill `$PI_PID`; read last 5 events from JSONL for clues; loop to plan |
-| OMP exits within 5s, no report | Brief failed to load (path wrong, `@file` typo) or pre-flight should have caught | Inspect `$PI_STDERR`; re-dispatch with corrected path |
-| OMP runs > 5 min, last JSONL event > 5 min old, CPU near 0 | Shell-expansion bug in brief (backticks expanded by parent shell) or `-p`+invalid flag combo | Confirm brief was passed via `@file`, not `$(cat ...)`; check OMP invocation flags; if neither, kill and re-dispatch |
-| Report exists but `## Completed` missing | OMP gave up mid-run | Read OMP's actual report content — may be all Unresolved; loop to plan with `## Implement Failure` |
-| Tests pass when OMP runs but fail when orchestrator re-runs | Environment drift (OMP's bash session vs orchestrator's) | Re-run with full env captured in brief; if persistent, escalate |
-
----
-
-## 6. Out of Scope
-
-- **External-API verification (ctx7) inside OMP** — the Claude `implement` agent has this; OMP does not. For now, any contract requiring external-API verification should be handled by the Claude `implement` agent or pre-resolved during planning. If OMP hits unknown library behavior, it should report Unresolved with the question.
-- **OMP via ACP adapter** — richer streaming integration. Not needed while the text-mode JSONL channel is sufficient.
-
----
-
-## 7. Escalation Contract (OMP → orchestrator)
-
-OMP has a structured upward channel for "the spec is wrong, not my implementation". When triggered, OMP writes `$ESCALATE_FILE` (path provided in the brief's Environment block) and exits with `DONE`. The orchestrator surfaces this as `NEEDS_REPLAN` status (distinct from `FAIL`), routing back to Plan for partial revision rather than retrying the same brief.
-
-### When OMP MUST escalate
-
-- A contract is internally inconsistent, contradicts another contract in the same shard, or is infeasible as specified.
-- A required file/module from `touches_files` does not exist AND creating it would change the architectural shape of the codebase.
-- A required dependency is missing AND cannot be installed safely.
-- The same test failure pattern recurs across two distinct fix attempts.
-
-Note: ordinary uncertainty about an internal naming choice or minor design decision is NOT an escalation trigger — those are decidable from the Context Summary. Escalation is for genuine spec-level problems OMP cannot solve through implementation choices.
-
-### Escalation file schema
+Escalation file (≤ 80 lines / ~2KB, all four sections required):
 
 ```markdown
 ## Blocker
@@ -414,36 +137,61 @@ Note: ordinary uncertainty about an internal naming choice or minor design decis
 
 ## Affected contracts
 - {ContractName}
-- ...
 
 ## What I tried
-- {bullet listing attempts}
-- ...
+- {bullet}
 
 ## What I need from Plan/Research
 {specific question or concrete unblock action}
 ```
 
-OMP-side rules for the escalate file:
-
-- ≤ 80 lines / ~2KB total. The orchestrator hard-truncates above this.
-- One `## Blocker` line, one `## Affected contracts` list, one `## What I tried` list, one `## What I need from Plan/Research` block. All four sections required.
-- After writing `$ESCALATE_FILE`, print `DONE` and exit. Do NOT also write a misleading `$REPORT_FILE` claiming success. If you started writing a report and then escalated, leave the partial report — the orchestrator looks at `$ESCALATE_FILE` first and ignores `$REPORT_FILE` when escalation is present.
-- Any contract commits OMP already made on the cf-branch are preserved — the orchestrator treats partial-success-then-escalation as legitimate (the surviving commits inform the partial-replan).
-
-### Brief Environment block (orchestrator → OMP)
-
-Every brief now includes an `## Environment` block with absolute paths for `WORK_DIR`, `CF_BRANCH`, `BASE_HEAD`, `REPORT_FILE`, `ESCALATE_FILE`, `TEST_RUNNER`, `SHARD_GROUP`, plus a Rules sub-block. This is OMP's only window into the surrounding orchestration (it has no knowledge of worktrees, sharding, or upstream Phase 2). OMP MUST:
-
-- Write all files inside `WORK_DIR`. Never `cd` out or edit the parent repo checkout.
-- Stay on `CF_BRANCH`. No `git push`, `git remote`, no branch switching.
-- Per-contract commit to `CF_BRANCH`, using the contract name in the subject line.
-- Only implement contracts listed in this brief. Each shard's brief is its own complete unit of work.
-
-The Environment block is generated by `cf-pi-brief.sh` from the shard session's `env.sh` — OMP can trust the values verbatim.
+After writing it, print `DONE` — do NOT also write a success-claiming report (a partial report may remain; the orchestrator ignores `$REPORT_FILE` when escalation is present). Contract commits already on the branch are preserved and inform the partial-replan.
 
 ---
 
-## 8. Out of Scope (continued)
+## 5. Environment Block (orchestrator → worker)
 
-- **Parallel implement dispatch coordination across shards** — handled at the orchestrator layer (cf-pi-shard.sh + cf.md Phase 3). OMP itself does NOT need to know other shards exist; each shard's OMP sees only its own brief, Environment, and contracts.
+Every brief carries an `## Environment` block — absolute values for `WORK_DIR`, `CF_BRANCH`, `BASE_HEAD`, `REPORT_FILE`, `ESCALATE_FILE`, `TEST_RUNNER`, `SHARD_GROUP` — generated from the shard's `env.sh`; the worker trusts them verbatim. It is the worker's only window into the orchestration. Worker rules:
+
+- Write only inside `WORK_DIR`; never `cd` out or edit the parent checkout.
+- Stay on `CF_BRANCH`; no `git push`, no remotes, no branch switching.
+- Implement only the contracts in this brief — each shard's brief is a complete unit of work.
+
+---
+
+## 6. Transition Validation: Implement → Review
+
+Performed by the orchestrator (inside `cf-pi-run.sh` per shard). The worker's report is untrusted input.
+
+1. **Pre-flight probe** — `cf-pi-probe.sh` sends a `say ok` prompt (30s cap) before any real dispatch. Fail → abort Phase 3 with the exact errorMessage + resolved provider/model and concrete remediation (`omp auth …`, quota reset time, model-id check); a hung probe means a broken invocation — recommend the Claude implementer fallback. Costs ~cents; a failed brief dispatch wastes far more.
+2. **Poll loop** — lives inside `cf-pi-run.sh` (background task, exempt from the foreground Bash ceiling): every ~30s `cf-pi-poll.sh` emits one status line (`RUNNING` / `STATUS=OK` / stall / timeout / error variants), max 70 rounds. Defaults: `PI_STALL_THRESHOLD_S=180` (long tool calls approach this — don't go below 120), `PI_WALL_CLOCK_S=1800`; raise both for Rust/Docker-heavy briefs. **A failed poll call says nothing about the worker** — re-poll (up to 3×), then verify with `kill -0` before declaring death; the worker is failed only by an explicit kill-status line from a successful poll.
+3. **Report gate** — `$REPORT_FILE` exists, non-empty, has `## Summary` + `## Completed` in `head -20`. Missing → the run failed; promote nothing.
+4. **Survivors** — a contract survives iff it was declared in this shard AND claimed in `## Completed`. There is deliberately no grep of test sources against contract prose (a removed "grep guard" did that — it mechanically checked the non-deterministic question "does this test capture the intent?" and demoted virtually every well-written test; that judgement belongs to Review).
+5. **Test execution** — the orchestrator runs the suite itself via `cf-pi-test.sh` (one retest for environment transients, one in-shard resume re-brief on persistent failure, then NEEDS_REPLAN). Worker-claimed results are never trusted.
+6. **Scope check** — `actual touched ⊆ declared touches_files`; root build/lock manifests (pyproject.toml, uv.lock, package.json, …) are allowlisted as warnings; other violations → NEEDS_REPLAN `undeclared_file_touched`.
+7. **Cleanup** — `$CLEANUP_SCRIPT` captures `git diff $BASE_HEAD` to `$DIFF_FILE` and removes the worktree; the cf branch survives for rebase + human fast-forward.
+
+---
+
+## 7. Failure Modes
+
+Diagnose from the session JSONL first, stderr second; `cf-pi-postmortem.sh` for a bounded dump.
+
+| Symptom | Likely cause | Action |
+|---|---|---|
+| Probe times out, no stdout | bad invocation / missing auth / broken install | abort Phase 3; inspect probe artifacts; offer Claude fallback |
+| JSONL `usage_limit_reached` | quota | report `resets_at`; offer fallback or another provider |
+| JSONL `401`/`unauthorized` | auth expired | recommend `omp auth <provider>`; never silently switch providers |
+| JSONL `model_not_found` | bad model id | recommend listing models; abort |
+| No JSONL within 60s | worker failed to start | check stderr; retry once |
+| JSONL stale > threshold | stall (network / lockup) | kill; read last events; route per gates |
+| Exits < 5s, no report | brief failed to load (`@file` path wrong) | check stderr; re-dispatch corrected |
+| Report exists, no `## Completed` | worker gave up mid-run | may be all-Unresolved; route to Plan via Implement Failure |
+| Tests pass for worker, fail for orchestrator | environment drift | re-run with env captured in brief; persistent → escalate |
+
+---
+
+## 8. Out of Scope
+
+- External-API verification (ctx7) inside the worker — contracts needing it go to the Claude implement agent or get pre-resolved in planning; the worker reports Unresolved on unknown library behavior.
+- Cross-shard awareness — each worker sees only its own brief; parallel coordination is entirely the orchestrator's (cf-pi-shard.sh + cf.md Phase 3).

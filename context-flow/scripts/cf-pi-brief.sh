@@ -114,7 +114,7 @@ render_attachments() {
       # Extract path from header line
       path=$(echo "$header" | sed -n 's/.* path=//p')
       if [ -n "$path" ]; then
-        # Attachment paths are relative to $FLOW_SESSION (per design §3).
+        # Attachment paths are relative to $FLOW_SESSION (per design §2 Sharding Model).
         local abs="$FLOW_SESSION/$path"
         if [ -f "$abs" ]; then
           echo "$header"

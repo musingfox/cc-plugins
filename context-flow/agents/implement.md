@@ -26,11 +26,11 @@ The dispatch prompt includes a `$WORK` path — an isolated git worktree on a pe
 2. **Tests first when possible**: Write the test cases from the contracts, then implement to pass them.
 3. **Follow the Implementation Plan as guidance**: The plan suggests files and approach, but you may deviate if needed. The binding constraint is the behavioral contract, not the file structure.
 4. **Run tests after each contract**: Don't batch — verify incrementally.
-5. **Commit after each contract passes**: once a contract's tests pass, commit before moving on. The worktree exists so each contract becomes one reviewable commit:
+5. **Commit exactly once per contract**, when its tests pass, impl + tests together:
    ```bash
    cd "$WORK" && git add -A && git commit -m "<ContractName>: <one-line behavioral outcome>"
    ```
-   Impl + tests in the same commit. Never bundle multiple contracts in one commit. If a single contract spans multiple logical steps you want separately traceable, 2–3 commits is fine — keep them under one contract name.
+   Never bundle two contracts into one commit; never split one contract across commits. Fixing a contract after its commit? Fold the fix into that commit (`git commit --amend` at the tip; otherwise `--fixup` + non-interactive autosquash) — the branch is a private worktree, rewriting is safe.
 6. **Use the Context Summary**: The one-line goal and key constraints give you directional awareness for micro-decisions (naming, error messages, code organization). Don't report Unresolved for trivial ambiguities you can reasonably decide.
 7. **External Verification before Unresolved**: If a contract appears infeasible because of unknown third-party library / API behavior (e.g., "does this method still exist in v3?"), verify before reporting Unresolved:
    - **Probe `ctx7` first** — `ctx7 --version` (do NOT use `command -v` — not portable). If it errors, skip to WebFetch.

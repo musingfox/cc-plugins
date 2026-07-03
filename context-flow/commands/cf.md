@@ -88,9 +88,7 @@ Every research/plan/review agent dispatch follows the same contract:
 
 ## Reporting Principles (orchestrator-side reformat)
 
-These principles govern how **you** (the orchestrator) reformat agent outputs before presenting them to the human at any gate, validation pause, or final summary. Agents produce structured outputs per their schemas; you translate those into human-facing reports.
-
-Lead with the **consequence of a change**, not the change itself. The test for every bullet: *what will downstream observers see differently after this lands?* If the answer is still "the code looks like this," rewrite it.
+Whenever you present agent output to the human (gates, pauses, final summary), lead with the **consequence of a change**, not the change itself. Test for every bullet: *what will downstream observers see differently after this lands?* If the answer is still "the code looks like this," rewrite it.
 
 | Type | Frame | ✅ Example | ❌ Anti-example |
 |---|---|---|---|
@@ -99,13 +97,7 @@ Lead with the **consequence of a change**, not the change itself. The test for e
 | Design decision | choice + trade-off concretely | "Postgres over Redis for queue: durability beats latency; cost ~5× slower writes, well under limit" | "Picked Postgres for the queue" |
 | Low-level change | scope + why | "Bumped `node-fetch` to v3 — required for streaming work, callers unchanged" | "Updated `node-fetch` to 3.0.0" |
 
-Rules:
-- One change per bullet (no "and"/"also").
-- Always answer "what will break or behave differently because of this?"
-- Before→After when behavior shifts; scope+reason for fixes.
-- Technical detail (files, functions, types) belongs in evidence sections, never in headlines.
-
-If an agent's output reads as "the change itself," reformat before presenting. Do not pass raw schema output to the human verbatim.
+One change per bullet; Before→After when behavior shifts; technical detail (files, functions, types) goes in evidence sections, never headlines. Never pass raw schema output to the human verbatim.
 
 ---
 
@@ -142,16 +134,9 @@ Every arrow between phases passes through you. At each transition you perform a 
 
 ### Loop Budget (single counter)
 
-Track all loop-backs in `$SESSION/loop-budget.json` under one field: `retries_used`. **Max 4 total retries per flow**, regardless of which phase is re-run. Each of the following increments the counter by 1:
+Track all loop-backs in `$SESSION/loop-budget.json` under one field: `retries_used`. **Max 4 total retries per flow.** Every re-dispatch of any phase — same-phase re-run with feedback, cross-phase loop-back, plan after implement FAIL, implement after review REQUEST_CHANGES — increments the counter by 1. One counter forces a check-in once total churn exceeds 4, no matter which phase burned it.
 
-- re-dispatching the same phase with feedback (phase re-run)
-- looping back to an earlier phase (cross-phase loop)
-- re-running plan after implement FAIL
-- re-running implement after review REQUEST_CHANGES
-
-A single counter forces a check-in once total churn exceeds 4 — it doesn't matter whether the cost came from one stubborn phase or from bouncing between phases.
-
-**Persistence**: read `$SESSION/loop-budget.json` at every transition; increment **before** dispatching the loop and write it back. This survives context compression — never trust your own memory for the count.
+**Persistence**: read the file at every transition; increment **before** dispatching the loop and write it back. Never trust your own memory for the count — it must survive context compression.
 
 ```bash
 jq '.retries_used += 1' "$SESSION/loop-budget.json" > "$SESSION/loop-budget.json.tmp" \
@@ -294,7 +279,9 @@ carries that approval from the upstream handoff).
 
 State to the human upfront: `Phase 3: parallel-sharded OMP fan-out on <N> contract(s). Parent branch cf/$CF_SLUG; per-shard branches cf/$CF_SLUG-shard-<id>.`
 
-Phase 3 splits the contract set by file-touch graph and runs one `cf-pi-run.sh` per shard in parallel, each as a **main-launched background task** (no sub-agent). The full per-shard lifecycle (brief → worktree → probe → dispatch → poll → gates → outcome) lives in `cf-pi-run.sh`; main only fans out, collects each shard's paths-only `outcome.md`, and routes. Token discipline (design §17) is non-negotiable and is enforced by the boundary itself: a background task's heavy stdout (progress lines, JSONL) goes to its own output file, never into main's context — main reads only the paths-only `outcome.md` plus bounded `Read(file, limit=…)`, `jq '.field'`, and `head -N` peeks, and NEVER `report.md`, `contracts.json`, `escalate.md`, postmortems, or test logs.
+Phase 3 splits the contract set by file-touch graph and runs one `cf-pi-run.sh` per shard, each as a **main-launched background task** (no sub-agent). The full per-shard lifecycle (worktree → brief → probe → dispatch → poll → gates → outcome) lives inside that script; you only fan out, collect, and route.
+
+**Token discipline (design §7), non-negotiable**: read ONLY each shard's paths-only `outcome.md` plus bounded peeks (`Read(file, limit=…)`, `jq '.field'`, `head`/`tail -N`, `sed -n` section slices). NEVER read `report.md`, `contracts.json`, `escalate.md`, briefs, postmortems, JSONL, or test logs — background-task stdout stays in the task's own output file.
 
 ### 3.0 Parent worktree setup (idempotent)
 
@@ -344,11 +331,11 @@ Bash(run_in_background: true, command:
 ... (one background Bash per id in $SHARD_IDS)
 ```
 
-The 4 positionals are `SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER`; `TEST_RUNNER` is the resolved `SHARD_TEST_RUNNER` (per-shard gates run the hermetic subset — the full suite belongs to the integration gate). `cf-pi-run.sh` runs the entire per-shard lifecycle to completion in pure shell and writes only the paths-only `$SESSION/shards/<id>/outcome.md`; its progress stdout is captured to the background task's output file, never into main's context. Running as a background task, it is exempt from the 10-minute Bash ceiling (set `BASH_MAX_TIMEOUT_MS` as a safety net) and main stays free while shards run. Do NOT pass research output, decision alternatives, plan prose, or rejected approaches — each shard derives everything else from its `SHARD_SESSION/env.sh`.
+The 4 positionals are `SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER` — pass the resolved `SHARD_TEST_RUNNER` (the full suite belongs to the integration gate). Do NOT pass research output, decision alternatives, plan prose, or rejected approaches; each shard derives everything else from its `SHARD_SESSION/env.sh`. Background tasks are exempt from the 10-minute Bash ceiling (set `BASH_MAX_TIMEOUT_MS` as a safety net); each writes `$SESSION/shards/<id>/outcome.md` on completion.
 
 ### 3.3 Collect
 
-The harness re-invokes main when each background task completes. Wait for ALL N shards before routing (round-collection rule, design §7) — this lets NEEDS_REPLAN coalesce into a single Plan invocation and prevents interleaved replans. A shard is done when `$SESSION/shards/<id>/outcome.md` exists and is non-empty (or check the tasks via `TaskList`/`Monitor`). End your turn after fan-out; on each completion notification, check whether every id in `$SHARD_IDS` now has an outcome.md — if not, end the turn again and wait for the rest. (Main does no work between completions; it is not blocked.)
+Wait for ALL N shards before routing (round-collection rule, design §4) so NEEDS_REPLAN coalesces into a single Plan invocation. End your turn after fan-out; the harness re-invokes you on each task completion — check whether every id in `$SHARD_IDS` now has a non-empty `$SESSION/shards/<id>/outcome.md`, and if not, end the turn again.
 
 Once all are done, read each shard's status from its paths-only outcome (never the report/diff/JSONL it points to):
 
@@ -395,7 +382,7 @@ If the second attempt still returns FAIL, escalate via `AskUserQuestion` (peek c
 
 - Options: `accept-partial` (drop failed shard, route remaining via §3.4 below) / `abort-flow` / `attempt-third-retry`.
 
-Per-shard, per-round FAIL retry budget = 1 (design §10).
+Per-shard, per-round FAIL retry budget = 1 (design §6).
 
 #### All PASS (after FAIL resolution)
 
