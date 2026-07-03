@@ -88,7 +88,11 @@ Anti-growth: `dispatch-state.json` holds only the latest round (~1KB); history i
 
 ## 8. Observability
 
-Pull, not push. Each background task's progress lines go to its own output file (`TaskOutput`/`Read` on demand) and its latest line is mirrored to `$SHARD_SESSION/progress`; `cf-pi-status.sh $SESSION` prints one line per shard — liveness + current lifecycle phase (read-only, safe any time). The orchestrator runs it on every wake-up while shards are pending and reports non-PASS causes from `## Cause`, so the human is never blind mid-run and never sees a bare FAIL.
+Three layers, all fed by `cf-pi-run.sh` mirroring its latest progress line to `$SHARD_SESSION/progress`:
+
+- **Push (primary)**: after fan-out the orchestrator arms one `Monitor` on `cf-pi-watch.sh`, which emits one chat notification per meaningful change (phase transitions, liveness transitions, per-shard final `Status (reason) — cause`) and exits when all outcomes exist — that exit doubles as the round-collection signal. Volatile counters are normalized away so it never spams.
+- **Pull (on demand)**: `cf-pi-status.sh $SESSION` — one line per shard, liveness + current phase; read-only, safe any time.
+- **Post-hoc**: `## Cause` in each outcome (reason-matched, bounded) plus the durable non-PASS bundle under `$PI_RUNS_DIR`. Reporting non-PASS causes to the human is mandatory — never a bare FAIL.
 
 ## 9. Open Risks
 

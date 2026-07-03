@@ -1,7 +1,7 @@
 ---
 description: "Context-flow pipeline — contract-driven development with human-in-the-loop decision gating; OMP as default implementer, Claude implement agent as fallback"
 argument-hint: "<goal>"
-allowed-tools: [Agent, Read, Write, Bash, Glob, Grep, AskUserQuestion]
+allowed-tools: [Agent, Read, Write, Bash, Glob, Grep, AskUserQuestion, Monitor]
 ---
 
 # Context Flow Orchestrator
@@ -337,10 +337,22 @@ The 4 positionals are `SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER` — p
 
 Wait for ALL N shards before routing (round-collection rule, design §4) so NEEDS_REPLAN coalesces into a single Plan invocation. End your turn after fan-out; the harness re-invokes you on each task completion — check whether every id in `$SHARD_IDS` now has a non-empty `$SESSION/shards/<id>/outcome.md`, and if not, end the turn again.
 
-**Progress visibility** — the human must never sit blind while shards run:
+**Progress visibility** — the human must never sit blind while shards run. Immediately after fan-out (same turn), arm ONE progress monitor:
 
-- Right after fan-out, print one line telling the human how to check progress themselves at any time: `` Watch progress: bash $SCRIPTS/cf-pi-status.sh $SESSION ``
-- On EVERY wake-up while shards are still pending, run `"$SCRIPTS/cf-pi-status.sh" "$SESSION"` (bounded: one line per shard, includes the shard's current lifecycle phase) and print its output verbatim before ending the turn. This turns each completion event into a progress update instead of silence.
+```
+Monitor(
+  command: "\"$SCRIPTS/cf-pi-watch.sh\" \"$SESSION\"",
+  description: "cf shards progress",
+  timeout_ms: 3600000, persistent: false
+)
+```
+
+`cf-pi-watch.sh` emits one line per meaningful change — lifecycle-phase transitions, liveness transitions (ALIVE/STALL/…), and a final per-shard `Status (reason) — cause` summary — then exits when every shard has an outcome. Each line arrives as a chat notification, so progress is visible mid-run with zero polling from you. Round counters and byte sizes are normalized away; it will not spam.
+
+- Also print one line so the human can check on demand: `` Watch progress: bash $SCRIPTS/cf-pi-status.sh $SESSION ``
+- The monitor's `--- all shards done ---` event doubles as the round-collection signal — proceed to reading outcomes.
+- If the monitor times out (flow > 1h) with shards still pending, re-arm it.
+- On a `STALL` event, do not intervene — `cf-pi-run.sh` handles kill/retry itself; the event is for awareness.
 
 Once all are done, read each shard's status from its paths-only outcome (never the report/diff/JSONL it points to):
 
