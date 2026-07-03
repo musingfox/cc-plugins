@@ -209,12 +209,12 @@ Send Discord webhook notifications from Claude Code:
 
 ### pi-dispatch (Experimental)
 
-Offload heavy work to [Pi](https://github.com/badlogic/pi-mono)'s cheap/fast models so Claude only writes briefs and reads summaries — saving tokens:
+Offload heavy work to [omp (oh-my-pi)](https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent) cheap/fast models so Claude only writes briefs and reviews summaries — saving tokens:
 - **Dispatcher subagent (`pi-dispatcher`)**: runs on a cheap model (`haiku`); takes a self-contained brief, invokes the script, returns a tight summary + an output-file path — never the full result
-- **`pi-dispatch.sh`**: routes one brief to a cheap/fast Pi model (`--provider`/`--model`, default `google/gemini-2.5-flash-lite`), writes the result to a file, prints its path
-- **Token-saving by design**: main thread issues the instruction and collects the path; all reading/reasoning/generation happens inside Pi, off Claude's context
-- **Configurable routing**: `PI_PROVIDER` / `PI_MODEL` env vars override the cheap-model defaults
-- **Prerequisite**: `pi` CLI installed and authenticated
+- **`pi-dispatch.sh`**: launches one brief on a cheap/fast omp model in the background (default `grok-build`; `--profile fast|balanced|careful` or `PI_MODEL` to override), returns a run handle instantly — dispatch N briefs for parallel fan-out
+- **`pi-poll.sh` / `pi-stop.sh`**: idempotent one-line status polls and group-kill cancel; `pi-worktree.sh` isolates parallel code-writing tasks in git worktrees
+- **Claude reviews, workers write**: main thread issues briefs, collects diffs/summaries, and does the final review — all reading/reasoning/generation happens inside omp, off Claude's context
+- **Prerequisite**: `omp` CLI installed and authenticated (`PI_BIN` selects another pi-compatible binary)
 
 **Installation:**
 ```bash

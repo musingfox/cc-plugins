@@ -61,8 +61,17 @@ fi
 BRIEF_FILE="${1:?usage: pi-build.sh BRIEF_FILE [OUTDIR]}"
 OUTDIR="${2:-${PI_RUNS_DIR:-$HOME/.cache/pi-runs}/spiral}"
 
-PROVIDER="${PI_PROVIDER:-google}"
-MODEL="${PI_MODEL:-gemini-2.5-flash-lite}"
+# Routing label: mirror what the canonical pi-dispatch.sh will actually resolve
+# (env > profile > canonical default) via its no-launch introspection seam, so
+# the OUTCOME line never drifts from the real routing.
+PROVIDER="${PI_PROVIDER:-}"
+MODEL="${PI_MODEL:-}"
+if [ -z "$MODEL" ] && [ -n "$CANON_DISPATCH" ] && [ -f "$CANON_DISPATCH" ]; then
+  _resolved="$(PI_RESOLVE_PROFILE_ONLY=1 "$CANON_DISPATCH" 2>/dev/null)"   # "PROVIDER=… MODEL=…"
+  PROVIDER="$(printf '%s' "$_resolved" | sed -n 's/^PROVIDER=\([^ ]*\).*/\1/p')"
+  MODEL="$(printf '%s' "$_resolved" | sed -n 's/.*MODEL=//p')"
+fi
+MODEL_LABEL="${PROVIDER:+$PROVIDER/}${MODEL:-unresolved}"
 POLL_INTERVAL="${PI_POLL_INTERVAL_S:-5}"
 
 # Cap the wall-clock UNDER the harness's 600s Bash-tool ceiling so the poll loop's
@@ -75,7 +84,7 @@ export PI_WALL_CLOCK_S="${PI_WALL_CLOCK_S:-480}"
 SCRIPT_DEADLINE="${PI_BUILD_DEADLINE_S:-540}"
 
 if [ -z "$CANON_DISPATCH" ] || [ ! -f "$CANON_DISPATCH" ]; then
-  echo "OUTCOME=FAIL OUTPUT= MODEL=$PROVIDER/$MODEL | pi-dispatch-not-found"
+  echo "OUTCOME=FAIL OUTPUT= MODEL=$MODEL_LABEL | pi-dispatch-not-found"
   exit 0
 fi
 
@@ -85,9 +94,10 @@ CANON_DIR="$(dirname "$CANON_DISPATCH")"
 # so the canonical pi-dispatch.sh forwards it verbatim to the pi invocation.
 export PI_PROMPT="Read the brief and execute it: make the changes it specifies directly in the working-tree files (your edit/write tools are enabled). Do NOT just describe the changes. When finished, print a one-line list of the files you changed and nothing else."
 
-# pi missing -> immediate FAIL so convergence can fall back to building itself.
-if ! command -v pi >/dev/null 2>&1; then
-  echo "OUTCOME=FAIL OUTPUT= MODEL=$PROVIDER/$MODEL | pi-not-found"
+# Agent binary missing -> immediate FAIL so convergence can fall back to building
+# itself. Delegated to the canonical probe — spiral owns no agent-binary handling.
+if ! probe_line="$("$CANON_DIR/pi-probe.sh" --bin-only 2>/dev/null)"; then
+  echo "OUTCOME=FAIL OUTPUT= MODEL=$MODEL_LABEL | pi-not-found (${probe_line:-probe-failed})"
   exit 0
 fi
 
@@ -98,7 +108,7 @@ launch="$("$CANON_DIR/pi-dispatch.sh" "$BRIEF_FILE" "$OUTDIR")"
 RUNDIR="$(printf '%s\n' "$launch" | sed -n 's/^RUNDIR=//p')"
 OUTPUT="$(printf '%s\n' "$launch" | sed -n 's/^OUTPUT=//p')"
 if [ -z "$RUNDIR" ]; then
-  echo "OUTCOME=FAIL OUTPUT= MODEL=$PROVIDER/$MODEL | dispatch-failed"
+  echo "OUTCOME=FAIL OUTPUT= MODEL=$MODEL_LABEL | dispatch-failed"
   exit 0
 fi
 OUTCOME_FILE="$RUNDIR/outcome.txt"
@@ -114,16 +124,16 @@ while :; do
   line="$("$CANON_DIR/pi-poll.sh" "$RUNDIR")"
   case "$line" in
     STATUS=OK*)
-      emit "OUTCOME=OK OUTPUT=$OUTPUT MODEL=$PROVIDER/$MODEL | $line"
+      emit "OUTCOME=OK OUTPUT=$OUTPUT MODEL=$MODEL_LABEL | $line"
       exit 0 ;;
     STATUS=FAIL*)
-      emit "OUTCOME=FAIL OUTPUT=$OUTPUT MODEL=$PROVIDER/$MODEL | $line"
+      emit "OUTCOME=FAIL OUTPUT=$OUTPUT MODEL=$MODEL_LABEL | $line"
       exit 0 ;;
   esac
   # Script-level deadline guard (poll never reported terminal in time).
   if [ $(( $(date +%s) - START )) -gt "$SCRIPT_DEADLINE" ]; then
     "$CANON_DIR/pi-stop.sh" "$RUNDIR" >/dev/null 2>&1
-    emit "OUTCOME=FAIL OUTPUT=$OUTPUT MODEL=$PROVIDER/$MODEL | script-deadline ${SCRIPT_DEADLINE}s"
+    emit "OUTCOME=FAIL OUTPUT=$OUTPUT MODEL=$MODEL_LABEL | script-deadline ${SCRIPT_DEADLINE}s"
     exit 0
   fi
   sleep "$POLL_INTERVAL"

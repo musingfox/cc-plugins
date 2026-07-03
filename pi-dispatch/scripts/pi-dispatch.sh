@@ -21,7 +21,7 @@
 #                     the WHOLE stream in PRIOR_RUNDIR/pi.stream.jsonl (primary)
 #                     or PRIOR_RUNDIR/result.md (fallback) via
 #                       jq -rs 'map(select(.type=="session"))[0].id // empty'
-#                     and pi is invoked with --session <sid> --mode json passing
+#                     and the agent is invoked with --resume <sid> --mode json passing
 #                     BRIEF via @"$BRIEF_FILE" (the resume brief — NOT the full
 #                     prior brief inlined). Everything else (wrapper, artifacts) is
 #                     identical to a fresh dispatch.
@@ -32,8 +32,9 @@
 #   RUNDIR=<per-run dir holding result/stderr/pid/pgid/rc/start>
 #
 # Routing (cheap/fast by default; precedence: env > --profile/PI_PROFILE > default):
-#   PI_PROVIDER  default: google
-#   PI_MODEL     default: gemini-2.5-flash-lite
+#   PI_BIN       agent binary to invoke (default: omp — the oh-my-pi fork of pi)
+#   PI_PROVIDER  optional; when set, the model is passed as PROVIDER/MODEL
+#   PI_MODEL     default: grok-build (omp fuzzy-matches model names)
 #   PI_PROFILE / --profile NAME   named preset from profiles.conf (NAME PROVIDER MODEL)
 #   PI_PROFILES_FILE              override the profiles.conf path
 #   PI_RESOLVE_PROFILE_ONLY=1     print resolved "PROVIDER=… MODEL=…" and exit (no launch)
@@ -99,8 +100,15 @@ if [ -n "$PI_PROFILE" ]; then
 fi
 
 # Precedence: explicit env PI_PROVIDER/PI_MODEL > profile preset > built-in default.
-PROVIDER="${PI_PROVIDER:-${_PROF_PROVIDER:-google}}"
-MODEL="${PI_MODEL:-${_PROF_MODEL:-gemini-2.5-flash-lite}}"
+PROVIDER="${PI_PROVIDER:-${_PROF_PROVIDER:-}}"
+MODEL="${PI_MODEL:-${_PROF_MODEL:-grok-build}}"
+
+# omp takes a single --model spec; a provider (when set) is expressed as a
+# PROVIDER/MODEL prefix rather than the legacy --provider flag.
+MODEL_SPEC="${PROVIDER:+$PROVIDER/}$MODEL"
+
+# The agent binary. Default: omp (oh-my-pi). Override with PI_BIN=pi etc.
+PI_BIN="${PI_BIN:-omp}"
 
 # Introspection seam (no launch): print the resolved routing and exit. Lets callers
 # and tests verify profile resolution without invoking pi.
@@ -181,7 +189,10 @@ fi
 # pi.stream.jsonl.
 
 if [ -n "$PRIOR_SESSION_ID" ]; then
-  # Resume path: --session <sid> --mode json, brief via @file.
+  # Resume path: --resume <sid> --mode json, brief via @file.
+  # omp resolves --resume ids against --session-dir, so point it at the PRIOR
+  # run's sessions dir (where the session actually lives), not this run's empty one.
+  SESSION_DIR="$PRIOR_RUNDIR/sessions"
   perl -MPOSIX -e '
     POSIX::setsid();
     my $rcfile = shift @ARGV;
@@ -194,11 +205,10 @@ if [ -n "$PRIOR_SESSION_ID" ]; then
     print $fh "$rc\n";
     close($fh);
   ' "$RC_FILE" \
-    pi -p \
+    "$PI_BIN" -p \
        --mode json \
-       --provider "$PROVIDER" \
-       --model "$MODEL" \
-       --session "$PRIOR_SESSION_ID" \
+       --model "$MODEL_SPEC" \
+       --resume "$PRIOR_SESSION_ID" \
        --session-dir "$SESSION_DIR" \
        @"$BRIEF_FILE" \
        "$PROMPT" \
@@ -217,10 +227,9 @@ else
     print $fh "$rc\n";
     close($fh);
   ' "$RC_FILE" \
-    pi -p \
+    "$PI_BIN" -p \
        --mode json \
-       --provider "$PROVIDER" \
-       --model "$MODEL" \
+       --model "$MODEL_SPEC" \
        --session-dir "$SESSION_DIR" \
        @"$BRIEF_FILE" \
        "$PROMPT" \

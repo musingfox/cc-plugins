@@ -32,8 +32,14 @@ else
   PI_DESC="Pi default config"
 fi
 
+# Availability gate via the canonical probe — cf owns no agent-binary handling.
+# shellcheck source=cf-pi-env.sh
+. "$SCRIPT_DIR/cf-pi-env.sh"
 PI_AVAILABLE=0
-command -v pi >/dev/null 2>&1 && PI_AVAILABLE=1
+_canon="$(resolve_canon_dispatch)"
+if [ -n "${_canon:-}" ] && [ -f "$_canon" ]; then
+  "$(dirname "$_canon")/pi-probe.sh" --bin-only >/dev/null 2>&1 && PI_AVAILABLE=1
+fi
 
 cat > "$SESSION/env.sh" <<EOF
 SESSION="$SESSION"

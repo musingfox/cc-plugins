@@ -1,7 +1,7 @@
 {
   "name": "pi-dispatch",
   "version": "0.1.32",
-  "description": "[Experimental] Offload heavy work to Pi's cheap/fast models — a dispatcher subagent + a dispatch.sh script so Claude only issues briefs and collects summaries, saving tokens",
+  "description": "[Experimental] Offload heavy work to cheap/fast models via omp (oh-my-pi) — background dispatch + idempotent poll + worktree isolation, so Claude only issues briefs, reviews results, and scales to parallel tasks while saving tokens",
   "author": {
     "name": "Nick Huang"
   }

@@ -373,7 +373,7 @@ Diagnose primarily from `$PI_SESSION_DIR/*.jsonl` (rich event stream), then from
 
 | Symptom | Likely cause | Action |
 |---|---|---|
-| Pre-flight probe times out > 30s with no stdout | `pi -p` + invalid flag combo; or provider auth missing; or Pi installation broken | Abort Phase 3. Inspect `$PROBE_STDOUT` and `$PI_PROBE_DIR/*.jsonl`. Recommend fallback to Claude implement agent. |
+| Pre-flight probe times out > 30s with no stdout | `pi -p` + invalid flag combo; or provider auth missing; or Pi installation broken | Abort Phase 3. Inspect `$PI_PROBE_DIR/probe-stdout.log` and `$PI_PROBE_DIR/*.jsonl`. Recommend fallback to Claude implement agent. |
 | Session JSONL `errorMessage` matches `usage_limit_reached` | Provider quota exhausted | Extract `resets_at` from event headers; tell human "quota resets at <timestamp>"; offer fallback to `/cf` Claude implementer or different provider |
 | Session JSONL `errorMessage` matches `unauthorized` / `status_code:401` | Provider auth missing or expired | Recommend `pi auth <provider>`; do not silently switch providers |
 | Session JSONL `errorMessage` matches `model_not_found` | Invalid model ID for provider | Recommend `pi --list-models <provider>`; abort Phase 3 |

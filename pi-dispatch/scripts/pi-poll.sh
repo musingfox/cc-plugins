@@ -83,6 +83,7 @@ else
 fi
 
 OUTPUT_FILE="$RUNDIR/result.md"
+STATUS_FILE="$RUNDIR/status"
 PID_FILE="$RUNDIR/pi.pid"
 RC_FILE="$RUNDIR/rc"
 START_FILE="$RUNDIR/pi-start.ts"
@@ -107,10 +108,20 @@ emit() {
         "$(basename "$(dirname "$RUNDIR")")" \
         "$1" "$RUNDIR" \
         >> "$PI_RUNS_DIR/index.log" 2>/dev/null || true
+      # Persist the terminal verdict so re-polls are IDEMPOTENT (replayed from
+      # disk, not re-judged — a distilled/killed run would otherwise re-judge
+      # as a false no-rc FAIL and double-record in the index).
+      printf '%s\n' "$1" > "$STATUS_FILE" 2>/dev/null || true
       ;;
   esac
   echo "$1"
 }
+
+# Idempotent replay: a prior poll already reached a terminal verdict.
+if [ -s "$STATUS_FILE" ]; then
+  cat "$STATUS_FILE"
+  exit 0
+fi
 
 # Broken handle — nothing to poll. Terminal FAIL so the caller doesn't loop forever.
 if [ ! -f "$PID_FILE" ]; then
@@ -146,7 +157,12 @@ if [ -f "$OUTPUT_FILE" ]; then
   AGENT_END_LINE="$(grep '"type":"agent_end"' "$OUTPUT_FILE" 2>/dev/null | tail -1 || true)"
   if [ -n "$AGENT_END_LINE" ]; then
     STOP_REASON="$(printf '%s' "$AGENT_END_LINE" | jq -r '.messages[-1].stopReason // "unknown"' 2>/dev/null || true)"
-    DISTILLED_TEXT="$(printf '%s' "$AGENT_END_LINE" | jq -r '.messages[-1].text // ""' 2>/dev/null || true)"
+    # Message text lives in either the legacy flat `.text` field (old pi) or the
+    # content-block array (omp / pi >= 0.79: [{type:"text",text:…},…]) — support both.
+    DISTILLED_TEXT="$(printf '%s' "$AGENT_END_LINE" | jq -r '.messages[-1] |
+      if (.content | type) == "array"
+      then [.content[] | select(.type == "text") | .text] | join("\n")
+      else (.text // "") end' 2>/dev/null || true)"
   fi
 fi
 

@@ -44,13 +44,13 @@ got="$(PI_PROFILE=careful PI_PROVIDER=openai PI_MODEL=gpt-x bash "$DISPATCH" --p
 
 # 4. Unknown profile falls through to the built-in default (warns on stderr).
 got="$(PI_PROFILE=nope bash "$DISPATCH" dummy 2>/dev/null)"
-[ "$got" = "PROVIDER=google MODEL=gemini-2.5-flash-lite" ] \
+[ "$got" = "PROVIDER= MODEL=grok-build" ] \
   && ok "unknown profile falls through to default" \
   || bad "unknown profile" "$got"
 
 # 5. No profile at all: built-in default.
 got="$(PI_PROFILE= bash "$DISPATCH" dummy 2>/dev/null)"
-[ "$got" = "PROVIDER=google MODEL=gemini-2.5-flash-lite" ] \
+[ "$got" = "PROVIDER= MODEL=grok-build" ] \
   && ok "no profile uses built-in default" \
   || bad "no profile" "$got"
 

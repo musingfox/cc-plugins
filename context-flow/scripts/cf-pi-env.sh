@@ -19,8 +19,9 @@
 #       PI_STDOUT, PI_STDERR, PI_SESSION_DIR, PI_PROBE_DIR,
 #       DIFF_FILE, WORK, CF_BRANCH,
 #       PI_PID_FILE, PI_START_FILE,
-#       PROBE_STDOUT, PROBE_STDERR, TEST_LOG.
-#     PI_ARGS array rebuilt from PI_PROVIDER/PI_MODEL (empty when neither set).
+#       TEST_LOG.
+#     (Probe artifacts live in $PI_PROBE_DIR/probe-{stdout,stderr}.log,
+#      written by the canonical pi-probe.sh.)
 #
 # load_cf_flow_env FLOW_SESSION
 #   Derives flow-level (cross-shard) paths from the flow session root.
@@ -59,18 +60,10 @@ load_cf_pi_env() {
   CF_BRANCH="ctxflow/$SESSION_BASENAME"
   PI_PID_FILE="$session/pi.pid"
   PI_START_FILE="$session/pi-start.ts"
-  PROBE_STDOUT="$session/probe-stdout.log"
-  PROBE_STDERR="$session/probe-stderr.log"
   TEST_LOG="$session/test-output.log"
 
   mkdir -p "$PI_SESSION_DIR"
 
-  PI_ARGS=()
-  [ -n "${PI_PROVIDER:-}" ] && PI_ARGS+=(--provider "$PI_PROVIDER")
-  [ -n "${PI_MODEL:-}" ] && PI_ARGS+=(--model "$PI_MODEL")
-  # Final `return 0` matters: without it, the last `&& append` short-circuits
-  # when PI_MODEL is empty (default), function returns 1, and any caller
-  # running `set -e` exits silently before its own work begins.
   return 0
 }
 

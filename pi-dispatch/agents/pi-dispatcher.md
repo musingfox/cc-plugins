@@ -23,7 +23,7 @@ If the brief is not self-contained, do NOT guess — return a one-line note aski
 
 ### 1. Launch the run (non-blocking)
 
-One short Bash call. Cheap/fast model routing is the script's default (`gemini-2.5-flash-lite`); override only if main passed `PI_MODEL`/`PI_PROVIDER`.
+One short Bash call. Cheap/fast model routing is the script's default (omp `grok-build`); override only if main passed `PI_MODEL`/`PI_PROVIDER` or a `--profile`.
 
 ```bash
 "$SCRIPTS/pi-dispatch.sh" "$BRIEF" "$OUTDIR"
@@ -51,6 +51,8 @@ Each call prints exactly one line:
 If you ever abort the poll loop early yourself (e.g. you decide to stop before a terminal `STATUS=` line), call `"$SCRIPTS/pi-stop.sh" "$RUNDIR"` first so no orphan pi is left running.
 
 Stop the loop the moment a `STATUS=` line appears. Keep the round count bounded — if it stays `RUNNING` far past a reasonable budget, report that as a stall rather than looping forever.
+
+When a run stays `RUNNING` for a long stretch and you (or main) want to know what the worker is actually doing, call `"$SCRIPTS/pi-watch.sh" "$RUNDIR"` — a fixed four-line snapshot (tool progress, tokens, latest text). It is observational only; the poll loop remains the terminal-state authority.
 
 ### 3. Read the output (bounded)
 

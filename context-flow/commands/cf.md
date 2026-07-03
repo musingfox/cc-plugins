@@ -49,7 +49,7 @@ to breaking-change-only.` — then apply these deltas:
 After setup, read `$PI_AVAILABLE` from env.sh:
 
 - `PI_AVAILABLE=1` → Phase 3 uses Pi (default).
-- `PI_AVAILABLE=0` → Phase 3 falls back to Claude `context-flow:implement` agent. Log: `Pi CLI not on PATH — Phase 3 will use Claude implement agent. Install pi from pi.dev to use the Pi implementer.` Do NOT abort.
+- `PI_AVAILABLE=0` → Phase 3 falls back to Claude `context-flow:implement` agent. Log: `omp CLI not on PATH — Phase 3 will use Claude implement agent. Install omp (bun i -g @oh-my-pi/pi-coding-agent) to use the Pi implementer.` Do NOT abort.
 
 The fallback path is also reachable mid-flow (a shard's `Status: FAIL` with unrecoverable probe error, or the human selects "Fall back to Claude implement agent" at a recovery prompt). See §Phase 3.
 
