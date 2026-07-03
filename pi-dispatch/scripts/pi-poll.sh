@@ -117,6 +117,19 @@ emit() {
   echo "$1"
 }
 
+# Bounded root-cause excerpt appended to FAIL lines: first errorMessage from the
+# event stream, else the last stderr line. Lowercased with '='/tabs/newlines
+# stripped so it can never spuriously match a consumer's status-word glob
+# (TIMEOUT / STALL / ERROR / "exit rc="). Empty when there is no evidence.
+fail_cause() {
+  local c=""
+  [ -f "$OUTPUT_FILE" ] && \
+    c="$(grep -m1 -o '"errorMessage":"[^"]*"' "$OUTPUT_FILE" 2>/dev/null | cut -d'"' -f4)"
+  [ -z "$c" ] && [ -s "$STDERR_FILE" ] && c="$(tail -1 "$STDERR_FILE" 2>/dev/null)"
+  [ -z "$c" ] && return 0
+  printf ' cause:%s' "$(printf '%s' "$c" | tr '[:upper:]' '[:lower:]' | tr -d '=\t\n' | head -c 120)"
+}
+
 # Idempotent replay: a prior poll already reached a terminal verdict.
 if [ -s "$STATUS_FILE" ]; then
   cat "$STATUS_FILE"
@@ -179,11 +192,11 @@ PI_RC=""
 # agent loop is OVER, so the result is terminal regardless of process liveness.
 judge_agent_end() {
   if [ "$STOP_REASON" = "error" ]; then
-    emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE ERROR terminal=error ${ELAPSED}s"
+    emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE ERROR terminal=error ${ELAPSED}s$(fail_cause)"
     exit 0
   fi
   if [ "$STOP_REASON" != "stop" ]; then
-    emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE terminal=${STOP_REASON:-none} not-stop ${ELAPSED}s"
+    emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE terminal=${STOP_REASON:-none} not-stop ${ELAPSED}s$(fail_cause)"
     exit 0
   fi
   # stopReason == stop: check result text is non-empty. Empty text == the agent
@@ -209,13 +222,13 @@ if [ "$alive_rc" -ne 0 ]; then
   if [ -n "$PI_RC" ]; then
     # rc != 0 is an abnormal-death backstop: surface immediately, no further checks.
     if [ "$PI_RC" -ne 0 ]; then
-      emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE exit rc=$PI_RC ${ELAPSED}s"
+      emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE exit rc=$PI_RC ${ELAPSED}s$(fail_cause)"
       exit 0
     fi
     # rc == 0: now check agent_end. Absent agent_end overrides a clean rc —
     # the process died mid-stream without emitting a terminal event.
     if [ -z "$AGENT_END_LINE" ]; then
-      emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE died-mid-stream no-terminal ${ELAPSED}s"
+      emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE died-mid-stream no-terminal ${ELAPSED}s$(fail_cause)"
       exit 0
     fi
     # agent_end present: judge stopReason via the shared whitelist.
@@ -226,7 +239,7 @@ if [ "$alive_rc" -ne 0 ]; then
   # forever. ELAPSED grows monotonically (start-ts is fixed on disk), so it always
   # crosses the grace on a later poll -> terminal FAIL.
   if [ "$ELAPSED" -gt "$NO_MARKER_GRACE" ]; then
-    emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE no-rc ${ELAPSED}s grace=${NO_MARKER_GRACE}s"
+    emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE no-rc ${ELAPSED}s grace=${NO_MARKER_GRACE}s$(fail_cause)"
     exit 0
   fi
   echo "RUNNING settling ${ELAPSED}s (dead, awaiting rc within grace=${NO_MARKER_GRACE}s)"
@@ -253,7 +266,7 @@ fi
 # double the stall threshold (pi is actively working on a long tool call).
 if [ "$ELAPSED" -gt "$WALL_CLOCK" ]; then
   "$SCRIPT_DIR/pi-stop.sh" "$RUNDIR" >/dev/null 2>&1
-  emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE TIMEOUT ${ELAPSED}s wall=${WALL_CLOCK}s"
+  emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE TIMEOUT ${ELAPSED}s wall=${WALL_CLOCK}s$(fail_cause)"
   exit 0
 fi
 # Stall: portable mtime of the output file (primary artifact being written).
@@ -272,7 +285,7 @@ fi
 
 if [ "$STALE" -gt "$EFFECTIVE_STALL" ]; then
   "$SCRIPT_DIR/pi-stop.sh" "$RUNDIR" >/dev/null 2>&1
-  emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE STALL ${ELAPSED}s stale=${STALE}s thr=${EFFECTIVE_STALL}s"
+  emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE STALL ${ELAPSED}s stale=${STALE}s thr=${EFFECTIVE_STALL}s$(fail_cause)"
   exit 0
 fi
 

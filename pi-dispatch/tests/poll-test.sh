@@ -111,6 +111,17 @@ case "$OUT" in STATUS=FAIL*no-rc*) ok "(3) no-rc -> $OUT";; *) bad "(3) expected
 D4="$TMP/c4"; make_run "$D4" "$DEAD" 100 "0" "$ERROR_STREAM"
 OUT="$(bash "$POLL" "$D4")"
 case "$OUT" in STATUS=FAIL*ERROR*) ok "(4a) error-event -> $OUT";; *) bad "(4a) expected STATUS=FAIL ... ERROR, got: $OUT";; esac
+case "$OUT" in *cause:boom*) ok "(4a-cause) FAIL line carries errorMessage cause";; *) bad "(4a-cause) expected cause:boom in: $OUT";; esac
+
+# --- (4c) cause sanitization: '='/uppercase in errorMessage must be stripped/
+#          lowercased so consumers' status-word globs (*TIMEOUT*, *exit rc=*)
+#          can never false-match on the cause text ---
+D4c="$TMP/c4c"
+DIRTY_STREAM="$SESSION_LINE
+{\"type\":\"agent_end\",\"messages\":[{\"role\":\"assistant\",\"stopReason\":\"error\",\"errorMessage\":\"TIMEOUT waiting rc=9\"}]}"
+make_run "$D4c" "$DEAD" 100 "0" "$DIRTY_STREAM"
+OUT="$(bash "$POLL" "$D4c")"
+case "$OUT" in *cause:timeout\ waiting\ rc9*) ok "(4c) cause sanitized (lowercase, '=' stripped)";; *) bad "(4c) expected sanitized cause, got: $OUT";; esac
 
 # --- (4b) result QUOTES "stopReason":"error" in its TEXT but the structural
 #         agent_end has stopReason=stop -> STATUS=OK (we key on agent_end event) ---
