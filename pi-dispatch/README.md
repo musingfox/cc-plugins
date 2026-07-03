@@ -17,6 +17,12 @@ Claude (main)          pi-dispatcher agent (haiku)      omp worker (cheap model)
 - **`scripts/pi-probe.sh [--bin-only] [PROBE_DIR]`** — pre-flight gate: `--bin-only` checks the agent binary is on PATH (exit 0/1); the full probe runs `say ok` on the exact routing a dispatch would resolve. Callers never touch the agent binary themselves.
 - **`scripts/pi-watch.sh RUNDIR`** — one-shot monitoring snapshot of a live run (fixed 4 lines regardless of stream size): event/byte counts, tool progress + current tool, token usage, latest assistant text. `pi-poll.sh` answers "is it done?"; `pi-watch.sh` answers "what is it doing?". Safe on a mid-write stream (partial trailing line skipped).
 - **`scripts/pi-worktree.sh create|clean …`** — git-worktree isolation for code-writing tasks; cleanup captures the diff before removal.
+- **`scripts/pi-acp-*.sh`** — interactive ACP worker sessions (`omp acp` over a stdin fifo / stdout jsonl pair), for work that needs mid-flight governance rather than fire-and-forget:
+  - `pi-acp-start.sh [--resume SID] [OUTDIR [CWD]]` — background session + handshake, returns `RUNDIR=/SESSION=/PID=`. `--resume` restores a prior session's context (`session/load`) across processes.
+  - `pi-acp-send.sh RUNDIR prompt TEXT_OR_FILE | permission OPTION_ID [REQ_ID] | cancel` — non-blocking frame sends: start a turn, answer a tool-permission request, or cancel the in-flight turn (session survives).
+  - `pi-acp-poll.sh RUNDIR` — one line per call: `IDLE` / `RUNNING` / `PERMISSION id=… tool=… options=…` (worker blocked awaiting an answer — this is the governance hook) / `STATUS=DONE id=… stopReason=…` (per-turn terminal; turn text distilled to `result.md`) / `STATUS=DEAD`. Teardown reuses `pi-stop.sh` (same pid/pgid layout).
+
+  Division of labor: `pi-dispatch.sh` (`-p` mode, auto-approved tools) stays the batch fan-out workhorse; ACP sessions are for interactive workers — per-tool-call approval, warm multi-turn without re-briefing, protocol-level cancel.
 - **`agents/pi-dispatcher.md`** — a haiku subagent that runs the launch→poll→distill loop so even the polling stays out of the main context.
 
 ## Model routing
@@ -49,4 +55,4 @@ Context hygiene: main never reads worker streams or source material — only bri
 
 ## Tests
 
-`bash tests/profile-test.sh && bash tests/wrapper-test.sh && bash tests/poll-test.sh && bash tests/worktree-cleanup-test.sh && bash tests/probe-watch-test.sh` — all pure-local, no network.
+`bash tests/profile-test.sh && bash tests/wrapper-test.sh && bash tests/poll-test.sh && bash tests/worktree-cleanup-test.sh && bash tests/probe-watch-test.sh && bash tests/acp-test.sh` — all pure-local, no network (acp-test uses a bash shim in place of `omp acp`).
