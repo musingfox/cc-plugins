@@ -54,7 +54,7 @@ Worst case: flow aborts, all branches and tags remain; the user cherry-picks val
 | `FAIL` | infrastructure failure (probe, dispatch, stall, missing outcome) | retry once; second FAIL → escalate |
 | `NEEDS_REPLAN` | escalate-file present; persistent test fail after one in-shard re-dispatch; undeclared file touched | coalesce, partial-replan the affected contracts |
 
-`outcome.md` is **paths-only by construction**: every value is a short enum/id or a filesystem path, never inlined content — the read is bounded no matter what happened inside the shard.
+`outcome.md` is **bounded by construction**: every value is a short enum/id, a filesystem path, or the single `## Cause` line (≤300 chars, extracted from the artifact matching the failure reason) — never inlined content, so the read is bounded no matter what happened inside the shard.
 
 **Round-collection rule**: main waits for ALL shards in a round before routing, so NEEDS_REPLAN coalesces into a single Plan invocation and replans never interleave.
 
@@ -88,7 +88,7 @@ Anti-growth: `dispatch-state.json` holds only the latest round (~1KB); history i
 
 ## 8. Observability
 
-Pull, not push. Each background task's progress lines go to its own output file (`TaskOutput`/`Read` on demand); `cf-pi-status.sh $SESSION` prints one liveness line per shard (read-only, safe any time). No heartbeats into main's context.
+Pull, not push. Each background task's progress lines go to its own output file (`TaskOutput`/`Read` on demand) and its latest line is mirrored to `$SHARD_SESSION/progress`; `cf-pi-status.sh $SESSION` prints one line per shard — liveness + current lifecycle phase (read-only, safe any time). The orchestrator runs it on every wake-up while shards are pending and reports non-PASS causes from `## Cause`, so the human is never blind mid-run and never sees a bare FAIL.
 
 ## 9. Open Risks
 

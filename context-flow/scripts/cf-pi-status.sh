@@ -61,9 +61,16 @@ format_size() {
 
 NOW=$(date +%s)
 
+# Latest lifecycle phase, mirrored by cf-pi-run.sh's say() into a 1-line file.
+phase_of() {
+  local p="$1/progress"
+  [ -f "$p" ] && printf ' | %s' "$(head -c 200 "$p" | tr -d '\n')"
+}
+
 while IFS= read -r dir; do
   id=$(basename "$dir")
   group=$(group_lookup_for "$id")
+  phase=$(phase_of "$dir")
   start_file="$dir/pi-start.ts"
   start=$(cat "$start_file" 2>/dev/null || true)
   [ -z "$start" ] && start=$NOW
@@ -79,7 +86,7 @@ while IFS= read -r dir; do
   pid=$(cat "$pid_file" 2>/dev/null || true)
 
   if [ -z "$pid" ]; then
-    echo "shard-$id ($group): NO_PID ${elapsed}s"
+    echo "shard-$id ($group): NO_PID ${elapsed}s$phase"
     continue
   fi
 
@@ -93,11 +100,11 @@ while IFS= read -r dir; do
 
   if [ -z "$jsonl" ]; then
     if [ "$alive" -eq 0 ]; then
-      echo "shard-$id ($group): DONE ${elapsed}s no-jsonl"
+      echo "shard-$id ($group): DONE ${elapsed}s no-jsonl$phase"
     elif [ "$elapsed" -gt 60 ]; then
-      echo "shard-$id ($group): NO_JSONL_FAIL ${elapsed}s"
+      echo "shard-$id ($group): NO_JSONL_FAIL ${elapsed}s$phase"
     else
-      echo "shard-$id ($group): NO_JSONL ${elapsed}s"
+      echo "shard-$id ($group): NO_JSONL ${elapsed}s$phase"
     fi
     continue
   fi
@@ -108,14 +115,14 @@ while IFS= read -r dir; do
   sz_fmt=$(format_size "$sz")
 
   if [ "$alive" -eq 0 ]; then
-    echo "shard-$id ($group): DONE ${elapsed}s jsonl=$sz_fmt"
+    echo "shard-$id ($group): DONE ${elapsed}s jsonl=$sz_fmt$phase"
     continue
   fi
 
   if [ "$stale" -gt "$STALL_THRESHOLD" ]; then
-    echo "shard-$id ($group): STALL ${elapsed}s jsonl=$sz_fmt stale=${stale}s"
+    echo "shard-$id ($group): STALL ${elapsed}s jsonl=$sz_fmt stale=${stale}s$phase"
     continue
   fi
 
-  echo "shard-$id ($group): ALIVE ${elapsed}s jsonl=$sz_fmt stale=${stale}s"
+  echo "shard-$id ($group): ALIVE ${elapsed}s jsonl=$sz_fmt stale=${stale}s$phase"
 done <<< "$shard_dirs"

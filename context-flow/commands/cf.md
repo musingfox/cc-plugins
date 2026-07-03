@@ -337,6 +337,11 @@ The 4 positionals are `SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER` — p
 
 Wait for ALL N shards before routing (round-collection rule, design §4) so NEEDS_REPLAN coalesces into a single Plan invocation. End your turn after fan-out; the harness re-invokes you on each task completion — check whether every id in `$SHARD_IDS` now has a non-empty `$SESSION/shards/<id>/outcome.md`, and if not, end the turn again.
 
+**Progress visibility** — the human must never sit blind while shards run:
+
+- Right after fan-out, print one line telling the human how to check progress themselves at any time: `` Watch progress: bash $SCRIPTS/cf-pi-status.sh $SESSION ``
+- On EVERY wake-up while shards are still pending, run `"$SCRIPTS/cf-pi-status.sh" "$SESSION"` (bounded: one line per shard, includes the shard's current lifecycle phase) and print its output verbatim before ending the turn. This turns each completion event into a progress update instead of silence.
+
 Once all are done, read each shard's status from its paths-only outcome (never the report/diff/JSONL it points to):
 
 ```bash
@@ -346,7 +351,9 @@ for id in $SHARD_IDS; do
 done
 ```
 
-`outcome.md` carries `## Status`, `## Reason`, `## Run`, `## Survived contracts`, `## Affected contracts`, `## Artifacts` — all paths-only; pull `## Survived contracts` / `## Affected contracts` only when routing needs them. If a shard's outcome.md is missing or empty (its background task crashed before writing it), treat that shard as `FAIL` with reason `outcome-missing`.
+`outcome.md` carries `## Status`, `## Reason`, `## Cause` (one bounded line extracted from the artifact matching the failure), `## Run`, `## Survived contracts`, `## Affected contracts`, `## Artifacts` — all paths-only besides Cause; pull `## Survived contracts` / `## Affected contracts` only when routing needs them. If a shard's outcome.md is missing or empty (its background task crashed before writing it), treat that shard as `FAIL` with reason `outcome-missing`.
+
+**Failure transparency — mandatory.** For every non-PASS shard, before routing, read its `## Reason` + `## Cause` and tell the human in one sentence per shard WHY it failed (e.g. `B: NEEDS_REPLAN — test-fail-persistent: "AssertionError: expected 200, got 404"`). Never report a bare status. If Cause is `-`, read `tail -20` of the postmortem path from `## Artifacts` and summarize; name the postmortem path so the human can dig deeper.
 
 Persist round results to disk (main never holds the JSON in context):
 
