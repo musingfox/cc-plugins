@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Thin adapter: launch Pi for ONE cf shard via the canonical pi-dispatch.sh.
+# Thin adapter: launch OMP for ONE cf shard via the canonical pi-dispatch.sh.
 #
 # cf-facing interface (unchanged):
 #   Usage:   cf-pi-dispatch.sh SESSION [RESUME_PROMPT_FILE]
@@ -58,7 +58,7 @@ if [ -n "$resume_prompt" ]; then
 fi
 
 # PI_PROMPT: preserve cf's brief prompt behavior (fresh dispatch suffix).
-# Nudge: Pi on high thinking can spend its whole first turn planning and end it
+# Nudge: OMP on high thinking can spend its whole first turn planning and end it
 # with zero tool calls (no write/edit/bash, no report) — a clean stop that produces
 # nothing. Tell it to act before ending the turn, so planning never substitutes for
 # the first concrete tool call.

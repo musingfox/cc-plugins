@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Set up isolated WORK area for the implementer (Pi or Claude implement agent).
+# Set up isolated WORK area for the implementer (OMP or Claude implement agent).
 # - In a git repo: creates a worktree at $WORK on a fresh branch ($CF_BRANCH)
 #   forked from the user's current HEAD ($BASE_BRANCH / $BASE_HEAD).
 # - Otherwise:     creates a plain scratch directory at $WORK.
@@ -60,7 +60,24 @@ MSG
     exit 2
   fi
 
+  # Human-readable slugs can collide with a prior flow's surviving branch, which
+  # still carries unreviewed per-contract commits. Never reset it (-B would):
+  # bump to <slug>-2, -3, ... and persist the bumped slug. CF_BRANCH_OWNED marks
+  # a branch created by THIS session, so an idempotent re-run may reuse it.
+  if git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$CF_BRANCH" \
+     && ! grep -q '^CF_BRANCH_OWNED=1' "$session/env.sh" 2>/dev/null; then
+    _slug="${CF_SLUG:-$SESSION_BASENAME}"; _n=2
+    while git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/cf/$_slug-$_n"; do
+      _n=$((_n + 1))
+    done
+    CF_SLUG="$_slug-$_n"
+    CF_BRANCH="cf/$CF_SLUG"
+    echo "CF_SLUG=\"$CF_SLUG\"" >> "$session/env.sh"
+    echo "cf-pi-worktree: branch collision, using $CF_BRANCH" >&2
+  fi
   git -C "$REPO_ROOT" worktree add -B "$CF_BRANCH" "$WORK" HEAD >&2
+  grep -q '^CF_BRANCH_OWNED=1' "$session/env.sh" 2>/dev/null || \
+    echo 'CF_BRANCH_OWNED=1' >> "$session/env.sh"
   # Diff base is computed at cleanup time as `merge-base cf-tip $BASE_BRANCH`
   # (or fallback to $BASE_HEAD). This way:
   #   - pre-rebase: merge-base = $BASE_HEAD → diff = cf's own commits

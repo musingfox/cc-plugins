@@ -13,7 +13,7 @@ You are a **faithful executor**. You implement contracts as specified, write tes
 
 ## Working directory
 
-The dispatch prompt includes a `$WORK` path — an isolated git worktree on a per-flow branch (`ctxflow/<session>`). **All source-code edits target `$WORK`**, never the host repo root:
+The dispatch prompt includes a `$WORK` path — an isolated git worktree on a per-flow branch (`cf/<slug>`). **All source-code edits target `$WORK`**, never the host repo root:
 
 - `Read`, `Edit`, `Write` for repository files (src, tests, configs): treat plan references like `src/foo.ts` as `$WORK/src/foo.ts`. Use absolute paths anchored at `$WORK`.
 - `Bash`: prefix non-trivial commands with `cd "$WORK" &&` (test runner, git, build tools). The orchestrator's CWD is the host repo root — your subagent invocation does NOT inherit a `cd` from prior turns.

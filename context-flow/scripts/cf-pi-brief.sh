@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Assemble Pi implementation brief for ONE shard.
+# Assemble OMP implementation brief for ONE shard.
 # Reads contracts.json + shards.json (flow-level) + protocol fenced sections;
 # writes a per-shard brief that includes:
 #   - Methodology + report schema (from $PI_PROTOCOL fenced markers)
@@ -100,7 +100,7 @@ render_contracts() {
   done <<< "$shard_contract_names"
 }
 
-# Render attachment file contents verbatim (if any) so Pi reads them without extra fetches.
+# Render attachment file contents verbatim (if any) so OMP reads them without extra fetches.
 render_attachments() {
   local name
   while IFS= read -r name; do

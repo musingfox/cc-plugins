@@ -3,7 +3,7 @@
 #
 # A first gate-3 failure is often an environment transient (parallel shards
 # colliding on a shared port/service). cf-pi-run.sh must retest once before the
-# expensive Pi re-dispatch:
+# expensive OMP re-dispatch:
 #   - transient  : test fails, retest passes  -> PASS, exactly 1 dispatch
 #   - persistent : test fails twice           -> re-dispatch once, retry fails
 #                                                -> NEEDS_REPLAN, 2 dispatches

@@ -44,10 +44,11 @@ rollback_one() {
     return 0
   fi
 
-  local sb_session_basename sb_cf_branch sb_work
-  # Read SESSION_BASENAME from shard env without polluting our scope.
-  sb_session_basename=$(grep -E '^SESSION_BASENAME=' "$shard_session/env.sh" | head -1 | sed 's/^SESSION_BASENAME="\(.*\)"$/\1/')
-  sb_cf_branch="ctxflow/$sb_session_basename"
+  local sb_slug sb_cf_branch sb_work
+  # Read CF_SLUG (fallback SESSION_BASENAME) from shard env without polluting our scope.
+  sb_slug=$(grep -E '^CF_SLUG=' "$shard_session/env.sh" | tail -1 | sed 's/^CF_SLUG="\(.*\)"$/\1/')
+  [ -z "$sb_slug" ] && sb_slug=$(grep -E '^SESSION_BASENAME=' "$shard_session/env.sh" | head -1 | sed 's/^SESSION_BASENAME="\(.*\)"$/\1/')
+  sb_cf_branch="cf/$sb_slug"
   sb_work="$shard_session/work"
 
   # Look for any cf-checkpoint tag pointing to this branch (best-effort).

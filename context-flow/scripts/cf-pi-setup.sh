@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Initialize a cf-pi session.
-# Usage:   cf-pi-setup.sh
+# Usage:   cf-pi-setup.sh [SLUG]   (SLUG = task short name for the branch, kebab-case)
 # Stdin:   none
 # Stdout:  SESSION path (single line)
 # Env in:  PI_PROVIDER, PI_MODEL, PI_STALL_THRESHOLD_S, PI_WALL_CLOCK_S (all optional)
@@ -20,16 +20,20 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_ROOT="$(dirname "$SCRIPT_DIR")"
 
-SESSION="/tmp/context-flow-pi-$(date +%s)-$$-${RANDOM}"
+SESSION=$(mktemp -d "/tmp/cf-$(date +%m%d)-XXXX")
 SESSION_BASENAME="$(basename "$SESSION")"
 mkdir -p "$SESSION"
+
+# Optional task short name (kebab, 1-3 words, e.g. "rwd-setup"): becomes the
+# branch name cf/<slug>[-shard-X]. Falls back to the session basename.
+CF_SLUG="${1:-$SESSION_BASENAME}"
 
 PI_PROVIDER="${PI_PROVIDER:-}"
 PI_MODEL="${PI_MODEL:-}"
 if [ -n "$PI_PROVIDER" ] || [ -n "$PI_MODEL" ]; then
   PI_DESC="${PI_PROVIDER:-<pi-default-provider>}/${PI_MODEL:-<pi-default-model>}"
 else
-  PI_DESC="Pi default config"
+  PI_DESC="OMP default config"
 fi
 
 # Availability gate via the canonical probe — cf owns no agent-binary handling.
@@ -44,6 +48,7 @@ fi
 cat > "$SESSION/env.sh" <<EOF
 SESSION="$SESSION"
 SESSION_BASENAME="$SESSION_BASENAME"
+CF_SLUG="$CF_SLUG"
 PLUGIN_ROOT="$PLUGIN_ROOT"
 SCRIPTS="$PLUGIN_ROOT/scripts"
 PI_PROTOCOL="$PLUGIN_ROOT/docs/pi-implementer-protocol.md"
@@ -62,15 +67,15 @@ chmod +x "$SESSION/cleanup.sh"
 cat > "$SESSION/README.md" <<EOF
 # cf-pi session: $SESSION_BASENAME
 
-Pi-driven implement session. Files are flat under this directory.
+OMP-driven implement session. Files are flat under this directory.
 
 ## Key files
 - \`env.sh\` — session-wide env (provider/model, thresholds, paths)
-- \`implement-brief.md\` — brief Pi was given
-- \`implement-report.md\` — Pi's final report (present on DONE)
-- \`implement.diff\` — captured diff of Pi's work
-- \`pi-stdout.log\` / \`pi-stderr.log\` — Pi process output
-- \`pi-sessions/*.jsonl\` — Pi JSONL transcript (authoritative state)
+- \`implement-brief.md\` — brief OMP was given
+- \`implement-report.md\` — OMP's final report (present on DONE)
+- \`implement.diff\` — captured diff of OMP's work
+- \`pi-stdout.log\` / \`pi-stderr.log\` — OMP process output
+- \`pi-sessions/*.jsonl\` — OMP JSONL transcript (authoritative state)
 - \`pi-probe/\` — pre-flight probe artifacts
 - \`work/\` — implementer's working directory (git worktree on branch \`$SESSION/env.sh:CF_BRANCH\`)
 - \`cleanup.sh\` — run to capture diff + remove worktree (branch survives for review/merge)

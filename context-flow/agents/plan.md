@@ -239,7 +239,7 @@ Input format (provided by the orchestrator):
 ```markdown
 ## Implement Failure
 Status: PARTIAL | FAIL
-Implementer: pi | claude-implement
+Implementer: omp | claude-implement
 Failed contracts:
 - <contract-name>: <one-sentence reason>
 Survived contracts:

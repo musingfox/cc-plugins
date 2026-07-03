@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # cf-pi-record-round.sh
-# Records round results for parallel-sharded Pi orchestration.
+# Records round results for parallel-sharded OMP orchestration.
 # Writes $FLOW_SESSION/dispatch-state.json and appends to dispatch-state-archive.jsonl
 # Also handles git checkpoint tags for PASS results (CheckpointTagOnPass).
 #
-# Usage: cf-pi-record-round.sh --round N [--result KEY=VAL ...]
+# Usage: cf-pi-record-round.sh [FLOW_SESSION] --round N [--result KEY=VAL ...]
+#        (FLOW_SESSION may also come from the env; positional wins)
 # Exit: 2 on missing --round; 0 otherwise (graceful on non-git)
 
 set -euo pipefail
@@ -15,16 +16,24 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 round=""
 results=()
+positional_session=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --round)
       round="$2"; shift 2 ;;
     --result)
       results+=("$2"); shift 2 ;;
-    *)
+    -*)
       echo "cf-pi-record-round.sh: unknown arg $1" >&2; exit 2 ;;
+    *)
+      if [ -z "$positional_session" ]; then
+        positional_session="$1"; shift
+      else
+        echo "cf-pi-record-round.sh: unknown arg $1" >&2; exit 2
+      fi ;;
   esac
 done
+[ -n "$positional_session" ] && FLOW_SESSION="$positional_session"
 
 if [ -z "$round" ]; then
   exit 2
@@ -75,11 +84,11 @@ if [ -n "$repo_root" ] && [ -d "$repo_root/.git" ]; then
     key="${res%%=*}"
     val="${res#*=}"
     if [ "$val" = "PASS" ]; then
-      # Determine branch: assume current or ctxflow/*-shard-$key
+      # Determine branch: assume current or cf/*-shard-$key
       branch=$(git -C "$repo_root" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
       if [ -z "$branch" ] || [[ "$branch" != *"shard-$key"* ]]; then
         # try to find
-        branch=$(git -C "$repo_root" branch --list "ctxflow/*shard-$key" | head -1 | tr -d ' *' || echo "")
+        branch=$(git -C "$repo_root" branch --list "cf/*shard-$key" | head -1 | tr -d ' *' || echo "")
       fi
       if [ -n "$branch" ]; then
         sha=$(git -C "$repo_root" rev-parse "$branch" 2>/dev/null || echo "")

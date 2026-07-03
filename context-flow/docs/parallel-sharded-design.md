@@ -1,8 +1,8 @@
-# Parallel Sharded Pi — Design
+# Parallel Sharded OMP — Design
 
 Status: draft (architecture proposal, not yet implemented)
 Scope: context-flow Phase 3 (Implement) overhaul + Plan phase additions
-Author intent: let `cf` run a large goal to completion inside a single main-context budget by fanning out Pi work in parallel as main-launched background tasks, reading each shard's paths-only outcome directly, and routing structured escalations without bouncing through the user.
+Author intent: let `cf` run a large goal to completion inside a single main-context budget by fanning out OMP work in parallel as main-launched background tasks, reading each shard's paths-only outcome directly, and routing structured escalations without bouncing through the user.
 
 ---
 
@@ -10,14 +10,14 @@ Author intent: let `cf` run a large goal to completion inside a single main-cont
 
 ### Goals
 - **Token budget**: minimize main-orchestrator token spend so a medium goal (5–10 contracts, 2–3 replan cycles) finishes well under the compaction threshold.
-- **Parallelism**: dispatch multiple Pi processes concurrently at the finest meaningful granularity (per parallel group of contracts).
-- **Recoverability**: agent or Pi failures must never invalidate already-completed contract work.
-- **Adaptive escalation**: Pi can signal "spec is wrong, not my bug" and the system replans only the affected slice without nuking validated work.
-- **Single flow**: no branch between "single Pi" and "sharded Pi". Sharding with N=1 IS the single-Pi case.
+- **Parallelism**: dispatch multiple OMP processes concurrently at the finest meaningful granularity (per parallel group of contracts).
+- **Recoverability**: agent or OMP failures must never invalidate already-completed contract work.
+- **Adaptive escalation**: OMP can signal "spec is wrong, not my bug" and the system replans only the affected slice without nuking validated work.
+- **Single flow**: no branch between "single OMP" and "sharded OMP". Sharding with N=1 IS the single-worker case.
 
 ### Non-Goals
-- Replacing the Claude implement agent fallback (it remains for non-Pi environments).
-- Cross-Pi real-time coordination (sub-agents cannot talk to each other while running; coordination happens at fan-out boundaries).
+- Replacing the Claude implement agent fallback (it remains for non-OMP environments).
+- Cross-OMP real-time coordination (sub-agents cannot talk to each other while running; coordination happens at fan-out boundaries).
 - Eliminating human review at the end of the flow.
 
 ---
@@ -35,9 +35,9 @@ flowchart TB
     Shard -->|group B| ShB[cf-pi-run.sh B<br/>background task<br/>worktree B, branch cf/.../shard-B]
     Shard -->|group C| ShC[cf-pi-run.sh C<br/>background task<br/>worktree C, branch cf/.../shard-C]
 
-    ShA --> PiA[Pi process]
-    ShB --> PiB[Pi process]
-    ShC --> PiC[Pi process]
+    ShA --> PiA[OMP process]
+    ShB --> PiB[OMP process]
+    ShC --> PiC[OMP process]
 
     PiA --> OutA[outcome.md A:<br/>paths-only<br/>PASS / FAIL / NEEDS_REPLAN]
     PiB --> OutB[outcome.md B]
@@ -63,8 +63,8 @@ flowchart TB
 | Layer | Owns | Token cost source |
 |---|---|---|
 | Main orchestrator | Goal interpretation, shard fan-out decisions, reading each shard's paths-only `outcome.md`, outcome routing, integration gate, user-facing summary | Initial goal + per-shard `outcome.md` reads + integration + final summary |
-| `cf-pi-run.sh` (per shard, main-launched **background task**) | Full Pi lifecycle: worktree → brief → probe → dispatch → poll → gates → outcome write. No sub-agent. Heavy stdout goes to the task's own output file; main reads only the resulting `outcome.md` | Zero Claude tokens (background task; main reads only `outcome.md`) |
-| Pi | Implement contracts, per-contract commit, write `$REPORT_FILE` or `$ESCALATE_FILE` | Zero Claude tokens (separate billing) |
+| `cf-pi-run.sh` (per shard, main-launched **background task**) | Full OMP lifecycle: worktree → brief → probe → dispatch → poll → gates → outcome write. No sub-agent. Heavy stdout goes to the task's own output file; main reads only the resulting `outcome.md` | Zero Claude tokens (background task; main reads only `outcome.md`) |
+| OMP | Implement contracts, per-contract commit, write `$REPORT_FILE` or `$ESCALATE_FILE` | Zero Claude tokens (separate billing) |
 
 ---
 
@@ -118,7 +118,7 @@ Field rules:
 - `name`: stable identifier (used as anchor in plan.md, key for partial-replan, branch label hint).
 - `touches_files`: superset of every file the contract creates or modifies (test files count). Underset is a bug; `cf-pi-run.sh` post-validates `actual ⊆ declared` and NEEDS_REPLANs on violation.
 - `test_cases`: structured test intent, drives grep-guard generation in shell (no markdown parsing).
-- `attachments`: **escape hatch for prose**. When a contract genuinely needs rich design discussion / decision log / diagrams, Plan attaches a markdown file under `plan-attachments/`. Brief assembly includes attachment contents verbatim for Pi to read. Empty array is the common case.
+- `attachments`: **escape hatch for prose**. When a contract genuinely needs rich design discussion / decision log / diagrams, Plan attaches a markdown file under `plan-attachments/`. Brief assembly includes attachment contents verbatim for OMP to read. Empty array is the common case.
 
 ### Group derivation (script, not Plan)
 
@@ -144,13 +144,13 @@ Output: `$SESSION/shards.json`:
 
 Same-file ⇒ same group, deterministically. Physical merge conflicts at integration become structurally impossible (semantic regressions are still possible — integration gate is their safety net).
 
-If `fan_out_count == 1`, the single-Pi case is identical in code path — just one background `cf-pi-run.sh` task.
+If `fan_out_count == 1`, the single-worker case is identical in code path — just one background `cf-pi-run.sh` task.
 
 ---
 
 ## 4. Shard Isolation & Recoverability
 
-Each shard runs in its own git worktree on its own branch. No two Pi processes ever touch the same checkout. Combined with §3's file-graph sharding, **two shards cannot edit the same file** — integration-time merges are conflict-free by construction (semantic regressions excepted; integration gate catches those).
+Each shard runs in its own git worktree on its own branch. No two OMP processes ever touch the same checkout. Combined with §3's file-graph sharding, **two shards cannot edit the same file** — integration-time merges are conflict-free by construction (semantic regressions excepted; integration gate catches those).
 
 | Resource | Naming | Lifetime |
 |---|---|---|
@@ -161,19 +161,19 @@ Each shard runs in its own git worktree on its own branch. No two Pi processes e
 
 ### Recoverability ladder
 
-1. **Per-contract commit (existing Pi protocol §3.6)**: failed contracts inside a shard leave no commit. PARTIAL shard's branch already represents only validated work.
+1. **Per-contract commit (existing OMP protocol §3.6)**: failed contracts inside a shard leave no commit. PARTIAL shard's branch already represents only validated work.
 2. **Per-shard branch**: one shard's collapse never affects another's commits.
 3. **Checkpoint tag**: each PASS shard gets a tag — surgical rollback target.
-4. **Integration gate**: merge into a transient `cf/<flow>/integrated` branch and run the full test suite. The main cf-branch is only touched after integration passes — failures never corrupt the trunk.
+4. **Integration gate**: merge into a transient `cf/<flow-slug>-integrated` branch (sibling naming — a `/integrated` suffix would collide with the shard branch refs) and run the full test suite. The main cf-branch is only touched after integration passes — failures never corrupt the trunk.
 
 ### Worst case
 Entire flow aborts; all shard branches and checkpoint tags remain. User can cherry-pick validated contract commits manually.
 
 ---
 
-## 5. Pi Brief — Environment Block
+## 5. OMP Brief — Environment Block
 
-`cf-pi-brief.sh` is extended to inject an `## Environment` block before contracts. This is the only window Pi has into the worktree/branch context.
+`cf-pi-brief.sh` is extended to inject an `## Environment` block before contracts. This is the only window OMP has into the worktree/branch context.
 
 ```markdown
 ## Environment
@@ -194,11 +194,11 @@ Entire flow aborts; all shard branches and checkpoint tags remain. User can cher
 
 ---
 
-## 6. Pi Escalation Contract
+## 6. OMP Escalation Contract
 
-Added to `pi-implementer-protocol.md`. Pi triggers escalation by writing `$ESCALATE_FILE` then printing `DONE`.
+Added to `pi-implementer-protocol.md`. OMP triggers escalation by writing `$ESCALATE_FILE` then printing `DONE`.
 
-### When to escalate (Pi-side rules)
+### When to escalate (OMP-side rules)
 
 - A contract is internally inconsistent, contradicts another contract, or is infeasible as specified.
 - A required file/module from the Implementation Plan does not exist and creating it would change the architectural shape.
@@ -223,7 +223,7 @@ Added to `pi-implementer-protocol.md`. Pi triggers escalation by writing `$ESCAL
 {specific question or concrete unblock action}
 ```
 
-`$ESCALATE_FILE` presence after Pi exit ⇒ `cf-pi-run.sh` sets outcome status `NEEDS_REPLAN` regardless of whether `$REPORT_FILE` also exists. Any contract commits Pi made before escalation are preserved on the shard branch.
+`$ESCALATE_FILE` presence after OMP exit ⇒ `cf-pi-run.sh` sets outcome status `NEEDS_REPLAN` regardless of whether `$REPORT_FILE` also exists. Any contract commits OMP made before escalation are preserved on the shard branch.
 
 ---
 
@@ -234,13 +234,13 @@ Three statuses (collapsed from four — PARTIAL's routing was identical to NEEDS
 | Status | Trigger | Main routing |
 |---|---|---|
 | `PASS` | All contracts in shard survive gate 1 + gate 3 + file-scope check | Tag checkpoint, mark shard done |
-| `FAIL` | Pi infrastructure failure (probe error, stall after retry, dispatch broken, report missing) | Retry brief once; second FAIL ⇒ escalate to user |
+| `FAIL` | OMP infrastructure failure (probe error, stall after retry, dispatch broken, report missing) | Retry brief once; second FAIL ⇒ escalate to user |
 | `NEEDS_REPLAN` | Any of: `$ESCALATE_FILE` present; persistent test failure after one in-shard redispatch; an undeclared file was touched | Coalesce all NEEDS_REPLAN this round; accept any passed contracts; invoke Plan partial-replan for `affected_contracts` |
 
 `NEEDS_REPLAN` always carries:
 - `passed_contracts`: contracts that did survive (already committed on shard branch — preserved)
 - `affected_contracts`: contracts that need a spec revision
-- `reason`: enum + escalate.md path (when Pi-initiated) OR gate failure summary
+- `reason`: enum + escalate.md path (when worker-initiated) OR gate failure summary
 
 ### Round-collection rule
 
@@ -400,7 +400,7 @@ Main parses Status + Reason + Survived/Affected contracts deterministically. The
 
 ## 13. Token Budget Sketch (medium goal)
 
-Realistic estimate accounts for integration-gate failures auto-triggering NEEDS_REPLAN (decision 2a), which typically adds 1–2 extra replan cycles on top of Pi-initiated escalations.
+Realistic estimate accounts for integration-gate failures auto-triggering NEEDS_REPLAN (decision 2a), which typically adds 1–2 extra replan cycles on top of worker-initiated escalations.
 
 | Phase | Source | Happy path | Typical (2–3 replan cycles) |
 |---|---|---|---|
@@ -419,7 +419,7 @@ Both well under compaction threshold for a 200K-context model. The 40–60K typi
 
 ## 14. Open Risks
 
-- **Pi escalation discipline**: Pi must actually use `$ESCALATE_FILE` instead of silently giving up or claiming Completed. Protocol additions + brief environment block are the only enforcement; defense in depth is gates 2/3 catching false-PASS.
+- **OMP escalation discipline**: OMP must actually use `$ESCALATE_FILE` instead of silently giving up or claiming Completed. Protocol additions + brief environment block are the only enforcement; defense in depth is gates 2/3 catching false-PASS.
 - **`touches_files` underset (load-bearing)**: if Plan understates the files a contract touches, two shards may collide at runtime despite the file-graph saying they shouldn't. Mitigation: `cf-pi-run.sh` post-validates `actual_touched ⊆ declared_touched` and surfaces a NEEDS_REPLAN with `reason: undeclared_file_touched` when violated. Plan agent prompt must include a worked example showing test files count. Optional pre-flight lint via `grep -l` is a tightening, not a blocker.
 - **`contracts.json` schema drift**: the JSON sidecar is now load-bearing. Mitigation: `schema_version` field; every consumer script validates it and refuses on mismatch. Schema changes go through a versioned migration, never silent.
 - **Disk pressure**: N worktrees can balloon for large repos with many shards. Mitigation: worktree cleanup post-integration; cap fan-out to N ≤ 6 by default.
@@ -461,12 +461,12 @@ Token economics are guarded by **convention + scripts + the background-task boun
 | Artifact | Why dangerous | Where it lives |
 |---|---|---|
 | `contracts.json` full content | Can be 20KB+ for large plans | `$SESSION/contracts.json` — main passes the **path** only |
-| Pi's `$REPORT_FILE` full content | Verbose; only `## Summary` is meaningful | `cf-pi-run.sh` reads `head -20` internally; `outcome.md` carries only the path; main never reads it |
-| Pi's JSONL session files | Per-event chatter, MB scale | Live inside the background task; `cf-pi-poll.sh` does mtime/size checks only; `outcome.md` carries only the path |
+| OMP's `$REPORT_FILE` full content | Verbose; only `## Summary` is meaningful | `cf-pi-run.sh` reads `head -20` internally; `outcome.md` carries only the path; main never reads it |
+| OMP's JSONL session files | Per-event chatter, MB scale | Live inside the background task; `cf-pi-poll.sh` does mtime/size checks only; `outcome.md` carries only the path |
 | Test runner full output | Failure logs can be huge | `cf-pi-test.sh` already bounds; captured to the task's output file; main reads only a tail on demand |
 | Postmortem full content | ~5KB cap exists; still too big for casual read | `outcome.md` references the path only; main reads only on explicit deep-debug |
-| Brief content (per shard) | Each ~3–10KB | File-based; `cf-pi-brief.sh` writes it, Pi reads it; never reaches main |
-| `escalate.md` full content (Pi-authored) | Pi could write anything | `cf-pi-run.sh` bounds it internally (`head -80` into a snippet); `outcome.md` carries only the path; main reads bounded on demand |
+| Brief content (per shard) | Each ~3–10KB | File-based; `cf-pi-brief.sh` writes it, OMP reads it; never reaches main |
+| `escalate.md` full content (OMP-authored) | OMP could write anything | `cf-pi-run.sh` bounds it internally (`head -80` into a snippet); `outcome.md` carries only the path; main reads bounded on demand |
 | Plan revision JSON content | Schema artifact, can be large | `cf-pi-merge-revision.sh` applies via `jq` from path; main never holds |
 | Integration test logs | Can match test-runner verbosity | `cf-pi-integrate.sh` writes `integration-result.json` with top-K failures only |
 
@@ -487,7 +487,7 @@ Forbidden: `Read(file)` with no limit on any artifact > 1KB.
 
 | Scenario | Naive cost | Mitigation |
 |---|---|---|
-| Re-dispatch same shard's Pi after gate-3 fail | A full extra dispatch+poll cycle | Handled INSIDE `cf-pi-run.sh`: one in-script resume re-brief (`dispatch_and_poll "$REBRIEF_FILE"`) reuses Pi's warm session before giving up. Main does not re-launch for gate-3 fails — only for FAIL infrastructure failures |
+| Re-dispatch same shard's OMP after gate-3 fail | A full extra dispatch+poll cycle | Handled INSIDE `cf-pi-run.sh`: one in-script resume re-brief (`dispatch_and_poll "$REBRIEF_FILE"`) reuses OMP's warm session before giving up. Main does not re-launch for gate-3 fails — only for FAIL infrastructure failures |
 | Plan partial-replan | Plan re-investigates same files | Pass `base_contracts` + `escalations` paths only; do NOT re-include research output (Plan reads from disk if needed) |
 | Main re-reads dispatch-state per round | Each round, file accumulates history | Main reads via `jq '.rounds[-1]'` (latest round only); full history is archive |
 | Reading a shard's outcome | Verbose narrative would bloat the read | `outcome.md` is paths-only by construction — no narrative to bloat; deeper context is pulled (bounded) from the referenced paths only when routing needs it |

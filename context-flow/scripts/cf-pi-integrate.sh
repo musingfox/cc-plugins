@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Integration gate: merge all PASS shard branches into cf/<flow>/integrated,
+# Integration gate: merge all PASS shard branches into cf/<flow-slug>-integrated,
 # run the full test suite there, classify outcome.
 #
 # Usage:   cf-pi-integrate.sh FLOW_SESSION TEST_RUNNER
 # Reads:   $SHARDS_FILE (group -> contracts), $DISPATCH_STATE_FILE (which shards PASS).
-# Writes:  $INTEGRATION_RESULT (json), integration branch cf/<flow>/integrated.
+# Writes:  $INTEGRATION_RESULT (json), integration branch cf/<flow-slug>-integrated.
 # Exit:    0 PASS, 2 NEEDS_REPLAN (per decision 2a), 3 merge conflict (structurally
 #          impossible but guarded), 4 misuse.
 # Stdout:  short progress lines + final status word.
@@ -68,7 +68,10 @@ if [ -z "$shard_ids" ]; then
 fi
 
 flow_basename=$(basename "$flow_session")
-integration_branch="ctxflow/$flow_basename/integrated"
+flow_slug="${CF_SLUG:-$flow_basename}"
+# Sibling naming, NOT "cf/$flow_slug/integrated": shard branches live at
+# cf/$flow_slug*, and git refs cannot have cf/X as both file and dir.
+integration_branch="cf/$flow_slug-integrated"
 integration_work="$flow_session/integrated-work"
 
 # Snapshot base = the BASE_HEAD captured at flow start.
@@ -95,8 +98,9 @@ for sid in $shard_ids; do
     echo "shard-$sid: SKIP (no shard env)"
     continue
   fi
-  sb_basename=$(grep -E '^SESSION_BASENAME=' "$shard_env" | head -1 | sed 's/^SESSION_BASENAME="\(.*\)"$/\1/')
-  shard_branch="ctxflow/$sb_basename"
+  sb_slug=$(grep -E '^CF_SLUG=' "$shard_env" | tail -1 | sed 's/^CF_SLUG="\(.*\)"$/\1/')
+  [ -z "$sb_slug" ] && sb_slug=$(grep -E '^SESSION_BASENAME=' "$shard_env" | head -1 | sed 's/^SESSION_BASENAME="\(.*\)"$/\1/')
+  shard_branch="cf/$sb_slug"
   if ! git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$shard_branch"; then
     echo "shard-$sid: SKIP (branch $shard_branch missing)"
     continue

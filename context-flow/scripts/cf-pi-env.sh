@@ -3,7 +3,7 @@
 #
 # load_cf_pi_env SESSION
 #   Sources $SESSION/env.sh (session-wide vars) and derives session-scoped paths.
-#   Works for both flat (legacy single-Pi) and shard (sub-session under flow/shards/<id>)
+#   Works for both flat (legacy single-worker) and shard (sub-session under flow/shards/<id>)
 #   layouts -- it only knows about the session passed in. Per-shard layout is
 #   established by cf-pi-shard.sh which seeds each shard dir with its own env.sh.
 #   Creates $PI_SESSION_DIR if missing.
@@ -57,7 +57,7 @@ load_cf_pi_env() {
   PI_PROBE_DIR="$session/pi-probe"
   DIFF_FILE="$session/implement.diff"
   WORK="$session/work"
-  CF_BRANCH="ctxflow/$SESSION_BASENAME"
+  CF_BRANCH="cf/${CF_SLUG:-$SESSION_BASENAME}"
   PI_PID_FILE="$session/pi.pid"
   PI_START_FILE="$session/pi-start.ts"
   TEST_LOG="$session/test-output.log"

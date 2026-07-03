@@ -8,7 +8,7 @@
 #
 # Usage:   cf-pi-run.sh SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER
 # Stdout:  operator-facing progress lines (one per major event)
-# Writes:  $BRIEF_FILE, $REPORT_FILE (Pi), $ESCALATE_FILE (Pi optional),
+# Writes:  $BRIEF_FILE, $REPORT_FILE (OMP), $ESCALATE_FILE (OMP optional),
 #          $DIFF_FILE, $OUTCOME_FILE (this script -- structured outcome)
 # Exit:    0 = PASS, 1 = FAIL, 2 = NEEDS_REPLAN
 #
@@ -17,7 +17,7 @@
 #                            Environment block can include WORK/CF_BRANCH/BASE_HEAD)
 #   2. cf-pi-brief.sh        assemble brief
 #   3. cf-pi-probe.sh        liveness probe
-#   4. cf-pi-dispatch.sh     background Pi
+#   4. cf-pi-dispatch.sh     background OMP
 #   5. poll loop             cf-pi-poll.sh once per ~30s, max 70 rounds
 #   6. escalation detect     $ESCALATE_FILE present => NEEDS_REPLAN
 #   7. gate 1 report         head -20 contains ## Summary && ## Completed
@@ -155,7 +155,7 @@ shard_contract_names() {
 }
 
 # Extract Completed-claimed contract names from $REPORT_FILE.
-# Pi protocol uses "_(contract: Name)_" suffix on each Completed bullet.
+# OMP protocol uses "_(contract: Name)_" suffix on each Completed bullet.
 completed_contracts() {
   # Pull only the lines inside ## Completed section.
   sed -n '/^## Completed/,/^## /p' "$REPORT_FILE" \
@@ -218,7 +218,7 @@ esac
 # -------- 4-5. dispatch + poll (factored so step 9 can re-dispatch) -----
 
 # dispatch_and_poll [RESUME_PROMPT_FILE]
-# With an argument, cf-pi-dispatch.sh resumes the prior Pi session and sends the
+# With an argument, cf-pi-dispatch.sh resumes the prior OMP session and sends the
 # file as the new prompt (context-retaining re-brief); without, fresh dispatch.
 dispatch_and_poll() {
   local resume_file="${1:-}"
@@ -355,7 +355,7 @@ if [ "$TEST_RC" -ne 0 ]; then
   if grep -q '^test_exit=' "$SHARD_SESSION/gate3.out"; then
     # Cheap retest before the expensive re-dispatch: a first-run failure is often an
     # environment transient (parallel shards colliding on a shared port/service), not
-    # Pi's code. Re-dispatching Pi for those wastes a full dispatch+poll cycle.
+    # OMP's code. Re-dispatching OMP for those wastes a full dispatch+poll cycle.
     echo "[shard $SHARD_ID] gate 3 first run failed (rc=$TEST_RC), retesting once before re-dispatch"
     set +e
     "$SCRIPTS/cf-pi-test.sh" "$SHARD_SESSION" $TEST_RUNNER > "$SHARD_SESSION/gate3-retest.out" 2>&1
@@ -375,7 +375,7 @@ if [ "$TEST_RC" -ne 0 ]; then
     REBRIEF_FILE="$SHARD_SESSION/re-brief.md"
     {
       printf '## Previous run feedback\n'
-      printf 'The orchestrator ran the test suite and it failed. Inspect the failures, fix, re-commit per-contract, then print DONE.\n\n'
+      printf 'The orchestrator ran the test suite and it failed. Inspect the failures and fix. Fold each fix into that contract'\''s EXISTING commit instead of adding fixup commits: `git commit --amend` if it is the branch tip, otherwise `git commit --fixup=<that commit> && GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash %s`. This branch is a private worktree; rewriting it is safe. Then print DONE.\n\n' "$BASE_HEAD"
       printf '### Test output tail (last 30 lines)\n```\n'
       tail -30 "$SHARD_SESSION/gate3-retest.out" 2>/dev/null || tail -30 "$SHARD_SESSION/gate3.out"
       printf '\n```\n'
@@ -384,8 +384,8 @@ if [ "$TEST_RC" -ne 0 ]; then
     # re-sends the whole brief, which must then carry the feedback too.
     { printf '\n\n'; cat "$REBRIEF_FILE"; } >> "$BRIEF_FILE"
 
-    # Re-dispatch resumes the prior Pi session with only the feedback as the new
-    # prompt -- Pi keeps its working context instead of a cold start.
+    # Re-dispatch resumes the prior OMP session with only the feedback as the new
+    # prompt -- OMP keeps its working context instead of a cold start.
     # dispatch_and_poll exits on failure paths; on DONE returns.
     dispatch_and_poll "$REBRIEF_FILE"
 
@@ -422,6 +422,19 @@ if [ -n "$actual_files" ]; then
   undeclared=$(comm -23 <(printf '%s\n' "$actual_files") <(printf '%s\n' "$declared_files") || true)
 fi
 
+# Build/lock manifests are legitimately touched when the isolated worktree must
+# add a missing dev dep to run the tests (e.g. `uv add --dev pytest`). Treat
+# them as a warning, not a scope violation.
+BUILD_LOCK_ALLOWLIST='^(pyproject\.toml|uv\.lock|requirements[^/]*\.txt|package\.json|package-lock\.json|bun\.lock(b)?|yarn\.lock|pnpm-lock\.yaml|Cargo\.(toml|lock)|go\.(mod|sum)|Gemfile(\.lock)?)$'
+allowlisted=""
+if [ -n "$undeclared" ]; then
+  allowlisted=$(printf '%s\n' "$undeclared" | grep -E "$BUILD_LOCK_ALLOWLIST" || true)
+  undeclared=$(printf '%s\n' "$undeclared" | grep -vE "$BUILD_LOCK_ALLOWLIST" || true)
+fi
+if [ -n "$allowlisted" ]; then
+  echo "[shard $SHARD_ID] WARN undeclared build/lock files (allowlisted): $(printf '%s' "$allowlisted" | tr '\n' ',' | sed 's/,$//')"
+fi
+
 if [ -n "$undeclared" ]; then
   undecl_csv=$(printf '%s' "$undeclared" | tr '\n' ',' | sed 's/,$//')
   affected=$(shard_contract_names | awk '{print $0 ": gate-scope undeclared_file_touched"}')
@@ -438,6 +451,9 @@ git -C "$WORK" diff "$BASE_HEAD" > "$DIFF_FILE" 2>/dev/null || true
 # -------- 12. write PASS outcome ---------------------------------------
 
 # All contracts this shard declared + reported survived (gates 1+3 ok, scope ok).
-write_outcome PASS none "$survivors" "" "-" "-"
+# Allowlisted build/lock touches (if any) surface in undeclared_files for review.
+allow_csv="-"
+[ -n "$allowlisted" ] && allow_csv=$(printf '%s' "$allowlisted" | tr '\n' ',' | sed 's/,$//')
+write_outcome PASS none "$survivors" "" "-" "$allow_csv"
 echo "[shard $SHARD_ID] PASS"
 exit 0

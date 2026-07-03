@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Thin adapter: stop the Pi process via the canonical pi-stop.sh.
+# Thin adapter: stop the OMP process via the canonical pi-stop.sh.
 #
 # cf-facing interface (unchanged):
 #   Usage:   cf-pi-stop.sh SESSION [--abort]

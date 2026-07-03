@@ -1,5 +1,5 @@
 ---
-description: "Context-flow pipeline — contract-driven development with human-in-the-loop decision gating; Pi (pi.dev) as default implementer, Claude implement agent as fallback"
+description: "Context-flow pipeline — contract-driven development with human-in-the-loop decision gating; OMP as default implementer, Claude implement agent as fallback"
 argument-hint: "<goal>"
 allowed-tools: [Agent, Read, Write, Bash, Glob, Grep, AskUserQuestion]
 ---
@@ -14,7 +14,10 @@ Phase 3 mechanics live in `${CLAUDE_PLUGIN_ROOT}/scripts/cf-pi-*.sh`. The orches
 
 ```bash
 SCRIPTS="${CLAUDE_PLUGIN_ROOT}/scripts"
-SESSION=$("$SCRIPTS/cf-pi-setup.sh")    # honors PI_PROVIDER / PI_MODEL / PI_STALL_THRESHOLD_S / PI_WALL_CLOCK_S
+SESSION=$("$SCRIPTS/cf-pi-setup.sh" "<slug>")   # honors PI_PROVIDER / PI_MODEL / PI_STALL_THRESHOLD_S / PI_WALL_CLOCK_S
+# <slug> = task short name you derive from the goal: kebab-case, 1-3 words
+# (e.g. "rwd-setup"). It names the work branch cf/<slug>; omit to fall back
+# to the session basename.
 . "$SESSION/env.sh"                      # exposes SESSION_BASENAME, BRIEF_FILE, REPORT_FILE, PI_PROTOCOL, PI_AVAILABLE, PI_DESC, PROTOCOL_DIR, thresholds
 PROTOCOL_DIR="${PROTOCOL_DIR:-${CLAUDE_PLUGIN_ROOT}/docs}"
 echo '{"retries_used":0}' > "$SESSION/loop-budget.json"
@@ -48,8 +51,8 @@ to breaking-change-only.` — then apply these deltas:
 
 After setup, read `$PI_AVAILABLE` from env.sh:
 
-- `PI_AVAILABLE=1` → Phase 3 uses Pi (default).
-- `PI_AVAILABLE=0` → Phase 3 falls back to Claude `context-flow:implement` agent. Log: `omp CLI not on PATH — Phase 3 will use Claude implement agent. Install omp (bun i -g @oh-my-pi/pi-coding-agent) to use the Pi implementer.` Do NOT abort.
+- `PI_AVAILABLE=1` → Phase 3 uses OMP (default).
+- `PI_AVAILABLE=0` → Phase 3 falls back to Claude `context-flow:implement` agent. Log: `omp CLI not on PATH — Phase 3 will use Claude implement agent. Install omp (bun i -g @oh-my-pi/pi-coding-agent) to use the OMP implementer.` Do NOT abort.
 
 The fallback path is also reachable mid-flow (a shard's `Status: FAIL` with unrecoverable probe error, or the human selects "Fall back to Claude implement agent" at a recovery prompt). See §Phase 3.
 
@@ -61,11 +64,11 @@ The fallback path is also reachable mid-flow (a shard's `Status: FAIL` with unre
 |-------|-------|-------|
 | Research | `context-flow:research` | Read, Grep, Glob, Bash, WebFetch |
 | Plan | `context-flow:plan` | Read, Write, Grep, Glob |
-| **Implement (default)** | **Pi via background `cf-pi-run.sh`** | Pi's own tools + main's Bash/Read |
+| **Implement (default)** | **OMP via background `cf-pi-run.sh`** | OMP's own tools + main's Bash/Read |
 | Implement (fallback) | `context-flow:implement` | Read, Edit, Write, Bash, Glob, Grep, WebFetch |
 | Review | `context-flow:review` | Read, Write, Grep, Glob, Bash |
 
-Phase 3 uses Pi's provider/model config (override via `$PI_PROVIDER`/`$PI_MODEL`); the Claude fallback runs on the default model. If a more specialized agent exists for the goal (e.g., a frontend-dev agent for UI work), prefer it.
+Phase 3 uses OMP's provider/model config (override via `$PI_PROVIDER`/`$PI_MODEL`); the Claude fallback runs on the default model. If a more specialized agent exists for the goal (e.g., a frontend-dev agent for UI work), prefer it.
 
 ### Agent Output Discipline (file-write + summary reply)
 
@@ -125,7 +128,7 @@ Each phase below specifies its own option set. "Ask the human X" everywhere mean
 [research] → VALIDATE
   → [plan] → VALIDATE → HUMAN GATE (High decisions only)
        ↑ Research Insufficiency BLOCKED → research (cross-phase)
-  → [implement — Pi default, Claude fallback] → VALIDATE
+  → [implement — OMP default, Claude fallback] → VALIDATE
        ↑ Failure Class = retry-different-approach → implement (same plan, with hint)
        ↑ Failure Class = loop-back-to-plan → plan (revise contracts)
        ↑ Failure Class = pivot-goal → escalate to human (bypass retry budget)
@@ -289,7 +292,7 @@ carries that approval from the upstream handoff).
 
 ## Phase 3: Implement
 
-State to the human upfront: `Phase 3: parallel-sharded Pi fan-out on <N> contract(s). Parent branch ctxflow/$SESSION_BASENAME; per-shard branches under cf/$SESSION_BASENAME/shard-<id>.`
+State to the human upfront: `Phase 3: parallel-sharded OMP fan-out on <N> contract(s). Parent branch cf/$CF_SLUG; per-shard branches cf/$CF_SLUG-shard-<id>.`
 
 Phase 3 splits the contract set by file-touch graph and runs one `cf-pi-run.sh` per shard in parallel, each as a **main-launched background task** (no sub-agent). The full per-shard lifecycle (brief → worktree → probe → dispatch → poll → gates → outcome) lives in `cf-pi-run.sh`; main only fans out, collects each shard's paths-only `outcome.md`, and routes. Token discipline (design §17) is non-negotiable and is enforced by the boundary itself: a background task's heavy stdout (progress lines, JSONL) goes to its own output file, never into main's context — main reads only the paths-only `outcome.md` plus bounded `Read(file, limit=…)`, `jq '.field'`, and `head -N` peeks, and NEVER `report.md`, `contracts.json`, `escalate.md`, postmortems, or test logs.
 
@@ -303,7 +306,7 @@ Before sharding, materialize the parent worktree that all shard branches will be
 . "$SESSION/env.sh"                          # picks up REPO_ROOT, BASE_BRANCH, BASE_HEAD, WORK
 ```
 
-After this, `$WORK` is a git worktree on `ctxflow/$SESSION_BASENAME` forked from the user's HEAD at flow start. Per-shard branches (`cf/$SESSION_BASENAME/shard-A`, `-B`, …) are created from this parent inside `cf-pi-run.sh`; the integration gate merges them back here. The user's host working tree is never touched during implement. After Phase 4 PASS, the parent branch is rebased onto the latest `$BASE_BRANCH`.
+After this, `$WORK` is a git worktree on `cf/$CF_SLUG` forked from the user's HEAD at flow start. Per-shard branches (`cf/$CF_SLUG-shard-A`, `-B`, …) are created from this parent inside `cf-pi-run.sh`; the integration gate merges them back here. The user's host working tree is never touched during implement. After Phase 4 PASS, the parent branch is rebased onto the latest `$BASE_BRANCH`.
 
 If `$REPO_ROOT` is empty (host is non-git): `$WORK` is a scratch directory; integration and rollback degrade gracefully (each script reports the limitation in its result JSON).
 
@@ -381,7 +384,7 @@ Precedence within one round: **FAIL retries are resolved first, then NEEDS_REPLA
 
 #### Any FAIL
 
-A FAIL means Pi infrastructure failure (probe error, dispatch broken, stall after in-script retry, outcome missing/malformed). Re-launch `cf-pi-run.sh` for that shard with the same inputs — one message, one background `Bash` per failed shard if multiple:
+A FAIL means OMP infrastructure failure (probe error, dispatch broken, stall after in-script retry, outcome missing/malformed). Re-launch `cf-pi-run.sh` for that shard with the same inputs — one message, one background `Bash` per failed shard if multiple:
 
 ```
 Bash(run_in_background: true, command:
@@ -396,7 +399,7 @@ Per-shard, per-round FAIL retry budget = 1 (design §10).
 
 #### All PASS (after FAIL resolution)
 
-Run the integration gate — merge all PASS shard branches into `cf/$SESSION_BASENAME/integrated` and run the full test suite:
+Run the integration gate — merge all PASS shard branches into `cf/$CF_SLUG-integrated` and run the full test suite:
 
 ```bash
 "$SCRIPTS/cf-pi-integrate.sh" "$SESSION" "$TEST_RUNNER"
@@ -408,7 +411,7 @@ INT_STATUS=$(jq -r '.status' "$SESSION/integration-result.json")
 
 #### Any NEEDS_REPLAN (after FAIL resolution)
 
-Coalesce all NEEDS_REPLAN this round (Pi-initiated escalate.md, persistent-test-fail, undeclared_file_touched, AND any integration-injected affected_contracts) into a single Plan partial-replan invocation. Already-PASS contracts (from this and prior rounds) are preserved — their checkpoints stay on shard branches.
+Coalesce all NEEDS_REPLAN this round (worker-initiated escalate.md, persistent-test-fail, undeclared_file_touched, AND any integration-injected affected_contracts) into a single Plan partial-replan invocation. Already-PASS contracts (from this and prior rounds) are preserved — their checkpoints stay on shard branches.
 
 Build the Partial Replan Request block per `agents/plan.md` §Partial Replan Request, then dispatch:
 
@@ -470,7 +473,7 @@ Replan budget = 2 attempts per contract (third NEEDS_REPLAN escalates). Rollback
 
 Dispatch a single review agent.
 
-Capture the diff to a file before dispatching review — never into a shell variable, which would inject the full diff into the orchestrator's context. For Pi the diff is already at `$SESSION/implement.diff` (written by the integration gate). For Claude-fallback, capture it from the worktree now:
+Capture the diff to a file before dispatching review — never into a shell variable, which would inject the full diff into the orchestrator's context. For OMP the diff is already at `$SESSION/implement.diff` (written by the integration gate). For Claude-fallback, capture it from the worktree now:
 
 ```bash
 . "$SESSION/env.sh"
@@ -511,7 +514,7 @@ $SESSION/implement.diff
 
 Use changelog format — Added / Changed / Fixed sections describing **what the user/system can now do**, not which files were edited. Group related changes; use feature names over contract names. Then: `## Contract Status` (N/M passed) and `## Advisories` (critical/warning only — drop info unless relevant). See `agents/review.md` for full schema and rules.
 
-When describing the run, mention which implementer ran (`Implementation by Pi ($PI_DESC)` or `Fallback: Claude implement agent`).
+When describing the run, mention which implementer ran (`Implementation by OMP ($PI_DESC)` or `Fallback: Claude implement agent`).
 
 ### Handling the Verdict
 
@@ -542,19 +545,19 @@ Interpret the first token of `$REBASE_STATUS`:
 Always close with branch + ff guidance:
 
 ```
-Phase 4 PASSED. Committed to branch `ctxflow/$SESSION_BASENAME` (<N> commits).
+Phase 4 PASSED. Committed to branch `cf/$CF_SLUG` (<N> commits).
 
 To merge into your branch:
-  git checkout $BASE_BRANCH && git merge --ff-only ctxflow/$SESSION_BASENAME
+  git checkout $BASE_BRANCH && git merge --ff-only cf/$CF_SLUG
 
 Inspect first:
-  git log --oneline $BASE_BRANCH..ctxflow/$SESSION_BASENAME
-  git diff $BASE_BRANCH..ctxflow/$SESSION_BASENAME
+  git log --oneline $BASE_BRANCH..cf/$CF_SLUG
+  git diff $BASE_BRANCH..cf/$CF_SLUG
 ```
 
 On `CONFLICT`, also include the manual rebase command:
 ```
-  git checkout ctxflow/$SESSION_BASENAME
+  git checkout cf/$CF_SLUG
   git rebase $BASE_BRANCH    # resolve conflicts, then git rebase --continue
 ```
 
@@ -601,12 +604,12 @@ At the end of the flow (success OR escalation), invoke the cleanup script that `
 [ -n "${CLEANUP_SCRIPT:-}" ] && [ -x "$CLEANUP_SCRIPT" ] && bash "$CLEANUP_SCRIPT"
 ```
 
-Captures the final diff and removes the worktree. **The cf branch (`ctxflow/$SESSION_BASENAME`) intentionally survives** — it carries the per-contract commit history the human needs to fast-forward (success path) or salvage (escalation path). `$SESSION/` is also preserved for inspection. Log both the session path and the surviving branch name.
+Captures the final diff and removes the worktree. **The cf branch (`cf/$CF_SLUG`) intentionally survives** — it carries the per-contract commit history the human needs to fast-forward (success path) or salvage (escalation path). `$SESSION/` is also preserved for inspection. Log both the session path and the surviving branch name.
 
 If a prior `/cf` flow left a stale branch the user no longer wants, suggest cleanup explicitly:
 
 ```
-git branch -D ctxflow/<old-session>
+git branch -D cf/<old-slug>
 ```
 
 Never delete cf branches automatically — the user owns that decision.

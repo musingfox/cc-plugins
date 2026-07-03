@@ -39,6 +39,13 @@ replan=$(jq -r '.replan_count.Foo' "$FLOW_SESSION/dispatch-state.json")
 assert_eq "2" "$replan" "T3 replan_count.Foo == 2"
 rm -rf "$FLOW_SESSION"
 
+# T3b: positional FLOW_SESSION (the /cf command-doc calling convention) works
+# without the env var and wins over an env-set value.
+pos_session="$(mktemp -d)"
+env -u FLOW_SESSION "$CF_TESTS_DIR/../scripts/cf-pi-record-round.sh" "$pos_session" --round 1 --result A=PASS
+assert_json "$pos_session/dispatch-state.json" '.results_latest.A' "PASS" "T3b positional session accepted"
+rm -rf "$pos_session"
+
 # T4: no --round flag -> exit 2, no dispatch-state.json mutation
 FLOW_SESSION="$(mktemp -d)"
 export FLOW_SESSION

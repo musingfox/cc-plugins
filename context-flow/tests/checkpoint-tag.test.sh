@@ -4,7 +4,7 @@
 
 . "$CF_TESTS_DIR/lib/assert.sh"
 
-# T1: given a git repo with branch ctxflow/<flow>-shard-A at sha S, record-round --round 1 --result A=PASS
+# T1: given a git repo with branch cf/<flow>-shard-A at sha S, record-round --round 1 --result A=PASS
 # -> expect git tag -l 'cf-checkpoint/*shard-A*' is non-empty and resolves to sha S
 REPO_ROOT="$(mktemp -d)"
 export REPO_ROOT
@@ -14,7 +14,7 @@ mkdir -p "$FLOW_SESSION"
 cd "$REPO_ROOT"
 git init -q
 git commit --allow-empty -m init -q
-git checkout -b ctxflow/myflow-shard-A -q
+git checkout -b cf/myflow-shard-A -q
 sha=$(git rev-parse HEAD)
 "$CF_TESTS_DIR/../scripts/cf-pi-record-round.sh" --round 1 --result A=PASS
 tag=$(git tag -l 'cf-checkpoint/*shard-A*' | head -1)
@@ -32,7 +32,7 @@ mkdir -p "$FLOW_SESSION"
 cd "$REPO_ROOT"
 git init -q
 git commit --allow-empty -m init -q
-git checkout -b ctxflow/myflow-shard-A -q
+git checkout -b cf/myflow-shard-A -q
 "$CF_TESTS_DIR/../scripts/cf-pi-record-round.sh" --round 1 --result A=PASS
 tag_in_state=$(jq -r '.checkpoints.A' "$FLOW_SESSION/dispatch-state.json")
 assert_contains "$tag_in_state" "cf-checkpoint/" "T2 checkpoints.A has cf-checkpoint/"
@@ -48,7 +48,7 @@ mkdir -p "$FLOW_SESSION"
 cd "$REPO_ROOT"
 git init -q
 git commit --allow-empty -m init -q
-git checkout -b ctxflow/myflow-shard-B -q
+git checkout -b cf/myflow-shard-B -q
 "$CF_TESTS_DIR/../scripts/cf-pi-record-round.sh" --round 1 --result B=NEEDS_REPLAN
 tag_count=$(git tag -l 'cf-checkpoint/*shard-B*' | wc -l | tr -d ' ')
 assert_eq "0" "$tag_count" "T3 no tag for NEEDS_REPLAN"

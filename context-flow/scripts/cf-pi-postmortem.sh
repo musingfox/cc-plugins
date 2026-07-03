@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bounded post-mortem (~5 KB) of a failed Pi run.
+# Bounded post-mortem (~5 KB) of a failed OMP run.
 # Use on kill-status paths only (STALL / ERROR / TIMEOUT / NO_JSONL_FAIL).
 # On DONE the report file IS the post-mortem; skip this script.
 #
@@ -43,6 +43,6 @@ echo "error_count=$ERROR_COUNT jsonl=${JSONL:-<none>}"
 echo "=== JSONL (${JSONL:-<none>}) ==="
 [ -n "$JSONL" ] && grep -m 5 '"errorMessage"' "$JSONL" | head -c 2000
 [ -n "$JSONL" ] && tail -3 "$JSONL" | head -c 2000
-echo "=== Pi stderr (${CANON_STDERR:-<none>}) ==="; [ -n "$CANON_STDERR" ] && tail -10 "$CANON_STDERR"
-echo "=== Pi stdout/result (${CANON_RESULT:-<none>}) ==="; [ -n "$CANON_RESULT" ] && tail -20 "$CANON_RESULT"
+echo "=== OMP stderr (${CANON_STDERR:-<none>}) ==="; [ -n "$CANON_STDERR" ] && tail -10 "$CANON_STDERR"
+echo "=== OMP stdout/result (${CANON_RESULT:-<none>}) ==="; [ -n "$CANON_RESULT" ] && tail -20 "$CANON_RESULT"
 echo "(Read tool on any path above for full content.)"
