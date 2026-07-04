@@ -24,8 +24,10 @@ by the `pi-agent.sh` primitives (start/send/poll/peek/ls/stop/watch).
 | (no analog)      | dedicated shell script (cf)   | none (zero inference) | fixed-domain repeated pipelines; maximum determinism |
 
 Rows 1–3 are model-driven (flexible, can drift); rows 4–5 are deterministic
-(reliable, written in advance). The haiku wrapper, wherever it appears, plays
-one role: context firewall + structured-output enforcement point.
+(reliable, written in advance). The haiku liaison, wherever it appears, is a
+**coordinator**: it establishes the environment, injects the brief, runs the
+deterministic checks, and assembles evidence — a context firewall and
+structured-output enforcement point. It never issues the verdict.
 
 ## Dispatch decision — fit first, cost second
 
@@ -59,11 +61,30 @@ hand it; anything not in the brief does not exist. A brief carries:
 - the operating environment: working directory (absolute paths, never cd
   out), available tools/CLIs, credential assumptions, output path.
 
-**Return end — a designated reviewer.** Judge ≥ builder, at the tool layer:
-every return path names its reviewer — main reads it directly; foreman
-distills and main reviews; a Workflow schema gate plus the consuming stage;
-cf's gate scripts. A dispatch with no reviewer is not a dispatch — it's
-abandonment.
+**Return end — independent review (builder ↔ advisor).** Every dispatch
+names its reviewer, and the reviewer is never the builder (self-acceptance)
+nor the coordinator that dispatched it (self-certification — the coordinator
+has a close-the-task incentive). Three seats:
+
+- **coordinator** runs the deterministic checks (tests, acceptance commands,
+  schema) and assembles the evidence bundle;
+- **independent reviewer** judges what checks can't decide — non-
+  deterministic clauses ("minimal memory", "idiomatic") get evidence-backed
+  adversarial judgement at the contract's own precision, in a FRESH session
+  given only the contract + deliverable + check results (never the builder's
+  transcript);
+- **main** owns the final verdict.
+
+Capability rule: **reviewer ≥ builder** — `profiles.conf` is ordered
+(fast < balanced < careful); a builder on the top tier gets a fresh top-tier
+session or main itself as reviewer. The reviewer is just another dispatch —
+same primitives, stronger profile.
+
+Proportionality: deterministic checks always run; a separate reviewer is
+dispatched only when the deliverable is a code change or the contract has
+non-deterministic clauses; main may mark a dispatch `no-review` when it will
+read and judge the result itself. A dispatch with no reviewer on any seat is
+not a dispatch — it's abandonment.
 
 ## Empirical footnotes (2026-07, verified live)
 
