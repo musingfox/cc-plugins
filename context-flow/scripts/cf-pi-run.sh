@@ -481,12 +481,29 @@ fi
 git -C "$WORK" add --intent-to-add -- . 2>/dev/null || true
 git -C "$WORK" diff "$BASE_HEAD" > "$DIFF_FILE" 2>/dev/null || true
 
-# -------- 12. write PASS outcome ---------------------------------------
+# -------- 12. completeness gate + write PASS outcome --------------------
+
+allow_csv="-"
+[ -n "$allowlisted" ] && allow_csv=$(printf '%s' "$allowlisted" | tr '\n' ',' | sed 's/,$//')
+
+# PASS requires survivors == declared. A shard that quietly implemented only a
+# subset (unimplemented contracts have no failing test yet, so gate 3 can't see
+# them) must NOT read as success — route the missing contracts to replan now
+# instead of letting Phase-4 Review discover them after a wasted integration.
+missing=""
+for cname in $declared_names; do
+  echo "$survivors" | grep -qxF "$cname" || missing="$missing${missing:+
+}$cname"
+done
+if [ -n "$missing" ]; then
+  say "incomplete: declared but not completed: $(echo "$missing" | tr '\n' ' ')"
+  write_outcome NEEDS_REPLAN incomplete-contracts "$survivors" "$missing" "-" "$allow_csv"
+  say "NEEDS_REPLAN incomplete-contracts"
+  exit 2
+fi
 
 # All contracts this shard declared + reported survived (gates 1+3 ok, scope ok).
 # Allowlisted build/lock touches (if any) surface in undeclared_files for review.
-allow_csv="-"
-[ -n "$allowlisted" ] && allow_csv=$(printf '%s' "$allowlisted" | tr '\n' ',' | sed 's/,$//')
 write_outcome PASS none "$survivors" "" "-" "$allow_csv"
 say "PASS"
 exit 0
