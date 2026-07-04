@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
 # pi-build.sh — BLOCKING build-via-Pi wrapper for spiral's BUILD act.
 #
-# The cf-pi-run.sh shape: one Bash call in, one terminal OUTCOME out. It dispatches
-# a self-contained build brief to Pi (background, via the canonical pi-dispatch.sh),
-# then BLOCKS in a short poll loop until pi-poll.sh reports a terminal STATUS, and
-# emits exactly one OUTCOME line (+ an outcome.txt on disk).
+# One Bash call in, one terminal OUTCOME out. Delegates the dispatch+block+reap
+# composition to the canonical pi-run.sh (whose detached watchdog reaps the worker
+# at the deadline even if this call's owner dies mid-wait), and reformats the
+# outcome with spiral's MODEL label (+ an outcome.txt on disk).
 #
 # Division of labor (load-bearing): this script offloads only the LABOR of writing
-# code. Pi edits the working tree as a side effect of acting on the brief. This
-# script does NOT run the gate — judging the build against the frozen gate, deciding
-# a re-brief, and falling back are convergence's job (the judgment stays on Claude).
+# code. Pi edits the files its brief points at — pass --cwd with a WORKTREE so
+# those edits land in isolation, never in the live tree. This script does NOT run
+# the gate — judging the build against the frozen gate, deciding a re-brief, and
+# falling back are convergence's job (the judgment stays on Claude).
 #
 # Usage:
-#   pi-build.sh BRIEF_FILE [OUTDIR]
+#   pi-build.sh [--cwd DIR] BRIEF_FILE [OUTDIR]
+#     --cwd DIR  — run the dispatch from DIR (the courier's isolation worktree);
+#                  relative paths in the brief resolve there.
 #     BRIEF_FILE — a self-contained build brief (path). convergence assembles it.
 #     OUTDIR     — base dir for run artifacts (default: ${PI_RUNS_DIR:-$HOME/.cache/pi-runs}/spiral).
 #
@@ -58,8 +61,18 @@ if [ "${PI_RESOLVE_ONLY:-}" = "1" ]; then
   exit 0
 fi
 
-BRIEF_FILE="${1:?usage: pi-build.sh BRIEF_FILE [OUTDIR]}"
+# Optional leading --cwd DIR: run the dispatch from DIR (the courier's worktree).
+BUILD_CWD=""
+if [ "${1:-}" = "--cwd" ]; then
+  BUILD_CWD="${2:?--cwd needs DIR}"
+  shift 2
+fi
+
+BRIEF_FILE="${1:?usage: pi-build.sh [--cwd DIR] BRIEF_FILE [OUTDIR]}"
 OUTDIR="${2:-${PI_RUNS_DIR:-$HOME/.cache/pi-runs}/spiral}"
+# Absolute-ify before any cd so --cwd cannot re-point them.
+case "$BRIEF_FILE" in /*) ;; *) BRIEF_FILE="$PWD/$BRIEF_FILE" ;; esac
+case "$OUTDIR"     in /*) ;; *) OUTDIR="$PWD/$OUTDIR"         ;; esac
 
 # Routing label: mirror what the canonical pi-dispatch.sh will actually resolve
 # (env > profile > canonical default) via its no-launch introspection seam, so
@@ -72,7 +85,6 @@ if [ -z "$MODEL" ] && [ -n "$CANON_DISPATCH" ] && [ -f "$CANON_DISPATCH" ]; then
   MODEL="$(printf '%s' "$_resolved" | sed -n 's/.*MODEL=//p')"
 fi
 MODEL_LABEL="${PROVIDER:+$PROVIDER/}${MODEL:-unresolved}"
-POLL_INTERVAL="${PI_POLL_INTERVAL_S:-5}"
 
 # Cap the wall-clock UNDER the harness's 600s Bash-tool ceiling so the poll loop's
 # own TIMEOUT (which group-kills the orphan pi via pi-stop.sh before returning) always
@@ -101,40 +113,24 @@ if ! probe_line="$("$CANON_DIR/pi-probe.sh" --bin-only 2>/dev/null)"; then
   exit 0
 fi
 
-START=$(date +%s)
-
-# Launch Pi (non-blocking) via the canonical pi-dispatch.sh and capture the run handle.
-launch="$("$CANON_DIR/pi-dispatch.sh" "$BRIEF_FILE" "$OUTDIR")"
-RUNDIR="$(printf '%s\n' "$launch" | sed -n 's/^RUNDIR=//p')"
-OUTPUT="$(printf '%s\n' "$launch" | sed -n 's/^OUTPUT=//p')"
-if [ -z "$RUNDIR" ]; then
-  echo "OUTCOME=FAIL OUTPUT= MODEL=$MODEL_LABEL | dispatch-failed"
+# Run to terminal via the canonical pi-run.sh: dispatch + block + one OUTCOME line.
+# Its detached watchdog reaps the worker at the deadline even if THIS process (or
+# the courier's Bash call above us) is killed mid-wait — orphan safety no longer
+# depends on the courier passing the right Bash-tool timeout.
+# --cwd: run the dispatch from an isolation dir (worktree) so the worker's cwd —
+# and every relative path in the brief — lands there, never in the live tree.
+if [ -n "$BUILD_CWD" ]; then cd "$BUILD_CWD" || {
+  echo "OUTCOME=FAIL OUTPUT= MODEL=$MODEL_LABEL | bad --cwd $BUILD_CWD"
   exit 0
-fi
-OUTCOME_FILE="$RUNDIR/outcome.txt"
-
-emit() {  # emit OUTCOME to both stdout and outcome.txt
-  printf '%s\n' "$1" | tee "$OUTCOME_FILE"
-}
-
-# Block in a short poll loop until terminal. pi-poll.sh self-cancels an orphan pi on
-# TIMEOUT/STALL/ERROR (it calls pi-stop.sh before printing FAIL), so a terminal FAIL
-# never leaves a stray pi behind.
-while :; do
-  line="$("$CANON_DIR/pi-poll.sh" "$RUNDIR")"
-  case "$line" in
-    STATUS=OK*)
-      emit "OUTCOME=OK OUTPUT=$OUTPUT MODEL=$MODEL_LABEL | $line"
-      exit 0 ;;
-    STATUS=FAIL*)
-      emit "OUTCOME=FAIL OUTPUT=$OUTPUT MODEL=$MODEL_LABEL | $line"
-      exit 0 ;;
-  esac
-  # Script-level deadline guard (poll never reported terminal in time).
-  if [ $(( $(date +%s) - START )) -gt "$SCRIPT_DEADLINE" ]; then
-    "$CANON_DIR/pi-stop.sh" "$RUNDIR" >/dev/null 2>&1
-    emit "OUTCOME=FAIL OUTPUT=$OUTPUT MODEL=$MODEL_LABEL | script-deadline ${SCRIPT_DEADLINE}s"
-    exit 0
-  fi
-  sleep "$POLL_INTERVAL"
-done
+}; fi
+line="$("$CANON_DIR/pi-run.sh" --deadline "$SCRIPT_DEADLINE" "$BRIEF_FILE" "$OUTDIR")"
+RUNDIR="$(printf '%s\n' "$line" | sed -n 's/.*RUNDIR=\([^ ]*\).*/\1/p')"
+OUTPUT="$(printf '%s\n' "$line" | sed -n 's/.*OUTPUT=\([^ ]*\).*/\1/p')"
+STATUS_TAIL="${line#*| }"
+case "$line" in
+  OUTCOME=OK*)  out="OUTCOME=OK OUTPUT=$OUTPUT MODEL=$MODEL_LABEL | $STATUS_TAIL" ;;
+  *)            out="OUTCOME=FAIL OUTPUT=$OUTPUT MODEL=$MODEL_LABEL | $STATUS_TAIL" ;;
+esac
+printf '%s\n' "$out"
+[ -n "$RUNDIR" ] && printf '%s\n' "$out" > "$RUNDIR/outcome.txt"
+exit 0

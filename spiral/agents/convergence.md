@@ -42,34 +42,44 @@ three acts and the single goal of each:
   lower the frozen contract to fit the build.
   - **Courier mode — offloading the typing to Pi (when `$SPIRAL_PI_BUILD` is set, off by default).**
     Writing the code is labor; judging it is not. On this path you are a **pure relay with no
-    judgment**: assemble the brief, run Pi, keep Pi inside its lane, run the gate — you do **not**
-    write code yourself and you do **not** adjudicate a red. Before dispatching, the tree should be
-    clean (the offload path delegates *instead of* writing) — confirm with `git status --porcelain`;
-    if it is not clean, you are not on the offload path.
-    1. Assemble a **self-contained** build brief to `.spiral/pi-build-brief.md` — Pi shares none of
+    judgment**: create the isolation worktree, assemble the brief, run Pi, run the gate IN the
+    worktree, apply the diff only on green — you do **not** write code yourself and you do **not**
+    adjudicate a red. Pi NEVER touches the live tree: every failure path ends with removing the
+    worktree, so the baseline needs no revert.
+    1. **Create the isolation worktree** (canonical primitive; resolve its dir once with
+       `PI_RESOLVE_ONLY=1 bash "${CLAUDE_PLUGIN_ROOT}/scripts/pi-build.sh"` → `RESOLVED=<dir>`):
+       `bash <dir>/pi-worktree.sh create --repo_root "$PWD" --branch_name spiral/pi-turn-N \
+          --base_ref "$(git rev-parse HEAD)" --base_branch "$(git branch --show-current)" \
+          --work_path "$PWD/.spiral/pi-wt" --diff_out "$PWD/.spiral/pi-build.diff" \
+          --cleanup_out "$PWD/.spiral/pi-wt-cleanup.sh" --rundir-file "$PWD/.spiral/pi-rundir"`
+       It prints the worktree path (`$WT`).
+    2. Assemble a **self-contained** build brief to `.spiral/pi-build-brief.md` — Pi shares none of
        your context, so it needs everything to act without asking: the **frozen Examples**, the gate
-       file's contents quoted as **read-only success criteria** ("make `bash <gate>` pass; do NOT
-       modify the gate file or anything under `.spiral/`"), the constraints, and an explicit
-       **target file scope** (the only paths it may create or edit). Tell it to write the
-       implementation *and any tests it needs*, touch only in-scope files, and end with a one-line
-       list of files it changed.
-    2. Dispatch (blocking, one call) — **you MUST pass `timeout: 540000` to the Bash tool**, or the
-       default 120s kills it mid-poll and orphans Pi:
-       `PI_PROVIDER="$SPIRAL_PI_PROVIDER" PI_MODEL="$SPIRAL_PI_MODEL" bash "${CLAUDE_PLUGIN_ROOT}/scripts/pi-build.sh" .spiral/pi-build-brief.md`
-       The script self-caps Pi's wall-clock at 480s and returns one `OUTCOME=OK|FAIL` line; Pi edits
-       the working tree as a side effect.
-    3. **Scope revert (mechanical, not judgment).** `git status --porcelain` lists what Pi touched.
-       Revert everything **outside the declared target scope** and anything under `.spiral/`
-       (`git checkout -- <path>` for tracked, `git clean -f <path>` for new files) — the driver
-       commits with `git add -A`, so un-reverted junk *will* ride into the commit.
-    4. **Run the gate** (`bash .spiral/gate-turn-N.sh`). GREEN with scope clean → return `DONE`.
-       RED → re-brief Pi with the gate output (cap **2**).
-    5. **On failure, revert and hand back — never self-write.** `OUTCOME=FAIL`, out-of-scope edits as
-       a sign Pi went off the rails, or still-RED after the cap → **revert all of Pi's edits**
-       (in-scope too: `git checkout -- <tracked>`, `git clean -f <new>`) so the tree is the clean
-       baseline again, then return **`PI_FAILED`** to the driver. You do not rebuild it yourself: the
-       driver re-dispatches BUILD as a self-write instance on a stronger model. Pi is an accelerator,
-       never a single point of failure, and never a source of half-finished edits in the commit.
+       file's contents quoted as **read-only success criteria**, the constraints, and an explicit
+       **target file scope** whose paths all live **under `$WT`** (the only paths it may create or
+       edit; never mention the live repo's path). Tell it to write the implementation *and any tests
+       it needs*, touch only in-scope files, and end with a one-line list of files it changed.
+    3. Dispatch (blocking, one call):
+       `PI_PROVIDER="$SPIRAL_PI_PROVIDER" PI_MODEL="$SPIRAL_PI_MODEL" bash "${CLAUDE_PLUGIN_ROOT}/scripts/pi-build.sh" --cwd "$WT" "$PWD/.spiral/pi-build-brief.md"`
+       Returns one `OUTCOME=OK|FAIL … | <cause>` line; write the run's RUNDIR (`dirname` of the
+       line's `OUTPUT=` path) into `.spiral/pi-rundir` so cleanup can reap a straggler. Pass `timeout: 540000` to the Bash
+       tool so you get the OUTCOME back in-call; if you forget, the script's detached watchdog still
+       reaps Pi at the deadline — you lose the turn's result, never the tree.
+    4. **Run the gate in the worktree**: `(cd "$WT" && bash "$OWD/.spiral/gate-turn-N.sh")` where
+       `$OWD` is the live repo root (`.spiral/` is gitignored so the gate file exists only there).
+       GREEN → **scope-check the diff, then apply**: run
+       `bash <dir>/pi-worktree.sh clean "$PWD/.spiral/pi-wt-cleanup.sh"` (captures the full diff —
+       new files included — to `.spiral/pi-build.diff`, then removes the worktree); verify every
+       `+++ ` path in the diff is inside the declared scope (out-of-scope → treat as failure, do NOT
+       apply); then `git apply .spiral/pi-build.diff` in the live tree and return `DONE`.
+       RED → re-brief Pi with the gate output (cap **2**), same worktree.
+    5. **On failure, discard and hand back — never self-write.** `OUTCOME=FAIL`, out-of-scope paths
+       in the diff, or still-RED after the cap → run the cleanup (worktree removed; the live tree
+       was never touched), then return **`PI_FAILED reason=<the cause tail of the last OUTCOME line,
+       or "gate-red: <last failing gate line>">`** to the driver — the reason travels so the driver
+       re-dispatches informed, not blind. You do not rebuild it yourself: the driver re-dispatches
+       BUILD as a self-write instance on a stronger model. Pi is an accelerator, never a single
+       point of failure, and never a source of half-finished edits in the commit.
 
     "Never edit the gate" still holds. Judging the red (mis-forged vs a real wall) is the driver's and
     Divergence's job, not the courier's — you only report `DONE` or `PI_FAILED`. (A cheaper executor

@@ -243,13 +243,17 @@ builder:
   judgment** — so it takes the smallest model.
   > `Agent(subagent_type: "spiral:convergence", model: "haiku")` with a task beginning `BUILD:` then
   > the **approved** Examples and the gate path, plus a note that `$SPIRAL_PI_BUILD` is set so it runs
-  > the courier path (`$SPIRAL_PI_PROVIDER` / `$SPIRAL_PI_MODEL` route Pi). It returns `DONE` (gate
-  > green, scope clean) or `PI_FAILED` (it has already reverted Pi's edits to a clean baseline).
+  > the courier path (`$SPIRAL_PI_PROVIDER` / `$SPIRAL_PI_MODEL` route Pi). Pi builds inside an
+  > isolation worktree and its diff is applied to the live tree only after the gate passes there, so
+  > no failure path can leave Pi's edits behind. It returns `DONE` (gate green in the worktree, diff
+  > scope-checked and applied) or `PI_FAILED reason=<cause>` (worktree discarded, live tree untouched).
   >
   > On `PI_FAILED`, **re-dispatch BUILD as the self-write instance on `sonnet`** (the bullet above,
-  > toggle treated as off for this one re-dispatch). The courier never writes code itself, so Pi is
-  > an accelerator, never a single point of failure. Only a *self-write* red is a real red worth
-  > classifying in step 4 — a Pi flake is not, so it must never flow into the infeasibility path.
+  > toggle treated as off for this one re-dispatch), and pass the `reason=` through in the task so the
+  > self-writer knows what Pi tripped on (a stall/timeout means try a plainer decomposition; a gate-red
+  > means read that gate line first). The courier never writes code itself, so Pi is an accelerator,
+  > never a single point of failure. Only a *self-write* red is a real red worth classifying in step
+  > 4 — a Pi flake is not, so it must never flow into the infeasibility path.
 
 ### 4 — The machine: deterministic gate at commit
 
