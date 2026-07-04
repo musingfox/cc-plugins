@@ -5,7 +5,7 @@ Offload heavy work to cheap/fast models via [omp (oh-my-pi)](https://www.npmjs.c
 ## Architecture
 
 ```
-Claude (main)          pi-dispatcher agent (haiku)      omp worker (cheap model)
+Claude (main)          wrapper (haiku, optional)        omp worker (cheap model)
   write brief   ──►    pi-dispatch.sh (instant)   ──►   background run in RUNDIR
   ...                  pi-poll.sh loop (1 line/round)     result.md + stream + rc
   review result ◄──    tight summary + file path   ◄──   distilled final text
@@ -23,7 +23,7 @@ Claude (main)          pi-dispatcher agent (haiku)      omp worker (cheap model)
   - `pi-acp-poll.sh RUNDIR` — one line per call: `IDLE` / `RUNNING` / `PERMISSION id=… tool=… options=…` (worker blocked awaiting an answer — this is the governance hook) / `STATUS=DONE id=… stopReason=…` (per-turn terminal; turn text distilled to `result.md`) / `STATUS=DEAD`. Teardown reuses `pi-stop.sh` (same pid/pgid layout).
 
   Division of labor: `pi-dispatch.sh` (`-p` mode, auto-approved tools) stays the batch fan-out workhorse; ACP sessions are for interactive workers — per-tool-call approval, warm multi-turn without re-briefing, protocol-level cancel.
-- **`agents/pi-dispatcher.md`** — a haiku subagent that runs the launch→poll→distill loop so even the polling stays out of the main context.
+- **`agents/pi-foreman.md`** — a resident haiku coordinator: give it task descriptions, it writes briefs, dispatches via `pi-agent.sh`, watches the fleet, and reports to main over SendMessage; message it again to dispatch more or steer a worker. Works one-shot (single task, watch, report) or resident.
 
 ## Named agents — `pi-agent.sh` (native sub-agent verbs)
 
@@ -63,7 +63,7 @@ Dispatch is non-blocking, so fan-out is just N launches:
 
 1. Claude decomposes work into self-contained briefs (one observable outcome each).
 2. For code-writing tasks, `pi-worktree.sh create` one worktree per task; put the worktree path in the brief (worker uses absolute paths, never cd out).
-3. Launch each brief with `pi-dispatch.sh` (each returns instantly) — directly or via one `pi-dispatcher` agent per task.
+3. Launch each brief with `pi-dispatch.sh` (each returns instantly) — directly, or hand the whole fan-out to one `pi-foreman` agent.
 4. Poll each RUNDIR until terminal; failures carry diagnostics in `RUNDIR/pi.stderr.log`.
 5. `pi-worktree.sh clean` captures each task's diff; Claude reviews diffs/results against the brief's contract and merges or re-dispatches (resume via `PRIOR_RUNDIR` keeps the worker's session context).
 

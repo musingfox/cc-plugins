@@ -18,8 +18,8 @@ by the `pi-agent.sh` primitives (start/send/poll/peek/ls/stop/watch).
 | Native analog    | Control plane                 | Wrapper        | Use when |
 |------------------|-------------------------------|----------------|----------|
 | background task  | main + Monitor on `watch`     | none           | single small task; main reads the result anyway |
-| sub-agent        | one-shot haiku (pi-dispatcher)| one-shot       | single larger task; keep brief/result out of main's context |
-| agent team       | resident haiku (pi-foreman)   | resident       | multiple workers, cross-turn follow-ups, conversational steering |
+| sub-agent        | pi-foreman, used once         | one-shot       | single larger task; keep brief/result out of main's context |
+| agent team       | pi-foreman, resident          | resident       | multiple workers, cross-turn follow-ups, conversational steering |
 | dynamic workflow | Workflow script (deterministic)| one-shot per node | multi-stage pipelines needing schema gates, journal/resume, concurrency caps |
 | (no analog)      | dedicated shell script (cf)   | none (zero inference) | fixed-domain repeated pipelines; maximum determinism |
 

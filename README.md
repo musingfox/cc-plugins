@@ -210,7 +210,8 @@ Send Discord webhook notifications from Claude Code:
 ### pi-dispatch (Experimental)
 
 Offload heavy work to [omp (oh-my-pi)](https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent) cheap/fast models so Claude only writes briefs and reviews summaries — saving tokens:
-- **Dispatcher subagent (`pi-dispatcher`)**: runs on a cheap model (`haiku`); takes a self-contained brief, invokes the script, returns a tight summary + an output-file path — never the full result
+- **Foreman subagent (`pi-foreman`)**: resident haiku coordinator — give it task descriptions, it writes briefs, dispatches named workers via `pi-agent.sh`, watches the fleet, and reports to main over SendMessage; message it again to dispatch more or steer a worker
+- **`pi-agent.sh`**: name-addressed unified verbs (`start/send/poll/peek/ls/stop/watch`) mirroring native sub-agent UX; `send` resumes a finished worker's session, `watch` feeds the Monitor tool for push notifications
 - **`pi-dispatch.sh`**: launches one brief on a cheap/fast omp model in the background (default `grok-build`; `--profile fast|balanced|careful` or `PI_MODEL` to override), returns a run handle instantly — dispatch N briefs for parallel fan-out
 - **`pi-poll.sh` / `pi-stop.sh`**: idempotent one-line status polls and group-kill cancel; `pi-worktree.sh` isolates parallel code-writing tasks in git worktrees
 - **Claude reviews, workers write**: main thread issues briefs, collects diffs/summaries, and does the final review — all reading/reasoning/generation happens inside omp, off Claude's context
