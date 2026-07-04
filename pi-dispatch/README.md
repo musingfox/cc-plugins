@@ -41,6 +41,10 @@ Claude (main)          pi-dispatcher agent (haiku)      omp worker (cheap model)
 
 `send` on a finished batch run resumes its session (new RUNDIR, context preserved — native SendMessage semantics) and re-points the NAME; on an ACP session it starts the next turn. `watch` polls every registered agent, prints one line per meaningful state change (turn done, `PERMISSION` pending, dead, stall — volatile counters normalized away), and exits when nothing is in flight; arm it on the Monitor tool so each line arrives as a chat notification.
 
+When/how to choose between direct dispatch, dispatcher, foreman, Workflow
+thin-shells — and when not to outsource at all: see
+[docs/dispatch-doctrine.md](docs/dispatch-doctrine.md).
+
 ## Model routing
 
 `profiles.conf` maps names to omp models (must have working omp auth):
