@@ -274,7 +274,11 @@ dispatch_and_poll() {
   }
 
   local round=0
-  local max_rounds=70
+  # Ceiling derives from the documented tuning knob: raising PI_WALL_CLOCK_S for
+  # heavy briefs (Rust/Docker) must actually lift the hard stop, not just the
+  # poll-side guard. rounds = wall-clock / 30s interval, +4 rounds of settle
+  # slack so pi-poll's own wall-clock guard fires first (cleaner FAIL cause).
+  local max_rounds=$(( ${PI_WALL_CLOCK_S:-1800} / 30 + 4 ))
   while [ "$round" -lt "$max_rounds" ]; do
     round=$((round + 1))
     sleep 30
@@ -316,7 +320,7 @@ dispatch_and_poll() {
   # Exhausted rounds without DONE.
   "$SCRIPTS/cf-pi-stop.sh" "$SHARD_SESSION" --abort >/dev/null 2>&1 || true
   local pm; pm=$(do_postmortem)
-  write_outcome FAIL poll-ceiling "" "(all): poll loop ceiling (70 rounds)" "$pm" "-"
+  write_outcome FAIL poll-ceiling "" "(all): poll loop ceiling ($max_rounds rounds)" "$pm" "-"
   say "FAIL poll ceiling"
   exit 1
 }

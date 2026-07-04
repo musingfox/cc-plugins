@@ -222,6 +222,13 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/state.sh" set gate_path .spiral/gate-turn-N.
 bash .spiral/gate-turn-N.sh   # expect RED — a gate green before BUILD is a tautology
 ```
 
+Sanity-run includes a **behavioral floor when `$SPIRAL_PI_BUILD` is on**: read the gate and confirm
+at least one check EXECUTES the artifact (runs the code/tests/CLI and asserts on its output) rather
+than only grepping the source for shapes. A cheaper executor buys a different failure profile —
+subtly-wrong-but-well-shaped code — and a grep-only gate passes exactly that. A grep-only gate is
+mis-forged for the offload path: send it back to EXAMINE with that one-line reason before any BUILD
+dispatch (this is reviewing the gate's fitness, not authoring checks yourself).
+
 If EXAMINE flags an Example too vague to mechanize, surface it to the human (it is a criteria
 gap) — do not let it, or yourself, guess the missing criterion.
 
