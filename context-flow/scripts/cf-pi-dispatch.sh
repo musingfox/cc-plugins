@@ -64,7 +64,11 @@ fi
 # the first concrete tool call.
 export PI_PROMPT="${PI_PROMPT:-Read the brief and execute it. Act now: make your first tool call (read/edit/bash) before ending your turn — do not end a turn on planning alone. When finished, print exactly DONE and nothing else.}"
 
-# Pass cf's env vars to the canonical dispatch.
+# Pass cf's env vars to the canonical dispatch. PI_PROFILE selects a named
+# capability tier from pi-dispatch's profiles.conf (fast < balanced < careful);
+# explicit PI_PROVIDER/PI_MODEL still win. Pick the builder tier with the
+# reviewer in mind: the doctrine's reviewer >= builder ordering must hold.
+export PI_PROFILE="${PI_PROFILE:-}"
 export PI_PROVIDER="${PI_PROVIDER:-}"
 export PI_MODEL="${PI_MODEL:-}"
 export PI_WALL_CLOCK_S="${PI_WALL_CLOCK_S:-1800}"

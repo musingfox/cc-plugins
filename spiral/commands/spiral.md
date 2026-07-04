@@ -243,7 +243,9 @@ builder:
   judgment** — so it takes the smallest model.
   > `Agent(subagent_type: "spiral:convergence", model: "haiku")` with a task beginning `BUILD:` then
   > the **approved** Examples and the gate path, plus a note that `$SPIRAL_PI_BUILD` is set so it runs
-  > the courier path (`$SPIRAL_PI_PROVIDER` / `$SPIRAL_PI_MODEL` route Pi). Pi builds inside an
+  > the courier path (`$SPIRAL_PI_PROFILE` — a pi-dispatch `profiles.conf` tier, `fast` < `balanced`
+  > < `careful` — or explicit `$SPIRAL_PI_PROVIDER` / `$SPIRAL_PI_MODEL` route Pi; keep the builder
+  > tier at or below the judging models, per the dispatch doctrine's reviewer ≥ builder rule). Pi builds inside an
   > isolation worktree and its diff is applied to the live tree only after the gate passes there, so
   > no failure path can leave Pi's edits behind. It returns `DONE` (gate green in the worktree, diff
   > scope-checked and applied) or `PI_FAILED reason=<cause>` (worktree discarded, live tree untouched).

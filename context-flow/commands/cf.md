@@ -14,7 +14,7 @@ Phase 3 mechanics live in `${CLAUDE_PLUGIN_ROOT}/scripts/cf-pi-*.sh`. The orches
 
 ```bash
 SCRIPTS="${CLAUDE_PLUGIN_ROOT}/scripts"
-SESSION=$("$SCRIPTS/cf-pi-setup.sh" "<slug>")   # honors PI_PROVIDER / PI_MODEL / PI_STALL_THRESHOLD_S / PI_WALL_CLOCK_S
+SESSION=$("$SCRIPTS/cf-pi-setup.sh" "<slug>")   # honors PI_PROFILE / PI_PROVIDER / PI_MODEL / PI_STALL_THRESHOLD_S / PI_WALL_CLOCK_S
 # <slug> = task short name you derive from the goal: kebab-case, 1-3 words
 # (e.g. "rwd-setup"). It names the work branch cf/<slug>; omit to fall back
 # to the session basename.
@@ -68,7 +68,7 @@ The fallback path is also reachable mid-flow (a shard's `Status: FAIL` with unre
 | Implement (fallback) | `context-flow:implement` | Read, Edit, Write, Bash, Glob, Grep, WebFetch |
 | Review | `context-flow:review` | Read, Write, Grep, Glob, Bash |
 
-Phase 3 uses OMP's provider/model config (override via `$PI_PROVIDER`/`$PI_MODEL`); the Claude fallback runs on the default model. If a more specialized agent exists for the goal (e.g., a frontend-dev agent for UI work), prefer it.
+Phase 3 routes the OMP builder via `$PI_PROFILE` (pi-dispatch's `profiles.conf` capability tiers: `fast` < `balanced` < `careful`; explicit `$PI_PROVIDER`/`$PI_MODEL` still win); the Claude fallback runs on the default model. Choose the builder tier with the review seat in mind — the reviewer must sit at or above the builder's capability (dispatch doctrine: reviewer ≥ builder). If a more specialized agent exists for the goal (e.g., a frontend-dev agent for UI work), prefer it.
 
 ### Agent Output Discipline (file-write + summary reply)
 

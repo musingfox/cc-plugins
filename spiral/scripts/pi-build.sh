@@ -20,6 +20,9 @@
 #     OUTDIR     — base dir for run artifacts (default: ${PI_RUNS_DIR:-$HOME/.cache/pi-runs}/spiral).
 #
 # Env:
+#   PI_PROFILE                       — named capability tier from pi-dispatch's
+#                                      profiles.conf (fast < balanced < careful);
+#                                      explicit PI_PROVIDER/PI_MODEL still win.
 #   PI_PROVIDER / PI_MODEL          — routing; defaults are pi-dispatch.sh's cheap/fast.
 #   PI_WALL_CLOCK_S                  — hard elapsed ceiling (default 480 here, NOT
 #                                      pi-poll's 900: a single blocking Bash call must

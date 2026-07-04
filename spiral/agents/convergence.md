@@ -60,7 +60,7 @@ three acts and the single goal of each:
        edit; never mention the live repo's path). Tell it to write the implementation *and any tests
        it needs*, touch only in-scope files, and end with a one-line list of files it changed.
     3. Dispatch (blocking, one call):
-       `PI_PROVIDER="$SPIRAL_PI_PROVIDER" PI_MODEL="$SPIRAL_PI_MODEL" bash "${CLAUDE_PLUGIN_ROOT}/scripts/pi-build.sh" --cwd "$WT" "$PWD/.spiral/pi-build-brief.md"`
+       `PI_PROFILE="$SPIRAL_PI_PROFILE" PI_PROVIDER="$SPIRAL_PI_PROVIDER" PI_MODEL="$SPIRAL_PI_MODEL" bash "${CLAUDE_PLUGIN_ROOT}/scripts/pi-build.sh" --cwd "$WT" "$PWD/.spiral/pi-build-brief.md"`
        Returns one `OUTCOME=OK|FAIL … | <cause>` line; write the run's RUNDIR (`dirname` of the
        line's `OUTPUT=` path) into `.spiral/pi-rundir` so cleanup can reap a straggler. Pass `timeout: 540000` to the Bash
        tool so you get the OUTCOME back in-call; if you forget, the script's detached watchdog still
