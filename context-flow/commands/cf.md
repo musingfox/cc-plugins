@@ -54,7 +54,7 @@ After setup, read `$PI_AVAILABLE` from env.sh:
 - `PI_AVAILABLE=1` → Phase 3 uses OMP (default).
 - `PI_AVAILABLE=0` → Phase 3 falls back to Claude `context-flow:implement` agent. Log: `omp CLI not on PATH — Phase 3 will use Claude implement agent. Install omp (bun i -g @oh-my-pi/pi-coding-agent) to use the OMP implementer.` Do NOT abort.
 
-The fallback path is also reachable mid-flow (a shard's `Status: FAIL` with unrecoverable probe error, or the human selects "Fall back to Claude implement agent" at a recovery prompt). See §Phase 3.
+The fallback path is also reachable mid-flow (a shard's `Status: FAIL` with unrecoverable probe error, or the human selects "Fall back to Claude implement agent" at a recovery prompt). Procedure: §3.6.
 
 ---
 
@@ -472,6 +472,16 @@ If either fires, escalate to the user via `AskUserQuestion`:
 - Options: `revise-goal` (loop back to Phase 1 with new framing) / `accept-partial` (ship PASS contracts only, drop the over-budget ones) / `abort-flow` / `other`.
 
 Replan budget = 2 attempts per contract (third NEEDS_REPLAN escalates). Rollback budget = 2 cycles per flow (third escalates). FAIL retry budget = 1 per shard per round (handled in §3.4 Any FAIL).
+
+### 3.6 Fallback: Claude implement agent (PI_AVAILABLE=0 or human-selected)
+
+The fallback fills the SAME seat under the SAME contract — only the builder changes. Per shard, sequentially (Claude agents are not free fan-out):
+
+1. **Environment (same as OMP)**: shard branches/worktrees from 3.0-3.1 are already in place; the shard's brief is already assembled at `$SESSION/shards/<id>/implement-brief.md`.
+2. **Dispatch**: `Agent(subagent_type: "context-flow:implement")` with the brief path + the shard worktree's absolute path; instruct it to work ONLY under that worktree, follow the brief's report format to `implement-report.md`, and never touch the gate/test files' expectations.
+3. **Gates (unchanged, non-negotiable)**: run the same deterministic gates the OMP path gets — from the shard session run `"$SCRIPTS/cf-pi-test.sh" "$SHARD_SESSION" $TEST_RUNNER` (bounded read of the tail), plus the file-scope check against declared `touches_files` (`git -C "$WORK" status --porcelain` vs the shard's file list, bounded). The builder's self-report is untrusted on this path too.
+4. **Outcome**: write the same `outcome.md` shape by hand (Status/Reason/Survived/Affected, paths only) so §3.3 Collect and §3.4 routing work identically; survivors == declared applies (missing contracts → NEEDS_REPLAN incomplete-contracts).
+5. **Reviewer seat**: unchanged — Phase-4 `context-flow:review` + integration gate. No step of this path lets the implement agent certify its own work.
 
 ---
 
