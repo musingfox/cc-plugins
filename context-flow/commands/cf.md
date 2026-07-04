@@ -214,7 +214,7 @@ Report path: $SESSION/plan.md
 ## Contract Requirements
 Your output MUST:
 1. Address every Constraint listed in the research.
-2. Every behavioral contract must have at least one test case with concrete input → expected output.
+2. Every behavioral contract must have at least one test case with concrete input → expected output. Constraints that genuinely resist test-casing go in that contract's `fuzzy_criteria` (binding, judged with evidence at Review) — never silently dropped.
 3. Every decision must have an Impact level (High/Medium/Low).
 4. Self-check contract atomicity per your agent prompt's `## Atomicity Self-Check` rules — collapse or split contracts that fail.
 ```

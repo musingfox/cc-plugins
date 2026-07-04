@@ -91,6 +91,10 @@ render_contracts() {
             "  - " + (.id // "") + ": given " + (.given // "") + " -> expect " + (.expect // "")
           ) | join("\n")) + "\n"
         else "" end) +
+      (if (.fuzzy_criteria // []) | length > 0
+        then "- **fuzzy_criteria** (binding; Review will judge these with evidence):\n" +
+          ((.fuzzy_criteria // []) | map("  - " + .) | join("\n")) + "\n"
+        else "" end) +
       (if (.attachments // []) | length > 0
         then "- **attachments**:\n" +
           ((.attachments // []) | map("  - " + .name + " -> " + .path) | join("\n")) + "\n"

@@ -155,6 +155,7 @@ Write a single JSON document conforming to schema_version 1:
       "test_cases": [
         {"id": "T1", "given": "<concrete input>", "expect": "<concrete value or pattern>"}
       ],
+      "fuzzy_criteria": ["<non-deterministic clause, e.g. 'minimal memory footprint'>"],
       "attachments": [
         {"name": "<short-name>", "path": "plan-attachments/<contract>-<topic>.md"}
       ]
@@ -169,6 +170,7 @@ Field rules:
 - **`summary`**: one-line restatement of the contract's Effect.
 - **`touches_files`** (load-bearing): SUPERSET of every file the contract creates or modifies. **Test files count. Doc files count if the contract changes docs.** Underset is a bug — `cf-pi-run.sh` post-validates `actual_touched ⊆ declared_touched` and emits NEEDS_REPLAN with `reason: undeclared_file_touched` on violation. Use repo-relative paths.
 - **`test_cases`**: structured form of the markdown Test Cases.
+- **`fuzzy_criteria`**: default `[]`. ONLY for constraints that genuinely resist a concrete test case ("minimal memory footprint", "idiomatic to the codebase") — never a dumping ground for lazy test-casing; if a concrete input→output exists, it belongs in `test_cases`. Each entry is BINDING: the Review phase must render an evidence-backed PASS/FAIL for it (measurement, comparison, or adversarial argument at the criterion's own precision), and a FAIL blocks the flow like any contract FAIL.
 - **`attachments`**: ESCAPE HATCH for rich design discussion (decision logs, diagrams). Default `[]`. Use only when contract-body prose is too long; place files under `$SESSION/plan-attachments/`. Brief assembly includes attachment contents verbatim for the implementer.
 
 The orchestrator's `cf-pi-shard.sh` derives parallel groups from the file-touch graph (connected components over `touches_files`). **Plan does NOT assign `parallel_group`** — it is script-derived.

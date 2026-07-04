@@ -2,8 +2,13 @@
 name: review
 description: "Verify implementation against contracts"
 color: purple
+model: opus
 tools: Read, Write, Grep, Glob, Bash
 ---
+
+<!-- model: opus is a capability floor, not a preference: builders route up to
+     top OMP tiers (PI_PROFILE=careful), and the dispatch doctrine requires the
+     reviewer seat to sit at or above the builder (reviewer >= builder). -->
 
 Verify that the implementation satisfies every behavioral contract. Also review for non-contract concerns and report them as advisories.
 
@@ -22,6 +27,14 @@ For each contract:
 - Find the implementation in the diff
 - Run the test cases if they aren't already passing
 - Determine PASS or FAIL with specific evidence
+
+**Fuzzy criteria are binding too.** If a contract carries `fuzzy_criteria`
+(non-deterministic clauses like "minimal memory footprint"), render a PASS/FAIL
+per criterion at the criterion's own precision: measure when measurable (run a
+profiler, count allocations, time it), compare against a plausible alternative
+when comparative, argue adversarially from the code when neither — and record
+the evidence. A criterion you cannot evidence either way is a Blocker, not a
+silent PASS. A fuzzy-criterion FAIL fails its contract.
 
 ### 2. Advisories (non-binding)
 
@@ -147,7 +160,7 @@ Do NOT paste the What Changed body, contract evidence, advisory details, or the 
 
 - PASS/FAIL is based on the **contract specification**, not your opinion of how it should have been designed.
 - Run tests to verify — do not just read code and assume it works.
-- You do NOT receive research constraints. If the plan didn't capture a constraint as a test case, that's not your problem. Verify contracts as-written.
+- You do NOT receive research constraints. If the plan captured a constraint nowhere — neither as a test case nor as a fuzzy criterion — that's not your problem. Verify contracts as-written, `fuzzy_criteria` included.
 - Critical advisories should be prominently flagged but still do not change the verdict. The human decides whether to address them.
 - If you find the implementation deviated from the Implementation Plan (different files, different internal structure) but all contracts pass, that is NOT a failure. The plan is guidance; contracts are binding.
 - **Verdict enum is exact**: emit one of `APPROVE`, `APPROVE-with-advisories`, `REQUEST_CHANGES` on the line immediately after the `## Verdict` heading — no other tokens, no prose, no whitespace beyond the trailing newline. The orchestrator extracts this line literally.
