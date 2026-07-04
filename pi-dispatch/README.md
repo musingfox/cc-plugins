@@ -25,6 +25,22 @@ Claude (main)          pi-dispatcher agent (haiku)      omp worker (cheap model)
   Division of labor: `pi-dispatch.sh` (`-p` mode, auto-approved tools) stays the batch fan-out workhorse; ACP sessions are for interactive workers — per-tool-call approval, warm multi-turn without re-briefing, protocol-level cancel.
 - **`agents/pi-dispatcher.md`** — a haiku subagent that runs the launch→poll→distill loop so even the polling stays out of the main context.
 
+## Named agents — `pi-agent.sh` (native sub-agent verbs)
+
+`scripts/pi-agent.sh` is the unified, name-addressed entry point over the primitives above, mirroring Claude Code's native sub-agent experience. The registry is the filesystem: `$PI_RUNS_DIR/agents/<NAME>` symlinks to the run's RUNDIR.
+
+| native experience | command |
+|---|---|
+| `Agent(name, prompt)` | `pi-agent.sh start NAME [--acp] [--profile P] [BRIEF]` |
+| `SendMessage(to)` | `pi-agent.sh send NAME TEXT_OR_FILE` |
+| poll / `TaskOutput` | `pi-agent.sh poll NAME` |
+| agent-view peek | `pi-agent.sh peek NAME` |
+| agent panel | `pi-agent.sh ls` |
+| `TaskStop` | `pi-agent.sh stop NAME` |
+| background completion / needs-input notifications | `pi-agent.sh watch [INTERVAL]` |
+
+`send` on a finished batch run resumes its session (new RUNDIR, context preserved — native SendMessage semantics) and re-points the NAME; on an ACP session it starts the next turn. `watch` polls every registered agent, prints one line per meaningful state change (turn done, `PERMISSION` pending, dead, stall — volatile counters normalized away), and exits when nothing is in flight; arm it on the Monitor tool so each line arrives as a chat notification.
+
 ## Model routing
 
 `profiles.conf` maps names to omp models (must have working omp auth):
@@ -55,4 +71,4 @@ Context hygiene: main never reads worker streams or source material — only bri
 
 ## Tests
 
-`bash tests/profile-test.sh && bash tests/wrapper-test.sh && bash tests/poll-test.sh && bash tests/worktree-cleanup-test.sh && bash tests/probe-watch-test.sh && bash tests/acp-test.sh` — all pure-local, no network (acp-test uses a bash shim in place of `omp acp`).
+`bash tests/profile-test.sh && bash tests/wrapper-test.sh && bash tests/poll-test.sh && bash tests/worktree-cleanup-test.sh && bash tests/probe-watch-test.sh && bash tests/acp-test.sh && bash tests/agent-test.sh` — all pure-local, no network (acp-test and agent-test use bash shims in place of `omp`).
