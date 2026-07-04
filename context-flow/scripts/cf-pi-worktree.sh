@@ -46,20 +46,6 @@ if [ -n "$REPO_ROOT" ]; then
   BASE_BRANCH="$(git -C "$REPO_ROOT" symbolic-ref --quiet --short HEAD 2>/dev/null || echo "")"
   BASE_HEAD="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo "")"
 
-  # Fail fast if git identity is unset — per-contract commits would otherwise
-  # blow up mid-Phase-3 with the cryptic "Please tell me who you are" error.
-  if ! git -C "$REPO_ROOT" config user.email >/dev/null 2>&1 && \
-     ! git config --global user.email >/dev/null 2>&1; then
-    cat >&2 <<'MSG'
-cf-pi-worktree: git user.email is not configured.
-Per-contract commits in $WORK will fail. Set identity before re-running /cf:
-  git config --global user.email "you@example.com"
-  git config --global user.name "Your Name"
-(Or set in this repo: drop `--global`.)
-MSG
-    exit 2
-  fi
-
   # Human-readable slugs can collide with a prior flow's surviving branch, which
   # still carries unreviewed per-contract commits. Never reset it (-B would):
   # bump to <slug>-2, -3, ... and persist the bumped slug. CF_BRANCH_OWNED marks
@@ -75,28 +61,28 @@ MSG
     echo "CF_SLUG=\"$CF_SLUG\"" >> "$session/env.sh"
     echo "cf-pi-worktree: branch collision, using $CF_BRANCH" >&2
   fi
-  git -C "$REPO_ROOT" worktree add -B "$CF_BRANCH" "$WORK" HEAD >&2
+  # Mechanism delegated to the canonical primitive (pi-dispatch/pi-worktree.sh):
+  # git-identity preflight (DEC-1), worktree add, and the cleanup block
+  # (straggler kill-confirm + merge-base diff capture + removal) all live
+  # there — cf keeps only its policy: slug-collision bump, CF_BRANCH_OWNED,
+  # scratch mode, branch retention. Cleanup diff semantics are identical
+  # (merge-base against $BASE_BRANCH, fallback $BASE_HEAD).
+  _canon="$(resolve_canon_dispatch)"
+  if [ -z "$_canon" ]; then
+    echo "cf-pi-worktree: cannot resolve canonical pi-dispatch/scripts dir" >&2
+    exit 1
+  fi
+  "$(dirname "$_canon")/pi-worktree.sh" create \
+    --repo_root   "$REPO_ROOT" \
+    --branch_name "$CF_BRANCH" \
+    --base_ref    "${BASE_HEAD:-HEAD}" \
+    --base_branch "${BASE_BRANCH:-${BASE_HEAD:-HEAD}}" \
+    --work_path   "$WORK" \
+    --diff_out    "$DIFF_FILE" \
+    --cleanup_out "$CLEANUP_SCRIPT" \
+    --rundir-file "$session/pi-rundir" >/dev/null
   grep -q '^CF_BRANCH_OWNED=1' "$session/env.sh" 2>/dev/null || \
     echo 'CF_BRANCH_OWNED=1' >> "$session/env.sh"
-  # Diff base is computed at cleanup time as `merge-base cf-tip $BASE_BRANCH`
-  # (or fallback to $BASE_HEAD). This way:
-  #   - pre-rebase: merge-base = $BASE_HEAD → diff = cf's own commits
-  #   - post-rebase: merge-base = current $BASE_BRANCH HEAD → diff still
-  #     excludes commits that landed on $BASE_BRANCH during the flow
-  # `git diff HEAD` would be empty because HEAD == cf-tip after per-contract
-  # commits, so it's never the right capture form.
-  diff_base_fallback="${BASE_HEAD:-HEAD}"
-  diff_base_branch="${BASE_BRANCH:-}"
-  cat >> "$CLEANUP_SCRIPT" <<EOF
-git -C "$WORK" add --intent-to-add -- . 2>/dev/null || true
-_diff_base="$diff_base_fallback"
-if [ -n "$diff_base_branch" ]; then
-  _mb="\$(git -C "$WORK" merge-base HEAD "$diff_base_branch" 2>/dev/null || true)"
-  [ -n "\$_mb" ] && _diff_base="\$_mb"
-fi
-git -C "$WORK" diff "\$_diff_base" > "$DIFF_FILE" 2>/dev/null || true
-git -C "$REPO_ROOT" worktree remove --force "$WORK" 2>/dev/null || true
-EOF
 else
   mkdir -p "$WORK"
   echo "# scratch mode ($SESSION_BASENAME) -- no cleanup, $WORK retained for inspection" >> "$CLEANUP_SCRIPT"
