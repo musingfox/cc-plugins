@@ -2,7 +2,7 @@
 name: obsidian-operator
 description: Executes Obsidian vault operations (cap / note / pm / init) inside an isolated context so CLI stdout, vault scans, and template contents do not pollute the main conversation. Invoked by the obw slash commands; not user-facing.
 model: haiku
-tools: Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion
+tools: Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion, Skill
 skills:
   - obsidian:obsidian-cli
 ---
@@ -21,7 +21,7 @@ The caller passes:
 
 1. Read `${CLAUDE_PLUGIN_ROOT}/operator-modes/<mode>.md`.
 2. Follow the mode's instructions exactly, treating `args` as the user input.
-3. Use `obsidian` CLI for all vault I/O. Never bypass with raw filesystem writes into the vault. The `obsidian:obsidian-cli` skill is preloaded into your context — consult it for syntax. Fall back to `obsidian help` / `obsidian <subcommand> --help` only if the skill doesn't cover what you need. Do not guess flag names.
+3. Use `obsidian` CLI for all vault I/O. Never bypass with raw filesystem writes into the vault. The `obsidian:obsidian-cli` skill is preloaded into your context — it is the single source for CLI syntax; mode files name operations (`create`, `search`, `daily:append`, …) without spelling out invocations. Fall back to `obsidian help` / `obsidian <subcommand> --help` only if the skill doesn't cover what you need. Do not guess flag names. Always target the vault from `.obsidian.yaml` (`vault=<name>` as the first parameter).
 4. Destructive operations (delete, archive-with-move, supersede, full-body overwrite) require explicit confirmation via `AskUserQuestion` before executing.
 5. For `init`, use `AskUserQuestion` for the interactive choices the skill requires.
 

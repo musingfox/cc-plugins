@@ -1,6 +1,6 @@
 # pm — Obsidian Project Management
 
-This mode owns: folder layout, template names, property schema, ADR numbering, dashboard generation strategy, and the direct-read rule. **For CLI syntax, consult the preloaded `obsidian:obsidian-cli` skill**; fall back to `obsidian <subcommand> --help` only if the skill doesn't cover it. For Bases (`.base`) syntax used by dashboards, read the bundled `templates/dashboard-cross.base` / `dashboard-project.base` directly — do not guess.
+This mode owns: folder layout, template names, property schema, ADR numbering, dashboard generation strategy, and the direct-read rule. For Bases (`.base`) syntax used by dashboards, read the bundled `templates/dashboard-cross.base` / `dashboard-project.base` directly — do not guess.
 
 ## Config (`.obsidian.yaml`)
 
@@ -23,7 +23,7 @@ pm/
 └── dashboard.base   # cross-project dashboard (optional)
 ```
 
-Folders are created on demand — `obsidian create path="pm/{project}/tasks/foo.md"` auto-creates any missing parent folders. No `mkdir` needed.
+Folders are created on demand — `create` / `move` auto-create missing parent folders. No `mkdir` needed.
 
 ## Template Names
 
@@ -33,21 +33,18 @@ If `obsidian vault=<v> templates` doesn't list one of these, `/obw:init` hasn't 
 
 ## Operations
 
-All vault I/O goes through the `obsidian` CLI — see preloaded `obsidian:obsidian-cli` skill. Use **one call** per known-name read — never chain `search → read`. The pm-specific bits:
+Use **one call** per known-name read — never chain `search → read`. The pm-specific bits:
 
-- **Create task** → `create path="pm/{project}/tasks/{name}.md" template=task`, then `property:set` for `project` / `priority` / `due` / `tags`.
-- **Create doc** → `create path="pm/{project}/docs/{name}.md" template=doc`, then `property:set name=project`.
-- **Create ADR** → `create path="pm/{project}/docs/adr-{NNNN}-{title}.md" template=adr`, then `property:set` for `project` / `status`. See ADR numbering below.
-- **List tasks** → `search query="[type:task] [project:{project}] [status:<s>]" format=json`.
-- **Archive** → set `status=done` and `completed`, then `move file="{name}" to="pm/{project}/archive"` (target folder is auto-created if missing).
+- **Create task** → `create` at `pm/{project}/tasks/{name}.md` with `template=task`, then set properties `project` / `priority` / `due` / `tags`.
+- **Create doc** → `create` at `pm/{project}/docs/{name}.md` with `template=doc`, then set `project`.
+- **Create ADR** → `create` at `pm/{project}/docs/adr-{NNNN}-{title}.md` with `template=adr`, then set `project` / `status`. See ADR numbering below.
+- **List tasks** → `search` with `query="[type:task] [project:{project}] [status:<s>]" format=json`.
+- **Archive** → set `status=done` and `completed`, then `move` to `pm/{project}/archive`.
 - **Delete** → confirm first; fall back to `move` if the build lacks `delete`.
 
 ### ADR numbering
 
-Before creating an ADR, search existing ADRs in the project and take max(number)+1, zero-padded to 4 digits:
-```bash
-obsidian vault={vault} search query="[type:adr] [project:{project}]" format=json
-```
+Before creating an ADR, `search` with `query="[type:adr] [project:{project}]" format=json` and take max(number)+1, zero-padded to 4 digits.
 
 ## Property Schema
 
@@ -79,7 +76,6 @@ Conversation-mode status (user asks in chat, not Obsidian): run the equivalent `
 ## Important Rules
 
 1. Read `.obsidian.yaml` before any operation.
-2. `file=` uses wikilink resolution — just the base name, no path/extension.
-3. Never `search` to locate a note whose name is known — go straight to `read`.
-4. Never bypass the CLI with filesystem Read/Write against `$VAULT_PATH/...`. Only exception: reading `.obsidian/templates.json` / `obsidian.json` during `/obw:init`. Dashboard creation uses the CLI via shell-piped content; folder creation is implicit in `create` / `move`.
-5. Confirm destructive intents (delete, archive-move, ADR supersede) before executing.
+2. Never `search` to locate a note whose name is known — go straight to `read`.
+3. Never bypass the CLI with filesystem Read/Write against `$VAULT_PATH/...`. Only exception: reading `.obsidian/templates.json` / `obsidian.json` during `/obw:init`. Dashboard creation uses the CLI via shell-piped content.
+4. Confirm destructive intents (delete, archive-move, ADR supersede) before executing.

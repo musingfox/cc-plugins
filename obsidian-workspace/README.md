@@ -24,6 +24,7 @@ Natural-language phrasing also works via the matching skills (`cap`, `note`, `pm
 
 ## Prerequisites
 
+- Official `obsidian` plugin (from the `obsidian-skills` marketplace) — declared as a plugin dependency, so it auto-installs with this plugin as long as that marketplace is added (`claude plugin marketplace add`)
 - [Obsidian](https://obsidian.md) app running (headless CLI also works)
 - Obsidian community plugin **`obsidian-cli`** installed and enabled. The plugin's name is `obsidian-cli` but the executable it installs is `obsidian` (invoked as `obsidian vault=<name> ...`). This is **not** the unrelated standalone `obsidian-cli` binary by Yakitrak.
 - **Templates** core plugin enabled (required for `/obw:pm` — `task` / `doc` / `adr` templates)

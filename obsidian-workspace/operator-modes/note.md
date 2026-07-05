@@ -1,6 +1,6 @@
 # note — Create a Long-Form Note
 
-This mode owns: target folder resolution, filename strategy, frontmatter composition. Vault I/O delegates to the `obsidian` CLI. **For CLI syntax, consult the preloaded `obsidian:obsidian-cli` skill**; fall back to `obsidian <subcommand> --help` only if the skill doesn't cover it.
+This mode owns: target folder resolution, filename strategy, frontmatter composition. Everything else is plain CLI usage.
 
 ## Config (`.obsidian.yaml`)
 
@@ -24,9 +24,9 @@ note:
    - `slug` → `<kebab>-YYYYMMDD.md`
    - `timestamp-title` → `YYYYMMDD-<kebab>.md`
 
-3. **Resolve path** = `<folder>/<filename>`. Check for conflict via CLI `read` — if it exists, ask the user (overwrite / rename / cancel via `AskUserQuestion`).
+3. **Resolve path** = `<folder>/<filename>`. Check for conflict (`read`) — if it exists, ask the user (overwrite / rename / cancel via `AskUserQuestion`).
 
-4. **Create the note** via CLI `create path="<folder>/<filename>" content="..."` where content is:
+4. **Create the note** at that path (`create`) with content:
    ```markdown
    ---
    created: YYYY-MM-DD

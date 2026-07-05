@@ -14,10 +14,8 @@ Daily note folder / filename / template are owned by Obsidian's **Daily Notes** 
 
 1. If body is empty, prompt for content.
 2. Compose bullet: `- HH:MM — <body>` (any `#tag` tokens stay inline — Obsidian indexes them automatically).
-3. Append via `obsidian vault=<v> daily:append content="<bullet>"`. The CLI creates the daily note if missing.
+3. Append the bullet to today's daily note via `daily:append` (creates the note if missing).
 4. Confirm with the appended line. Return `[[<daily-note-basename>]]`.
-
-For CLI syntax, consult the preloaded `obsidian:obsidian-cli` skill; fall back to `obsidian daily:append --help` if needed.
 
 ## Example
 

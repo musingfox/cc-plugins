@@ -4,6 +4,7 @@
     "name": "Nick Huang"
   },
   "description": "Nick's personal Claude Code plugin marketplace featuring OMT and other productivity tools",
+  "allowCrossMarketplaceDependenciesOn": ["obsidian-skills"],
   "plugins": [
     {
       "name": "omt",
