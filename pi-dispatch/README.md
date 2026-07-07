@@ -24,7 +24,8 @@ Claude (main)          wrapper (haiku, optional)        omp worker (cheap model)
   - `pi-acp-poll.sh RUNDIR` — one line per call: `IDLE` / `RUNNING` / `PERMISSION id=… tool=… options=…` (worker blocked awaiting an answer — this is the governance hook) / `STATUS=DONE id=… stopReason=…` (per-turn terminal; turn text distilled to `result.md`) / `STATUS=DEAD`. Teardown reuses `pi-stop.sh` (same pid/pgid layout).
 
   Division of labor: `pi-dispatch.sh` (`-p` mode, auto-approved tools) stays the batch fan-out workhorse; ACP sessions are for interactive workers — per-tool-call approval, warm multi-turn without re-briefing, protocol-level cancel.
-- **`agents/pi-foreman.md`** — a resident haiku coordinator: give it task descriptions, it writes briefs, dispatches via `pi-agent.sh`, watches the fleet, and reports to main over SendMessage; message it again to dispatch more or steer a worker. Works one-shot (single task, watch, report) or resident.
+- **`agents/builder.md`** — a brief-driven executor. When the brief embeds the `pi-agent.sh` offload usage, builder operates it as a pure operator: `pi-agent.sh start` per task, `pi-agent.sh watch` as the main loop, runs each worker's acceptance check, and distills a report to main. When the brief carries no offload usage, builder does the work itself. Builder does NOT choose the mode — the brief does.
+- **`agents/reviewer.md`** — an independent contract judge. Given ONLY the contract, the deliverable paths, and the check output, it returns an evidence-backed PASS/FAIL per clause. It never sees the builder transcript and never runs offload verbs.
 
 ## Named agents — `pi-agent.sh` (native sub-agent verbs)
 
@@ -42,7 +43,7 @@ Claude (main)          wrapper (haiku, optional)        omp worker (cheap model)
 
 `send` on a finished batch run resumes its session (new RUNDIR, context preserved — native SendMessage semantics) and re-points the NAME; on an ACP session it starts the next turn. `watch` polls every registered agent, prints one line per meaningful state change (turn done, `PERMISSION` pending, dead, stall — volatile counters normalized away), and exits when nothing is in flight; arm it on the Monitor tool so each line arrives as a chat notification.
 
-When/how to choose between direct dispatch, dispatcher, foreman, Workflow
+When/how to choose between direct dispatch, dispatcher, builder/reviewer, Workflow
 thin-shells — and when not to outsource at all: see
 [docs/dispatch-doctrine.md](docs/dispatch-doctrine.md).
 
@@ -64,7 +65,7 @@ Dispatch is non-blocking, so fan-out is just N launches:
 
 1. Claude decomposes work into self-contained briefs (one observable outcome each).
 2. For code-writing tasks, `pi-worktree.sh create` one worktree per task; put the worktree path in the brief (worker uses absolute paths, never cd out).
-3. Launch each brief with `pi-dispatch.sh` (each returns instantly) — directly, or hand the whole fan-out to one `pi-foreman` agent.
+3. Launch each brief with `pi-dispatch.sh` (each returns instantly) — directly, or hand the whole fan-out to one `builder` agent.
 4. Poll each RUNDIR until terminal; failures carry diagnostics in `RUNDIR/pi.stderr.log`.
 5. `pi-worktree.sh clean` captures each task's diff; Claude reviews diffs/results against the brief's contract and merges or re-dispatches (resume via `PRIOR_RUNDIR` keeps the worker's session context).
 

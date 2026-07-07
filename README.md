@@ -210,7 +210,8 @@ Send Discord webhook notifications from Claude Code:
 ### pi-dispatch (Experimental)
 
 Offload heavy work to [omp (oh-my-pi)](https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent) cheap/fast models so Claude only writes briefs and reviews summaries — saving tokens:
-- **Foreman subagent (`pi-foreman`)**: resident haiku coordinator — give it task descriptions, it writes briefs, dispatches named workers via `pi-agent.sh`, watches the fleet, and reports to main over SendMessage; message it again to dispatch more or steer a worker
+- **`agents/builder.md`**: brief-driven executor — when the brief embeds `pi-agent.sh` offload usage, builder operates it as a pure operator (`pi-agent.sh start` per task, `pi-agent.sh watch` as the main loop, run acceptance check, distill report); when the brief carries no offload usage, builder does the work itself. Builder does NOT choose the mode — the brief does.
+- **`agents/reviewer.md`**: independent contract judge — given ONLY the contract, the deliverable paths, and the check output, returns an evidence-backed PASS/FAIL per clause; never sees the builder transcript, never runs offload verbs. Main dispatches builder and reviewer directly (no intermediary coordinator).
 - **`pi-agent.sh`**: name-addressed unified verbs (`start/send/poll/peek/ls/stop/watch`) mirroring native sub-agent UX; `send` resumes a finished worker's session, `watch` feeds the Monitor tool for push notifications
 - **`pi-dispatch.sh`**: launches one brief on a cheap/fast omp model in the background (default `grok-build`; `--profile fast|balanced|careful` or `PI_MODEL` to override), returns a run handle instantly — dispatch N briefs for parallel fan-out
 - **`pi-poll.sh` / `pi-stop.sh`**: idempotent one-line status polls and group-kill cancel; `pi-worktree.sh` isolates parallel code-writing tasks in git worktrees
