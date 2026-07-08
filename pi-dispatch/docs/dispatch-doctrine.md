@@ -13,21 +13,45 @@ only question is which seats are filled by a contractor with a thin haiku
 liaison in front. The worker side is always the same: omp processes managed
 by the `pi-agent.sh` primitives (start/send/poll/peek/ls/stop/watch).
 
-## Five consumption shapes (one primitive set)
+## Two-node dispatch model (current shape)
 
-| Native analog    | Control plane                 | Wrapper        | Use when |
-|------------------|-------------------------------|----------------|----------|
-| background task  | main + Monitor on `watch`     | none           | single small task; main reads the result anyway |
-| sub-agent        | pi-foreman, used once         | one-shot       | single larger task; keep brief/result out of main's context |
-| agent team       | pi-foreman, resident          | resident       | multiple workers, cross-turn follow-ups, conversational steering |
-| dynamic workflow | Workflow script (deterministic)| one-shot per node | multi-stage pipelines needing schema gates, journal/resume, concurrency caps |
-| (no analog)      | dedicated shell script (cf)   | none (zero inference) | fixed-domain repeated pipelines; maximum determinism |
+The live topology is two nodes off main:
+
+- **builder** — executes the brief. Main either embeds `pi-agent.sh` offload
+  usage (builder offloads to an omp worker) or omits it (builder does the work
+  itself as a sonnet). The mode is dictated by the brief, not by the builder.
+- **reviewer** — independent contract judge. Given only the contract +
+  deliverable paths + check output; never sees the builder transcript.
+
+Main dispatches both and owns the final verdict. The worker side (when offloaded)
+is always the same: omp processes managed by the `pi-agent.sh` primitives
+(start/send/poll/peek/ls/stop/watch). The reviewer is just another dispatch —
+same primitives, stronger profile (`reviewer ≥ builder`).
+
+### Consumption shapes (one primitive set)
+
+| Native analog    | Control plane                 | Use when |
+|------------------|-------------------------------|----------|
+| background task  | main + Monitor on `watch`     | single small task; main reads the result anyway |
+| sub-agent        | main → builder (one-shot)     | single larger task; keep brief/result out of main's context |
+| agent team       | main → builder (resident)     | multiple workers, cross-turn follow-ups, conversational steering |
+| dynamic workflow | Workflow script (deterministic) | multi-stage pipelines needing schema gates, journal/resume, concurrency caps |
+| (no analog)      | dedicated shell script (cf)   | fixed-domain repeated pipelines; maximum determinism |
 
 Rows 1–3 are model-driven (flexible, can drift); rows 4–5 are deterministic
-(reliable, written in advance). The haiku liaison, wherever it appears, is a
-**coordinator**: it establishes the environment, injects the brief, runs the
-deterministic checks, and assembles evidence — a context firewall and
-structured-output enforcement point. It never issues the verdict.
+(reliable, written in advance). The builder, wherever it offloads, is a
+**coordinator** of the omp worker: it establishes the environment, injects the
+brief, runs the deterministic checks, and assembles evidence — a context
+firewall and structured-output enforcement point. It never issues the verdict;
+that seat belongs to main, informed by the reviewer.
+
+### Historical note (retired topology)
+
+The previous (retired/legacy) control plane used a `pi-foreman` liaison node
+between main and the omp worker. That topology is **retired** (legacy, replaced
+by the two-node main → builder/reviewer model above). The empirical footnotes
+below still describe live harness behavior of named sub-agents; they are kept
+as **historical** evidence, not as a description of the current topology.
 
 ## Dispatch decision — fit first, cost second
 
@@ -86,13 +110,13 @@ non-deterministic clauses; main may mark a dispatch `no-review` when it will
 read and judge the result itself. A dispatch with no reviewer on any seat is
 not a dispatch — it's abandonment.
 
-## Empirical footnotes (2026-07, verified live)
+## Empirical footnotes (2026-07, verified live; historical — describe named-agent harness behavior, not the current pi-foreman topology which is retired/legacy)
 
 - SendMessage to a completed named subagent resumes it from transcript with
-  full context — this is what makes the foreman "resident".
+  full context — this is what made the historical foreman "resident" (legacy topology, retired).
 - A background subagent can push `SendMessage(to: "main")` mid-invocation;
-  a named agent's idle notification carries no text, so all foreman
-  reporting must go through SendMessage.
+  a named agent's idle notification carries no text, so all historical foreman
+  reporting went through SendMessage (legacy, deprecated topology).
 - Haiku wrappers drift after resumes (dispatch-and-sleep); pin discipline as
   an end-of-turn check in the agent definition, not as one-time narrative.
 - Official docs lag the product on both resume and to:"main" — trust live
