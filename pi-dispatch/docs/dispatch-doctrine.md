@@ -50,8 +50,8 @@ belongs to main, informed by the reviewer.
 The previous (retired/legacy) control plane used a `pi-foreman` liaison node
 between main and the omp worker. That topology is **retired** (legacy, replaced
 by the two-node main → builder/reviewer model above). The empirical footnotes
-below still describe live harness behavior of named sub-agents; they are kept
-as **historical** evidence, not as a description of the current topology.
+below describe live, current harness behavior of named sub-agents (SendMessage
+resume, idle notifications); only the `pi-foreman` liaison topology is retired.
 
 ## Dispatch decision — fit first, cost second
 
@@ -87,8 +87,8 @@ hand it; anything not in the brief does not exist. A brief carries:
 
 **Return end — independent review (builder ↔ advisor).** Every dispatch
 names its reviewer, and the reviewer is never the builder (self-acceptance)
-nor the dispatching party (self-certification — the dispatcher has a
-close-the-task incentive). Three seats:
+nor the dispatcher (main) — main has a close-the-task incentive
+(self-certification). Three seats:
 
 - **builder** runs the deterministic checks (tests, acceptance commands,
   schema) and assembles the evidence bundle;
