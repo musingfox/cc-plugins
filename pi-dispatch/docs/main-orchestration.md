@@ -7,6 +7,15 @@ do the hands-on work — **builder** (executes the brief, either by offloading
 to an omp worker or by doing it itself) and **reviewer** (independent contract
 judge). Main dispatches both and owns the final verdict.
 
+## Scope
+
+This document covers the **one-shot** dispatch loop only: main dispatches a
+builder and a reviewer for a single task, then owns the verdict. The
+**resident** shape (cross-turn resume, agent-team) and the **background**
+shape (task with no builder) are not described here — see
+`dispatch-doctrine.md`'s consumption-shapes table for those. The six-step
+loop below is the one-shot path.
+
 ## 1. Offload decision
 
 Main decides, per task, whether to **offload** the execution to an external omp

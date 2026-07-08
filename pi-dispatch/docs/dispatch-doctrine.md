@@ -39,11 +39,11 @@ same primitives, stronger profile (`reviewer ≥ builder`).
 | (no analog)      | dedicated shell script (cf)   | fixed-domain repeated pipelines; maximum determinism |
 
 Rows 1–3 are model-driven (flexible, can drift); rows 4–5 are deterministic
-(reliable, written in advance). The builder, wherever it offloads, is a
-**coordinator** of the omp worker: it establishes the environment, injects the
-brief, runs the deterministic checks, and assembles evidence — a context
-firewall and structured-output enforcement point. It never issues the verdict;
-that seat belongs to main, informed by the reviewer.
+(reliable, written in advance). The builder, wherever it offloads, coordinates
+the omp worker: it establishes the environment, injects the brief, runs the
+deterministic checks, and assembles evidence — a context firewall and
+structured-output enforcement point. It never issues the verdict; that seat
+belongs to main, informed by the reviewer.
 
 ### Historical note (retired topology)
 
@@ -87,10 +87,10 @@ hand it; anything not in the brief does not exist. A brief carries:
 
 **Return end — independent review (builder ↔ advisor).** Every dispatch
 names its reviewer, and the reviewer is never the builder (self-acceptance)
-nor the coordinator that dispatched it (self-certification — the coordinator
-has a close-the-task incentive). Three seats:
+nor the dispatching party (self-certification — the dispatcher has a
+close-the-task incentive). Three seats:
 
-- **coordinator** runs the deterministic checks (tests, acceptance commands,
+- **builder** runs the deterministic checks (tests, acceptance commands,
   schema) and assembles the evidence bundle;
 - **independent reviewer** judges what checks can't decide — non-
   deterministic clauses ("minimal memory", "idiomatic") get evidence-backed
@@ -110,13 +110,13 @@ non-deterministic clauses; main may mark a dispatch `no-review` when it will
 read and judge the result itself. A dispatch with no reviewer on any seat is
 not a dispatch — it's abandonment.
 
-## Empirical footnotes (2026-07, verified live; historical — describe named-agent harness behavior, not the current pi-foreman topology which is retired/legacy)
+## Empirical footnotes (2026-07, verified live — describe named-agent harness behavior; the pi-foreman topology is retired/legacy)
 
-- SendMessage to a completed named subagent resumes it from transcript with
-  full context — this is what made the historical foreman "resident" (legacy topology, retired).
+- SendMessage to a completed named subagent resumes it from transcript with full context — a live, verified harness behavior. This is what makes the resident shape (consumption-shapes row 3) work: main → builder, cross-turn resume.
 - A background subagent can push `SendMessage(to: "main")` mid-invocation;
-  a named agent's idle notification carries no text, so all historical foreman
-  reporting went through SendMessage (legacy, deprecated topology).
+  a named agent's idle notification carries no text, so all foreman-era
+  reporting went through that channel. The pi-foreman topology is legacy,
+  retired, deprecated (see the Historical note above).
 - Haiku wrappers drift after resumes (dispatch-and-sleep); pin discipline as
   an end-of-turn check in the agent definition, not as one-time narrative.
 - Official docs lag the product on both resume and to:"main" — trust live
