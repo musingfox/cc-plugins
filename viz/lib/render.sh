@@ -93,19 +93,31 @@ export VIZ_PORT
 # Start (or verify) the viz server. Used for SSH (always) and recipes (Save endpoint).
 start_viz_server() {
     local bind_host="$1"
-    # Healthy viz server already running?
+    local base_port="${VIZ_PORT:-18090}"
+    local p chosen=""
+    # Pick a port: prefer one already running a healthy viz server, else the
+    # first free port from base_port upward (try 5 candidates, then bail and
+    # let the caller fall back to file://). Avoids silently dropping to file://
+    # when 18090 is held by another process.
+    for p in $(seq "$base_port" $((base_port + 4))); do
+        if curl -sf "http://127.0.0.1:${p}/api/health" >/dev/null 2>&1; then
+            chosen="$p"; break
+        fi
+        if ! lsof -i :"$p" -sTCP:LISTEN &>/dev/null; then
+            chosen="$p"; break
+        fi
+    done
+    [ -z "$chosen" ] && return 1
+    VIZ_PORT="$chosen"; export VIZ_PORT
+    # Already healthy on the chosen port? Nothing to start.
     if curl -sf "http://127.0.0.1:${VIZ_PORT}/api/health" >/dev/null 2>&1; then
         return 0
     fi
-    # Stale viz pid? Kill it before re-binding.
+    # Stale viz pid from a previous run? Kill it before re-binding.
     if [ -f /tmp/viz/.server.pid ]; then
         kill "$(cat /tmp/viz/.server.pid)" 2>/dev/null || true
         sleep 0.2
         rm -f /tmp/viz/.server.pid
-    fi
-    # Port held by something else (not us)? Bail; caller falls back.
-    if lsof -i :"$VIZ_PORT" -sTCP:LISTEN &>/dev/null; then
-        return 1
     fi
     if [ -f "$SERVER_SCRIPT" ]; then
         nohup python3 "$SERVER_SCRIPT" "$bind_host" >/tmp/viz/.server.log 2>&1 &
