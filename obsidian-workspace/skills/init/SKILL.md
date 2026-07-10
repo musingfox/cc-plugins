@@ -1,6 +1,11 @@
-# init
+---
+name: init
+description: Interactively create `.obsidian.yaml` and install starter templates (task / doc / adr) for this project. Triggers via `/obw:init` or when another obw skill reports missing config.
+---
 
-Initialise the project's Obsidian Workspace configuration and seed starter templates.
+# init — Initialize Obsidian Workspace
+
+Run everything directly in the main context — the flow is interactive (`AskUserQuestion`) by design.
 
 ## Execution
 
@@ -15,10 +20,10 @@ Initialise the project's Obsidian Workspace configuration and seed starter templ
 
 3. **Ask config options** (via `AskUserQuestion`):
    - Project identifier for `/obw:pm`? (default = current directory basename; allow "skip" to omit the `pm` section)
-   - Default folder for `/obw:note`? (default `Inbox`)
-   - Filename strategy for `/obw:note`? options: `title` / `slug` / `timestamp-title`
+   - Default folder for long-form notes? (default `Inbox`)
+   - Filename strategy for notes? options: `title` / `slug` / `timestamp-title`
 
-   Mention: daily note folder / filename / template are configured in Obsidian's **Daily Notes** core plugin, not here. `/obw:cap` always prepends `HH:MM` and writes `#tag` tokens inline (Obsidian indexes them automatically).
+   Mention: daily note folder / filename / template are configured in Obsidian's **Daily Notes** core plugin, not here. Quick capture always prepends `HH:MM` and writes `#tag` tokens inline (Obsidian indexes them automatically).
 
 4. **Install starter templates** — read the Templates folder from `$VAULT_PATH/.obsidian/templates.json`:
    ```bash
@@ -59,7 +64,6 @@ Return a summary in this shape:
 Templates installed to <TF>/: task.md, doc.md, adr.md (only the missing ones).
 
 Next:
-  /obw:cap <text>        — quick capture to today's daily note
-  /obw:note <title>      — create a long-form note
+  /obw:jot <text>        — quick capture to today's daily note, or a long-form note
   /obw:pm                — task / doc / ADR management
 ```

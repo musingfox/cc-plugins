@@ -1,6 +1,13 @@
+---
+name: pm
+description: Obsidian Workspace PM — tasks, documents, and ADRs in your Obsidian vault. Triggers on task/doc/ADR lifecycle requests ("add a task", "create an ADR", "archive X", "list in-progress tasks", "refresh dashboard") and via `/obw:pm`. Requires `.obsidian.yaml` with a `pm.project` section.
+---
+
 # pm — Obsidian Project Management
 
-This mode owns: folder layout, template names, property schema, ADR numbering, dashboard generation strategy, and the direct-read rule. For Bases (`.base`) syntax used by dashboards, read the bundled `templates/dashboard-cross.base` / `dashboard-project.base` directly — do not guess.
+Run the `obsidian` CLI directly — no sub-agent. For CLI syntax defer to the `obsidian:obsidian-cli` skill; this skill owns only the PM conventions: folder layout, template names, property schema, ADR numbering, and dashboard generation.
+
+**CLI gotcha**: `file=` resolves like a wikilink — bare note name only, no path, no `.md`. Use `path=` for vault-root-relative paths. If a command returns `File not found` after a `create`, fix the parameter — never re-run `create` (it makes `name 1.md` duplicates).
 
 ## Config (`.obsidian.yaml`)
 
@@ -10,7 +17,7 @@ pm:
   project: <PROJECT_NAME>
 ```
 
-Missing config or `pm.project` → tell the user to run `/obw:init` and stop.
+Missing config or `pm.project` → tell the user to run `/obw:init` and stop. Never guess the vault.
 
 ## Vault Layout
 
@@ -77,5 +84,7 @@ Conversation-mode status (user asks in chat, not Obsidian): run the equivalent `
 
 1. Read `.obsidian.yaml` before any operation.
 2. Never `search` to locate a note whose name is known — go straight to `read`.
-3. Never bypass the CLI with filesystem Read/Write against `$VAULT_PATH/...`. Only exception: reading `.obsidian/templates.json` / `obsidian.json` during `/obw:init`. Dashboard creation uses the CLI via shell-piped content.
+3. Never bypass the CLI with filesystem Read/Write against the vault. Only exception: reading `.obsidian/templates.json` / `obsidian.json` during `/obw:init`. Dashboard creation uses the CLI via shell-piped content.
 4. Confirm destructive intents (delete, archive-move, ADR supersede) before executing.
+5. A claim of "created" / "updated" needs a receipt — the CLI's own success output counts; an error output never does. Report failures as failures.
+6. Bulk scans (e.g. auditing all archived tasks) may be delegated to a read-only Explore agent to keep the listing out of context; single-entity operations never need one.

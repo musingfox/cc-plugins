@@ -181,11 +181,10 @@ Interact with [Fizzy](https://fizzy.do) via the Fizzy CLI for project management
 
 ### Obsidian Workspace
 
-Personal Obsidian vault productivity — capture, notes, and project management through the Obsidian CLI:
-- **Quick Capture** (`/obw:cap`): Append timestamped entries to today's journal; `#tag` extraction into frontmatter
-- **Long-form Notes** (`/obw:note`): Create notes in a configurable default folder with filename strategies (title / slug / timestamp-title); `--folder` overrides per-call
-- **Project Management** (`/obw:pm`): Task/doc/ADR lifecycle, Dataview dashboards, wikilink cross-references (formerly `/obm`)
-- **Interactive Init** (`/obw:init`): Guided setup of `.obsidian.yaml` — vault binding, journal/note/pm sections
+Personal Obsidian vault productivity — capture, notes, and project management through the Obsidian CLI (skills-only, runs directly in the main context):
+- **Jot** (`/obw:jot`): Quick capture (timestamped journal bullet) or long-form note — triages by input shape; filename strategies (title / slug / timestamp-title), `--folder` overrides per-call
+- **Project Management** (`/obw:pm`): Task/doc/ADR lifecycle, Bases dashboards, wikilink cross-references
+- **Interactive Init** (`/obw:init`): Guided setup of `.obsidian.yaml` — vault binding, note/pm sections
 - **Prerequisites**: Obsidian app + CLI enabled, `.obsidian.yaml` config in project root
 
 **Installation:**
@@ -312,8 +311,8 @@ cc-plugins/
 ├── obsidian-workspace/           # Obsidian vault: capture, notes, PM
 │   ├── .claude-plugin/
 │   │   └── plugin.json
-│   ├── commands/                 # /obw:init, /obw:cap, /obw:note, /obw:pm
-│   ├── skills/                   # cap, note, pm
+│   ├── skills/                   # init, jot, pm
+│   ├── templates/                # task / doc / adr + dashboard .base
 │   └── README.md
 ├── discord-webhook/              # Discord webhook notifications
 │   ├── .claude-plugin/

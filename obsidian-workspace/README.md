@@ -1,24 +1,21 @@
 # Obsidian Workspace
 
-Project-scoped Obsidian vault productivity for Claude Code — quick capture, long-form notes, and project management. The plugin owns **folder layout + file templates + minimal glue**; all vault I/O delegates to the Obsidian CLI and the official `obsidian:obsidian-cli` skill. Each skill file is kept small so it doesn't burn your context budget.
+Project-scoped Obsidian vault productivity for Claude Code — quick capture, long-form notes, and project management. The plugin is **skills-only**: it owns folder layout + file templates + PM conventions; all vault I/O runs the Obsidian CLI directly in the main context, deferring to the official `obsidian:obsidian-cli` skill for syntax. Each skill file is kept small so it doesn't burn your context budget.
 
-Plugin identifier: `obw` (commands invoked as `/obw:<name>`).
+Plugin identifier: `obw` (skills invoked as `/obw:<name>` or via natural language).
 
-## Commands
+## Skills
 
-| Command | Purpose |
-|---------|---------|
+| Skill | Purpose |
+|-------|---------|
 | `/obw:init` | Pick a vault, write `.obsidian.yaml`, install starter templates into your vault's Templates folder |
-| `/obw:cap <text>` | Append a timestamped bullet to today's daily note (via `obsidian daily:append`) |
-| `/obw:note <title>` | Create a long-form note at your default folder with a chosen filename strategy |
+| `/obw:jot <text>` | Quick capture (timestamped bullet to today's daily note) or long-form note — triages by input shape |
 | `/obw:pm [intent]` | Task / document / ADR lifecycle, project-scoped; free-form natural language |
-
-Natural-language phrasing also works via the matching skills (`cap`, `note`, `pm`).
 
 ## How It Works
 
-- **Vault I/O** goes through the `obsidian` CLI. This plugin does not duplicate CLI syntax; it defers to the official `obsidian:obsidian-cli` skill and `obsidian help`.
-- **Daily notes** use Obsidian's **Daily Notes** core plugin (folder / filename / template). `/obw:cap` calls `daily:append`.
+- **Vault I/O** goes through the `obsidian` CLI, run directly in the main context (no sub-agent). This plugin does not duplicate CLI syntax; it defers to the official `obsidian:obsidian-cli` skill and `obsidian help`.
+- **Daily notes** use Obsidian's **Daily Notes** core plugin (folder / filename / template). Quick capture calls `daily:append`.
 - **Templates** (`task`, `doc`, `adr`) live in your vault's Obsidian Templates folder. On `/obw:init` the plugin copies starter files from `templates/` only if the same name doesn't already exist — it never overwrites your edits.
 - **Dashboards** (optional) are **Obsidian Bases** (`.base` files — core in Obsidian 1.9+) generated from plugin-internal templates via shell substitution, so contents never enter Claude's context.
 
@@ -28,7 +25,7 @@ Natural-language phrasing also works via the matching skills (`cap`, `note`, `pm
 - [Obsidian](https://obsidian.md) app running (headless CLI also works)
 - Obsidian community plugin **`obsidian-cli`** installed and enabled. The plugin's name is `obsidian-cli` but the executable it installs is `obsidian` (invoked as `obsidian vault=<name> ...`). This is **not** the unrelated standalone `obsidian-cli` binary by Yakitrak.
 - **Templates** core plugin enabled (required for `/obw:pm` — `task` / `doc` / `adr` templates)
-- **Daily Notes** core plugin enabled (required for `/obw:cap`)
+- **Daily Notes** core plugin enabled (required for `/obw:jot` quick capture)
 - **Bases** core plugin enabled (required only for `/obw:pm` dashboards — bundled in Obsidian 1.9+)
 
 ## Installation
@@ -39,7 +36,7 @@ Natural-language phrasing also works via the matching skills (`cap`, `note`, `pm
 
 ## Permissions (recommended)
 
-The plugin runs vault operations inside the `obsidian-operator` sub-agent, which shells out to the `obsidian` CLI plus a few Unix helpers. In auto mode every un-allowlisted Bash invocation prompts the user — and the sub-agent will stall waiting for that prompt. Add these to user `settings.json` (`~/.claude/settings.json`) once:
+Vault operations shell out to the `obsidian` CLI plus a few Unix helpers. To avoid repeated permission prompts, add these to user `settings.json` (`~/.claude/settings.json`) once:
 
 ```json
 {
@@ -97,8 +94,8 @@ Dashboards and searches depend on these frontmatter fields. If you edit the inst
 ## Examples
 
 ```
-/obw:cap #worklog 完成 API 重構 PR，等 review
-/obw:note API Redesign Proposal --folder Architecture --tag design
+/obw:jot #worklog 完成 API 重構 PR，等 review
+/obw:jot API Redesign Proposal --folder Architecture --tag design
 /obw:pm add task implement-auth, high priority, due 2026-05-01
 /obw:pm create adr about switching to SQLite
 /obw:pm implement-auth is done, archive it
