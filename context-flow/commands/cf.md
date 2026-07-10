@@ -54,7 +54,7 @@ After setup, read `$PI_AVAILABLE` from env.sh:
 - `PI_AVAILABLE=1` → Phase 3 uses OMP (default).
 - `PI_AVAILABLE=0` → Phase 3 falls back to Claude `context-flow:implement` agent. Log: `omp CLI not on PATH — Phase 3 will use Claude implement agent. Install omp (bun i -g @oh-my-pi/pi-coding-agent) to use the OMP implementer.` Do NOT abort.
 
-The fallback path is also reachable mid-flow (a shard's `Status: FAIL` with unrecoverable probe error, or the human selects "Fall back to Claude implement agent" at a recovery prompt). Procedure: §3.6.
+The fallback path is also reachable mid-flow (a shard's `Status: FAIL` with unrecoverable probe error, the pre-dispatch quota gate reports the OMP provider near-saturated — §3.2, or the human selects "Fall back to Claude implement agent" at a recovery prompt). Procedure: §3.6.
 
 ---
 
@@ -321,6 +321,17 @@ SHARD_IDS=$(jq -r '.groups[].id' "$SESSION/shards.json")
 
 ### 3.2 Fan-out
 
+**Quota pre-flight (only when `PI_PROVIDER` is set).** Before launching (and before each re-fan-out in §3.4), run once:
+
+```bash
+bash "$SCRIPTS/cf-pi-usage-check.sh" "$SESSION"   # reads PI_PROVIDER, PI_USAGE_CEILING (default 0.85) from env.sh
+```
+
+- `OK` (or any `OK skip-…`) → dispatch OMP as normal.
+- `SATURATED <provider> <pct>` → OMP's configured provider is near its quota ceiling; a fresh dispatch could die mid-build. Route **this round** through the Claude fallback (§3.6) instead, logging: `omp provider <provider> at <pct> quota — using Claude implement agent this round to avoid a half-finished dispatch.` This is automatic; do not prompt the human.
+
+The check is advisory and fail-open (a flaky `omp usage` returns `OK skip-…`); with `PI_PROVIDER` unset it always skips, since OMP then picks its own provider and no single quota binds. Tune the trip point with `PI_USAGE_CEILING` (fraction, e.g. `0.9`).
+
 Launch N shards in PARALLEL — one `cf-pi-run.sh` per shard as a **background task** (`Bash` with `run_in_background: true`), all in a **single message**:
 
 ```
@@ -341,13 +352,13 @@ Wait for ALL N shards before routing (round-collection rule, design §4) so NEED
 
 ```
 Monitor(
-  command: "\"$SCRIPTS/cf-pi-watch.sh\" \"$SESSION\"",
+  command: "\"$SCRIPTS/cf-pi-watch.sh\" \"$SESSION\" 300",
   description: "cf shards progress",
   timeout_ms: 3600000, persistent: false
 )
 ```
 
-`cf-pi-watch.sh` emits one line per meaningful change — lifecycle-phase transitions, liveness transitions (ALIVE/STALL/…), and a final per-shard `Status (reason) — cause` summary — then exits when every shard has an outcome. Each line arrives as a chat notification, so progress is visible mid-run with zero polling from you. Round counters and byte sizes are normalized away; it will not spam.
+`cf-pi-watch.sh` emits one line per meaningful change — lifecycle-phase transitions, liveness transitions (ALIVE/STALL/…), and a final per-shard `Status (reason) — cause` summary — then exits when every shard has an outcome. The `300` sets a 5-minute poll interval, so meaningful changes coalesce into at most one notification burst every 5 min instead of spamming. Each line arrives as a chat notification, so progress is visible mid-run with zero polling from you. Round counters and byte sizes are normalized away; it will not spam.
 
 - Also print one line so the human can check on demand: `` Watch progress: bash $SCRIPTS/cf-pi-status.sh $SESSION ``
 - The monitor's `--- all shards done ---` event doubles as the round-collection signal — proceed to reading outcomes.
@@ -473,7 +484,7 @@ If either fires, escalate to the user via `AskUserQuestion`:
 
 Replan budget = 2 attempts per contract (third NEEDS_REPLAN escalates). Rollback budget = 2 cycles per flow (third escalates). FAIL retry budget = 1 per shard per round (handled in §3.4 Any FAIL).
 
-### 3.6 Fallback: Claude implement agent (PI_AVAILABLE=0 or human-selected)
+### 3.6 Fallback: Claude implement agent (PI_AVAILABLE=0, quota-saturated, or human-selected)
 
 The fallback fills the SAME seat under the SAME contract — only the builder changes. Per shard, sequentially (Claude agents are not free fan-out):
 
