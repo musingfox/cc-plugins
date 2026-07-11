@@ -5,9 +5,11 @@ description: Obsidian Workspace PM — tasks, documents, and ADRs in your Obsidi
 
 # pm — Obsidian Project Management
 
-Run the `obsidian` CLI directly — no sub-agent. For CLI syntax defer to the `obsidian:obsidian-cli` skill; this skill owns only the PM conventions: folder layout, template names, property schema, ADR numbering, and dashboard generation.
+Run the `obsidian` CLI directly — no sub-agent. Before any CLI call, invoke the `obsidian:obsidian-cli` skill to load exact syntax — never run `obsidian help`/`--help` to discover it. This skill owns only the PM conventions: folder layout, template names, property schema, ADR numbering, and dashboard generation.
 
 **CLI gotcha**: `file=` resolves like a wikilink — bare note name only, no path, no `.md`. Use `path=` for vault-root-relative paths. If a command returns `File not found` after a `create`, fix the parameter — never re-run `create` (it makes `name 1.md` duplicates).
+
+**`property:set` gotcha**: one property per call, no batch form. Pass `type=list` for `tags`, `type=date` for `due`/`completed` — omit `type=` and it's stored as plain text.
 
 ## Config (`.obsidian.yaml`)
 

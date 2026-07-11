@@ -5,7 +5,7 @@ description: Unified entry point for Obsidian daily-note captures and long-form 
 
 # jot — Capture or Note
 
-Single triage skill. Decide the mode, then run the `obsidian` CLI directly — no sub-agent. For CLI syntax defer to the `obsidian:obsidian-cli` skill. If `.obsidian.yaml` is missing, tell the user to run `/obw:init` and stop.
+Single triage skill. Decide the mode, then run the `obsidian` CLI directly — no sub-agent. Before any CLI call, invoke the `obsidian:obsidian-cli` skill to load exact syntax — never run `obsidian help`/`--help` to discover it. If `.obsidian.yaml` is missing, tell the user to run `/obw:init` and stop.
 
 ## Mode selection
 

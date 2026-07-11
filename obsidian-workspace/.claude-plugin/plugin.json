@@ -1,6 +1,6 @@
 {
   "name": "obw",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Obsidian Workspace — project-scoped vault productivity (capture / notes / PM). Skills-only: owns folder layout and templates; runs the Obsidian CLI directly via the official obsidian-cli skill.",
   "dependencies": [
     { "name": "obsidian", "marketplace": "obsidian-skills" }
