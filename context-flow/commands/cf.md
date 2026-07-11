@@ -68,7 +68,7 @@ The fallback path is also reachable mid-flow (a shard's `Status: FAIL` with unre
 | Implement (fallback) | `context-flow:implement` | Read, Edit, Write, Bash, Glob, Grep, WebFetch |
 | Review | `context-flow:review` | Read, Write, Grep, Glob, Bash |
 
-Phase 3 routes the OMP builder via `$PI_PROFILE` (pi-dispatch's `profiles.conf` capability tiers: `fast` < `balanced` < `careful`; explicit `$PI_PROVIDER`/`$PI_MODEL` still win); the Claude fallback runs on the default model. Choose the builder tier with the review seat in mind — the reviewer must sit at or above the builder's capability (dispatch doctrine: reviewer ≥ builder). If a more specialized agent exists for the goal (e.g., a frontend-dev agent for UI work), prefer it.
+Phase 3 routes the OMP builder via `$PI_PROFILE` (pi-dispatch's `profiles.conf` capability tiers: `fast` < `balanced` < `careful`; explicit `$PI_PROVIDER`/`$PI_MODEL` still win); the Claude fallback runs on the default model. To activate the §3.2 quota gate, point `$PI_PROVIDER` at a provider whose quota `omp usage` can read (e.g. `openai-codex`) — set it in your own environment, not here. Choose the builder tier with the review seat in mind — the reviewer must sit at or above the builder's capability (dispatch doctrine: reviewer ≥ builder). If a more specialized agent exists for the goal (e.g., a frontend-dev agent for UI work), prefer it.
 
 ### Agent Output Discipline (file-write + summary reply)
 
@@ -321,7 +321,7 @@ SHARD_IDS=$(jq -r '.groups[].id' "$SESSION/shards.json")
 
 ### 3.2 Fan-out
 
-**Quota pre-flight (only when `PI_PROVIDER` is set).** Before launching (and before each re-fan-out in §3.4), run once:
+**Quota pre-flight.** Before launching (and before each re-fan-out in §3.4), run once:
 
 ```bash
 bash "$SCRIPTS/cf-pi-usage-check.sh" "$SESSION"   # reads PI_PROVIDER, PI_USAGE_CEILING (default 0.85) from env.sh
@@ -330,7 +330,7 @@ bash "$SCRIPTS/cf-pi-usage-check.sh" "$SESSION"   # reads PI_PROVIDER, PI_USAGE_
 - `OK` (or any `OK skip-…`) → dispatch OMP as normal.
 - `SATURATED <provider> <pct>` → OMP's configured provider is near its quota ceiling; a fresh dispatch could die mid-build. Route **this round** through the Claude fallback (§3.6) instead, logging: `omp provider <provider> at <pct> quota — using Claude implement agent this round to avoid a half-finished dispatch.` This is automatic; do not prompt the human.
 
-The check is advisory and fail-open (a flaky `omp usage` returns `OK skip-…`); with `PI_PROVIDER` unset it always skips, since OMP then picks its own provider and no single quota binds. Tune the trip point with `PI_USAGE_CEILING` (fraction, e.g. `0.9`).
+The gate activates only when `$PI_PROVIDER` names a provider whose quota `omp usage` can read (e.g. `openai-codex`); set that in your own environment (the plugin ships no default so it stays portable). With `$PI_PROVIDER` unset — or set to a blind-quota provider (xai/grok, ollama expose no usage API) — the check returns `OK skip-…` and dispatch is unguarded, but the reactive poll in `cf-pi-run.sh` still catches true exhaustion. The check is advisory and fail-open. Tune the trip point with `PI_USAGE_CEILING` (fraction, e.g. `0.9`).
 
 Launch N shards in PARALLEL — one `cf-pi-run.sh` per shard as a **background task** (`Bash` with `run_in_background: true`), all in a **single message**:
 
