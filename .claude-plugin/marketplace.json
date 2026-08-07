@@ -4,7 +4,9 @@
     "name": "Nick Huang"
   },
   "description": "Nick's personal Claude Code plugin marketplace featuring OMT and other productivity tools",
-  "allowCrossMarketplaceDependenciesOn": ["obsidian-skills"],
+  "allowCrossMarketplaceDependenciesOn": [
+    "obsidian-skills"
+  ],
   "plugins": [
     {
       "name": "omt",
@@ -44,7 +46,7 @@
     {
       "name": "spiral",
       "source": "./spiral",
-      "description": "[Experimental] Spiral — converge a vague idea into code, diverge into the next idea: a deterministic commit gate (the machine), an independent adversarial judge (Divergence), and the human as decision-maker"
+      "description": "[Experimental] Spiral — narrow a vague question into an implementation-sized goal, one layer at a time: diverge into distinct directions, you pick one, converge it into a plan or milestone, then dig another layer or stop; hands the goal to /cf and never writes code"
     },
     {
       "name": "gog",

@@ -30,10 +30,11 @@ Write the goal to `$SESSION/goal.md`.
 
 ### Baton mode (pre-validated contract input)
 
-If the goal references a handoff/baton document (e.g. `docs/handoff-*.md`, typically
-produced by a spiral run via `/spiral:handoff`), this flow runs in **baton mode**: the
-contracts arrive pre-validated and human-approved upstream, so re-approving them here is
-double taxation. Log one line — `Baton mode: contracts from <path>; plan gate collapses
+If the goal references a handoff/baton document (e.g. `docs/handoff-*.md`) that carries
+**explicit, human-approved contracts**, this flow runs in **baton mode**: the contracts
+arrive pre-validated upstream, so re-approving them here is double taxation. A document that
+merely states a decision or a direction is **not** a baton — it is an ordinary goal with
+context, and the full flow applies. Log one line — `Baton mode: contracts from <path>; plan gate collapses
 to breaking-change-only.` — then apply these deltas:
 
 - **Phase 1 (Research)** becomes a **gap-scan**: inventory only the areas the execution

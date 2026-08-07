@@ -46,11 +46,10 @@ from a det result. The axiom tells each motion what it may mechanize and what it
 leave to judgment.
 
 Determinism **concentrates** non-determinism; it does not eliminate it. Every right/wrong
-line was *drawn* by an opinion — mutation coverage is det, but "80% enough?" is non-det; a
-test passing is det, but "which cases test the right thing?" is non-det. The residual
-non-det never disappears; it is pushed onto the **threshold and criteria seams**, which
-are anchored once by the decision-maker and never re-litigated below. That is what buys
-the machine its purity.
+line was *drawn* by an opinion — a cost figure is det, but "is that cheap?" is non-det; what
+an API does is det, but "does that settle the choice?" is non-det. The residual non-det never
+disappears; it is pushed onto the **threshold and criteria seams**, which are anchored once by
+the decision-maker and never re-litigated below.
 
 The sort also governs **how much capability each unit deserves**. Det work needs a mechanism,
 not a mind — spend no judgment on it (a script, not a deliberator). Non-det work needs judgment
@@ -67,35 +66,32 @@ result deserves the most.
 Two roles, named for the motion they own. (A role may be filled by a person, a team, or a
 machine — the concept does not care which.)
 
-- **The Convergence role** — vague idea → concrete result. It *formalizes* (turns the
-  goal into a stable "what", with a feasibility verdict — including the legitimate verdict
-  *infeasible*, which ends the pass with reasons and no result built) and it *builds*
-  (turns the agreed "what" into the result, satisfying the deterministic gate). It does
-  the narrowing.
-- **The Divergence role** — concrete result → new ideas. It *judges against intent* (not
-  just "does it pass" but "is this what was wanted, and where does it fall short"), *hunts
-  adversarially* (breakage the spec never anticipated; a suite that passes while testing
-  the wrong behavior), and *regenerates* the next non-det seed. It does the widening.
+- **The Convergence role** — vague idea → concrete result. It *formalizes*: turns what was
+  chosen into a stable, determinate "what" — the commitment, what it forecloses, and what
+  would overturn it. Open sub-choices it resolves rather than punts: a retrievable fact gets
+  looked up, a reversible one gets a sane default. It does the narrowing.
+- **The Divergence role** — concrete result → new ideas. It names the genuinely *distinct*
+  directions the current state makes thinkable, *hunts adversarially* for the ones nobody
+  framed, and sorts each by what taking it commits to. It does the widening — and it
+  describes, never decides.
 
 ---
 
-## 4. The machine and the decision-maker
+## 4. The decision-maker
 
-Beyond the two motions, two further roles complete the system.
+Beyond the two motions, one role completes the system.
 
-- **The machine** is the deterministic gate. It judges the det world by mechanism — right
-  or wrong, no opinion. A failing gate means the pass is **not done**: it cannot be
-  delivered or declared complete. This is the reality floor. The machine does not build
-  itself: drawing its checks from the spec is a non-det act, so an independent hand forges it
-  from the "what" *before the build exists* (§8) — never the builder, who would test itself.
-- **The decision-maker** is the anchor, and owns what no other role may take:
-  1. the **criteria** — what the formalized "what" is, what "good enough" means;
-  2. the **navigation** — when to descend a layer (§5), when to stop, and the hardest call of
-     all, when to break the frame (§7). Here the *cost to reverse* splits the call: riding an
-     obvious next seed is cheap to undo, so the loop may take that on its own; the *irreversible*
-     navigation — to stop, to reframe, to end the oscillation at a dead end — is the
-     decision-maker's, and re-ratifying the reversible kind every turn is the rubber-stamp trap
-     (§2).
+**The decision-maker** is the anchor, and owns what no other role may take:
+
+1. the **choice** — which direction, and when what is on the table is good enough to settle;
+2. the **navigation** — when to widen again, when to descend a layer (§5), when to stop, and
+   the hardest call of all, when to break the frame (§7).
+
+What is *not* theirs is as load-bearing as what is. A **retrievable fact** is nobody's vote —
+it gets looked up. A **reversible** sub-choice gets a sane default and rides. Putting either in
+front of the decision-maker looks like deference and works like noise: it spends the attention
+that the one-way doors need, and it trains them to rubber-stamp (§2). Escalate by *cost to
+reverse*, not exhaustively.
 
 ---
 
@@ -113,10 +109,13 @@ runs the same two motions at its own scope.
 
 This makes **determinism relative to scope.** A plan is "determined enough" at the planning
 layer yet is a "vague idea" at the implementation layer — the det *output* of one layer is
-the non-det *input* of the layer below. How much the machine (§4) can judge also varies by
-scope: at the planning layer little is mechanizable — there is no compiler for a strategy —
-while at the implementation layer much is. The axiom holds at every layer; only the
-formalizable fraction changes. So the picture is a spiral of spirals: oscillate within a
+the non-det *input* of the layer below. How much can be settled by mechanism also varies by
+scope: at the planning layer almost nothing is — there is no compiler for a strategy — while
+at the implementation layer much is. The axiom holds at every layer; only the formalizable
+fraction changes. **This is where the spiral stops.** Its subject is the layers with no
+compiler — it descends through as many of them as the decision-maker asks for, and hands over
+at the first one a machine could judge: once a result is determinate enough to be mechanically
+right or wrong, the work belongs to a tool that has that machine. So the picture is a spiral of spirals: oscillate within a
 layer until the conclusion is solid, then descend to concretize it.
 
 ---
@@ -130,9 +129,12 @@ feedback, and iterate.
 
 What separates a real iteration from churn is **feedback**.
 
-- A change licensed by genuine feedback from a concrete result is a real pass.
+- A change licensed by genuine feedback is a real pass. At the planning layer the feedback is
+  the decision-maker's reaction to what was put in front of them, plus the facts the widening
+  turned up — not a test result, and no weaker for it.
 - A change driven only by "I want to go from A to B," with no feedback, is **false
-  progress** — motion disguised as iteration.
+  progress** — motion disguised as iteration. Re-listing last round's directions with new
+  wording is exactly this: the most common way a widening loop fakes a pass.
 
 The distinction is *feedback-grounded vs want-driven*, not *better vs worse*: a
 feedback-grounded change that turns out worse is still a real iteration (you keep that
@@ -165,29 +167,20 @@ concretize when a layer is solid, and ascending to reframe when a layer is stuck
 > verdict is **MECHANICAL** (right/wrong), bias is structurally immune, so no independence
 > is required.
 
-The Convergence role may build *and* check its own result, because the det parts are judged
-mechanically, not by the builder's self-assessment — the student does not grade their own
-exam, the machine does. Divergence is a **separate** role because judging "is this what was
-wanted" and hunting holes are opinion-judgments, so the judge must be independent of the
-builder. The Convergence role authored the idea→result translation and is structurally
-blind to its own misreading of the goal; only an independent Divergence role, and the
-decision-maker who owns the goal, sit outside that translation.
+At these layers *every* verdict is an opinion — there is no compiler for a strategy (§5) — so
+the split is not a convenience, it is the only thing standing in for the machine that does not
+exist here.
 
-But the machine itself has a blind spot the axiom hides: *executing* the gate is mechanical
-and bias-immune, yet **drawing its lines** — which checks, which thresholds, what counts as
-the behavior — is an opinion-laden act. So "Convergence may check its own result" means it
-may *run* the machine, never *build* it. If the builder authors the gate that judges its
-build, the bias the machine exists to remove leaks back in through the machine's
-construction: a gate can be written to grep for a string the build trivially contains,
-passing green while the behavior is broken (the §2 mistake, now mechanized). So the gate's
-**authorship** is its own independent act — a separate hand forges the gate from the spec
-*before the build exists*, so the machine cannot be bent to fit the code. It is not the
-builder's (it would test itself), and not the driver's either: constructing the machine is
-hands-work, distinct from advancing the turn. And independent means *derived*, not relabeled:
-if the builder hands over a runnable gate the constructor merely transcribes, construction
-still sits inside the builder. The constructor must draw the checks from the *what* — the
-Examples — by its own judgment of the *how*. The machine is bias-immune only once it exists;
-making it is not.
+Convergence and Divergence are **separate roles** because the one that narrowed a question is
+structurally blind to what it narrowed away. Having committed to a reading of the goal, it can
+no longer see the readings it dropped; asked to widen, it will widen *within* its own frame and
+call that exploring. Only a role that never saw the narrowing — and the decision-maker, who
+owns the goal — sit outside that translation.
 
-Convergence does; Divergence judges; the machine gates; the decision-maker anchors and
-navigates the layers.
+The same blindness runs the other way, which is why the widening role does not decide. Naming
+directions and choosing between them are different acts: whoever authored the options has
+already weighted them, and a chooser who is also the author is picking their own favorite while
+calling it a verdict. So Divergence describes and never decides; the decision-maker chooses
+and never has to defend the menu they were handed.
+
+Convergence narrows; Divergence widens; the decision-maker chooses and navigates the layers.

@@ -93,11 +93,12 @@ Experimental agentic workflow based on the **Context + Goal + Tools** principle:
 
 ### Spiral (Experimental)
 
-Development as a spiral of **converge → diverge**, built on one axiom: the non-deterministic world has only opinions, the deterministic world has only right/wrong — sort each piece of work correctly.
-- **Two roles, isolated**: a **Convergence** subagent (vague idea → code + tests) and an independent **Divergence** subagent (judge against intent + adversarially hunt holes). Fresh context guarantees the judge never saw how the builder reasoned.
-- **The machine**: a deterministic commit-gate hook blocks `git commit` when tests/lint fail — *a failing gate means not done*, enforced (not at the model's discretion) and bypass-proof.
-- **The human is the decision-maker**: owns the criteria (approve the Specification-by-Example) and the STOP (ship, continue, or reframe), via in-flow gates.
-- **Single command**: `/spiral "goal"` runs one turn — formalize → human-approve → build → gate → diverge → human-decide.
+Narrows a vague question into an implementation-sized goal, one layer at a time — **diverge → you pick → converge** — for the layers where there is no compiler: strategy, approach, milestones.
+- **Divergence names the options**: an isolated subagent lists the genuinely *distinct* directions and what each one commits to, sorted by cost to reverse (one-way vs two-way door). It describes; it never decides, and it never re-lists last round.
+- **Convergence lands a layer**: the direction you picked becomes a plan or milestone — what this layer settles, what is concrete enough to build on, what it deliberately leaves to the next layer.
+- **You stay on the converging side**: each step renders as a readable decision page in the browser. Pick a direction, then say whether the layer is deep enough. It only widens again when you ask — no menu is pushed at someone ready to stop.
+- **Output is a goal, not code**: hand the final plan to `/cf` (as a seed, not a contract set) or keep it via `/adr`. No gate, no commit.
+- **Single command**: `/spiral "the question"`.
 
 See `spiral/docs/concept.md` for the full concept.
 

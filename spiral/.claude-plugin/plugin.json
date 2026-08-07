@@ -1,7 +1,7 @@
 {
   "name": "spiral",
-  "version": "0.1.20",
-  "description": "[Experimental] Spiral — converge a vague idea into code, diverge into the next idea: a deterministic commit gate (the machine), an independent adversarial judge (Divergence), and the human as decision-maker",
+  "version": "0.2.0",
+  "description": "[Experimental] Spiral — narrow a vague question into an implementation-sized goal, one layer at a time: diverge into distinct directions, you pick one, converge it into a plan or milestone, then dig another layer or stop; hands the goal to /cf and never writes code",
   "author": {
     "name": "Nick Huang",
     "email": "nick12703990@gmail.com"
@@ -12,12 +12,16 @@
     "spiral",
     "convergence",
     "divergence",
-    "deterministic-gate",
+    "decision-making",
     "human-in-the-loop",
-    "contract-first",
-    "specification-by-example"
+    "cost-to-reverse",
+    "option-generation"
   ],
   "license": "MIT",
-  "dependencies": ["viz", "pi-dispatch"],
-  "commands": ["./commands/"]
+  "dependencies": [
+    "viz"
+  ],
+  "commands": [
+    "./commands/"
+  ]
 }
