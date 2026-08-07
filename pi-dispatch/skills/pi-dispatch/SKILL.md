@@ -11,6 +11,48 @@ symlinks to the run's RUNDIR. Main (the orchestrator) loads this usage and
 embeds it verbatim into a builder brief when offloading; the builder operates
 the verbs as a pure operator.
 
+## Output contract — required in every brief, on either control plane
+
+Never extract a verdict by parsing a transcript or a session jsonl. Name the
+artifact in the brief instead:
+
+> Write the result to `/abs/path/verdict.md` as exactly one line:
+> `STATUS=PASS|FAIL …`. Do not print it in the terminal. Reply only `DONE`.
+
+The caller reads that file: present = the worker finished, absent = it did not.
+This is stronger than a process exit code — `rc=0` proves the process did not
+crash, not that the work is done.
+
+## Control plane — herdr when available, `pi-agent.sh` otherwise
+
+Two control planes drive the same omp workers. Pick once, at the start of a
+dispatch:
+
+```bash
+test "${HERDR_ENV:-}" = 1
+```
+
+**Inside herdr** — prefer it. **Load the `herdr` skill first** (or run
+`herdr --skill`): it does not auto-trigger on delegation intent, so main must
+request it explicitly before issuing any `herdr` command. Then:
+
+```bash
+herdr pane split --current --direction right --cwd <ABS_DIR> --no-focus
+herdr agent start NAME --kind omp --pane <PANE_ID>
+herdr agent prompt NAME <BRIEF> --wait --timeout <MS>
+```
+
+A worker that dies mid-turn fails the waiting call at once with
+`agent_not_running` (rc=1) instead of hanging to the timeout.
+`herdr worktree create --cwd <REPO> --branch <NAME>` replaces
+`pi-worktree.sh create` for isolation — but its `remove --force` deletes a live
+worktree without killing the worker or capturing the diff, so commit the work
+(or capture the diff) before removing.
+
+**Outside herdr** — cron, CI, the web and IDE clients, any Claude not launched
+from a herdr pane — use the verbs below. This is the portable path, and the one
+cf/spiral's own scripts sit on.
+
 ## Verbs
 
 | verb | command | purpose |

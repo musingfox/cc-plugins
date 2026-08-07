@@ -47,6 +47,25 @@ When/how to choose between direct dispatch, dispatcher, builder/reviewer, Workfl
 thin-shells — and when not to outsource at all: see
 [docs/dispatch-doctrine.md](docs/dispatch-doctrine.md).
 
+## Running inside herdr (better experience)
+
+[herdr](https://herdr.dev) is a terminal multiplexer that recognizes coding agents in panes. When Claude itself runs in a herdr pane (`HERDR_ENV=1`), herdr's CLI is the nicer control plane over the same omp workers, and `pi-agent.sh` is not needed:
+
+| | `pi-agent.sh` | `herdr agent` |
+|---|---|---|
+| worker visibility | RUNDIR files | a live pane you can watch and type into |
+| blocked worker | `PERMISSION` line, relayed by hand | native `blocked` lifecycle state |
+| death mid-turn | detected on the next poll | the waiting call returns `agent_not_running` (rc=1) at once |
+| worktree | `pi-worktree.sh create` (8 named params) | `herdr worktree create --cwd R --branch B` |
+| worktree teardown | kill-confirm, then diff capture, then remove | `remove --force` deletes a live worktree, no kill-confirm, no diff |
+| run registry | name→RUNDIR symlink, `result.md`, replayable terminal verdict | none — the agent name dies with the pane |
+
+herdr ships its own skill (`herdr --skill`); pi-dispatch references it rather than vendoring a copy. It does not auto-trigger on delegation intent, so load it explicitly before issuing herdr commands.
+
+`pi-agent.sh` remains the portable path: outside a herdr pane (cron, CI, the web and IDE clients) it is the only one that works, and cf/spiral consume `pi-dispatch.sh`/`pi-worktree.sh` directly on either plane.
+
+Either way, put the output contract in the brief — an absolute artifact path plus a one-line format, so the verdict is read from a file instead of parsed out of a transcript. See [skills/pi-dispatch/SKILL.md](skills/pi-dispatch/SKILL.md).
+
 ## Model routing
 
 `profiles.conf` maps names to omp models (must have working omp auth):
