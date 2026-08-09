@@ -1,6 +1,6 @@
 {
   "name": "spiral",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "[Experimental] Spiral — narrow a vague question into an implementation-sized goal, one layer at a time: diverge into distinct directions, you pick one, converge it into a plan or milestone, then dig another layer or stop; hands the goal to /cf and never writes code",
   "author": {
     "name": "Nick Huang",

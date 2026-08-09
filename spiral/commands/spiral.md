@@ -124,16 +124,21 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/render-decision.sh" <file> <name>
 ```
 
 It ends with `[spiral] save-mode=browser|inline`.
-- **`browser`** → launch the waiter with the Bash tool's `run_in_background` and end your turn;
-  the human's Save resumes you. Tell them: pick + Save, or just type an answer instead.
+- **`browser`** → hand them the `URL:` line render-decision printed, launch the waiter with the
+  Bash tool's `run_in_background`, and end your turn; the human's Save resumes you. Tell them:
+  pick + Save, or just type an answer instead. Surfacing the URL is not optional — over SSH
+  nothing on this machine can open the browser they are actually looking at.
   ```bash
   bash "${CLAUDE_PLUGIN_ROOT}/scripts/wait-decision.sh" <file>
   ```
 - **`inline`** (viz absent / headless) → **AskUserQuestion** with the same options plus "Other".
 - **On wake, branch on `choice:`, never on how you woke.** Grep `choice:`/`notes:` from the
-  file: non-empty → that is the call (`notes:` `\n` is literal — unescape it); empty → take the
-  typed answer, or ask. If you proceed from a typed answer while the waiter may still poll,
-  `TaskStop` it.
+  file (`notes:` `\n` is literal — unescape it). `choice:` non-empty → that is the call.
+  `choice:` empty with `notes:` filled → they Saved without picking, which is 都不對 *plus*
+  their reasoning. At §2 that is the `A+1` path; §4 has no such branch, so ask them which of its
+  two it is, carrying their notes. Never read a no-pick as agreement with `recommend:` — an
+  unpicked option was not picked. Both empty → take the typed answer, or ask.
+  If you proceed from a typed answer while the waiter may still poll, `TaskStop` it.
 
 ## Rules
 
