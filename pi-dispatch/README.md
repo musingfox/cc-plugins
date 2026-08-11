@@ -18,12 +18,6 @@ Claude (main)          wrapper (haiku, optional)        omp worker (cheap model)
 - **`scripts/pi-probe.sh [--bin-only] [PROBE_DIR]`** — pre-flight gate: `--bin-only` checks the agent binary is on PATH (exit 0/1); the full probe runs `say ok` on the exact routing a dispatch would resolve. Callers never touch the agent binary themselves.
 - **`scripts/pi-watch.sh RUNDIR`** — one-shot monitoring snapshot of a live run (fixed 4 lines regardless of stream size): event/byte counts, tool progress + current tool, token usage, latest assistant text. `pi-poll.sh` answers "is it done?"; `pi-watch.sh` answers "what is it doing?". Safe on a mid-write stream (partial trailing line skipped).
 - **`scripts/pi-worktree.sh create|clean …`** — git-worktree isolation for code-writing tasks; cleanup captures the diff before removal.
-- **`scripts/pi-acp-*.sh`** — interactive ACP worker sessions (`omp acp` over a stdin fifo / stdout jsonl pair), for work that needs mid-flight governance rather than fire-and-forget:
-  - `pi-acp-start.sh [--resume SID] [OUTDIR [CWD]]` — background session + handshake, returns `RUNDIR=/SESSION=/PID=`. `--resume` restores a prior session's context (`session/load`) across processes.
-  - `pi-acp-send.sh RUNDIR prompt TEXT_OR_FILE | permission OPTION_ID [REQ_ID] | cancel` — non-blocking frame sends: start a turn, answer a tool-permission request, or cancel the in-flight turn (session survives).
-  - `pi-acp-poll.sh RUNDIR` — one line per call: `IDLE` / `RUNNING` / `PERMISSION id=… tool=… options=…` (worker blocked awaiting an answer — this is the governance hook) / `STATUS=DONE id=… stopReason=…` (per-turn terminal; turn text distilled to `result.md`) / `STATUS=DEAD`. Teardown reuses `pi-stop.sh` (same pid/pgid layout).
-
-  Division of labor: `pi-dispatch.sh` (`-p` mode, auto-approved tools) stays the batch fan-out workhorse; ACP sessions are for interactive workers — per-tool-call approval, warm multi-turn without re-briefing, protocol-level cancel.
 - **`agents/builder.md`** — a brief-driven executor. When the brief embeds the `pi-agent.sh` offload usage, builder operates it as a pure operator: `pi-agent.sh start` per task, `pi-agent.sh watch` as the main loop, runs each worker's acceptance check, and distills a report to main. When the brief carries no offload usage, builder does the work itself. Builder does NOT choose the mode — the brief does.
 - **`agents/reviewer.md`** — an independent contract judge. Given ONLY the contract, the deliverable paths, and the check output, it returns an evidence-backed PASS/FAIL per clause. It never sees the builder transcript and never runs offload verbs.
 
@@ -33,7 +27,7 @@ Claude (main)          wrapper (haiku, optional)        omp worker (cheap model)
 
 | native experience | command |
 |---|---|
-| `Agent(name, prompt)` | `pi-agent.sh start NAME [--acp] [--profile P] [BRIEF]` |
+| `Agent(name, prompt)` | `pi-agent.sh start NAME [--profile P] BRIEF` |
 | `SendMessage(to)` | `pi-agent.sh send NAME TEXT_OR_FILE` |
 | poll / `TaskOutput` | `pi-agent.sh poll NAME` |
 | agent-view peek | `pi-agent.sh peek NAME` |
@@ -41,7 +35,7 @@ Claude (main)          wrapper (haiku, optional)        omp worker (cheap model)
 | `TaskStop` | `pi-agent.sh stop NAME` |
 | background completion / needs-input notifications | `pi-agent.sh watch [INTERVAL]` |
 
-`send` on a finished batch run resumes its session (new RUNDIR, context preserved — native SendMessage semantics) and re-points the NAME; on an ACP session it starts the next turn. `watch` polls every registered agent, prints one line per meaningful state change (turn done, `PERMISSION` pending, dead, stall — volatile counters normalized away), and exits when nothing is in flight; arm it on the Monitor tool so each line arrives as a chat notification.
+`send` on a finished run resumes its session (new RUNDIR, context preserved — native SendMessage semantics) and re-points the NAME. `watch` polls every registered agent, prints one line per meaningful state change (turn done, dead, stall — volatile counters normalized away), and exits when nothing is in flight; arm it on the Monitor tool so each line arrives as a chat notification.
 
 When/how to choose between direct dispatch, dispatcher, builder/reviewer, Workflow
 thin-shells — and when not to outsource at all: see
@@ -54,7 +48,6 @@ thin-shells — and when not to outsource at all: see
 | | `pi-agent.sh` | `herdr agent` |
 |---|---|---|
 | worker visibility | RUNDIR files | a live pane you can watch and type into |
-| blocked worker | `PERMISSION` line, relayed by hand | native `blocked` lifecycle state |
 | death mid-turn | detected on the next poll | the waiting call returns `agent_not_running` (rc=1) at once |
 | worktree | `pi-worktree.sh create` (8 named params) | `herdr worktree create --cwd R --branch B` |
 | worktree teardown | kill-confirm, then diff capture, then remove | `remove --force` deletes a live worktree, no kill-confirm, no diff |
@@ -96,4 +89,4 @@ Context hygiene: main never reads worker streams or source material — only bri
 
 ## Tests
 
-`bash tests/profile-test.sh && bash tests/wrapper-test.sh && bash tests/poll-test.sh && bash tests/worktree-cleanup-test.sh && bash tests/probe-watch-test.sh && bash tests/acp-test.sh && bash tests/agent-test.sh` — all pure-local, no network (acp-test and agent-test use bash shims in place of `omp`).
+`bash tests/profile-test.sh && bash tests/wrapper-test.sh && bash tests/poll-test.sh && bash tests/worktree-cleanup-test.sh && bash tests/probe-watch-test.sh && bash tests/agent-test.sh` — all pure-local, no network (agent-test uses a bash shim in place of `omp`).

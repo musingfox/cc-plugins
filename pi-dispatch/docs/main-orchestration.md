@@ -61,7 +61,7 @@ Main dispatches one **builder** agent per task, driven by the brief from
 step 2. The builder executes:
 
 - usage present → offload mode: operate `pi-agent.sh` as a pure operator,
-  relay `PERMISSION` lines back to main, run each worker's acceptance check
+  run each worker's acceptance check
   when it settles, distill a report,
 - usage absent → self-do mode: do the work directly, write tests, run the
   acceptance check, distill a report.

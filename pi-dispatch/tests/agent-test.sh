@@ -8,7 +8,7 @@
 #   start dup    refuses an existing NAME
 #   poll         routes to pi-poll.sh, reaches STATUS=OK on the stub stream
 #   send (batch) resumes the finished run (new RUNDIR), re-points the symlink
-#   ls           one line per agent, correct mode detection (batch vs acp)
+#   ls           one line per agent, carrying that agent's poll status
 #   watch        emits per-agent lines, exits 0 when nothing is in flight
 #   stop         unregisters the NAME
 #   unknown NAME poll fails non-zero
@@ -75,12 +75,11 @@ LINE="$(wait_terminal worker-a)"
 case "$LINE" in STATUS=OK*) ok "resumed run reaches STATUS=OK" ;; *) bad "resumed run STATUS=OK (got: $LINE)" ;; esac
 grep -q "resumed reply" "$DIR2/result.md" && ok "resume path hit (--resume seen by stub)" || bad "resume path hit"
 
-# --- ls: mode detection (fabricate a dead acp rundir) ---
-ACPDIR="$TMP/acp-fake"; mkdir -p "$ACPDIR"; mkfifo "$ACPDIR/in.fifo"
-ln -sfn "$ACPDIR" "$REG/worker-b"
+# --- ls: one line per agent, carrying its status; dangling links pruned ---
+ln -sfn "$TMP/gone" "$REG/worker-b"
 LS="$("$SCRIPTS/pi-agent.sh" ls)"
-case "$LS" in *"worker-a mode=batch STATUS=OK"*) ok "ls shows batch agent + status" ;; *) bad "ls batch line (got: $LS)" ;; esac
-case "$LS" in *"worker-b mode=acp STATUS=DEAD"*) ok "ls detects acp mode" ;; *) bad "ls acp line (got: $LS)" ;; esac
+case "$LS" in *"worker-a STATUS=OK"*) ok "ls shows agent + status" ;; *) bad "ls agent line (got: $LS)" ;; esac
+[ ! -e "$REG/worker-b" ] && ok "ls prunes dangling link" || bad "ls prunes dangling link"
 
 # --- watch: emits lines, exits 0 with nothing in flight ---
 W="$("$SCRIPTS/pi-agent.sh" watch 1)"; RC=$?
@@ -89,8 +88,8 @@ case "$W" in *"worker-a: STATUS=OK"*) ok "watch emits per-agent state" ;; *) bad
 case "$W" in *"no agents in flight"*) ok "watch terminal marker" ;; *) bad "watch terminal marker" ;; esac
 
 # --- stop: unregisters ---
-"$SCRIPTS/pi-agent.sh" stop worker-b >/dev/null
-[ ! -e "$REG/worker-b" ] && ok "stop unregisters NAME" || bad "stop unregisters NAME"
+"$SCRIPTS/pi-agent.sh" stop worker-a >/dev/null
+[ ! -e "$REG/worker-a" ] && ok "stop unregisters NAME" || bad "stop unregisters NAME"
 
 # --- unknown NAME: non-zero ---
 if "$SCRIPTS/pi-agent.sh" poll nope >/dev/null 2>&1; then

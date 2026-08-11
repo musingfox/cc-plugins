@@ -57,8 +57,8 @@ cf/spiral's own scripts sit on.
 
 | verb | command | purpose |
 |---|---|---|
-| dispatch a worker | `pi-agent.sh start NAME [--acp] [--profile P] [BRIEF]` | launch a batch (or interactive ACP) worker in the background |
-| follow-up turn | `pi-agent.sh send NAME TEXT_OR_FILE` | resume a finished worker's session with context (SendMessage semantics); on an ACP session, start the next turn |
+| dispatch a worker | `pi-agent.sh start NAME [--profile P] BRIEF` | launch a worker in the background |
+| follow-up turn | `pi-agent.sh send NAME TEXT_OR_FILE` | resume a finished worker's session with context (SendMessage semantics) |
 | status poll | `pi-agent.sh poll NAME` | one-shot one-line status: `RUNNING` or a terminal `STATUS=OK\|FAIL …` |
 | activity snapshot | `pi-agent.sh peek NAME` | one-shot agent-view snapshot of a live run |
 | agent panel | `pi-agent.sh ls` | list registered agents + their state |
@@ -72,8 +72,7 @@ cf/spiral's own scripts sit on.
    `pi-worktree.sh create` and put its ABSOLUTE path in the brief.
 2. Embed this usage section + the per-task brief into a builder dispatch.
    The builder runs `pi-agent.sh start` per task and `pi-agent.sh watch` as
-   its main loop; relay `PERMISSION` lines back to main, and run each
-   worker's acceptance check when it settles.
+   its main loop, and runs each worker's acceptance check when it settles.
 3. Terminal verdicts persist in the RUNDIR and replay on re-poll; raw stream
    is kept as `pi.stream.jsonl`, distilled final text as `result.md`.
 

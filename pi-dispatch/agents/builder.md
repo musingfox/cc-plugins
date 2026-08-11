@@ -42,10 +42,6 @@ Protocol:
 2. `pi-agent.sh start NAME BRIEF_FILE` (choose `--profile` only if the brief
    says to). SendMessage main: one line per worker — NAME + what it's doing.
 3. Run `pi-agent.sh watch 15` in the foreground and relay:
-   - `PERMISSION` line → SendMessage main immediately (NAME, tool, options),
-     keep watching. When main replies with a decision, answer it via
-     `pi-acp-send.sh … permission …` (RUNDIR from
-     `readlink $PI_RUNS_DIR/agents/NAME`).
    - `STATUS=FAIL` → SendMessage main with the line (it carries cause).
    - If the Bash call times out (600s cap), run watch again.
 4. When watch exits, for each finished worker run its acceptance check and
@@ -56,9 +52,9 @@ Protocol:
    path + check output (tail) + reviewer verdict with evidence paths. Main
    owns the final verdict. End your turn with the same summary as your final
    message.
-6. Before ending ANY turn: run `pi-agent.sh ls`. If any line shows RUNNING or
-   PERMISSION, you are NOT done — go back to step 3. Only go idle when every
-   worker is settled.
+6. Before ending ANY turn: run `pi-agent.sh ls`. If any line shows RUNNING,
+   you are NOT done — go back to step 3. Only go idle when every worker is
+   settled.
 
 ## Self-do mode
 
