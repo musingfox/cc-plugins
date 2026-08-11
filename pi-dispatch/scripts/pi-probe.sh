@@ -8,9 +8,8 @@
 # Usage:
 #   pi-probe.sh --bin-only            fast gate: is the agent binary on PATH?
 #   pi-probe.sh [PROBE_DIR]           full probe: run "say ok" on the SAME routing
-#                                     pi-dispatch.sh would resolve (env > profile >
-#                                     default), sessions + logs land in PROBE_DIR
-#                                     (default: a fresh mktemp -d).
+#                                     pi-dispatch.sh would resolve, sessions + logs
+#                                     land in PROBE_DIR (default: a fresh mktemp -d).
 #
 # Stdout (exactly one line):
 #   OK                 binary present; (full probe) model answered
@@ -19,8 +18,8 @@
 #   ERROR:<excerpt>    session jsonl contains "errorMessage" (auth/quota/model)
 # Exit code: 0 iff OK (gate-friendly).
 #
-# Env: PI_BIN (default omp), PI_PROVIDER/PI_MODEL/PI_PROFILE (routing, resolved
-#      via pi-dispatch.sh's PI_RESOLVE_PROFILE_ONLY seam).
+# Env: PI_BIN (default omp), PI_CONFIG_FILES/PI_PROVIDER/PI_MODEL (routing, resolved
+#      via pi-dispatch.sh's PI_RESOLVE_ROUTING_ONLY seam).
 #
 # Full-probe side effects in PROBE_DIR: probe-stdout.log, probe-stderr.log,
 # session *.jsonl — diagnostics for a failed probe.
@@ -48,16 +47,23 @@ fi
 PROBE_DIR="${1:-$(mktemp -d)}"
 mkdir -p "$PROBE_DIR"
 
-# Resolve the exact routing pi-dispatch.sh would use (env > profile > default).
-_resolved="$(PI_RESOLVE_PROFILE_ONLY=1 "$SCRIPT_DIR/pi-dispatch.sh" 2>/dev/null)"
-PROVIDER="$(printf '%s' "$_resolved" | sed -n 's/^PROVIDER=\([^ ]*\).*/\1/p')"
-MODEL="$(printf '%s' "$_resolved" | sed -n 's/.*MODEL=//p')"
-MODEL_SPEC="${PROVIDER:+$PROVIDER/}$MODEL"
+# Resolve the exact routing pi-dispatch.sh would use.
+_resolved="$(PI_RESOLVE_ROUTING_ONLY=1 "$SCRIPT_DIR/pi-dispatch.sh" 2>/dev/null)"
+CONFIG="$(printf '%s' "$_resolved" | sed -n 's/^CONFIG=\(.*\) PROVIDER=.*/\1/p')"
+PROVIDER="$(printf '%s' "$_resolved" | sed -n 's/.* PROVIDER=\([^ ]*\).*/\1/p')"
+MODEL="$(printf '%s' "$_resolved" | sed -n 's/.* MODEL=//p')"
+
+PROBE_ARGS=(-p)
+if [ -n "$CONFIG" ]; then
+  PROBE_ARGS+=(--config "$CONFIG")
+fi
+if [ -n "$MODEL" ]; then
+  PROBE_ARGS+=(--model "${PROVIDER:+$PROVIDER/}$MODEL")
+fi
 
 # -p (print mode) is load-bearing: without it omp opens its interactive TUI on a
 # non-tty stdin and hangs until the caller's timeout kills it.
-"$BIN" -p \
-  ${MODEL_SPEC:+--model "$MODEL_SPEC"} \
+"$BIN" "${PROBE_ARGS[@]}" \
   --session-dir "$PROBE_DIR" \
   --no-tools "say ok" > "$PROBE_DIR/probe-stdout.log" 2> "$PROBE_DIR/probe-stderr.log" || true
 

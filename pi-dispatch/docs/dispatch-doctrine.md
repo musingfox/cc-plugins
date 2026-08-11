@@ -48,7 +48,9 @@ no shell caller can reach it. Verified 2026-08-10: a subagent can address a peer
 by bare name, but `ListAgents` is unavailable to subagents — they can address,
 not discover, so main must name the peer in the brief. Against a plain subagent
 it buys nothing except reaching a session that is already sitting in a different
-repository; that is the only case worth using it for. The builder, wherever it offloads, coordinates
+repository; that is the only case worth using it for.
+
+The builder, wherever it offloads, coordinates
 the omp worker: it establishes the environment, injects the brief, runs the
 deterministic checks, and assembles evidence — a context firewall and
 structured-output enforcement point. It never issues the verdict; that seat
@@ -68,9 +70,9 @@ Outsource when the contractor is the better fit, not merely cheaper:
 
 - **Capability fit**: the work suits the worker's model or environment —
   bulk web reading, multimedia generation, long-document summarization,
-  massive parallel fan-out. `profiles.conf` is the capability routing table;
-  today it grades reasoning effort (fast/balanced/careful), and capability-
-  axis profiles (search, media, …) slot in without changing any script.
+  massive parallel fan-out. An omp config overlay (`--config`) is the routing
+  unit — it carries the whole `modelRoles` table plus per-provider workarounds,
+  so one file expresses a worker's entire capability profile.
 - **Cost fit**: mechanical work with a clear spec, where Claude tokens and
   latency buy nothing.
 
@@ -108,10 +110,12 @@ nor the dispatcher (main) — main has a close-the-task incentive
   transcript);
 - **main** owns the final verdict.
 
-Capability rule: **reviewer ≥ builder** — `profiles.conf` is ordered
-(fast < balanced < careful); a builder on the top tier gets a fresh top-tier
-session or main itself as reviewer. The reviewer is just another dispatch —
-same primitives, stronger profile.
+Capability rule: **reviewer ≥ builder**. Config overlays are named by provider,
+not ranked by tier, so nothing in the tooling enforces this — the dispatcher
+picks the reviewer's overlay and owns the judgement. A builder already on the
+strongest overlay available gets a fresh session on that same overlay, or main
+itself, as reviewer. The reviewer is just another dispatch — same primitives,
+a routing at least as capable.
 
 Proportionality: deterministic checks always run; a separate reviewer is
 dispatched only when the deliverable is a code change or the contract has

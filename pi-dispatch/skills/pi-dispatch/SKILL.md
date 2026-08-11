@@ -59,7 +59,7 @@ harness tool can reach them).
 
 | verb | command | purpose |
 |---|---|---|
-| dispatch a worker | `pi-agent.sh start NAME [--profile P] BRIEF` | launch a worker in the background |
+| dispatch a worker | `pi-agent.sh start NAME [--config PATH] BRIEF` | launch a worker in the background |
 | follow-up turn | `pi-agent.sh send NAME TEXT_OR_FILE` | resume a finished worker's session with context (SendMessage semantics) |
 | status poll | `pi-agent.sh poll NAME` | one-shot one-line status: `RUNNING` or a terminal `STATUS=OK\|FAIL …` |
 | activity snapshot | `pi-agent.sh peek NAME` | one-shot agent-view snapshot of a live run |
@@ -78,13 +78,23 @@ harness tool can reach them).
 3. Terminal verdicts persist in the RUNDIR and replay on re-poll; raw stream
    is kept as `pi.stream.jsonl`, distilled final text as `result.md`.
 
-## Profile routing
+## Routing
 
-`profiles.conf` maps profile names to omp models. Precedence:
-`PI_PROVIDER`/`PI_MODEL` env > `--profile`/`PI_PROFILE` > default
-(`grok-build`). Pick `fast` for mechanical work, `balanced` for ordinary
-implementation, `careful` for harder reasoning; the reviewer's profile must
-be ≥ the builder's.
+Routing is an omp config overlay passed through as `--config` (or `PI_CONFIG_FILES`):
+
+```bash
+pi-agent.sh start NAME --config ~/.omp/agent/config.codex.yml BRIEF
+```
+
+The overlay carries the whole `modelRoles` table, so one file routes every role
+the worker uses. Give none and omp resolves from its own
+`~/.omp/agent/config.yml`. `PI_PROVIDER`/`PI_MODEL` add a `--model` override on
+top when you need to pin a single model.
+
+Routing is recorded per run and replayed on resume, so `send` keeps the worker
+on the model it started with. Pick the reviewer's overlay to be at least as
+capable as the builder's — there is no ranked list to defer to, so that
+judgement is the dispatcher's.
 
 ## Prerequisites
 

@@ -7,8 +7,8 @@ tools: Read, Write, Grep, Glob, Bash
 ---
 
 <!-- model: opus is a capability floor, not a preference: builders route up to
-     top OMP tiers (PI_PROFILE=careful), and the dispatch doctrine requires the
-     reviewer seat to sit at or above the builder (reviewer >= builder). -->
+     the strongest OMP config overlay available, and the dispatch doctrine
+     requires the reviewer seat to sit at or above the builder. -->
 
 Verify that the implementation satisfies every behavioral contract. Also review for non-contract concerns and report them as advisories.
 

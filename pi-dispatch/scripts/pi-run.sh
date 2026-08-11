@@ -7,7 +7,7 @@
 # block inside a single Bash call (sub-agents can't be woken by Monitor).
 #
 # Usage:
-#   pi-run.sh [--profile NAME] [--deadline S] BRIEF [OUTDIR [PRIOR_RUNDIR]]
+#   pi-run.sh [--config PATH] [--deadline S] BRIEF [OUTDIR [PRIOR_RUNDIR]]
 #     --deadline S  hard wall for THIS call (default: PI_RUN_DEADLINE_S or 480).
 #     Everything else is passed through to pi-dispatch.sh unchanged.
 #
@@ -27,7 +27,7 @@
 #   caller — safety no longer depends on the caller passing the right timeout.
 #
 # Env: PI_RUN_DEADLINE_S (default 480), PI_POLL_INTERVAL_S (default 5),
-#      everything pi-dispatch.sh/pi-poll.sh honor (PI_BIN, PI_MODEL, profiles…).
+#      everything pi-dispatch.sh/pi-poll.sh honor (PI_BIN, PI_CONFIG_FILES, PI_MODEL…).
 #      PI_WALL_CLOCK_S defaults to the deadline so pi-poll's own liveness guard
 #      agrees with the watchdog instead of racing past it.
 
@@ -35,17 +35,17 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-PROFILE_ARGS=()
+ROUTE_ARGS=()
 DEADLINE="${PI_RUN_DEADLINE_S:-480}"
 while :; do
   case "${1:-}" in
-    --profile)  PROFILE_ARGS=(--profile "${2:?--profile needs a NAME}"); shift 2 ;;
+    --config)   ROUTE_ARGS=(--config "${2:?--config needs a PATH}"); shift 2 ;;
     --deadline) DEADLINE="${2:?--deadline needs SECONDS}"; shift 2 ;;
     *) break ;;
   esac
 done
 
-BRIEF="${1:?usage: pi-run.sh [--profile NAME] [--deadline S] BRIEF [OUTDIR [PRIOR_RUNDIR]]}"
+BRIEF="${1:?usage: pi-run.sh [--config PATH] [--deadline S] BRIEF [OUTDIR [PRIOR_RUNDIR]]}"
 OUTDIR="${2:-}"
 PRIOR="${3:-}"
 
@@ -61,7 +61,7 @@ if [ -n "$PRIOR" ]; then
 elif [ -n "$OUTDIR" ]; then
   ARGS+=("$OUTDIR")
 fi
-launch="$("$SCRIPT_DIR/pi-dispatch.sh" ${PROFILE_ARGS[@]+"${PROFILE_ARGS[@]}"} "${ARGS[@]}")" || true
+launch="$("$SCRIPT_DIR/pi-dispatch.sh" ${ROUTE_ARGS[@]+"${ROUTE_ARGS[@]}"} "${ARGS[@]}")" || true
 RUNDIR="$(printf '%s\n' "$launch" | sed -n 's/^RUNDIR=//p')"
 OUTPUT="$(printf '%s\n' "$launch" | sed -n 's/^OUTPUT=//p')"
 if [ -z "$RUNDIR" ]; then

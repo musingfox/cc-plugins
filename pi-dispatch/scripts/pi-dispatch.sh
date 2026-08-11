@@ -7,9 +7,11 @@
 # polls for completion with pi-poll.sh instead of blocking on one long Bash call.
 #
 # Usage:
-#   pi-dispatch.sh [--profile NAME] BRIEF [OUTDIR [PRIOR_RUNDIR]]
-#     --profile NAME — (optional, leading) a provider/model preset from profiles.conf
-#                     (or PI_PROFILE env). Explicit PI_PROVIDER/PI_MODEL still win.
+#   pi-dispatch.sh [--config PATH] BRIEF [OUTDIR [PRIOR_RUNDIR]]
+#     --config PATH — (optional, leading) an omp config overlay (or PI_CONFIG_FILES env),
+#                     e.g. ~/.omp/agent/config.codex.yml. The overlay carries the
+#                     whole modelRoles table, so routing is one file, not one model.
+#                     Omit it and omp resolves from its own ~/.omp/agent/config.yml.
 #     BRIEF         — work description. Either a path to a brief file, or inline text.
 #     OUTDIR        — base dir for run artifacts
 #                     (default: ${PI_RUNS_DIR:-$HOME/.cache/pi-runs}/pi-dispatch — a
@@ -31,13 +33,18 @@
 #   PID=<background wrapper pid (== PGID)>     <- the perl setsid wrapper's pid
 #   RUNDIR=<per-run dir holding result/stderr/pid/pgid/rc/start>
 #
-# Routing (cheap/fast by default; precedence: env > --profile/PI_PROFILE > default):
+# Routing (nothing set = omp's own config decides):
 #   PI_BIN       agent binary to invoke (default: omp — the oh-my-pi fork of pi)
+#   PI_CONFIG_FILES / --config PATH     omp config overlay (--config); the normal knob
 #   PI_PROVIDER  optional; when set, the model is passed as PROVIDER/MODEL
-#   PI_MODEL     default: grok-build (omp fuzzy-matches model names)
-#   PI_PROFILE / --profile NAME   named preset from profiles.conf (NAME PROVIDER MODEL)
-#   PI_PROFILES_FILE              override the profiles.conf path
-#   PI_RESOLVE_PROFILE_ONLY=1     print resolved "PROVIDER=… MODEL=…" and exit (no launch)
+#   PI_MODEL     optional single-model override (omp fuzzy-matches model names).
+#                A --model spec beats the overlay's `modelRoles.default`, so set
+#                it only to override one model — the overlay is the usual choice.
+#   PI_RESOLVE_ROUTING_ONLY=1     print resolved "CONFIG=… PROVIDER=… MODEL=…" and exit
+#
+# Routing is RECORDED to RUNDIR/routing and REPLAYED on resume: a follow-up turn
+# that passes PRIOR_RUNDIR but no routing of its own inherits the prior run's,
+# so a resumed session never silently changes model mid-conversation.
 #
 # Pi prompt (env-overridable):
 #   PI_PROMPT    default: "Read the brief above and complete it. Output only the result."
@@ -72,54 +79,52 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Optional leading --profile NAME: a named provider/model preset (see profiles.conf).
-# Selectable here or via the PI_PROFILE env var. Explicit PI_PROVIDER/PI_MODEL win.
-PI_PROFILE="${PI_PROFILE:-}"
-if [ "${1:-}" = "--profile" ]; then
-  PI_PROFILE="${2:?--profile needs a NAME}"
+# Optional leading --config PATH: an omp config overlay, or the PI_CONFIG_FILES env
+# var (which is omp's own — an ambient shell setting, not a per-dispatch decision).
+# The flag is INTENT; the env is ambient. On a resume that distinction decides who
+# wins against the prior run's recorded routing (see the inherit below).
+CONFIG="${PI_CONFIG_FILES:-}"
+CONFIG_EXPLICIT=0
+if [ "${1:-}" = "--config" ]; then
+  CONFIG="${2:?--config needs a PATH}"
+  CONFIG_EXPLICIT=1
   shift 2
 fi
 
-# Resolve the profile preset (if any). profiles.conf rows: `NAME PROVIDER MODEL`
-# (whitespace-separated; # comments and blank lines ignored). An unknown profile
-# warns and falls through to the built-in defaults rather than failing the launch.
-_PROF_PROVIDER=""; _PROF_MODEL=""
-if [ -n "$PI_PROFILE" ]; then
-  PROFILES_FILE="${PI_PROFILES_FILE:-$SCRIPT_DIR/../profiles.conf}"
-  if [ -f "$PROFILES_FILE" ]; then
-    _row="$(awk -v n="$PI_PROFILE" '!/^[[:space:]]*#/ && NF>=3 && $1==n {print $2, $3; exit}' "$PROFILES_FILE")"
-    if [ -n "$_row" ]; then
-      _PROF_PROVIDER="${_row%% *}"
-      _PROF_MODEL="${_row#* }"
-    else
-      echo "pi-dispatch: warning: profile '$PI_PROFILE' not in $PROFILES_FILE; using defaults" >&2
-    fi
-  else
-    echo "pi-dispatch: warning: PI_PROFILE='$PI_PROFILE' set but $PROFILES_FILE is absent; using defaults" >&2
-  fi
+PROVIDER="${PI_PROVIDER:-}"
+MODEL="${PI_MODEL:-}"
+
+# Migration guard. PI_PROFILE used to select a pi-dispatch preset; it is now
+# omp's own isolated auth/session profile (undocumented alias of OMP_PROFILE).
+# We don't unset it — it may be deliberate — but a value left over from the old
+# interface silently launches the worker under a profile with no credentials.
+if [ -n "${PI_PROFILE:-}" ]; then
+  echo "pi-dispatch: warning: PI_PROFILE='$PI_PROFILE' is omp's isolated auth profile, not a pi-dispatch preset (routing moved to --config/PI_CONFIG_FILES). Unset it unless you meant omp's profile." >&2
 fi
-
-# Precedence: explicit env PI_PROVIDER/PI_MODEL > profile preset > built-in default.
-PROVIDER="${PI_PROVIDER:-${_PROF_PROVIDER:-}}"
-MODEL="${PI_MODEL:-${_PROF_MODEL:-grok-build}}"
-
-# omp takes a single --model spec; a provider (when set) is expressed as a
-# PROVIDER/MODEL prefix rather than the legacy --provider flag.
-MODEL_SPEC="${PROVIDER:+$PROVIDER/}$MODEL"
 
 # The agent binary. Default: omp (oh-my-pi). Override with PI_BIN=pi etc.
 PI_BIN="${PI_BIN:-omp}"
 
 # Introspection seam (no launch): print the resolved routing and exit. Lets callers
-# and tests verify profile resolution without invoking pi.
-if [ "${PI_RESOLVE_PROFILE_ONLY:-}" = "1" ]; then
-  echo "PROVIDER=$PROVIDER MODEL=$MODEL"
+# and tests verify routing without invoking the binary.
+if [ "${PI_RESOLVE_ROUTING_ONLY:-}" = "1" ]; then
+  echo "CONFIG=$CONFIG PROVIDER=$PROVIDER MODEL=$MODEL"
   exit 0
 fi
 
-BRIEF="${1:?usage: pi-dispatch.sh [--profile NAME] BRIEF [OUTDIR [PRIOR_RUNDIR]]}"
+BRIEF="${1:?usage: pi-dispatch.sh [--config PATH] BRIEF [OUTDIR [PRIOR_RUNDIR]]}"
 OUTDIR="${2:-${PI_RUNS_DIR:-$HOME/.cache/pi-runs}/pi-dispatch}"
 PRIOR_RUNDIR="${3:-}"
+
+# A resume inherits the prior run's routing. The recorded routing beats the
+# AMBIENT env (PI_CONFIG_FILES is omp's own, and a shell that says grok must not
+# hijack a session started on codex); only an explicit --config on this call
+# overrides it. Without this a follow-up turn silently changes model mid-session.
+if [ "$CONFIG_EXPLICIT" = 0 ] && [ -n "$PRIOR_RUNDIR" ] && [ -f "$PRIOR_RUNDIR/routing" ]; then
+  CONFIG="$(sed -n 's/^CONFIG=//p' "$PRIOR_RUNDIR/routing")"
+  PROVIDER="$(sed -n 's/^PROVIDER=//p' "$PRIOR_RUNDIR/routing")"
+  MODEL="$(sed -n 's/^MODEL=//p' "$PRIOR_RUNDIR/routing")"
+fi
 
 PROMPT="${PI_PROMPT:-Read the brief above and complete it. Output only the result.}"
 
@@ -133,6 +138,9 @@ PGID_FILE="$RUNDIR/pi.pgid"
 RC_FILE="$RUNDIR/rc"
 START_FILE="$RUNDIR/pi-start.ts"
 mkdir -p "$SESSION_DIR"
+
+# Record the resolved routing so a later resume can replay it (see the inherit above).
+printf 'CONFIG=%s\nPROVIDER=%s\nMODEL=%s\n' "$CONFIG" "$PROVIDER" "$MODEL" > "$RUNDIR/routing"
 
 # Normalize the brief into a file so we can hand it to Pi via @file (never via
 # inline command substitution).
@@ -188,53 +196,38 @@ fi
 # readable text from agent_end on terminal OK and saves the raw stream as
 # pi.stream.jsonl.
 
+# Build the omp argv. Routing flags appear ONLY when set — with neither, omp
+# resolves from its own ~/.omp/agent/config.yml.
+OMP_ARGS=(-p --mode json)
+if [ -n "$CONFIG" ]; then
+  OMP_ARGS+=(--config "$CONFIG")
+fi
+if [ -n "$MODEL" ]; then
+  # omp takes a single --model spec; a provider (when set) is expressed as a
+  # PROVIDER/MODEL prefix rather than the legacy --provider flag.
+  OMP_ARGS+=(--model "${PROVIDER:+$PROVIDER/}$MODEL")
+fi
 if [ -n "$PRIOR_SESSION_ID" ]; then
-  # Resume path: --resume <sid> --mode json, brief via @file.
   # omp resolves --resume ids against --session-dir, so point it at the PRIOR
   # run's sessions dir (where the session actually lives), not this run's empty one.
   SESSION_DIR="$PRIOR_RUNDIR/sessions"
-  perl -MPOSIX -e '
-    POSIX::setsid();
-    my $rcfile = shift @ARGV;
-    my $status = system(@ARGV);
-    my $rc;
-    if ($status == -1)        { $rc = 127; }                 # could not exec pi
-    elsif ($status & 127)     { $rc = 128 + ($status & 127); } # killed by signal
-    else                      { $rc = $status >> 8; }          # normal exit code
-    open(my $fh, ">", $rcfile) or exit 255;
-    print $fh "$rc\n";
-    close($fh);
-  ' "$RC_FILE" \
-    "$PI_BIN" -p \
-       --mode json \
-       --model "$MODEL_SPEC" \
-       --resume "$PRIOR_SESSION_ID" \
-       --session-dir "$SESSION_DIR" \
-       @"$BRIEF_FILE" \
-       "$PROMPT" \
-    > "$OUTPUT_FILE" 2> "$STDERR_FILE" &
-else
-  # Fresh dispatch: --mode json, brief via @file.
-  perl -MPOSIX -e '
-    POSIX::setsid();
-    my $rcfile = shift @ARGV;
-    my $status = system(@ARGV);
-    my $rc;
-    if ($status == -1)        { $rc = 127; }                 # could not exec pi
-    elsif ($status & 127)     { $rc = 128 + ($status & 127); } # killed by signal
-    else                      { $rc = $status >> 8; }          # normal exit code
-    open(my $fh, ">", $rcfile) or exit 255;
-    print $fh "$rc\n";
-    close($fh);
-  ' "$RC_FILE" \
-    "$PI_BIN" -p \
-       --mode json \
-       --model "$MODEL_SPEC" \
-       --session-dir "$SESSION_DIR" \
-       @"$BRIEF_FILE" \
-       "$PROMPT" \
-    > "$OUTPUT_FILE" 2> "$STDERR_FILE" &
+  OMP_ARGS+=(--resume "$PRIOR_SESSION_ID")
 fi
+OMP_ARGS+=(--session-dir "$SESSION_DIR" @"$BRIEF_FILE" "$PROMPT")
+
+perl -MPOSIX -e '
+  POSIX::setsid();
+  my $rcfile = shift @ARGV;
+  my $status = system(@ARGV);
+  my $rc;
+  if ($status == -1)        { $rc = 127; }                 # could not exec pi
+  elsif ($status & 127)     { $rc = 128 + ($status & 127); } # killed by signal
+  else                      { $rc = $status >> 8; }          # normal exit code
+  open(my $fh, ">", $rcfile) or exit 255;
+  print $fh "$rc\n";
+  close($fh);
+' "$RC_FILE" "$PI_BIN" "${OMP_ARGS[@]}" \
+  > "$OUTPUT_FILE" 2> "$STDERR_FILE" &
 
 WRAP_PID=$!
 # setsid makes PGID == the wrapper's own pid, and $! is that wrapper pid, so the
