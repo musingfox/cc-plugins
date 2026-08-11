@@ -156,7 +156,7 @@ shard_group="$SHARD_ID"
   echo "- **BASE_HEAD**: \`${BASE_HEAD:-(unset)}\`     (compute diffs against this commit)"
   echo "- **REPORT_FILE**: \`$REPORT_FILE\`     (write your structured report here)"
   echo "- **ESCALATE_FILE**: \`$ESCALATE_FILE\`     (write here ONLY when stuck per Escalation Contract below)"
-  echo "- **TEST_RUNNER**: \`$test_runner\`     (run via the orchestrator's gate, do not re-invoke yourself unless verifying)"
+  echo "- **TEST_RUNNER**: \`$test_runner\`     (run it yourself after each contract per Methodology; the orchestrator re-runs it independently as a gate — green here does not skip the gate)"
   echo "- **SHARD_GROUP**: \`$shard_group\`"
   echo
   echo "## Rules"

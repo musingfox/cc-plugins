@@ -14,14 +14,26 @@ the verbs as a pure operator.
 ## Output contract — required in every brief, on either control plane
 
 Never extract a verdict by parsing a transcript or a session jsonl. Name the
-artifact in the brief instead:
+artifact in the brief instead, and make the worker verify before claiming:
 
-> Write the result to `/abs/path/verdict.md` as exactly one line:
-> `STATUS=PASS|FAIL …`. Do not print it in the terminal. Reply only `DONE`.
+> Run the acceptance check yourself first. Then write the result to
+> `/abs/path/verdict.md` as exactly one line:
+> `STATUS=DONE <check command + exit code>` — the check passed under you —
+> or `STATUS=BLOCKED <what is missing and what you need>` — you cannot
+> proceed. Do not print it in the terminal. Reply only `DONE`.
 
-The caller reads that file: present = the worker finished, absent = it did not.
+The caller routes on that line without reading anything else:
+
+- `DONE` → independent review (the caller re-runs the check; a mismatch with
+  the worker's claim is itself a high-signal finding)
+- `BLOCKED` → replan — the worker is saying the brief is wrong, not the work
+- file absent + process dead → mechanical failure; the cause (quota, auth,
+  model) lives in the stream, no judgement seat needed
+
 This is stronger than a process exit code — `rc=0` proves the process did not
-crash, not that the work is done.
+crash, not that the work is done — and a self-verified `DONE` is stronger than
+an unverified one: the round trip a caller would burn discovering a failed
+check happens inside the worker's own session instead.
 
 ## Control plane — herdr by default, `pi-agent.sh` as the fallback
 
