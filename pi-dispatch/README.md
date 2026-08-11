@@ -21,9 +21,9 @@ Claude (main)          wrapper (haiku, optional)        omp worker (cheap model)
 - **`agents/builder.md`** — a brief-driven executor. When the brief embeds the `pi-agent.sh` offload usage, builder operates it as a pure operator: `pi-agent.sh start` per task, `pi-agent.sh watch` as the main loop, runs each worker's acceptance check, and distills a report to main. When the brief carries no offload usage, builder does the work itself. Builder does NOT choose the mode — the brief does.
 - **`agents/reviewer.md`** — an independent contract judge. Given ONLY the contract, the deliverable paths, and the check output, it returns an evidence-backed PASS/FAIL per clause. It never sees the builder transcript and never runs offload verbs.
 
-## Named agents — `pi-agent.sh` (native sub-agent verbs)
+## Named agents — `pi-agent.sh` (fallback control plane)
 
-`scripts/pi-agent.sh` is the unified, name-addressed entry point over the primitives above, mirroring Claude Code's native sub-agent experience. The registry is the filesystem: `$PI_RUNS_DIR/agents/<NAME>` symlinks to the run's RUNDIR.
+`scripts/pi-agent.sh` is the unified, name-addressed entry point over the primitives above, mirroring Claude Code's native sub-agent experience. The registry is the filesystem: `$PI_RUNS_DIR/agents/<NAME>` symlinks to the run's RUNDIR. Inside a herdr pane, drive the same workers with `herdr agent` instead (see below) — these verbs are the fallback for everywhere else.
 
 | native experience | command |
 |---|---|
@@ -41,9 +41,9 @@ When/how to choose between direct dispatch, dispatcher, builder/reviewer, Workfl
 thin-shells — and when not to outsource at all: see
 [docs/dispatch-doctrine.md](docs/dispatch-doctrine.md).
 
-## Running inside herdr (better experience)
+## Running inside herdr (the default control plane)
 
-[herdr](https://herdr.dev) is a terminal multiplexer that recognizes coding agents in panes. When Claude itself runs in a herdr pane (`HERDR_ENV=1`), herdr's CLI is the nicer control plane over the same omp workers, and `pi-agent.sh` is not needed:
+[herdr](https://herdr.dev) is a terminal multiplexer that recognizes coding agents in panes. When Claude itself runs in a herdr pane (`HERDR_ENV=1`), **herdr's CLI is the control plane to use** over the same omp workers; `pi-agent.sh` is the fallback for when it isn't there:
 
 | | `pi-agent.sh` | `herdr agent` |
 |---|---|---|
@@ -55,7 +55,7 @@ thin-shells — and when not to outsource at all: see
 
 herdr ships its own skill (`herdr --skill`); pi-dispatch references it rather than vendoring a copy. It does not auto-trigger on delegation intent, so load it explicitly before issuing herdr commands.
 
-`pi-agent.sh` remains the portable path: outside a herdr pane (cron, CI, the web and IDE clients) it is the only one that works, and cf/spiral consume `pi-dispatch.sh`/`pi-worktree.sh` directly on either plane.
+`pi-agent.sh` remains the fallback path: outside a herdr pane (cron, CI, the web and IDE clients) it is the only one that works. cf consumes `pi-dispatch.sh`/`pi-worktree.sh` directly from bash on either plane — no harness-only tool can reach those call sites.
 
 Either way, put the output contract in the brief — an absolute artifact path plus a one-line format, so the verdict is read from a file instead of parsed out of a transcript. See [skills/pi-dispatch/SKILL.md](skills/pi-dispatch/SKILL.md).
 

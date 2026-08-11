@@ -37,9 +37,18 @@ same primitives, stronger profile (`reviewer ≥ builder`).
 | agent team       | main → builder (resident)     | multiple workers, cross-turn follow-ups, conversational steering |
 | dynamic workflow | Workflow script (deterministic) | multi-stage pipelines needing schema gates, journal/resume, concurrency caps |
 | (no analog)      | dedicated shell script (cf)   | fixed-domain repeated pipelines; maximum determinism |
+| peer session     | `ListAgents` + `SendMessage`  | a Claude session that already exists elsewhere — in practice, another repo |
 
 Rows 1–3 are model-driven (flexible, can drift); rows 4–5 are deterministic
-(reliable, written in advance). The builder, wherever it offloads, coordinates
+(reliable, written in advance).
+
+Row 6 is discover-and-talk, not dispatch: no verb creates a peer, kills one,
+isolates it in a worktree, or picks its model, and `SendMessage` has no CLI, so
+no shell caller can reach it. Verified 2026-08-10: a subagent can address a peer
+by bare name, but `ListAgents` is unavailable to subagents — they can address,
+not discover, so main must name the peer in the brief. Against a plain subagent
+it buys nothing except reaching a session that is already sitting in a different
+repository; that is the only case worth using it for. The builder, wherever it offloads, coordinates
 the omp worker: it establishes the environment, injects the brief, runs the
 deterministic checks, and assembles evidence — a context firewall and
 structured-output enforcement point. It never issues the verdict; that seat

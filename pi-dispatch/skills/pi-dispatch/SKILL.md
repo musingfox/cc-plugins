@@ -23,16 +23,17 @@ The caller reads that file: present = the worker finished, absent = it did not.
 This is stronger than a process exit code — `rc=0` proves the process did not
 crash, not that the work is done.
 
-## Control plane — herdr when available, `pi-agent.sh` otherwise
+## Control plane — herdr by default, `pi-agent.sh` as the fallback
 
-Two control planes drive the same omp workers. Pick once, at the start of a
+Two control planes drive the same omp workers. Decide once, at the start of a
 dispatch:
 
 ```bash
 test "${HERDR_ENV:-}" = 1
 ```
 
-**Inside herdr** — prefer it. **Load the `herdr` skill first** (or run
+**Inside herdr — use it.** This is the default, not a preference. **Load the
+`herdr` skill first** (or run
 `herdr --skill`): it does not auto-trigger on delegation intent, so main must
 request it explicitly before issuing any `herdr` command. Then:
 
@@ -50,8 +51,9 @@ worktree without killing the worker or capturing the diff, so commit the work
 (or capture the diff) before removing.
 
 **Outside herdr** — cron, CI, the web and IDE clients, any Claude not launched
-from a herdr pane — use the verbs below. This is the portable path, and the one
-cf/spiral's own scripts sit on.
+from a herdr pane — use the verbs below. This is the fallback path, and the one
+cf's own scripts sit on (they call `pi-dispatch.sh` directly, and no CLI-less
+harness tool can reach them).
 
 ## Verbs
 
