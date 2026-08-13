@@ -158,6 +158,12 @@ shard_group="$SHARD_ID"
   echo "- **ESCALATE_FILE**: \`$ESCALATE_FILE\`     (write here ONLY when stuck per Escalation Contract below)"
   echo "- **TEST_RUNNER**: \`$test_runner\`     (run it yourself after each contract per Methodology; the orchestrator re-runs it independently as a gate — green here does not skip the gate)"
   echo "- **SHARD_GROUP**: \`$shard_group\`"
+  # Prerequisite interfaces merged into this branch by cf-pi-run.sh (1b).
+  # Without this line the worker rediscovers them file-by-file or escalates.
+  if [ -s "$session/prereq-merged" ]; then
+    prereq_desc=$(awk -F'\t' '{printf "%s%s (shard %s)", sep, $2, $1; sep="; "}' "$session/prereq-merged")
+    echo "- **PREREQUISITES**: already merged into your branch — $prereq_desc. Their interfaces are ready to import; treat their files as read-only context, do NOT re-implement or modify them."
+  fi
   echo
   echo "## Rules"
   echo "- All file writes MUST stay inside WORK_DIR. Never \`cd\` out, never edit files in the parent repo checkout."

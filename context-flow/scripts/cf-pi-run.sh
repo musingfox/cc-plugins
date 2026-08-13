@@ -214,6 +214,41 @@ say "setting up worktree"
 load_cf_pi_env "$SHARD_SESSION"
 load_cf_flow_env "$FLOW_SESSION"
 
+# -------- 1b. prerequisite checkpoints ---------------------------------
+# A dependent shard forks from the user's HEAD, which lacks its prerequisites'
+# interfaces — without this merge the first round burns a guaranteed
+# escalation. depends_on comes from shards.json (cf-pi-shard.sh); refs come
+# from dispatch-state checkpoints, recorded on PASS. The orchestrator's wave
+# rule should never dispatch before prerequisites PASS; a missing checkpoint
+# here is therefore an infra FAIL, not a judgement call.
+PREREQ_MANIFEST="$SHARD_SESSION/prereq-merged"
+prereq_deps=$(jq -r --arg sid "$SHARD_ID" '.groups[$sid].depends_on // [] | .[]' "$SHARDS_FILE" 2>/dev/null || true)
+if [ -n "$prereq_deps" ] && [ -n "${REPO_ROOT:-}" ]; then
+  : > "$PREREQ_MANIFEST.tmp"
+  for dep in $prereq_deps; do
+    ref=$(jq -r --arg d "$dep" '.checkpoints[$d] // empty' "$DISPATCH_STATE_FILE" 2>/dev/null || true)
+    if [ -z "$ref" ] || ! git -C "$WORK" rev-parse --verify --quiet "refs/tags/$ref" >/dev/null; then
+      rm -f "$PREREQ_MANIFEST.tmp"
+      write_outcome FAIL prereq-missing "" "" "-" "-"
+      say "FAIL prereq-missing (shard $dep has no PASS checkpoint)"
+      exit 1
+    fi
+    # Idempotent for round-2 reuse of the same worktree.
+    if ! git -C "$WORK" merge-base --is-ancestor "refs/tags/$ref" HEAD 2>/dev/null; then
+      if ! git -C "$WORK" merge --no-edit "refs/tags/$ref" >/dev/null 2>&1; then
+        git -C "$WORK" merge --abort >/dev/null 2>&1 || true
+        rm -f "$PREREQ_MANIFEST.tmp"
+        write_outcome FAIL prereq-merge-conflict "" "" "-" "-"
+        say "FAIL prereq-merge-conflict (shard $dep checkpoint vs $CF_BRANCH)"
+        exit 1
+      fi
+    fi
+    dep_contracts=$(jq -r --arg d "$dep" '.groups[$d].contracts // [] | join(", ")' "$SHARDS_FILE" 2>/dev/null || true)
+    printf '%s\t%s\n' "$dep" "$dep_contracts" >> "$PREREQ_MANIFEST.tmp"
+  done
+  mv "$PREREQ_MANIFEST.tmp" "$PREREQ_MANIFEST"
+fi
+
 # -------- 2. brief ------------------------------------------------------
 
 say "assembling brief"
