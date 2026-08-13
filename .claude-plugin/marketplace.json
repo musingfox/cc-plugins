@@ -21,7 +21,7 @@
     {
       "name": "viz",
       "source": "./viz",
-      "description": "Render markdown, Mermaid, and ~/.claude/plans/ files as formatted HTML — one skill, one script"
+      "description": "Visual output for chat and browser — inline code-shape visuals (viz-inline) plus markdown/Mermaid HTML rendering (viz-render)"
     },
     {
       "name": "jj",

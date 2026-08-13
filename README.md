@@ -28,8 +28,9 @@ Your personal development squad powered by Agent-First workflow:
 
 ### Viz — Markdown & Mermaid HTML Renderer
 
-One skill, one script. Render markdown, Mermaid, or `~/.claude/plans/` files as formatted HTML:
-- **Single Skill (`viz-render`)**: handles three input shapes — file path, plan name, or inline content (markdown/mermaid)
+Visual output across the whole spectrum — inline chat shapes for short explanations, browser HTML for long documents:
+- **`viz-render`**: handles three input shapes — file path, plan name, or inline content (markdown/mermaid)
+- **`viz-inline`**: compact in-chat visuals (call trees, pseudocode, diff-on-shape, component trees) for short explanations and code-shape discussions; hands off to viz-render above ~20 lines (adapted from HumanLayer's show-me, MIT)
 - **Full Markdown**: syntax highlighting, KaTeX math, Mermaid, scroll animations, dark mode, TOC
 - **Plans Resolution**: bare name → looks up `~/.claude/plans/*.md`; no argument → lists available plans
 - **Proactive Triggers**: auto-renders when terminal would show a 4+ row / 3+ column table, a comparison, audit, feature matrix, or 50+ lines of structured content

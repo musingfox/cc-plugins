@@ -28,10 +28,10 @@ mode. One skill, one script, three input shapes.
 
 ## When NOT to Use
 
-- Short content (<20 lines) that renders fine in terminal
+- Short content (<20 lines) or simple diagrams (2–8 nodes) — use the
+  viz-inline skill's chat shapes (call tree, pseudocode, diff) instead
 - User explicitly wants terminal/text output
 - User is asking to edit or modify the content, not view it
-- Simple diagrams (2–3 nodes with obvious relationships)
 
 ## Input Shapes → Workflow
 
