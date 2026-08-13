@@ -78,21 +78,35 @@ groups_json=$(jq -c '
 ' "$CONTRACTS_FILE")
 
 # Translate components into shards.json with sequential letter ids.
-shards_json=$(jq -n --argjson comps "$groups_json" '
+# depends_on: contract-level `depends` (optional in contracts.json) mapped to
+# the shard that owns the prerequisite contract. Same-shard deps drop (already
+# co-located); deps naming contracts outside this plan drop (pre-existing code).
+shards_json=$(jq -n --argjson comps "$groups_json" --slurpfile c "$CONTRACTS_FILE" '
   ($comps | length) as $n
   | def letter_id($i):
       if $i < 26 then [65 + $i] | implode
       else "S" + ($i|tostring) end;
-  {
+  ($c[0].contracts // []) as $contracts
+  | ([range(0; $n) as $i | $comps[$i].names[] | {key: ., value: letter_id($i)}]
+     | from_entries) as $owner
+  | {
     schema_version: 1,
     fan_out_count: $n,
     groups: (
-      [range(0; $n)] | map({
-        key: letter_id(.),
+      [range(0; $n)] | map(. as $i | {
+        key: letter_id($i),
         value: {
-          shard_id: letter_id(.),
-          contracts: $comps[.].names,
-          files: $comps[.].files
+          shard_id: letter_id($i),
+          contracts: $comps[$i].names,
+          files: $comps[$i].files,
+          depends_on: (
+            [ $contracts[]
+              | select(.name as $cn | $comps[$i].names | index($cn))
+              | (.depends // [])[] ]
+            | map($owner[.] // empty)
+            | map(select(. != letter_id($i)))
+            | unique
+          )
         }
       }) | from_entries
     )

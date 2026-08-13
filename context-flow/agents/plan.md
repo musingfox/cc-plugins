@@ -151,6 +151,7 @@ Write a single JSON document conforming to schema_version 1:
     {
       "name": "<ContractName>",
       "summary": "<one-line Effect>",
+      "depends": ["<ContractName this one consumes>"],
       "touches_files": ["<path>", "<path>"],
       "test_cases": [
         {"id": "T1", "given": "<concrete input>", "expect": "<concrete value or pattern>"}
@@ -168,6 +169,7 @@ Field rules:
 
 - **`name`**: matches the contract heading in `plan.md` exactly. Stable identifier — used as merge key for partial-replan, anchor in prose, branch label hint.
 - **`summary`**: one-line restatement of the contract's Effect.
+- **`depends`** (load-bearing): the markdown contract's **depends** line, carried verbatim — names of contracts in THIS plan whose interfaces this one consumes. Default `[]`. The orchestrator shards by file overlap, then uses `depends` to sequence dispatch waves and to merge prerequisite checkpoints into dependent shards' worktree bases; omitting a real dependency costs the dependent shard a guaranteed first-round escalation. Dependencies on pre-existing code are NOT listed (only contracts of this plan).
 - **`touches_files`** (load-bearing): SUPERSET of every file the contract creates or modifies. **Test files count. Doc files count if the contract changes docs.** Underset is a bug — `cf-pi-run.sh` post-validates `actual_touched ⊆ declared_touched` and emits NEEDS_REPLAN with `reason: undeclared_file_touched` on violation. Use repo-relative paths.
 - **`test_cases`**: structured form of the markdown Test Cases.
 - **`fuzzy_criteria`**: default `[]`. ONLY for constraints that genuinely resist a concrete test case ("minimal memory footprint", "idiomatic to the codebase") — never a dumping ground for lazy test-casing; if a concrete input→output exists, it belongs in `test_cases`. Each entry is BINDING: the Review phase must render an evidence-backed PASS/FAIL for it (measurement, comparison, or adversarial argument at the criterion's own precision), and a FAIL blocks the flow like any contract FAIL.
@@ -369,5 +371,5 @@ Run this self-check before producing your final output. If any item fails, fix t
 - [ ] Every research constraint is either covered by a test case or listed in Unresolved with justification.
 - [ ] No "low confidence" guesses leaked into Decisions or Contracts — guesses live in Unresolved.
 - [ ] Implementation Plan steps each cite the contract they fulfill.
-- [ ] **contracts.json sidecar**: emitted with `schema_version=1` + every contract has `touches_files` (superset, includes test files and doc files).
+- [ ] **contracts.json sidecar**: emitted with `schema_version=1` + every contract has `touches_files` (superset, includes test files and doc files) + `depends` mirrors each markdown contract's depends line (in-plan contract names only).
 - [ ] If partial-replan mode: revision file uses same `name` values as base contracts; new names mean full re-plan (decline via `REPLAN_REQUIRES_ROLLBACK` instead).
