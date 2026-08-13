@@ -87,11 +87,15 @@ if [ -n "$repo_root" ] && [ -d "$repo_root/.git" ]; then
       # Determine branch: assume current or cf/*-shard-$key
       branch=$(git -C "$repo_root" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
       if [ -z "$branch" ] || [[ "$branch" != *"shard-$key"* ]]; then
-        # try to find
-        branch=$(git -C "$repo_root" branch --list "cf/*shard-$key" | head -1 | tr -d ' *' || echo "")
+        # for-each-ref emits clean names; `branch --list` prefixes '+' when the
+        # branch is checked out in a linked worktree — which a live shard
+        # branch always is — and plain rev-parse echoes an unresolvable arg to
+        # stdout, so the old pipeline recorded phantom refs like `@+cf/...`.
+        branch=$(git -C "$repo_root" for-each-ref --format='%(refname:short)' \
+          "refs/heads/cf/*shard-$key" | head -1)
       fi
       if [ -n "$branch" ]; then
-        sha=$(git -C "$repo_root" rev-parse "$branch" 2>/dev/null || echo "")
+        sha=$(git -C "$repo_root" rev-parse --verify --quiet "refs/heads/$branch" 2>/dev/null || echo "")
         if [ -n "$sha" ]; then
           tag="cf-checkpoint/$(basename "$FLOW_SESSION")/shard-$key@$sha"
           git -C "$repo_root" tag -f "$tag" "$sha" 2>/dev/null || true

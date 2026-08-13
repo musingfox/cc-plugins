@@ -56,6 +56,30 @@ has_b=$(jq 'has("B")' "$FLOW_SESSION/dispatch-state.json" 2>/dev/null || echo fa
 assert_eq "false" "$has_b" "T3 no checkpoints.B"
 rm -rf "$REPO_ROOT" "$FLOW_SESSION"
 
+# T5: given the shard branch checked out in a LINKED WORKTREE (repo HEAD stays
+# main — the live-run shape) -> expect tag exists AND checkpoints.A carries the
+# real sha (regression pin: `branch --list` marks worktree branches with '+',
+# which used to leak into rev-parse and record a phantom `@+cf/...` ref).
+REPO_ROOT="$(mktemp -d)"
+export REPO_ROOT
+FLOW_SESSION="$(mktemp -d)"
+export FLOW_SESSION
+cd "$REPO_ROOT"
+git init -q -b main
+git commit --allow-empty -m init -q
+WT="$(mktemp -d)/wt"
+git worktree add -b cf/myflow-shard-A "$WT" -q
+sha=$(git rev-parse cf/myflow-shard-A)
+"$CF_TESTS_DIR/../scripts/cf-pi-record-round.sh" --round 1 --result A=PASS
+tag=$(git tag -l 'cf-checkpoint/*shard-A*' | head -1)
+assert_contains "$tag" "shard-A@$sha" "T5 tag carries real sha (worktree branch)"
+tag_sha=$(git rev-parse "$tag" 2>/dev/null || echo MISSING)
+assert_eq "$sha" "$tag_sha" "T5 tag resolves to sha"
+tag_in_state=$(jq -r '.checkpoints.A' "$FLOW_SESSION/dispatch-state.json")
+assert_eq "$tag" "$tag_in_state" "T5 state matches the real tag"
+git worktree remove --force "$WT" 2>/dev/null || true
+rm -rf "$REPO_ROOT" "$FLOW_SESSION"
+
 # T4: given REPO_ROOT empty (non-git scratch mode) -> expect exit code 0, no tag attempted, .checkpoints unchanged (graceful degrade)
 FLOW_SESSION="$(mktemp -d)"
 export FLOW_SESSION
