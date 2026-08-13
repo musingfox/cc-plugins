@@ -103,7 +103,7 @@ Plan defaults to `pro` because design decision quality is the pipeline's bottlen
 
 ### Direct Sub-agent Invocation Caveat
 
-Agents (`@context-flow:research`, `@context-flow:plan`, etc.) are designed to be dispatched by the `/cf` orchestrator, which selects the model tier per stage at dispatch time. **If you invoke a sub-agent directly** (e.g., `@context-flow:research <goal>`), no `model:` is set in frontmatter, so it inherits the active session's model — the orchestrator's mode/tier mapping is bypassed. This is intentional (model is dispatch-time configuration), but it means direct invocation gives less predictable cost/quality. Prefer `/cf` for full pipeline behavior.
+Agents (`@cf:research`, `@cf:plan`, etc.) are designed to be dispatched by the `/cf` orchestrator, which selects the model tier per stage at dispatch time. **If you invoke a sub-agent directly** (e.g., `@cf:research <goal>`), no `model:` is set in frontmatter, so it inherits the active session's model — the orchestrator's mode/tier mapping is bypassed. This is intentional (model is dispatch-time configuration), but it means direct invocation gives less predictable cost/quality. Prefer `/cf` for full pipeline behavior.
 
 ## Design Documentation
 

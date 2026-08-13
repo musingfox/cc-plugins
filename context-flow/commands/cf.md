@@ -53,7 +53,7 @@ to breaking-change-only.` — then apply these deltas:
 After setup, read `$PI_AVAILABLE` from env.sh:
 
 - `PI_AVAILABLE=1` → Phase 3 uses OMP (default).
-- `PI_AVAILABLE=0` → Phase 3 falls back to Claude `context-flow:implement` agent. Log: `omp CLI not on PATH — Phase 3 will use Claude implement agent. Install omp (bun i -g @oh-my-pi/pi-coding-agent) to use the OMP implementer.` Do NOT abort.
+- `PI_AVAILABLE=0` → Phase 3 falls back to Claude `cf:implement` agent. Log: `omp CLI not on PATH — Phase 3 will use Claude implement agent. Install omp (bun i -g @oh-my-pi/pi-coding-agent) to use the OMP implementer.` Do NOT abort.
 
 The fallback path is also reachable mid-flow (a shard's `Status: FAIL` with unrecoverable probe error, the pre-dispatch quota gate reports the OMP provider near-saturated — §3.2, or the human selects "Fall back to Claude implement agent" at a recovery prompt). Procedure: §3.6.
 
@@ -63,11 +63,11 @@ The fallback path is also reachable mid-flow (a shard's `Status: FAIL` with unre
 
 | Stage | Agent | Tools |
 |-------|-------|-------|
-| Research | `context-flow:research` | Read, Grep, Glob, Bash, WebFetch |
-| Plan | `context-flow:plan` | Read, Write, Grep, Glob |
+| Research | `cf:research` | Read, Grep, Glob, Bash, WebFetch |
+| Plan | `cf:plan` | Read, Write, Grep, Glob |
 | **Implement (default)** | **OMP via background `cf-pi-run.sh`** | OMP's own tools + main's Bash/Read |
-| Implement (fallback) | `context-flow:implement` | Read, Edit, Write, Bash, Glob, Grep, WebFetch |
-| Review | `context-flow:review` | Read, Write, Grep, Glob, Bash |
+| Implement (fallback) | `cf:implement` | Read, Edit, Write, Bash, Glob, Grep, WebFetch |
+| Review | `cf:review` | Read, Write, Grep, Glob, Bash |
 
 Phase 3 routes the OMP builder via `$PI_CONFIG_FILES` — an omp config overlay such as `~/.omp/agent/config.codex.yml`, carrying the worker's whole `modelRoles` table (explicit `$PI_PROVIDER`/`$PI_MODEL` add a single-model override on top); the Claude fallback runs on the default model. To activate the §3.2 quota gate, point `$PI_PROVIDER` at a provider whose quota `omp usage` can read (e.g. `openai-codex`) — set it in your own environment, not here. Choose the builder's overlay with the review seat in mind — the reviewer must sit at or above the builder's capability (dispatch doctrine: reviewer ≥ builder), and nothing enforces that for you. If a more specialized agent exists for the goal (e.g., a frontend-dev agent for UI work), prefer it.
 
@@ -154,7 +154,7 @@ Dispatch a single research agent.
 
 ```
 Agent(
-  subagent_type: "context-flow:research",
+  subagent_type: "cf:research",
   prompt: "
     Report path: $SESSION/research.md
 
@@ -437,7 +437,7 @@ Build the Partial Replan Request block per `agents/plan.md` §Partial Replan Req
 
 ```
 Agent(
-  subagent_type: "context-flow:plan",
+  subagent_type: "cf:plan",
   prompt: "
     Report path: $SESSION/plan-replan-${ROUND}.md
     Contracts path: $SESSION/contracts.json
@@ -492,10 +492,10 @@ Replan budget = 2 attempts per contract (third NEEDS_REPLAN escalates). Rollback
 The fallback fills the SAME seat under the SAME contract — only the builder changes. Per shard, sequentially (Claude agents are not free fan-out):
 
 1. **Environment (same as OMP)**: shard branches/worktrees from 3.0-3.1 are already in place; the shard's brief is already assembled at `$SESSION/shards/<id>/implement-brief.md`.
-2. **Dispatch**: `Agent(subagent_type: "context-flow:implement")` with the brief path + the shard worktree's absolute path; instruct it to work ONLY under that worktree, follow the brief's report format to `implement-report.md`, and never touch the gate/test files' expectations.
+2. **Dispatch**: `Agent(subagent_type: "cf:implement")` with the brief path + the shard worktree's absolute path; instruct it to work ONLY under that worktree, follow the brief's report format to `implement-report.md`, and never touch the gate/test files' expectations.
 3. **Gates (unchanged, non-negotiable)**: run the same deterministic gates the OMP path gets — from the shard session run `"$SCRIPTS/cf-pi-test.sh" "$SHARD_SESSION" $TEST_RUNNER` (bounded read of the tail), plus the file-scope check against declared `touches_files` (`git -C "$WORK" status --porcelain` vs the shard's file list, bounded). The builder's self-report is untrusted on this path too.
 4. **Outcome**: write the same `outcome.md` shape by hand (Status/Reason/Survived/Affected, paths only) so §3.3 Collect and §3.4 routing work identically; survivors == declared applies (missing contracts → NEEDS_REPLAN incomplete-contracts).
-5. **Reviewer seat**: unchanged — Phase-4 `context-flow:review` + integration gate. No step of this path lets the implement agent certify its own work.
+5. **Reviewer seat**: unchanged — Phase-4 `cf:review` + integration gate. No step of this path lets the implement agent certify its own work.
 
 ---
 

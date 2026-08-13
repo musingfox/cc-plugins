@@ -1,6 +1,6 @@
 # OMP Implementer Protocol
 
-Governs the Phase 3 handoff when the orchestrator delegates to **OMP** (dispatched via the pi-dispatch canonical scripts) instead of the Claude `context-flow:implement` agent. Four parts: brief assembly, worker methodology, report contract, and the transition validation that protects against self-grading.
+Governs the Phase 3 handoff when the orchestrator delegates to **OMP** (dispatched via the pi-dispatch canonical scripts) instead of the Claude `cf:implement` agent. Four parts: brief assembly, worker methodology, report contract, and the transition validation that protects against self-grading.
 
 Core stance: the orchestrator never trusts the worker's stdout or report. The worker reports via files; the orchestrator verifies independently (gates + test execution). Stdout is log noise.
 
