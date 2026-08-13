@@ -305,10 +305,10 @@ Build the file-touch graph from `contracts.json` and emit one shard per connecte
 ```bash
 "$SCRIPTS/cf-pi-shard.sh" "$SESSION"
 FAN_OUT=$(jq '.fan_out_count' "$SESSION/shards.json")
-SHARD_IDS=$(jq -r '.groups[].id' "$SESSION/shards.json")
+SHARD_IDS=$(jq -r '.groups | keys[]' "$SESSION/shards.json")
 ```
 
-`shards.json` carries `{fan_out_count, groups:[{id, contracts:[…], files:[…]}…]}` and seeds `$SESSION/shards/<id>/env.sh` per shard. Main reads only those two scalars / id list — never the full groups payload. Also assemble the brief inputs once (shared across all shards):
+`shards.json` carries `{fan_out_count, groups: {<id>: {shard_id, contracts:[…], files:[…], depends_on:[…]}}}` and seeds `$SESSION/shards/<id>/env.sh` per shard. `depends_on` (shard ids whose contract interfaces this shard consumes, derived from contract-level `depends`) drives the wave rule in §3.2. Main reads only those two scalars / id list — never the full groups payload. Also assemble the brief inputs once (shared across all shards):
 
 - `GOAL_ONELINE` — derived from `$SESSION/goal.md` (one sentence).
 - `CONSTRAINTS` — `sed -n '/^## Constraints/,/^## Key Files/p' "$SESSION/research.md"`, boiled to short lines.
@@ -333,21 +333,23 @@ bash "$SCRIPTS/cf-pi-usage-check.sh" "$SESSION"   # reads PI_PROVIDER, PI_USAGE_
 
 The gate activates only when `$PI_PROVIDER` names a provider whose quota `omp usage` can read (e.g. `openai-codex`); set that in your own environment (the plugin ships no default so it stays portable). With `$PI_PROVIDER` unset — or set to a blind-quota provider (xai/grok, ollama expose no usage API) — the check returns `OK skip-…` and dispatch is unguarded, but the reactive poll in `cf-pi-run.sh` still catches true exhaustion. The check is advisory and fail-open. Tune the trip point with `PI_USAGE_CEILING` (fraction, e.g. `0.9`).
 
-Launch N shards in PARALLEL — one `cf-pi-run.sh` per shard as a **background task** (`Bash` with `run_in_background: true`), all in a **single message**:
+**Wave rule.** A shard is READY when every id in its `depends_on` already has a PASS checkpoint (`jq -r '.checkpoints | keys[]' "$SESSION/dispatch-state.json"`); shards with `depends_on: []` are READY immediately. Launch ONLY the READY shards — a dependent shard dispatched early forks a base without its prerequisites' interfaces and `cf-pi-run.sh` refuses it (`FAIL prereq-missing`). Dependent shards launch as the next wave from §3.4 routing; `cf-pi-run.sh` merges their prerequisites' checkpoints into their worktree base automatically.
+
+Launch the READY shards in PARALLEL — one `cf-pi-run.sh` per shard as a **background task** (`Bash` with `run_in_background: true`), all in a **single message**:
 
 ```
 Bash(run_in_background: true, command:
   "$SCRIPTS/cf-pi-run.sh $SESSION/shards/A '<one-sentence goal>' '<short constraints>' '<resolved SHARD_TEST_RUNNER>'")
 Bash(run_in_background: true, command:
   "$SCRIPTS/cf-pi-run.sh $SESSION/shards/B '<one-sentence goal>' '<short constraints>' '<resolved SHARD_TEST_RUNNER>'")
-... (one background Bash per id in $SHARD_IDS)
+... (one background Bash per READY id)
 ```
 
 The 4 positionals are `SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER` — pass the resolved `SHARD_TEST_RUNNER` (the full suite belongs to the integration gate). Do NOT pass research output, decision alternatives, plan prose, or rejected approaches; each shard derives everything else from its `SHARD_SESSION/env.sh`. Background tasks are exempt from the 10-minute Bash ceiling (set `BASH_MAX_TIMEOUT_MS` as a safety net); each writes `$SESSION/shards/<id>/outcome.md` on completion.
 
 ### 3.3 Collect
 
-Wait for ALL N shards before routing (round-collection rule, design §4) so NEEDS_REPLAN coalesces into a single Plan invocation. End your turn after fan-out; the harness re-invokes you on each task completion — check whether every id in `$SHARD_IDS` now has a non-empty `$SESSION/shards/<id>/outcome.md`, and if not, end the turn again.
+Wait for ALL shards of the current wave before routing (round-collection rule, design §4) so NEEDS_REPLAN coalesces into a single Plan invocation. End your turn after fan-out; the harness re-invokes you on each task completion — check whether every id dispatched this wave now has a non-empty `$SESSION/shards/<id>/outcome.md`, and if not, end the turn again.
 
 **Progress visibility** — the human must never sit blind while shards run. Immediately after fan-out (same turn), arm ONE progress monitor:
 
@@ -398,7 +400,7 @@ jq -r '.rollback_count'                                       "$SESSION/dispatch
 
 ### 3.4 Route by status set
 
-Precedence within one round: **FAIL retries are resolved first, then NEEDS_REPLAN is coalesced, then all-PASS triggers integration.** (FAIL is an infra signal; resolving it may change the NEEDS_REPLAN set.)
+Precedence within one round: **FAIL retries are resolved first, then NEEDS_REPLAN is coalesced, then newly-READY dependent shards dispatch as the next wave (back to §3.2), and only when EVERY shard in `shards.json` is PASS does integration trigger.** (FAIL is an infra signal; resolving it may change the NEEDS_REPLAN set.)
 
 #### Any FAIL
 
@@ -417,7 +419,7 @@ Per-shard, per-round FAIL retry budget = 1 (design §6).
 
 #### All PASS (after FAIL resolution)
 
-Run the integration gate — merge all PASS shard branches into `cf/$CF_SLUG-integrated` and run the full test suite:
+"All" means every shard in `shards.json`, not just this wave — if undispatched dependent shards remain, they are now READY (their prerequisites just passed): dispatch them as the next wave (§3.2) instead. Only with no shard left un-PASS, run the integration gate — merge all PASS shard branches into `cf/$CF_SLUG-integrated` and run the full test suite:
 
 ```bash
 "$SCRIPTS/cf-pi-integrate.sh" "$SESSION" "$TEST_RUNNER"
