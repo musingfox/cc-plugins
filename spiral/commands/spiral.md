@@ -6,9 +6,10 @@ allowed-tools: [Agent, Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion]
 
 # Spiral
 
-You drive the **main thread**: dispatch the two isolated subagents — **Divergence** names the
-directions, **Convergence** turns the picked one into a plan — write what the human reads, and
-stop. You do **not** name directions, pick between them, or write the plan yourself.
+You drive the **main thread**: dispatch **Divergence** — the one isolated subagent, and the only
+thing here that must not see your hypotheses — then converge the picked direction into a plan
+yourself, write what the human reads, and stop. You do **not** name directions or pick between
+them.
 
 Each round lands one **layer**: a plan or milestone, concrete at that layer's grain and no
 finer. The next round diverges from *that plan*, so the spiral descends — vague question →
@@ -46,7 +47,7 @@ any facts it resolved along the way.
 
 ## 2 — The human picks a direction
 
-Write `.spiral/L<N>-a<M>-directions.md` — *you* write this; the roles return data, never
+Write `.spiral/L<N>-a<M>-directions.md` — *you* write this; Divergence returns data, never
 human-facing prose. Frontmatter, then the body:
 
 ```
@@ -76,30 +77,62 @@ Render it and read the answer back (§Rendering). Then:
 
 ## 3 — Converge
 
-> `Agent(subagent_type: "spiral:convergence", model: "opus")` with the chosen direction, the
-> human's notes, which layer this is, the rounds that led here, and the output path
-> `.spiral/L<N>-plan.md`.
+**You write** `.spiral/L<N>-plan.md` — narrowing the chosen direction into one determinate
+result at this layer. Unlike the widening, this motion wants full context rather than
+blindness: the human has already picked, so there is nothing left to be unbiased about.
 
-It writes the layer's result — what this layer settles, what is now concrete enough to build
-on, what it deliberately leaves to the next layer, and what would overturn it.
+The result carries four things:
+
+- **What this layer settles** — the commitment, in one or two sentences. Not "we considered X
+  and Y"; the thing that is now decided.
+- **What is now concrete enough to build on** — the shape a next layer can take as given:
+  scope, boundaries, the pieces and how they relate. Concrete at *this* layer's grain, no finer.
+- **What is deliberately left to the next layer** — the choices you are consciously not making
+  yet, each with why it is premature. This is the seam the next round descends through; an empty
+  list means you either over-specified or the layer is actually done.
+- **What would overturn this** — the observation that would make it the wrong call, plus one
+  line each for the directions that lost. A result with no falsifier is a preference; say so
+  rather than dressing it up.
+
+Hold these while writing it:
+
+- **Concrete at this layer, not the next one.** No file lists, no task breakdowns, no code, no
+  API signatures — unless *this* layer is explicitly that grain. Over-specifying steals the next
+  round's job and forecloses choices nobody made.
+- **Resolve, don't punt.** A sub-choice with a right answer gets looked up, not listed as an
+  open question. A reversible one gets a sane default and a note — do not hand it back to the
+  human. "Left to the next layer" is for what is genuinely premature, never for what you
+  couldn't be bothered to settle.
+- **Do not re-open the choice.** They already picked; your job is to make that pick determinate,
+  not to re-argue it. The rejected rounds sitting in your context are input, not an invitation
+  to relitigate — you write the plan for the direction they chose, including the parts you would
+  have argued against. If the pick turns out to be internally contradictory, say so in one line
+  and stop, rather than silently substituting your own.
 
 ## 4 — The human decides whether to dig
 
-**Edit** the frontmatter onto the front of the plan file Convergence just wrote — do not rewrite
-its body, and do not paraphrase it into a second document:
+The plan is on disk and they can read it. Ask **inline** — `AskUserQuestion`, options
+`夠了，就用這個目標` / `再挖一層`, plus the tool's "Other" — carrying a plain-language line on what
+the layer settled. No browser render here: §2 is where they weigh substance against substance;
+this gate is one binary call on a document they already have, and rendering it again buys
+nothing but a round trip.
+
+Then **Edit** their answer onto the front of the plan file — do not rewrite its body, and do not
+paraphrase it into a second document:
 
 ```
 ---
-viz: feedback
+spiral: gate
 title: <what this layer settled, in plain language>
-panel: 這一層夠了嗎
-options: 夠了，就用這個目標 | 再挖一層
-choice:                            # leave empty
-notes:                             # leave empty
+choice: <夠了，就用這個目標 | 再挖一層>
+notes: <their reasoning, verbatim — empty if they gave none>
 ---
 ```
 
-Render it and read the answer back (§Rendering).
+Recording it is not optional: on the 再挖一層 path those notes are what the next Divergence
+diverges with, and they are the only account of *why* a layer was settled once your context has
+rolled over. That block is scaffolding, not content: whoever reads the plan next (the next
+layer's Divergence, `/cf`, a human) ignores it.
 
 - **夠了** → report the path. This plan is the deliverable: hand it to `/cf <the goal, one
   line>` with the file as context — it is a **seed**, not a contract set, so `/cf` still runs
@@ -108,16 +141,13 @@ Render it and read the answer back (§Rendering).
 - **再挖一層** → `L+1`, attempt back to `a1`, and back to step 1 — diverging from *this plan*
   and carrying their notes.
 
-The plan file keeps its panel frontmatter after Save, so the record also carries the human's
-`choice:`/`notes:` — why this layer was settled or dug deeper. That block is scaffolding, not
-content: whoever reads the plan next (the next layer's Divergence, `/cf`, a human) ignores it.
-
 Do **not** dispatch Divergence before this answer. Putting a fresh menu of directions in front
 of someone who was ready to stop manufactures the next round — that is the churn, mechanized.
 
 ## Rendering
 
-Both decision pages go through the same two calls:
+Only §2 renders — it is the one place the human weighs substance against substance. It goes
+through two calls:
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/render-decision.sh" <file> <name>
@@ -134,10 +164,9 @@ It ends with `[spiral] save-mode=browser|inline`.
 - **`inline`** (viz absent / headless) → **AskUserQuestion** with the same options plus "Other".
 - **On wake, branch on `choice:`, never on how you woke.** Grep `choice:`/`notes:` from the
   file (`notes:` `\n` is literal — unescape it). `choice:` non-empty → that is the call.
-  `choice:` empty with `notes:` filled → they Saved without picking, which is 都不對 *plus*
-  their reasoning. At §2 that is the `A+1` path; §4 has no such branch, so ask them which of its
-  two it is, carrying their notes. Never read a no-pick as agreement with `recommend:` — an
-  unpicked option was not picked. Both empty → take the typed answer, or ask.
+  `choice:` empty with `notes:` filled → they Saved without picking, which is 都不對 *plus* their
+  reasoning — the `A+1` path. Never read a no-pick as agreement with `recommend:` — an unpicked
+  option was not picked. Both empty → take the typed answer, or ask.
   If you proceed from a typed answer while the waiter may still poll, `TaskStop` it.
 
 ## Rules
@@ -145,13 +174,15 @@ It ends with `[spiral] save-mode=browser|inline`.
 - **Spiral plans; it does not build.** No code, no gate, no commit. If the question is already
   determinate — "how do I implement X" — say so and point at `/cf`; a settled task does not
   need divergence.
-- **One layer per round, and never descend two.** Convergence writes at the current grain; the
+- **One layer per round, and never descend two.** You write the plan at the current grain; the
   next layer is the next round's job. A plan that arrives with file lists and task breakdowns
-  skipped a layer nobody approved.
+  skipped a layer nobody approved. Writing it yourself is exactly where this gets tempting —
+  you can see the implementation from here, and that is not a reason to put it on the page.
 - **The human owns the pick and the stop.** You never choose a direction for them, and you never
   start another round on your own say-so.
-- **Keep each dispatch simple and goal-first** — what to widen from or narrow, the carry-over,
-  the output shape. Don't pour in your own hypotheses: steering Divergence toward what you
-  expect destroys the only thing it is for. If it returns one real direction, render one —
-  padding the page to three options to look thorough is the failure mode.
+- **Keep the Divergence dispatch simple and goal-first** — what to widen from, the carry-over,
+  the output shape. Don't pour in your own hypotheses: steering Divergence toward what you expect
+  destroys the only thing it is for, and it is now the only isolation left in the loop. If it
+  returns one real direction, render one — padding the page to three options to look thorough is
+  the failure mode.
 - **Files are the source of truth.** Your prose is for the human, not the record.
