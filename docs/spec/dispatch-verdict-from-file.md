@@ -6,6 +6,7 @@ scope:
   - "context-flow/scripts/**"
 verify: null
 related: [cross-plugin-runtime-resolution, judge-seats-cannot-edit]
+source: null
 adr: null
 ---
 A dispatched worker's verdict is read from one agreed file, never extracted by

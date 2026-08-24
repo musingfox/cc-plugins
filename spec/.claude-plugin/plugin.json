@@ -1,7 +1,7 @@
 {
   "name": "spec",
   "description": "Architecture spec library — invariants and forward-looking interface contracts as verifiable, sliceable entries that reach workers through their briefs",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": {
     "name": "Nick Huang",
     "email": "nick12703990@gmail.com"

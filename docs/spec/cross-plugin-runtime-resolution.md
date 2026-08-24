@@ -6,6 +6,7 @@ scope:
   - "spiral/scripts/**"
 verify: check:test -z "$(find . -path ./pi-dispatch -prune -o \( -name pi-dispatch.sh -o -name pi-worktree.sh \) -print 2>/dev/null)"
 related: [dispatch-verdict-from-file]
+source: null
 adr: null
 ---
 Plugins that need pi-dispatch's runtime resolve it at execution time through a

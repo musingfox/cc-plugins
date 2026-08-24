@@ -49,9 +49,19 @@ scope:                      # file globs, never module names
   - "pi-dispatch/agents/reviewer.md"
 verify: check:<shell command that exits 0 when the spec holds>
 related: [other-spec-id]    # entries this one bears on
+source: null                # where it came from — milestone slug, or null
 adr: null                   # link when superseded
 ---
 ```
+
+**`source` is the birth record.** An entry has two birthplaces: a milestone
+settles and names an interface later flows must honour, or a flow finishes and
+main finds an invariant the run revealed. Either way, write down which — a rule
+whose origin nobody remembers is a rule nobody dares delete, and that is how a
+spec library silts up into a layer of untouchable sediment.
+
+`null` is honest for entries that predate a milestone. Do not invent a source to
+fill the field.
 
 The body is the text that gets pasted into a brief verbatim. Write it that way:
 no "see file X", no summary-plus-detail split, nothing that needs a second pass

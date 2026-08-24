@@ -41,6 +41,7 @@ scope:
   - "context-flow/agents/review.md"
 verify: check:! grep -h '^tools:' pi-dispatch/agents/reviewer.md context-flow/agents/review.md | grep -qw Edit
 related: [dispatch-verdict-from-file]
+source: null                # milestone slug it came from
 adr: null
 ---
 A seat that renders a verdict must not hold `Edit`. The tools whitelist in an
