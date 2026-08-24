@@ -84,6 +84,20 @@ load_cf_flow_env() {
   return 0
 }
 
+# resolve_canon_spec
+#   Echoes the absolute path to the canonical spec.sh (highest version), or
+#   nothing if the spec plugin is not installed. Always returns 0 -- architecture
+#   specs are optional context, never a reason to fail a brief. Mirror of
+#   resolve_canon_dispatch below.
+resolve_canon_spec() {
+  local root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+  ls "$root"/../spec/scripts/spec.sh \
+     "$root"/../spec/*/scripts/spec.sh \
+     "$root"/../../spec/scripts/spec.sh \
+     "$root"/../../spec/*/scripts/spec.sh 2>/dev/null \
+   | sort -V | tail -1 || true
+}
+
 # resolve_canon_dispatch
 #   Echoes the absolute path to the canonical pi-dispatch.sh (highest version), or
 #   nothing if unresolved. Always returns 0 -- each caller keeps its own distinct

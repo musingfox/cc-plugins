@@ -1,6 +1,6 @@
 {
   "name": "cf",
-  "version": "0.6.6",
+  "version": "0.6.7",
   "description": "[Experimental] Contract-driven development pipeline with human-in-the-loop decision gating — agents defined by Context + Goal + Tools, not roles",
   "author": {
     "name": "Nick Huang"

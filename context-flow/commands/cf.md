@@ -553,6 +553,25 @@ When describing the run, mention which implementer ran (`Implementation by OMP (
 - **REQUEST_CHANGES with contract failures** → re-run implement with the failure details as additional context (treat as `retry-different-approach`; increment `retries_used`). Do NOT rebase yet — the cf branch accumulates more commits.
 - **REQUEST_CHANGES with fundamental design issues** → this means a contract is wrong, not just the implementation. Loop back to plan via the `## Implement Failure` mechanism in §3.4 with class `loop-back-to-plan`. Increment `retries_used`. Do NOT rebase.
 
+### Post-PASS spec maintenance
+
+Before rebasing, decide whether this flow established anything the **next** flow needs to know. Only three kinds qualify:
+
+1. **Something deliberately not done** — a negative constraint. Code can never show this.
+2. **An interface defined here that the next flow must reuse** — the slice of a contract that outlives this run. Not the whole contract: `contracts.json` already covers within-run dependencies.
+3. **An existing spec that turned out to be stale** — highest value, because a worker hit it for real. Arrives as an escalation or a Concern, not as your own inference.
+
+None of the three → write nothing. **Most flows produce zero entries; that is the healthy case.** A spec library that grows with every flow is a spec library nobody reads.
+
+If something qualifies:
+
+- **You write it.** You are the only participant present for the whole flow — research, gate, dispatch, review — so you are the only one who can tell a run-local detail from an invariant. Delegating the wording delegates the judgement.
+- **Delegate collection, never authorship.** When you need facts you no longer hold — which files an invariant actually covers, whether a candidate `check:` command is green today and red against a real violation — dispatch a sub-agent to go find out and report back. What returns is evidence. You decide what it means and you type the entry.
+- **Status is `proposed`.** Proposed entries are invisible to `slice`, so nothing you write here can reach a worker until a human promotes it to `accepted`. Commit it to the cf branch with the rest of the work — the human sees it in the same diff they are already reviewing.
+- **Maintain the links.** Set `related:` to the entries this one bears on, and add the back-link on those entries. This is how you will know where to send an agent next time something needs checking; an entry with no links is one you will not find again.
+
+Use the `spec` skill for the entry format and lifecycle. If the spec plugin is not installed, skip this step entirely.
+
 ### Post-PASS rebase + delivery
 
 Run `cf-rebase.sh` to align the cf branch with the latest `$BASE_BRANCH`, then hand the branch to the human. Never auto-fast-forward `$BASE_BRANCH` — the human decides when to merge.

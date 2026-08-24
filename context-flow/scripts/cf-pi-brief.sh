@@ -173,6 +173,27 @@ shard_group="$SHARD_ID"
   echo "- You will be measured against the contracts in this brief ONLY. Do not implement anything outside touches_files of these contracts."
   echo
 
+  # Architecture specs constraining the files this shard touches. Optional:
+  # silently skipped when the spec plugin is absent or nothing matches.
+  spec_sh=$(resolve_canon_spec)
+  if [ -n "$spec_sh" ]; then
+    shard_files=$(jq -r --arg sid "$SHARD_ID" --slurpfile sh <(cat "$SHARDS_FILE") '
+      [.contracts[] | select(.name as $n | $sh[0].groups[$sid].contracts | index($n)) | .touches_files // []]
+      | add // [] | unique | .[]
+    ' "$CONTRACTS_FILE" 2>/dev/null || true)
+    if [ -n "$shard_files" ]; then
+      # shellcheck disable=SC2086
+      spec_text=$("$spec_sh" slice $shard_files 2>/dev/null || true)
+      if [ -n "$spec_text" ]; then
+        echo "## Architecture Specs (binding)"; echo
+        echo "Invariants covering the files you touch. They outrank your own judgement:"
+        echo "contradicting one is an escalation, not a decision."; echo
+        # Demote slice's own `## spec:` headings so they nest under this section.
+        echo "$spec_text" | sed 's/^## spec: /### /'; echo
+      fi
+    fi
+  fi
+
   echo "## Behavioral Contracts (this shard)"; echo
   render_contracts; echo
 
