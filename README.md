@@ -151,6 +151,20 @@ Lifecycle management for [MADR 4.0](https://adr.github.io/madr/) Architecture De
 /plugin install adr
 ```
 
+### Spec (Architecture Spec Library)
+
+Invariants and forward-looking interface contracts as verifiable, sliceable entries:
+- **What must not change**, not why we chose it — complements ADR (history) with load-bearing constraints
+- **Scope by file globs**: globs match the code; module names are their own drift source
+- **`slice <path>...`**: prints the entries constraining those paths, ready to paste into a worker's brief — a spec nobody reads is a document, one that injects itself is a constraint
+- **`verify`**: runs every accepted entry's check; a check that would false-positive is downgraded to prose and reported as debt every run
+- **Forward-looking contracts**: describe an interface before it exists — the case code cannot cover
+
+**Installation:**
+```bash
+/plugin install spec
+```
+
 ### Hook Guard
 
 One-stop hook setup assistant for Claude Code projects:
@@ -304,6 +318,12 @@ cc-plugins/
 │   ├── .claude-plugin/
 │   │   └── plugin.json
 │   ├── skills/                   # adr (lifecycle), adr-ref-guard (advisory)
+│   └── README.md
+├── spec/                         # Architecture spec library
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   ├── skills/                   # spec (lifecycle + slicing)
+│   ├── scripts/                  # spec.sh (verify, slice)
 │   └── README.md
 ├── fizzy/                        # Fizzy project management
 │   ├── .claude-plugin/

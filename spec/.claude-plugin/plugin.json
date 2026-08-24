@@ -1,0 +1,18 @@
+{
+  "name": "spec",
+  "description": "Architecture spec library — invariants and forward-looking interface contracts as verifiable, sliceable entries that reach workers through their briefs",
+  "version": "0.1.0",
+  "author": {
+    "name": "Nick Huang",
+    "email": "nick12703990@gmail.com"
+  },
+  "keywords": [
+    "architecture",
+    "invariants",
+    "contracts",
+    "drift",
+    "verification"
+  ],
+  "homepage": "https://github.com/musingfox/cc-plugins/tree/main/spec",
+  "license": "MIT"
+}

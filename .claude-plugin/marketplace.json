@@ -54,6 +54,11 @@
       "description": "Google Workspace CLI skills — Gmail, Calendar, and Drive via gogcli (gog)"
     },
     {
+      "name": "spec",
+      "source": "./spec",
+      "description": "Architecture spec library — invariants and forward-looking interface contracts as verifiable, sliceable entries that reach workers through their briefs"
+    },
+    {
       "name": "adr",
       "source": "./adr",
       "description": "Architecture Decision Records lifecycle management with MADR 4.0 and cross-reference consistency enforcement"
