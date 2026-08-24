@@ -94,6 +94,11 @@ The result carries four things:
   line each for the directions that lost. A result with no falsifier is a preference; say so
   rather than dressing it up.
 
+**The first and last sections must stand alone.** Once this plan is promoted (§4) they are the
+acceptance criteria a later verifier reads — with the plan file and nothing else. No "see the
+conversation", no `.spiral/` paths: those die with the run, and a criterion nobody can resolve
+is a criterion nobody can check.
+
 Hold these while writing it:
 
 - **Concrete at this layer, not the next one.** No file lists, no task breakdowns, no code, no
@@ -134,10 +139,25 @@ diverges with, and they are the only account of *why* a layer was settled once y
 rolled over. That block is scaffolding, not content: whoever reads the plan next (the next
 layer's Divergence, `/cf`, a human) ignores it.
 
-- **夠了** → report the path. This plan is the deliverable: hand it to `/cf <the goal, one
-  line>` with the file as context — it is a **seed**, not a contract set, so `/cf` still runs
-  its own research → plan → gate. Keeping the record (move it into the repo, or `/adr`) is the
-  other one-liner. Then stop. Executing is not yours.
+- **夠了** → **promote the plan, then report.** `.spiral/` is scratch — gitignored, and it dies
+  with the run. This plan is the one thing here that must outlive it, so copy it to
+  `docs/milestones/<slug>.md` and put the milestone frontmatter on the front:
+
+  ```
+  ---
+  status: accepted    # accepted | done | superseded
+  delivered:          # commit or tag ref — filled when acceptance passes
+  depends: []         # milestone slugs that must land first
+  ---
+  ```
+
+  The slug comes from what the layer settled, never from `L<N>` — that counter is run-local and
+  collides across runs. `status: done` with an empty `delivered:` is a claim with no receipt;
+  the two move together.
+
+  The promoted file is the deliverable: hand it to `/cf <the goal, one line>` with the file as
+  context — it is a **seed**, not a contract set, so `/cf` still runs its own research → plan →
+  gate. Then stop. Executing is not yours.
 - **再挖一層** → `L+1`, attempt back to `a1`, and back to step 1 — diverging from *this plan*
   and carrying their notes.
 

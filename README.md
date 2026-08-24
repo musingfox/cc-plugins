@@ -98,7 +98,7 @@ Narrows a vague question into an implementation-sized goal, one layer at a time 
 - **Divergence names the options**: an isolated subagent lists the genuinely *distinct* directions and what each one commits to, sorted by cost to reverse (one-way vs two-way door). It describes; it never decides, and it never re-lists last round.
 - **Convergence lands a layer**: the direction you picked becomes a plan or milestone — what this layer settles, what is concrete enough to build on, what it deliberately leaves to the next layer.
 - **You stay on the converging side**: picking a direction renders as a readable decision page in the browser; the depth gate afterwards is a one-line ask in the terminal, on a plan you already have. It only widens again when you ask — no menu is pushed at someone ready to stop.
-- **Output is a goal, not code**: hand the final plan to `/cf` (as a seed, not a contract set) or keep it via `/adr`. No gate, no commit.
+- **Output is a goal, not code**: the settled plan is promoted to `docs/milestones/<slug>.md` — `.spiral/` is scratch, the milestone outlives it — then handed to `/cf` as a seed, not a contract set. No gate, no commit.
 - **Single command**: `/spiral "the question"`.
 
 See `spiral/docs/concept.md` for the full concept.
