@@ -1,6 +1,6 @@
 {
   "name": "viz",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Visual output for chat and browser — inline code-shape visuals (viz-inline) plus markdown/Mermaid HTML rendering (viz-render)",
   "author": {
     "name": "Nick Huang",
