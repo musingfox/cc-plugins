@@ -67,7 +67,8 @@ export FLOW_SESSION
 cd "$REPO_ROOT"
 git init -q -b main
 git commit --allow-empty -m init -q
-WT="$(mktemp -d)/wt"
+WT_PARENT="$(mktemp -d)"
+WT="$WT_PARENT/wt"
 git worktree add -b cf/myflow-shard-A "$WT" -q
 sha=$(git rev-parse cf/myflow-shard-A)
 "$CF_TESTS_DIR/../scripts/cf-pi-record-round.sh" --round 1 --result A=PASS
@@ -78,7 +79,7 @@ assert_eq "$sha" "$tag_sha" "T5 tag resolves to sha"
 tag_in_state=$(jq -r '.checkpoints.A' "$FLOW_SESSION/dispatch-state.json")
 assert_eq "$tag" "$tag_in_state" "T5 state matches the real tag"
 git worktree remove --force "$WT" 2>/dev/null || true
-rm -rf "$REPO_ROOT" "$FLOW_SESSION"
+rm -rf "$REPO_ROOT" "$FLOW_SESSION" "$WT_PARENT"
 
 # T4: given REPO_ROOT empty (non-git scratch mode) -> expect exit code 0, no tag attempted, .checkpoints unchanged (graceful degrade)
 FLOW_SESSION="$(mktemp -d)"

@@ -19,6 +19,14 @@ set -uo pipefail
 CF_TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export CF_TESTS_DIR
 
+# Tests spawn real cf-pi-run.sh instances whose write_outcome appends to the
+# shared pi-runs ledger; unredirected, one sweep buries the operator's real run
+# diagnostics under hundreds of fixture STATUS=FAIL lines. (TMPDIR is NOT worth
+# setting here -- BSD mktemp on macOS ignores it; each test cleans its own.)
+CF_TEST_TMP="$(mktemp -d)"
+export PI_RUNS_DIR="$CF_TEST_TMP/pi-runs"
+trap 'rm -rf "$CF_TEST_TMP"' EXIT
+
 shopt -s nullglob
 total=0
 failed=0

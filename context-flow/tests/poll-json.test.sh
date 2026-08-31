@@ -21,9 +21,13 @@ wait "$DEAD_PID" 2>/dev/null || true
 
 # new_session PID  -> sets $S (session dir with env.sh + pi-rundir pointing to RUNDIR)
 # The canonical RUNDIR is created at $S/run; fixtures write events to $S/run/result.md.
+# All fixtures live under one root so the sweep leaves no session dirs behind.
+FIXTURE_ROOT="$(mktemp -d)"
+trap 'rm -rf "$FIXTURE_ROOT"' EXIT
+
 new_session() {
   local pid="$1"
-  S="$(mktemp -d)"
+  S="$(mktemp -d "$FIXTURE_ROOT/XXXXXX")"
   cat > "$S/env.sh" <<EOF
 SESSION="$S"
 SESSION_BASENAME="poll-test"
