@@ -30,7 +30,7 @@ Sharding is derived from a **file-touch graph**, not declared by Plan — two sh
 
 Plan emits paired artifacts: `plan.md` (human prose) + `contracts.json` (machine-readable sidecar, schema-versioned). Orchestration scripts read **only** `contracts.json` — never parse plan.md.
 
-`contracts.json` per contract: `name` (stable id), `summary`, `touches_files` (superset of every file created/modified, tests included — underset is a bug, post-validated by cf-pi-run.sh), `test_cases` (`{id, given, expect}`), `attachments` (paths under `plan-attachments/` for rich prose; default empty).
+`contracts.json` per contract: `name` (stable id), `summary`, `touches_files` (superset of every file created/modified, tests included — underset is a bug, post-validated by cf-pi-scope.sh), `test_cases` (`{id, given, expect}`), `attachments` (paths under `plan-attachments/` for rich prose; default empty).
 
 `cf-pi-shard.sh`: nodes = contracts, edge ⇔ shared touched file, one shard per connected component → `shards.json` `{fan_out_count, groups:{id:{contracts,files}}}`. `fan_out_count == 1` IS the single-worker case — same code path.
 

@@ -3,7 +3,7 @@
 # Pins the intended `comm -23 <(actual) <(declared)` undeclared-file semantics
 # over synthetic declared/actual lists (per-shard-union granularity).
 # This test asserts the contract behavior directly; it does NOT extract or
-# depend on the live inline implementation in cf-pi-run.sh (lines 430-435).
+# depend on the live implementation in cf-pi-scope.sh.
 
 . "$CF_TESTS_DIR/lib/assert.sh"
 

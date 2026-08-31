@@ -492,42 +492,26 @@ fi
 say "gate 3 ok"
 
 # -------- 10. actual ⊆ declared file scope -----------------------------
+# Mechanism lives in cf-pi-scope.sh so the Claude-fallback path (cf.md §3.6)
+# runs the identical gate instead of a prose approximation.
 
-declared_files=$(jq -r --arg sid "$SHARD_ID" '.groups[$sid].files[]' "$SHARDS_FILE" | sort -u)
+set +e
+scope_out=$("$SCRIPT_DIR/cf-pi-scope.sh" "$SHARD_SESSION" 2>&1)  # not $SCRIPTS: this gate is never stubbable
+scope_rc=$?
+set -e
+allow_csv=$(printf '%s\n' "$scope_out" | sed -n 's/^ALLOWLISTED //p')
+undecl_csv=$(printf '%s\n' "$scope_out" | sed -n 's/^UNDECLARED //p')
 
-# Step 1b merged each prerequisite's checkpoint into this worktree, so anything
-# reachable from those tags is another shard's work; charging it here fails
-# every dependent shard on files it never touched. `--not` excludes exactly the
-# refs 1b validated (an empty set is a valid no-op, so no-prereq shards take the
-# same path). Merge commits contribute no paths under plain `git log`, so 1b's
-# own merge stays invisible.
-# Commit union, not net diff, on purpose: the gate asks whether the worker
-# touched an undeclared file, not what survived. A file created and deleted
-# again still collided with whatever shard actually owns it.
-# shellcheck disable=SC2046,SC2086
-actual_files=$(git -C "$WORK" log --name-only --pretty=format: "$BASE_HEAD..HEAD" \
-                 --not $(cat "$PREREQ_REFS" 2>/dev/null) 2>/dev/null | sed '/^$/d' | sort -u)
-
-undeclared=""
-if [ -n "$actual_files" ]; then
-  undeclared=$(comm -23 <(printf '%s\n' "$actual_files") <(printf '%s\n' "$declared_files") || true)
+if [ "$scope_rc" -ne 0 ] && [ "$scope_rc" -ne 2 ]; then
+  pm=$(do_postmortem)
+  write_outcome FAIL "scope gate error" "$survivors" "(all): $scope_out" "$pm" "-"
+  say "FAIL scope gate error"
+  exit 1
 fi
 
-# Build/lock manifests are legitimately touched when the isolated worktree must
-# add a missing dev dep to run the tests (e.g. `uv add --dev pytest`). Treat
-# them as a warning, not a scope violation.
-BUILD_LOCK_ALLOWLIST='^(pyproject\.toml|uv\.lock|requirements[^/]*\.txt|package\.json|package-lock\.json|bun\.lock(b)?|yarn\.lock|pnpm-lock\.yaml|Cargo\.(toml|lock)|go\.(mod|sum)|Gemfile(\.lock)?)$'
-allowlisted=""
-if [ -n "$undeclared" ]; then
-  allowlisted=$(printf '%s\n' "$undeclared" | grep -E "$BUILD_LOCK_ALLOWLIST" || true)
-  undeclared=$(printf '%s\n' "$undeclared" | grep -vE "$BUILD_LOCK_ALLOWLIST" || true)
-fi
-if [ -n "$allowlisted" ]; then
-  say "WARN undeclared build/lock files (allowlisted): $(printf '%s' "$allowlisted" | tr '\n' ',' | sed 's/,$//')"
-fi
+if [ -n "$allow_csv" ]; then say "WARN undeclared build/lock files (allowlisted): $allow_csv"; fi
 
-if [ -n "$undeclared" ]; then
-  undecl_csv=$(printf '%s' "$undeclared" | tr '\n' ',' | sed 's/,$//')
+if [ "$scope_rc" -eq 2 ]; then
   affected=$(shard_contract_names | awk '{print $0 ": gate-scope undeclared_file_touched"}')
   write_outcome NEEDS_REPLAN undeclared_file_touched "$survivors" "$affected" "-" "$undecl_csv"
   say "NEEDS_REPLAN undeclared_file_touched ($undecl_csv)"
@@ -541,8 +525,7 @@ git -C "$WORK" diff "$BASE_HEAD" > "$DIFF_FILE" 2>/dev/null || true
 
 # -------- 12. completeness gate + write PASS outcome --------------------
 
-allow_csv="-"
-[ -n "$allowlisted" ] && allow_csv=$(printf '%s' "$allowlisted" | tr '\n' ',' | sed 's/,$//')
+if [ -z "$allow_csv" ]; then allow_csv="-"; fi
 
 # PASS requires survivors == declared. A shard that quietly implemented only a
 # subset (unimplemented contracts have no failing test yet, so gate 3 can't see

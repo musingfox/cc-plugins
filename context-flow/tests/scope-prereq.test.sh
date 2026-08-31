@@ -125,3 +125,25 @@ case "$(sed -n '/^## Undeclared files/,/^$/p' "$SHARD/outcome.md")" in
   *) assert_eq ok ok "T2 prerequisite file absent from undeclared list" ;;
 esac
 rm -rf "$FLOW"
+
+# T3: the gate's CLI contract, as the Claude-fallback path (cf.md §3.6) consumes
+# it — exit 2 plus a machine-readable UNDECLARED line on stdout. The fallback
+# has no cf-pi-run.sh around it, so these two signals are all it gets.
+build_fixture "src/rogue.py"
+set +e
+scope_out=$(bash "$REAL_SCRIPTS/cf-pi-scope.sh" "$SHARD" 2>&1)
+scope_rc=$?
+set -e
+assert_eq "2" "$scope_rc" "T3 undeclared file exits 2"
+assert_eq "UNDECLARED src/rogue.py" "$scope_out" "T3 stdout names the undeclared file"
+rm -rf "$FLOW"
+
+# T4: clean shard exits 0 and says nothing.
+build_fixture ""
+set +e
+scope_out=$(bash "$REAL_SCRIPTS/cf-pi-scope.sh" "$SHARD" 2>&1)
+scope_rc=$?
+set -e
+assert_eq "0" "$scope_rc" "T4 clean shard exits 0"
+assert_eq "" "$scope_out" "T4 clean shard prints nothing"
+rm -rf "$FLOW"

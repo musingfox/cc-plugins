@@ -168,7 +168,7 @@ shard_group="$SHARD_ID"
   echo "## Rules"
   echo "- All file writes MUST stay inside WORK_DIR. Never \`cd\` out, never edit files in the parent repo checkout."
   echo "- Forbidden: \`git push\`, \`git remote\` operations, modifying or switching to any branch other than CF_BRANCH."
-  echo "- Per-contract commit to CF_BRANCH (see Methodology). Use the contract name in the commit subject."
+  echo "- Per-contract commit to CF_BRANCH (see Methodology). Write the subject in this repo's own commit convention — never put the contract name, shard id, or any other cf vocabulary in it."
   echo "- If a referenced file is missing, consult the contract's touches_files list. Do NOT invent locations under other paths."
   echo "- You will be measured against the contracts in this brief ONLY. Do not implement anything outside touches_files of these contracts."
   echo
