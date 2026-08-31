@@ -23,7 +23,8 @@
 #   7. gate 1 report         head -20 contains ## Summary && ## Completed
 #   8. survivors set         contracts this shard both declared and reported done
 #   9. gate 3 test execute   cf-pi-test.sh; one in-shard re-dispatch on fail
-#  10. actual ⊆ declared     git diff name-only ⊆ shard's declared files
+#  10. actual ⊆ declared     files this shard's own commits touched (prerequisite
+#                            checkpoints excluded) ⊆ shard's declared files
 #  11. capture diff          git diff $BASE_HEAD > $DIFF_FILE
 #  12. write OUTCOME_FILE    structured paths-only result main reads back
 
@@ -222,6 +223,11 @@ load_cf_flow_env "$FLOW_SESSION"
 # rule should never dispatch before prerequisites PASS; a missing checkpoint
 # here is therefore an infra FAIL, not a judgement call.
 PREREQ_MANIFEST="$SHARD_SESSION/prereq-merged"
+# Step 10 subtracts these refs from the shard's own work. Truncated
+# unconditionally so a replan that drops depends_on cannot leave last round's
+# refs behind and silently exempt files this shard now owns.
+PREREQ_REFS="$SHARD_SESSION/prereq-refs"
+: > "$PREREQ_REFS"
 prereq_deps=$(jq -r --arg sid "$SHARD_ID" '.groups[$sid].depends_on // [] | .[]' "$SHARDS_FILE" 2>/dev/null || true)
 if [ -n "$prereq_deps" ] && [ -n "${REPO_ROOT:-}" ]; then
   : > "$PREREQ_MANIFEST.tmp"
@@ -243,6 +249,7 @@ if [ -n "$prereq_deps" ] && [ -n "${REPO_ROOT:-}" ]; then
         exit 1
       fi
     fi
+    printf 'refs/tags/%s\n' "$ref" >> "$PREREQ_REFS"
     dep_contracts=$(jq -r --arg d "$dep" '.groups[$d].contracts // [] | join(", ")' "$SHARDS_FILE" 2>/dev/null || true)
     printf '%s\t%s\n' "$dep" "$dep_contracts" >> "$PREREQ_MANIFEST.tmp"
   done
@@ -487,7 +494,19 @@ say "gate 3 ok"
 # -------- 10. actual ⊆ declared file scope -----------------------------
 
 declared_files=$(jq -r --arg sid "$SHARD_ID" '.groups[$sid].files[]' "$SHARDS_FILE" | sort -u)
-actual_files=$(git -C "$WORK" diff --name-only "$BASE_HEAD"...HEAD 2>/dev/null | sort -u)
+
+# Step 1b merged each prerequisite's checkpoint into this worktree, so anything
+# reachable from those tags is another shard's work; charging it here fails
+# every dependent shard on files it never touched. `--not` excludes exactly the
+# refs 1b validated (an empty set is a valid no-op, so no-prereq shards take the
+# same path). Merge commits contribute no paths under plain `git log`, so 1b's
+# own merge stays invisible.
+# Commit union, not net diff, on purpose: the gate asks whether the worker
+# touched an undeclared file, not what survived. A file created and deleted
+# again still collided with whatever shard actually owns it.
+# shellcheck disable=SC2046,SC2086
+actual_files=$(git -C "$WORK" log --name-only --pretty=format: "$BASE_HEAD..HEAD" \
+                 --not $(cat "$PREREQ_REFS" 2>/dev/null) 2>/dev/null | sed '/^$/d' | sort -u)
 
 undeclared=""
 if [ -n "$actual_files" ]; then
