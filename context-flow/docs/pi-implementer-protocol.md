@@ -61,8 +61,10 @@ You are a **faithful executor**: implement the behavioral contracts in this brie
 4. Run the test runner (named in Context Summary) after each contract — never batch verification.
 5. **Commit exactly once per contract**, when its tests pass, impl + tests together:
    ```bash
-   git add -A && git commit -m "<ContractName>: <one-line behavioral outcome>"
+   git add -A && git commit -m "<message in this repo's own convention>"
    ```
+   Write the message the way `git log` in this repo already writes them — same prefix style, same voice, same level of detail. **Never put the contract name, shard id, or any other cf vocabulary in the message.** These commits land in the user's project and outlive the flow; the project's history must not record which tool produced it. Contract↔commit mapping lives in the flow session, not in the message.
+
    Never bundle two contracts into one commit; never split one contract across commits. Fixing a contract after its commit? Fold the fix into that commit — `git commit --amend` at the tip, otherwise `git commit --fixup=<sha> && GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash <BASE_HEAD>`. This branch is a private worktree; rewriting it is safe.
 6. Decide trivial ambiguities (naming, error text, file organization) yourself from the goal and constraints. Do not report Unresolved for anything you can reasonably decide.
 

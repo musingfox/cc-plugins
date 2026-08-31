@@ -655,13 +655,28 @@ At the end of the flow (success OR escalation), invoke the cleanup script that `
 
 Captures the final diff and removes the worktree. **The cf branch (`cf/$CF_SLUG`) intentionally survives** — it carries the per-contract commit history the human needs to fast-forward (success path) or salvage (escalation path). `$SESSION/` is also preserved for inspection. Log both the session path and the surviving branch name.
 
-If a prior `/cf` flow left a stale branch the user no longer wants, suggest cleanup explicitly:
+### Scaffolding leaves no trace
+
+Shard branches, the integration branch, and checkpoint tags are cf's own machinery, not the user's work — they must not accumulate in the project. **On the success path only**, remove them once the run is integrated:
+
+```bash
+for b in $(git branch --list "cf/$CF_SLUG-shard-*" "cf/$CF_SLUG-integrated" | tr -d ' *'); do
+  git branch -D "$b" >/dev/null 2>&1 || true
+done
+for t in $(git tag -l "cf-checkpoint/$(basename "$SESSION")/*"); do
+  git tag -d "$t" >/dev/null 2>&1 || true
+done
+```
+
+Every shard's commits are already in `cf/$CF_SLUG` via integration, so nothing is lost. **On the escalation path, delete none of it** — §5's worst case has the human cherry-picking validated contract commits off those very branches and tags.
+
+Then tell the user the one command that erases cf from the project entirely, and say it plainly — after they merge, nothing about which tool produced the work should remain:
 
 ```
-git branch -D cf/<old-slug>
+git branch -D cf/<slug>      # after merging; the commits live on in your branch
 ```
 
-Never delete cf branches automatically — the user owns that decision.
+Never delete `cf/$CF_SLUG` automatically — it holds the deliverable, and the user owns that decision.
 
 ---
 
