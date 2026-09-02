@@ -104,7 +104,10 @@ fallback triggers are any of:
 
 - `STATUS=FAIL` returned by the worker (the builder's report carries the
   STATUS=FAIL line with cause),
-- **pi token** exhausted (auth quota hit; the worker can't run),
+- **pi token** exhausted — the terminal line carries `QUOTA`. `pi-poll.sh`
+  kills the worker on the first quota error and `watch` aborts every
+  sibling still in flight, so no further pi spend happens; the builder
+  rolls the aborted worktrees back to clean before reporting,
 - **worker crash** (the pi process died before producing a result),
 - any other **offload fail** the builder reports.
 

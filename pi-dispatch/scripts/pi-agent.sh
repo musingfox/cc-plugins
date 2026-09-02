@@ -129,14 +129,38 @@ watch)
         [ -d "$dir" ] || continue
         line="$("$SCRIPT_DIR/pi-poll.sh" "$dir")"
         case "$line" in RUNNING*) ACTIVE=1 ;; esac
-        # Normalize volatile counters (elapsed/stale seconds) so a still-running
-        # turn doesn't re-emit every sweep; emit only on meaningful change.
-        norm="$(printf '%s' "$line" | sed -E 's/[0-9]+s/Ns/g')"
+        # Normalize volatile counters (elapsed/stale seconds, stream bytes) so a
+        # still-running turn doesn't re-emit every sweep; emit only on meaningful change.
+        norm="$(printf '%s' "$line" | sed -E 's/[0-9]+s/Ns/g; s/[0-9]+B/NB/g; s/ +/ /g')"
         if [ "$norm" != "$(cat "$STATE/$name" 2>/dev/null || true)" ]; then
           printf '%s\n' "$norm" > "$STATE/$name"
           echo "$name: $line"
+          case "$line" in *QUOTA*) QUOTA_SEEN=1 ;; esac
         fi
       done
+      # Quota abort: one worker hit the provider wall, so every sibling still in
+      # flight is about to pay for the same wall. Kill them now and stamp a
+      # replayable terminal verdict; the caller sees one QUOTA line per worker
+      # and falls back to a Claude self-do builder for the lot.
+      # ponytail: assumes siblings share the provider/quota (true for one
+      # settings.json default); compare RUNDIR/routing if mixed routing appears.
+      if [ "${QUOTA_SEEN:-0}" = 1 ]; then
+        for link in "$REG"/*; do
+          [ -L "$link" ] || continue
+          name="$(basename "$link")"; dir="$(readlink "$link")"
+          [ -d "$dir" ] || continue
+          case "$("$SCRIPT_DIR/pi-poll.sh" "$dir")" in RUNNING*)
+            "$SCRIPT_DIR/pi-stop.sh" "$dir" >/dev/null 2>&1
+            line="STATUS=FAIL OUTPUT=$dir/result.md QUOTA sibling-abort"
+            printf '%s\n' "$line" > "$dir/status"
+            printf '%s\t%s\t%s\t%s\n' "$(date +%Y-%m-%dT%H:%M:%S%z)" "$(basename "$(dirname "$dir")")" "$line" "$dir" \
+              >> "${PI_RUNS_DIR:-$HOME/.cache/pi-runs}/index.log" 2>/dev/null || true
+            printf '%s\n' "$line" > "$STATE/$name"
+            echo "$name: $line" ;;
+          esac
+        done
+        ACTIVE=0
+      fi
     fi
     [ "$ACTIVE" = 1 ] || { echo "--- no agents in flight ---"; exit 0; }
     sleep "$INTERVAL"

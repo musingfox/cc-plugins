@@ -48,6 +48,11 @@
 #   empty result                 STATUS=FAIL  empty    (dead-branch whitelist)
 #   no agent_end + rc==0         STATUS=FAIL  died-mid-stream
 #   no agent_end + no-rc         STATUS=FAIL  no-rc
+#   provider quota exhausted     QUOTA        STATUS=FAIL  (either branch; ALIVE kills on sight)
+#
+# Terminal lines carry " model=<provider/model> cost=$<sum over all turns> turns=<n>"
+# when the stream has usage, and back-fill a blank RUNDIR/routing with the model
+# actually used so a resume replays it.
 #
 # On terminal OK, pi-poll.sh distills the assistant text from the agent_end event
 # and writes it as the canonical human-readable result.md, preserving the raw stream
@@ -130,6 +135,44 @@ fail_cause() {
   printf ' cause:%s' "$(printf '%s' "$c" | tr '[:upper:]' '[:lower:]' | tr -d '=\t\n' | head -c 120)"
 }
 
+# QUOTA: any errorMessage in the stream that reads as provider EXHAUSTION (usage
+# limit / credits / billing). Deliberately NOT rate limits or 429: those are
+# transient spikes that parallel siblings cause each other, and treating one as
+# exhaustion would kill the whole batch. Matched on extracted errorMessage VALUES
+# only, so prose that merely mentions "quota" can never trip it. A quota hit is
+# terminal the moment it appears — pi may retry, but every retry is a paid round
+# trip on a wall that will not move — so the ALIVE branch kills on sight.
+QUOTA_RE='usage.?limit|out of credits|insufficient.?(quota|credits|funds)|quota.?(exceeded|exhausted|reached)|billing'
+quota_hit() {
+  [ -f "$OUTPUT_FILE" ] && grep -o '"errorMessage":"[^"]*"' "$OUTPUT_FILE" 2>/dev/null \
+    | cut -d'"' -f4 | grep -qiE "$QUOTA_RE"
+}
+
+# Spend + routing tail for terminal lines: " model=<provider/model> cost=$<sum> turns=<n>"
+# summed over EVERY assistant message_end in the stream (agent_end carries only the
+# last message's usage, which understates a multi-turn run several-fold). Empty when
+# the stream carries no usage. Also back-fills RUNDIR/routing when it was recorded
+# blank (routing came from pi's settings, not env), so a resume replays the model
+# the run actually used instead of whatever the settings say by then.
+usage_tail() {
+  [ -f "$OUTPUT_FILE" ] || return 0
+  local t
+  t="$(jq -rRn '[inputs | fromjson? // empty] as $ev |
+    ($ev | map(select(.type == "message_end" and .message.role == "assistant") | .message)) as $am |
+    ($ev | map(select(.type == "agent_end")) | last | .messages[-1] // {}) as $last |
+    [($last.provider // ""), ($last.model // "")] as [$p, $m] |
+    (if $m != "" then " model=\($p)/\($m)" else "" end)
+    + (if ($am | length) > 0 then " cost=$\($am | map(.usage.cost.total // 0) | add | . * 10000 | round / 10000) turns=\($am | length)" else "" end)' \
+    "$OUTPUT_FILE" 2>/dev/null || true)"
+  case "$t" in *model=*)
+    if [ -f "$RUNDIR/routing" ] && ! grep -q '^MODEL=.' "$RUNDIR/routing"; then
+      local pm="${t#* model=}"; pm="${pm%% *}"
+      printf 'PROVIDER=%s\nMODEL=%s\n' "${pm%%/*}" "${pm#*/}" > "$RUNDIR/routing" 2>/dev/null || true
+    fi ;;
+  esac
+  printf '%s' "$t"
+}
+
 # Idempotent replay: a prior poll already reached a terminal verdict.
 if [ -s "$STATUS_FILE" ]; then
   cat "$STATUS_FILE"
@@ -192,11 +235,12 @@ PI_RC=""
 # agent loop is OVER, so the result is terminal regardless of process liveness.
 judge_agent_end() {
   if [ "$STOP_REASON" = "error" ]; then
-    emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE ERROR terminal=error ${ELAPSED}s$(fail_cause)"
+    local tag="ERROR"; quota_hit && tag="ERROR QUOTA"
+    emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE $tag terminal=error ${ELAPSED}s$(usage_tail)$(fail_cause)"
     exit 0
   fi
   if [ "$STOP_REASON" != "stop" ]; then
-    emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE terminal=${STOP_REASON:-none} not-stop ${ELAPSED}s$(fail_cause)"
+    emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE terminal=${STOP_REASON:-none} not-stop ${ELAPSED}s$(usage_tail)$(fail_cause)"
     exit 0
   fi
   # stopReason == stop: check result text is non-empty. Empty text == the agent
@@ -207,10 +251,12 @@ judge_agent_end() {
   fi
   # Full whitelist satisfied: agent_end + stopReason==stop + non-empty text.
   # Distill: save raw stream as pi.stream.jsonl, write human-readable result.md.
+  # (usage_tail reads the raw stream, so compute it BEFORE result.md is rewritten.)
+  local ut; ut="$(usage_tail)"
   cp "$OUTPUT_FILE" "$STREAM_FILE" 2>/dev/null || true
   printf '%s\n' "$DISTILLED_TEXT" > "$OUTPUT_FILE" 2>/dev/null || true
   SZ=$(wc -c < "$OUTPUT_FILE" 2>/dev/null || echo 0)
-  emit "STATUS=OK OUTPUT=$OUTPUT_FILE ${ELAPSED}s ${SZ}B rc=0 terminal=stop"
+  emit "STATUS=OK OUTPUT=$OUTPUT_FILE ${ELAPSED}s ${SZ}B rc=0 terminal=stop$ut"
   exit 0
 }
 
@@ -222,13 +268,13 @@ if [ "$alive_rc" -ne 0 ]; then
   if [ -n "$PI_RC" ]; then
     # rc != 0 is an abnormal-death backstop: surface immediately, no further checks.
     if [ "$PI_RC" -ne 0 ]; then
-      emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE exit rc=$PI_RC ${ELAPSED}s$(fail_cause)"
+      emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE exit rc=$PI_RC ${ELAPSED}s$(usage_tail)$(fail_cause)"
       exit 0
     fi
     # rc == 0: now check agent_end. Absent agent_end overrides a clean rc —
     # the process died mid-stream without emitting a terminal event.
     if [ -z "$AGENT_END_LINE" ]; then
-      emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE died-mid-stream no-terminal ${ELAPSED}s$(fail_cause)"
+      emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE died-mid-stream no-terminal ${ELAPSED}s$(usage_tail)$(fail_cause)"
       exit 0
     fi
     # agent_end present: judge stopReason via the shared whitelist.
@@ -257,6 +303,13 @@ if [ -n "$AGENT_END_LINE" ]; then
   judge_agent_end
 fi
 
+# ---- ALIVE: provider quota already hit? kill now, don't pay for pi's retries ----
+if quota_hit; then
+  "$SCRIPT_DIR/pi-stop.sh" "$RUNDIR" >/dev/null 2>&1
+  emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE QUOTA killed ${ELAPSED}s$(usage_tail)$(fail_cause)"
+  exit 0
+fi
+
 # ---- ALIVE: liveness guards (wall-clock TIMEOUT, stall STALL) ----
 # On any ALIVE-branch terminal FAIL the pi tree is still running, so we CANCEL it
 # (group-kill via the sibling pi-stop.sh) BEFORE emitting STATUS=FAIL — closing the
@@ -266,7 +319,7 @@ fi
 # double the stall threshold (pi is actively working on a long tool call).
 if [ "$ELAPSED" -gt "$WALL_CLOCK" ]; then
   "$SCRIPT_DIR/pi-stop.sh" "$RUNDIR" >/dev/null 2>&1
-  emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE TIMEOUT ${ELAPSED}s wall=${WALL_CLOCK}s$(fail_cause)"
+  emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE TIMEOUT ${ELAPSED}s wall=${WALL_CLOCK}s$(usage_tail)$(fail_cause)"
   exit 0
 fi
 # Stall: portable mtime of the output file (primary artifact being written).
@@ -285,7 +338,7 @@ fi
 
 if [ "$STALE" -gt "$EFFECTIVE_STALL" ]; then
   "$SCRIPT_DIR/pi-stop.sh" "$RUNDIR" >/dev/null 2>&1
-  emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE STALL ${ELAPSED}s stale=${STALE}s thr=${EFFECTIVE_STALL}s$(fail_cause)"
+  emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE STALL ${ELAPSED}s stale=${STALE}s thr=${EFFECTIVE_STALL}s$(usage_tail)$(fail_cause)"
   exit 0
 fi
 

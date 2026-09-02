@@ -186,6 +186,11 @@ if [ -n "$PRIOR_SESSION_ID" ]; then
   SESSION_DIR="$PRIOR_RUNDIR/sessions"
   PI_ARGS+=(--session "$PRIOR_SESSION_ID")
 fi
+# PI_EXTRA_ARGS: optional extra pi flags, word-split on purpose (e.g. a lean
+# worker: "-nc -ns -np --tools read,bash,edit,write" cuts the per-turn prompt
+# ~40%, at the price of the dispatch AGENTS.md and extension tools).
+# shellcheck disable=SC2206
+[ -n "${PI_EXTRA_ARGS:-}" ] && PI_ARGS+=(${PI_EXTRA_ARGS})
 PI_ARGS+=(--session-dir "$SESSION_DIR" @"$BRIEF_FILE" "$PROMPT")
 
 perl -MPOSIX -e '

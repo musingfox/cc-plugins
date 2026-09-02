@@ -31,9 +31,15 @@ REG="$PI_RUNS_DIR/agents"
 mkdir -p "$TMP/bin"
 cat > "$TMP/bin/pi" <<'EOF'
 #!/usr/bin/env bash
-resumed=no
-for a in "$@"; do [ "$a" = "--session" ] && resumed=yes; done
+resumed=no; brief=""
+for a in "$@"; do [ "$a" = "--session" ] && resumed=yes; case "$a" in @*) brief="${a#@}";; esac; done
 echo '{"type":"session","id":"sess-stub"}'
+# Brief-driven behaviors for the watch quota-abort test.
+if grep -q SLOW_BRIEF "$brief" 2>/dev/null; then sleep 30; fi
+if grep -q QUOTA_BRIEF "$brief" 2>/dev/null; then
+  echo '{"type":"agent_end","messages":[{"stopReason":"error","errorMessage":"Codex error: The usage limit has been reached"}]}'
+  exit 0
+fi
 [ "$resumed" = yes ] && txt="resumed reply" || txt="first reply"
 echo "{\"type\":\"agent_end\",\"messages\":[{\"stopReason\":\"stop\",\"content\":[{\"type\":\"text\",\"text\":\"$txt\"}]}]}"
 EOF
@@ -86,6 +92,19 @@ W="$("$SCRIPTS/pi-agent.sh" watch 1)"; RC=$?
 [ "$RC" = 0 ] && ok "watch exits 0 when idle" || bad "watch exit rc=$RC"
 case "$W" in *"worker-a: STATUS=OK"*) ok "watch emits per-agent state" ;; *) bad "watch per-agent state (got: $W)" ;; esac
 case "$W" in *"no agents in flight"*) ok "watch terminal marker" ;; *) bad "watch terminal marker" ;; esac
+
+# --- watch quota-abort: one worker hits the provider wall -> siblings still in
+#     flight are killed and stamped QUOTA sibling-abort (replayable on poll) ---
+"$SCRIPTS/pi-agent.sh" start slow-w "SLOW_BRIEF" >/dev/null
+"$SCRIPTS/pi-agent.sh" start quota-w "QUOTA_BRIEF" >/dev/null
+sleep 1
+W="$(PI_STALL_THRESHOLD_S=100000 "$SCRIPTS/pi-agent.sh" watch 1)"; RC=$?
+case "$W" in *"quota-w: STATUS=FAIL"*QUOTA*) ok "watch surfaces QUOTA" ;; *) bad "watch surfaces QUOTA (got: $W)" ;; esac
+case "$W" in *"slow-w: STATUS=FAIL"*"QUOTA sibling-abort"*) ok "watch aborts in-flight siblings on quota" ;; *) bad "watch sibling abort (got: $W)" ;; esac
+[ "$RC" = 0 ] && ok "watch exits after quota abort" || bad "watch exit after quota abort rc=$RC"
+L="$("$SCRIPTS/pi-agent.sh" poll slow-w)"
+case "$L" in *"QUOTA sibling-abort"*) ok "sibling verdict replays on poll" ;; *) bad "sibling verdict replay (got: $L)" ;; esac
+"$SCRIPTS/pi-agent.sh" stop slow-w >/dev/null; "$SCRIPTS/pi-agent.sh" stop quota-w >/dev/null
 
 # --- stop: unregisters ---
 "$SCRIPTS/pi-agent.sh" stop worker-a >/dev/null

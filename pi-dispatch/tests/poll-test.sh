@@ -162,6 +162,56 @@ DA="$TMP/c-aborted"; make_run "$DA" "$DEAD" 100 "0" "$ABORTED_STREAM"
 OUT="$(bash "$POLL" "$DA")"
 case "$OUT" in STATUS=FAIL*) ok "(new-aborted) aborted not a clean OK -> $OUT";; *) bad "(new-aborted) expected STATUS=FAIL (not-stop), got: $OUT";; esac
 
+# --- (quota-dead) agent_end error whose errorMessage reads as quota exhaustion
+#     -> STATUS=FAIL tagged QUOTA (the fallback-to-Claude trigger) ---
+QUOTA_STREAM="$SESSION_LINE
+{\"type\":\"agent_end\",\"messages\":[{\"role\":\"assistant\",\"stopReason\":\"error\",\"errorMessage\":\"Codex error: The usage limit has been reached (usage_limit_reached)\"}]}"
+DQ="$TMP/c-quota"; make_run "$DQ" "$DEAD" 100 "0" "$QUOTA_STREAM"
+OUT="$(bash "$POLL" "$DQ")"
+case "$OUT" in STATUS=FAIL*QUOTA*) ok "(quota-dead) quota error tagged -> $OUT";; *) bad "(quota-dead) expected STATUS=FAIL ... QUOTA, got: $OUT";; esac
+
+# --- (quota-429) a transient rate limit is NOT exhaustion: plain ERROR, no QUOTA
+#     (siblings on one provider 429 each other; killing the batch for that is wrong) ---
+Q429_STREAM="$SESSION_LINE
+{\"type\":\"agent_end\",\"messages\":[{\"role\":\"assistant\",\"stopReason\":\"error\",\"errorMessage\":\"429 Too Many Requests, rate limit hit, retry after 3s\"}]}"
+DQ429="$TMP/c-quota-429"; make_run "$DQ429" "$DEAD" 100 "0" "$Q429_STREAM"
+OUT="$(bash "$POLL" "$DQ429")"
+case "$OUT" in STATUS=FAIL*QUOTA*) bad "(quota-429) transient 429 wrongly tagged QUOTA: $OUT";; STATUS=FAIL*ERROR*) ok "(quota-429) transient 429 is plain ERROR";; *) bad "(quota-429) expected STATUS=FAIL ERROR, got: $OUT";; esac
+
+# --- (quota-prose) the word "quota" in RESULT TEXT (not an errorMessage) must NOT tag ---
+QPROSE_STREAM="$SESSION_LINE
+{\"type\":\"agent_end\",\"messages\":[{\"role\":\"assistant\",\"stopReason\":\"stop\",\"text\":\"Set the quota to 429 and rate limit the API\"}]}"
+DQP="$TMP/c-quota-prose"; make_run "$DQP" "$DEAD" 100 "0" "$QPROSE_STREAM"
+OUT="$(bash "$POLL" "$DQP")"
+case "$OUT" in STATUS=OK*) ok "(quota-prose) prose mention is not a quota hit";; *) bad "(quota-prose) expected STATUS=OK, got: $OUT";; esac
+
+# --- (quota-alive) ALIVE wrapper, quota errorMessage already in the stream, no
+#     agent_end yet -> killed on sight, STATUS=FAIL QUOTA (don't pay for retries) ---
+QALIVE_STREAM="$SESSION_LINE
+{\"type\":\"message_end\",\"message\":{\"role\":\"assistant\",\"stopReason\":\"error\",\"errorMessage\":\"403 You have run out of credits\"}}"
+DQA="$TMP/c-quota-alive"
+sleep 60 & QPID=$!
+disown 2>/dev/null || true
+make_run "$DQA" "$QPID" 5 "" "$QALIVE_STREAM"
+OUT="$(PI_WALL_CLOCK_S=100000 PI_STALL_THRESHOLD_S=100000 bash "$POLL" "$DQA")"
+case "$OUT" in STATUS=FAIL*QUOTA*killed*) ok "(quota-alive) killed on sight -> $OUT";; *) bad "(quota-alive) expected STATUS=FAIL ... QUOTA killed, got: $OUT";; esac
+kill "$QPID" 2>/dev/null || true
+
+# --- (cost) OK line sums usage over EVERY assistant message_end (not just the last
+#     one agent_end carries), names the model, and back-fills a blank routing ---
+COST_STREAM="$SESSION_LINE
+{\"type\":\"message_end\",\"message\":{\"role\":\"assistant\",\"usage\":{\"cost\":{\"total\":0.01}}}}
+{\"type\":\"message_end\",\"message\":{\"role\":\"user\",\"usage\":{\"cost\":{\"total\":9}}}}
+{\"type\":\"message_end\",\"message\":{\"role\":\"assistant\",\"usage\":{\"cost\":{\"total\":0.02}}}}
+{\"type\":\"agent_end\",\"messages\":[{\"role\":\"assistant\",\"provider\":\"cursor\",\"model\":\"cursor-grok-4.6\",\"stopReason\":\"stop\",\"text\":\"done\",\"usage\":{\"cost\":{\"total\":0.02}}}]}"
+DC="$TMP/c-cost"; make_run "$DC" "$DEAD" 100 "0" "$COST_STREAM"
+printf 'PROVIDER=\nMODEL=\n' > "$DC/routing"
+OUT="$(bash "$POLL" "$DC")"
+case "$OUT" in STATUS=OK*"model=cursor/cursor-grok-4.6 cost=\$0.03 turns=2"*) ok "(cost) summed spend + model on OK line -> $OUT";; *) bad "(cost) expected model=cursor/cursor-grok-4.6 cost=\$0.03 turns=2, got: $OUT";; esac
+grep -qx 'MODEL=cursor-grok-4.6' "$DC/routing" && grep -qx 'PROVIDER=cursor' "$DC/routing" \
+  && ok "(cost-routing) blank routing back-filled with observed model" \
+  || bad "(cost-routing) routing not back-filled: $(tr '\n' ' ' < "$DC/routing")"
+
 # --- (5) alive pid within thresholds -> RUNNING ---
 D6="$TMP/c6"
 sleep 60 & ALIVE=$!

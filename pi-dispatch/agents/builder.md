@@ -43,6 +43,13 @@ Protocol:
    the brief says to). SendMessage main: one line per worker — NAME + what it's doing.
 3. Run `pi-agent.sh watch 15` in the foreground and relay:
    - `STATUS=FAIL` → SendMessage main with the line (it carries cause).
+   - any line containing `QUOTA` → the provider wall is hit; watch has
+     already stopped the siblings. Do NOT restart or `send` any worker.
+     Roll back each aborted worker's worktree
+     (`git -C <WT> checkout -- . && git -C <WT> clean -fd`; plus
+     `git -C <WT> reset --hard <base_ref>` if it committed), then
+     SendMessage main `QUOTA <names> rolled back` and end your turn — main
+     re-dispatches the task to a self-do builder.
    - If the Bash call times out (600s cap), run watch again.
 4. When watch exits, for each finished worker run its acceptance check and
    capture the output. You NEVER issue the verdict yourself — hand the

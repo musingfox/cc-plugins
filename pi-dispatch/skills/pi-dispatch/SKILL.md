@@ -89,6 +89,48 @@ harness tool can reach them).
    its main loop, and runs each worker's acceptance check when it settles.
 3. Terminal verdicts persist in the RUNDIR and replay on re-poll; raw stream
    is kept as `pi.stream.jsonl`, distilled final text as `result.md`.
+4. `stop NAME` once a worker's result is consumed. The registry never
+   self-prunes, and every `watch` re-prints each registered terminal agent
+   on its first sweep.
+
+## Waiting without burning tokens
+
+Never poll from a Bash loop in the main thread — every poll is a tool call.
+Start the workers, then arm ONE blocking watch in the background:
+
+```
+Bash(command: "pi-agent.sh watch 15", run_in_background: true)
+```
+
+The command exits when nothing is in flight; the completion notification
+carries one line per state change (verified: main is woken, no polling). A
+sub-agent cannot be woken this way — inside a sub-agent run `watch` in the
+foreground, or use `pi-run.sh` for a single worker.
+
+Every terminal line ends with `model=<provider/model> cost=$<sum> turns=<n>`
+summed over the whole run. Read it: a small task that shows 4 turns at ~20K
+input each is paying the full prompt every tool call (no cache on some
+providers). Trim with `PI_EXTRA_ARGS="-nc -ns -np --tools read,bash,edit,write"`
+(measured 21.4K → 12.8K input/turn) — at the price of the dispatch-dir
+AGENTS.md and extension tools, so it is opt-in.
+
+## Quota exhaustion → abort early, roll back, fall back to Claude
+
+A worker that hits the provider wall is tagged `QUOTA` on its terminal line
+(`pi-poll.sh` kills it on the first quota `errorMessage`, before pi's retries
+cost anything). `watch` then stops every sibling still RUNNING and stamps
+them `STATUS=FAIL … QUOTA sibling-abort` — they share the wall. On any
+`QUOTA` line:
+
+1. Do not re-dispatch to pi. The wall does not move within a session.
+2. Roll back each aborted worker's half-done edits in its worktree:
+   `git -C <WT> checkout -- . && git -C <WT> clean -fd`, and if the worker
+   was allowed to commit, `git -C <WT> reset --hard <base_ref>` (the ref
+   `pi-worktree.sh create` was given). A worker's partial state is not
+   reviewable; the fallback starts clean.
+3. Re-dispatch the SAME brief, minus this usage section, to a Claude
+   builder in self-do mode (`docs/main-orchestration.md` §6) on the same
+   worktree. One shot: if that fails too, the task is failed.
 
 ## Routing
 
@@ -99,12 +141,16 @@ Routing is `PI_PROVIDER` + `PI_MODEL` in the environment, passed to pi as one
 PI_PROVIDER=openai-codex PI_MODEL=gpt-5.4-mini pi-agent.sh start NAME BRIEF
 ```
 
-Give none and pi resolves from its own `~/.pi/agent/settings.json`.
+Give none and pi resolves from its own settings — `$PI_CODING_AGENT_DIR/settings.json`
+when that variable is exported (a dedicated worker profile), else
+`~/.pi/agent/settings.json`. Check which one binds before assuming a model.
 
 Routing is recorded per run and replayed on resume, so `send` keeps the worker
-on the model it started with. Pick the reviewer's model to be at least as
-capable as the builder's — there is no ranked list to defer to, so that
-judgement is the dispatcher's.
+on the model it started with; when nothing was set, the first terminal poll
+back-fills the record with the model actually observed in the stream.
+
+Pick the reviewer's model to be at least as capable as the builder's — there
+is no ranked list to defer to, so that judgement is the dispatcher's.
 
 ## Prerequisites
 
