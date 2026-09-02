@@ -4,7 +4,7 @@
 #
 #   native                      pi-agent.sh
 #   ------------------------    -----------------------------------------
-#   Agent(name:.., prompt:..)   start NAME [--config PATH] BRIEF
+#   Agent(name:.., prompt:..)   start NAME BRIEF
 #   SendMessage(to: name)       send NAME TEXT_OR_FILE
 #   TaskOutput / poll           poll NAME
 #   agent view peek             peek NAME
@@ -13,7 +13,7 @@
 #   background-完成通知 glue     watch [INTERVAL]   (feed to the Monitor tool)
 #
 # This is the FALLBACK control plane. Inside a herdr pane (HERDR_ENV=1) drive
-# the same omp workers with `herdr agent` instead — it gives a live pane, a
+# the same pi workers with `herdr agent` instead — it gives a live pane, a
 # native blocked state, and immediate death detection. These verbs are what
 # works everywhere else (cron, CI, the web and IDE clients).
 #
@@ -34,7 +34,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REG="${PI_RUNS_DIR:-$HOME/.cache/pi-runs}/agents"
 
 usage() {
-  echo "usage: pi-agent.sh start NAME [--config PATH] BRIEF" >&2
+  echo "usage: pi-agent.sh start NAME BRIEF" >&2
   echo "       pi-agent.sh send NAME TEXT_OR_FILE" >&2
   echo "       pi-agent.sh poll|peek|stop NAME" >&2
   echo "       pi-agent.sh ls" >&2
@@ -61,16 +61,9 @@ start)
   NAME="${1:?start needs NAME}"; shift
   [[ "$NAME" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*$ ]] || { echo "pi-agent: NAME must be [A-Za-z0-9_-]" >&2; exit 2; }
   [ -e "$REG/$NAME" ] && { echo "pi-agent: '$NAME' already exists (stop it or pick another name)" >&2; exit 1; }
-  CONFIG=""
-  while [ $# -gt 0 ]; do
-    case "$1" in
-      --config) CONFIG="${2:?--config needs a PATH}"; shift 2 ;;
-      *) break ;;
-    esac
-  done
   BRIEF="${1:-}"
   [ -n "$BRIEF" ] || { echo "pi-agent: start needs a BRIEF" >&2; exit 2; }
-  OUT="$("$SCRIPT_DIR/pi-dispatch.sh" ${CONFIG:+--config "$CONFIG"} "$BRIEF")"
+  OUT="$("$SCRIPT_DIR/pi-dispatch.sh" "$BRIEF")"
   RUNDIR="$(printf '%s\n' "$OUT" | sed -n 's/^RUNDIR=//p')"
   register "$NAME" "$RUNDIR"
   printf '%s\n' "$OUT"

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # routing-test.sh — committed behavior test for pi-dispatch.sh routing: the
-# --config/PI_CONFIG_FILES overlay, the PI_PROVIDER/PI_MODEL override, what actually
-# reaches the binary's argv, and routing replay across a resume.
+# PI_PROVIDER/PI_MODEL env, what actually reaches the binary's argv, and routing
+# replay across a resume.
 #
-# Pure-local, NO omp, NO network: a stub binary records its argv.
+# Pure-local, NO pi, NO network: a stub binary records its argv.
 #
 # Returns 0 iff every assertion holds.
 
@@ -19,39 +19,25 @@ bad() { FAIL=$((FAIL+1)); echo "FAIL - $1 (got: $2)"; }
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-# The caller's shell may already export omp's own PI_CONFIG_FILES (this repo's
-# author has one per shell). Start from a clean slate so the assertions below
-# measure the script, not the ambient environment.
-unset PI_CONFIG_FILES PI_PROVIDER PI_MODEL PI_PROFILE
+# Start from a clean slate so the assertions measure the script, not the
+# ambient environment.
+unset PI_PROVIDER PI_MODEL PI_CONFIG_FILES
 
 # --- resolution seam (no launch) ---------------------------------------------
 export PI_RESOLVE_ROUTING_ONLY=1
 
-got="$(bash "$DISPATCH" --config /tmp/codex.yml 2>/dev/null)"
-[ "$got" = "CONFIG=/tmp/codex.yml PROVIDER= MODEL=" ] \
-  && ok "--config flag resolves" || bad "--config flag" "$got"
-
-got="$(PI_CONFIG_FILES=/tmp/grok.yml bash "$DISPATCH" dummy 2>/dev/null)"
-[ "$got" = "CONFIG=/tmp/grok.yml PROVIDER= MODEL=" ] \
-  && ok "PI_CONFIG_FILES env resolves" || bad "PI_CONFIG_FILES env" "$got"
-
-got="$(PI_CONFIG_FILES=/tmp/env.yml bash "$DISPATCH" --config /tmp/flag.yml 2>/dev/null)"
-[ "$got" = "CONFIG=/tmp/flag.yml PROVIDER= MODEL=" ] \
-  && ok "--config flag beats PI_CONFIG_FILES env" || bad "flag vs env" "$got"
-
 got="$(PI_PROVIDER=openai-codex PI_MODEL=gpt-5.5 bash "$DISPATCH" dummy 2>/dev/null)"
-[ "$got" = "CONFIG= PROVIDER=openai-codex MODEL=gpt-5.5" ] \
+[ "$got" = "PROVIDER=openai-codex MODEL=gpt-5.5" ] \
   && ok "PI_PROVIDER/PI_MODEL resolve" || bad "provider/model env" "$got"
 
 got="$(bash "$DISPATCH" dummy 2>/dev/null)"
-[ "$got" = "CONFIG= PROVIDER= MODEL=" ] \
-  && ok "nothing set resolves to empty (omp's own config decides)" || bad "empty routing" "$got"
+[ "$got" = "PROVIDER= MODEL=" ] \
+  && ok "nothing set resolves to empty (pi's own settings decide)" || bad "empty routing" "$got"
 
-> "$TMP/warn"
-got="$(PI_PROFILE=stale bash "$DISPATCH" dummy 2>"$TMP/warn" >/dev/null; cat "$TMP/warn")"
+got="$(PI_CONFIG_FILES=/tmp/stale.yml bash "$DISPATCH" dummy 2>&1 >/dev/null)"
 case "$got" in
-  *"PI_PROFILE"*"omp's isolated auth profile"*) ok "leftover PI_PROFILE warns (migration guard)" ;;
-  *) bad "PI_PROFILE migration warning" "$got" ;;
+  *"PI_CONFIG_FILES is ignored"*) ok "leftover PI_CONFIG_FILES warns (omp migration guard)" ;;
+  *) bad "PI_CONFIG_FILES migration warning" "$got" ;;
 esac
 
 unset PI_RESOLVE_ROUTING_ONLY
@@ -60,14 +46,14 @@ unset PI_RESOLVE_ROUTING_ONLY
 # The stub records its argv, then emits a session line + agent_end so pi-poll
 # can reach a terminal state (needed for the resume leg below).
 export ARGVLOG="$TMP/argv"
-cat > "$TMP/omp" <<'EOF'
+cat > "$TMP/pi" <<'EOF'
 #!/usr/bin/env bash
 echo "$*" >> "$ARGVLOG"
 echo '{"type":"session","id":"sess-stub"}'
 echo '{"type":"agent_end","messages":[{"stopReason":"stop","content":[{"type":"text","text":"done"}]}]}'
 EOF
-chmod +x "$TMP/omp"
-export PI_BIN="$TMP/omp" PI_RUNS_DIR="$TMP/runs"
+chmod +x "$TMP/pi"
+export PI_BIN="$TMP/pi" PI_RUNS_DIR="$TMP/runs"
 
 launch_and_wait() { # ARGS... -> echoes RUNDIR
   local out rundir
@@ -78,56 +64,48 @@ launch_and_wait() { # ARGS... -> echoes RUNDIR
 }
 
 : > "$ARGVLOG"
-R1="$(launch_and_wait --config "$TMP/codex.yml" "brief one")"
+R0="$(launch_and_wait "brief zero")"
 got="$(cat "$ARGVLOG")"
 case "$got" in
-  *"--config $TMP/codex.yml"*) ok "--config reaches the binary" ;;
-  *) bad "--config in argv" "$got" ;;
+  *--model*) bad "no --model when nothing is set" "$got" ;;
+  *) ok "no --model flag when nothing is set" ;;
 esac
 case "$got" in
-  *--model*) bad "no --model when only --config given" "$got" ;;
-  *) ok "no --model flag when only --config is given" ;;
+  *--session\ *|*--resume*) bad "fresh dispatch must not pass a session id" "$got" ;;
+  *) ok "fresh dispatch passes no session id" ;;
+esac
+
+: > "$ARGVLOG"
+R1="$(PI_PROVIDER=openai-codex PI_MODEL=gpt-5.5 launch_and_wait "brief one")"
+got="$(cat "$ARGVLOG")"
+case "$got" in
+  *"--model openai-codex/gpt-5.5"*) ok "PROVIDER/MODEL reaches the binary as --model provider/model" ;;
+  *) bad "--model in argv" "$got" ;;
 esac
 
 # --- routing is recorded ------------------------------------------------------
 got="$(cat "$R1/routing" 2>/dev/null | tr '\n' ' ')"
-[ "$got" = "CONFIG=$TMP/codex.yml PROVIDER= MODEL= " ] \
+[ "$got" = "PROVIDER=openai-codex MODEL=gpt-5.5 " ] \
   && ok "routing recorded in RUNDIR" || bad "routing file" "$got"
 
-# --- resume with no routing of its own inherits the prior run's ---------------
+# --- resume inherits the prior run's routing; the env must NOT hijack it ------
 # This is the pin for the silent model switch: a follow-up turn used to fall back
 # to the default, so a resumed session changed model mid-conversation.
 : > "$ARGVLOG"
-launch_and_wait "follow-up" "$PI_RUNS_DIR/pi-dispatch" "$R1" >/dev/null
+PI_PROVIDER=xai-auth PI_MODEL=grok-build \
+  launch_and_wait "follow-up" "$PI_RUNS_DIR/pi-dispatch" "$R1" >/dev/null
 got="$(cat "$ARGVLOG")"
 case "$got" in
-  *"--config $TMP/codex.yml"*) ok "resume inherits the prior run's routing" ;;
+  *"--model openai-codex/gpt-5.5"*) ok "resume inherits the prior run's routing over the env" ;;
   *) bad "resume routing inherit" "$got" ;;
 esac
 case "$got" in
-  *--resume*) ok "resume passes --resume" ;;
+  *"--session sess-stub"*) ok "resume passes --session <id> (not --resume, pi's interactive picker)" ;;
   *) bad "resume flag" "$got" ;;
 esac
-
-# --- ambient env must NOT hijack a resume ------------------------------------
-# PI_CONFIG_FILES is omp's own variable, so a shell exporting grok would otherwise
-# pull a session started on codex onto a different model mid-conversation.
-: > "$ARGVLOG"
-PI_CONFIG_FILES="$TMP/ambient.yml" \
-  launch_and_wait "follow-up ambient" "$PI_RUNS_DIR/pi-dispatch" "$R1" >/dev/null
-got="$(cat "$ARGVLOG")"
 case "$got" in
-  *"--config $TMP/codex.yml"*) ok "ambient PI_CONFIG_FILES does not hijack a resume" ;;
-  *) bad "ambient env hijacked the resume" "$got" ;;
-esac
-
-# --- explicit routing on the resume still wins -------------------------------
-: > "$ARGVLOG"
-launch_and_wait --config "$TMP/other.yml" "follow-up 2" "$PI_RUNS_DIR/pi-dispatch" "$R1" >/dev/null
-got="$(cat "$ARGVLOG")"
-case "$got" in
-  *"--config $TMP/other.yml"*) ok "explicit routing overrides the inherit" ;;
-  *) bad "explicit routing on resume" "$got" ;;
+  *"--session-dir $R1/sessions"*) ok "resume points --session-dir at the PRIOR run's sessions" ;;
+  *) bad "resume session-dir" "$got" ;;
 esac
 
 echo "---"

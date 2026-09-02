@@ -224,14 +224,14 @@ Send Discord webhook notifications from Claude Code:
 
 ### pi-dispatch (Experimental)
 
-Offload heavy work to [omp (oh-my-pi)](https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent) cheap/fast models so Claude only writes briefs and reviews summaries — saving tokens:
+Offload heavy work to [pi](https://github.com/earendil-works/pi) cheap/fast models so Claude only writes briefs and reviews summaries — saving tokens:
 - **`agents/builder.md`**: brief-driven executor — when the brief embeds `pi-agent.sh` offload usage, builder operates it as a pure operator (`pi-agent.sh start` per task, `pi-agent.sh watch` as the main loop, run acceptance check, distill report); when the brief carries no offload usage, builder does the work itself. Builder does NOT choose the mode — the brief does.
 - **`agents/reviewer.md`**: independent contract judge — given ONLY the contract, the deliverable paths, and the check output, returns an evidence-backed PASS/FAIL per clause; never sees the builder transcript, never runs offload verbs. Main dispatches builder and reviewer directly (no intermediary coordinator).
 - **`pi-agent.sh`**: name-addressed unified verbs (`start/send/poll/peek/ls/stop/watch`) mirroring native sub-agent UX; `send` resumes a finished worker's session, `watch` feeds the Monitor tool for push notifications
-- **`pi-dispatch.sh`**: launches one brief on a cheap/fast omp model in the background (routed by an omp config overlay via `--config` / `PI_CONFIG_FILES`, or `PI_MODEL` to pin one model), returns a run handle instantly — dispatch N briefs for parallel fan-out
+- **`pi-dispatch.sh`**: launches one brief on a cheap/fast pi model in the background (routed by `PI_PROVIDER`/`PI_MODEL`), returns a run handle instantly — dispatch N briefs for parallel fan-out
 - **`pi-poll.sh` / `pi-stop.sh`**: idempotent one-line status polls and group-kill cancel; `pi-worktree.sh` isolates parallel code-writing tasks in git worktrees
-- **Claude reviews, workers write**: main thread issues briefs, collects diffs/summaries, and does the final review — all reading/reasoning/generation happens inside omp, off Claude's context
-- **Prerequisite**: `omp` CLI installed and authenticated (`PI_BIN` selects another pi-compatible binary)
+- **Claude reviews, workers write**: main thread issues briefs, collects diffs/summaries, and does the final review — all reading/reasoning/generation happens inside pi, off Claude's context
+- **Prerequisite**: `pi` CLI installed and authenticated (`PI_BIN` selects another pi-compatible binary)
 
 **Installation:**
 ```bash

@@ -4,7 +4,7 @@ This document is the canonical description of how Claude Code's **main** thread
 orchestrates work through pi-dispatch. Main is the orchestrator and the verdict
 owner; it never executes the brief itself. The loop has six steps. Two agents
 do the hands-on work — **builder** (executes the brief, either by offloading
-to an omp worker or by doing it itself) and **reviewer** (independent contract
+to a pi worker or by doing it itself) and **reviewer** (independent contract
 judge). Main dispatches both and owns the final verdict.
 
 ## Scope
@@ -18,7 +18,7 @@ loop below is the one-shot path.
 
 ## 1. Offload decision
 
-Main decides, per task, whether to **offload** the execution to an external omp
+Main decides, per task, whether to **offload** the execution to an external pi
 worker (cheap, fast, disposable) or to **self-do** it on a Claude sonnet
 builder. The decision belongs to main, not to the builder.
 
@@ -104,8 +104,8 @@ fallback triggers are any of:
 
 - `STATUS=FAIL` returned by the worker (the builder's report carries the
   STATUS=FAIL line with cause),
-- **omp token** exhausted (auth quota hit; the worker can't run),
-- **worker crash** (the omp process died before producing a result),
+- **pi token** exhausted (auth quota hit; the worker can't run),
+- **worker crash** (the pi process died before producing a result),
 - any other **offload fail** the builder reports.
 
 On any of those, main stops retrying the offload path and re-dispatches the

@@ -26,19 +26,19 @@ trap 'rm -rf "$TMP"' EXIT
 export PI_RUNS_DIR="$TMP/runs"
 REG="$PI_RUNS_DIR/agents"
 
-# Stub omp: emits a session line + a clean agent_end. On --resume the reply
+# Stub pi: emits a session line + a clean agent_end. On --session (resume) the reply
 # text differs, so the send/resume path is distinguishable from a fresh run.
 mkdir -p "$TMP/bin"
-cat > "$TMP/bin/omp" <<'EOF'
+cat > "$TMP/bin/pi" <<'EOF'
 #!/usr/bin/env bash
 resumed=no
-for a in "$@"; do [ "$a" = "--resume" ] && resumed=yes; done
+for a in "$@"; do [ "$a" = "--session" ] && resumed=yes; done
 echo '{"type":"session","id":"sess-stub"}'
 [ "$resumed" = yes ] && txt="resumed reply" || txt="first reply"
 echo "{\"type\":\"agent_end\",\"messages\":[{\"stopReason\":\"stop\",\"content\":[{\"type\":\"text\",\"text\":\"$txt\"}]}]}"
 EOF
-chmod +x "$TMP/bin/omp"
-export PI_BIN="$TMP/bin/omp"
+chmod +x "$TMP/bin/pi"
+export PI_BIN="$TMP/bin/pi"
 
 wait_terminal() { # NAME -> echoes final poll line
   local line
@@ -73,7 +73,7 @@ DIR2="$(readlink "$REG/worker-a")"
 [ "$DIR1" != "$DIR2" ] && ok "send re-points symlink to resume RUNDIR" || bad "send re-points symlink"
 LINE="$(wait_terminal worker-a)"
 case "$LINE" in STATUS=OK*) ok "resumed run reaches STATUS=OK" ;; *) bad "resumed run STATUS=OK (got: $LINE)" ;; esac
-grep -q "resumed reply" "$DIR2/result.md" && ok "resume path hit (--resume seen by stub)" || bad "resume path hit"
+grep -q "resumed reply" "$DIR2/result.md" && ok "resume path hit (--session seen by stub)" || bad "resume path hit"
 
 # --- ls: one line per agent, carrying its status; dangling links pruned ---
 ln -sfn "$TMP/gone" "$REG/worker-b"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # run-test.sh — committed behavior test for pi-run.sh (run-to-terminal + watchdog).
-# Pure-local, stubbed omp, no network.
+# Pure-local, stubbed pi, no network.
 #
 # Pins:
 #   T1  clean run   -> single OUTCOME=OK line carrying OUTPUT/RUNDIR + poll line
@@ -23,8 +23,8 @@ export PI_POLL_INTERVAL_S=1
 
 mkdir -p "$TMP/bin"
 
-# Stub omp: MODE env selects behavior (ok / err / hang).
-cat > "$TMP/bin/omp" <<'EOF'
+# Stub pi: MODE env selects behavior (ok / err / hang).
+cat > "$TMP/bin/pi" <<'EOF'
 #!/usr/bin/env bash
 echo '{"type":"session","id":"sess-stub"}'
 case "${STUB_MODE:-ok}" in
@@ -33,8 +33,8 @@ case "${STUB_MODE:-ok}" in
   hang) sleep 300 ;;
 esac
 EOF
-chmod +x "$TMP/bin/omp"
-export PI_BIN="$TMP/bin/omp"
+chmod +x "$TMP/bin/pi"
+export PI_BIN="$TMP/bin/pi"
 
 # --- T1: clean run ---
 OUT="$(STUB_MODE=ok "$SCRIPTS/pi-run.sh" "say hi" "$TMP/t1")"

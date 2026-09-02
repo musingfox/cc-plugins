@@ -18,7 +18,7 @@
 #   ERROR:<excerpt>    session jsonl contains "errorMessage" (auth/quota/model)
 # Exit code: 0 iff OK (gate-friendly).
 #
-# Env: PI_BIN (default omp), PI_CONFIG_FILES/PI_PROVIDER/PI_MODEL (routing, resolved
+# Env: PI_BIN (default pi), PI_PROVIDER/PI_MODEL (routing, resolved
 #      via pi-dispatch.sh's PI_RESOLVE_ROUTING_ONLY seam).
 #
 # Full-probe side effects in PROBE_DIR: probe-stdout.log, probe-stderr.log,
@@ -27,7 +27,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BIN="${PI_BIN:-omp}"
+BIN="${PI_BIN:-pi}"
 
 BIN_ONLY=0
 if [ "${1:-}" = "--bin-only" ]; then
@@ -49,23 +49,19 @@ mkdir -p "$PROBE_DIR"
 
 # Resolve the exact routing pi-dispatch.sh would use.
 _resolved="$(PI_RESOLVE_ROUTING_ONLY=1 "$SCRIPT_DIR/pi-dispatch.sh" 2>/dev/null)"
-CONFIG="$(printf '%s' "$_resolved" | sed -n 's/^CONFIG=\(.*\) PROVIDER=.*/\1/p')"
-PROVIDER="$(printf '%s' "$_resolved" | sed -n 's/.* PROVIDER=\([^ ]*\).*/\1/p')"
+PROVIDER="$(printf '%s' "$_resolved" | sed -n 's/^PROVIDER=\([^ ]*\).*/\1/p')"
 MODEL="$(printf '%s' "$_resolved" | sed -n 's/.* MODEL=//p')"
 
 PROBE_ARGS=(-p)
-if [ -n "$CONFIG" ]; then
-  PROBE_ARGS+=(--config "$CONFIG")
-fi
 if [ -n "$MODEL" ]; then
   PROBE_ARGS+=(--model "${PROVIDER:+$PROVIDER/}$MODEL")
 fi
 
-# -p (print mode) is load-bearing: without it omp opens its interactive TUI on a
+# -p (print mode) is load-bearing: without it pi opens its interactive TUI on a
 # non-tty stdin and hangs until the caller's timeout kills it.
 "$BIN" "${PROBE_ARGS[@]}" \
   --session-dir "$PROBE_DIR" \
-  --no-tools "say ok" > "$PROBE_DIR/probe-stdout.log" 2> "$PROBE_DIR/probe-stderr.log" || true
+  --no-tools "say ok" < /dev/null > "$PROBE_DIR/probe-stdout.log" 2> "$PROBE_DIR/probe-stderr.log" || true
 
 JSONL="$(ls -t "$PROBE_DIR"/*.jsonl 2>/dev/null | head -1)"
 

@@ -1,7 +1,7 @@
 {
   "name": "pi-dispatch",
-  "version": "0.2.1",
-  "description": "[Experimental] Offload heavy work to cheap/fast models via omp (oh-my-pi) — background dispatch + idempotent poll + worktree isolation, so Claude only issues briefs, reviews results, and scales to parallel tasks while saving tokens",
+  "version": "0.3.0",
+  "description": "[Experimental] Offload heavy work to cheap/fast models via pi — background dispatch + idempotent poll + worktree isolation, so Claude only issues briefs, reviews results, and scales to parallel tasks while saving tokens",
   "author": {
     "name": "Nick Huang"
   }

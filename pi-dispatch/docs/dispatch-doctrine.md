@@ -1,16 +1,16 @@
-# Dispatch Doctrine — when and how to outsource work to omp
+# Dispatch Doctrine — when and how to outsource work to pi
 
 pi-dispatch is a tool, not a methodology: it moves workload from Claude Code
-(expensive tokens, native tooling) to external omp workers (cheap, fast,
+(expensive tokens, native tooling) to external pi workers (cheap, fast,
 disposable). Methodologies (cf, spiral, ad-hoc main-thread work) choose when
 to use it. This doctrine is the choosing.
 
 ## The mental model
 
-Claude Code's native features are in-house employees; omp workers are
+Claude Code's native features are in-house employees; pi workers are
 contractors. Every native operating mode keeps its organizational shape — the
 only question is which seats are filled by a contractor with a thin haiku
-liaison in front. The worker side is always the same: omp processes managed
+liaison in front. The worker side is always the same: pi processes managed
 by the `pi-agent.sh` primitives (start/send/poll/peek/ls/stop/watch).
 
 ## Two-node dispatch model (current shape)
@@ -18,13 +18,13 @@ by the `pi-agent.sh` primitives (start/send/poll/peek/ls/stop/watch).
 The live topology is two nodes off main:
 
 - **builder** — executes the brief. Main either embeds `pi-agent.sh` offload
-  usage (builder offloads to an omp worker) or omits it (builder does the work
+  usage (builder offloads to a pi worker) or omits it (builder does the work
   itself as a sonnet). The mode is dictated by the brief, not by the builder.
 - **reviewer** — independent contract judge. Given only the contract +
   deliverable paths + check output; never sees the builder transcript.
 
 Main dispatches both and owns the final verdict. The worker side (when offloaded)
-is always the same: omp processes managed by the `pi-agent.sh` primitives
+is always the same: pi processes managed by the `pi-agent.sh` primitives
 (start/send/poll/peek/ls/stop/watch). The reviewer is just another dispatch —
 same primitives, stronger profile (`reviewer ≥ builder`).
 
@@ -51,7 +51,7 @@ it buys nothing except reaching a session that is already sitting in a different
 repository; that is the only case worth using it for.
 
 The builder, wherever it offloads, coordinates
-the omp worker: it establishes the environment, injects the brief, runs the
+the pi worker: it establishes the environment, injects the brief, runs the
 deterministic checks, and assembles evidence — a context firewall and
 structured-output enforcement point. It never issues the verdict; that seat
 belongs to main, informed by the reviewer.
@@ -59,7 +59,7 @@ belongs to main, informed by the reviewer.
 ### Historical note (retired topology)
 
 The previous (retired/legacy) control plane used a `pi-foreman` liaison node
-between main and the omp worker. That topology is **retired** (legacy, replaced
+between main and the pi worker. That topology is **retired** (legacy, replaced
 by the two-node main → builder/reviewer model above). The empirical footnotes
 below describe live, current harness behavior of named sub-agents (SendMessage
 resume, idle notifications); only the `pi-foreman` liaison topology is retired.
@@ -70,7 +70,7 @@ Outsource when the contractor is the better fit, not merely cheaper:
 
 - **Capability fit**: the work suits the worker's model or environment —
   bulk web reading, multimedia generation, long-document summarization,
-  massive parallel fan-out. An omp config overlay (`--config`) is the routing
+  massive parallel fan-out. `PI_PROVIDER`/`PI_MODEL` is the routing
   unit — it carries the whole `modelRoles` table plus per-provider workarounds,
   so one file expresses a worker's entire capability profile.
 - **Cost fit**: mechanical work with a clear spec, where Claude tokens and

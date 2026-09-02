@@ -64,12 +64,10 @@ fi
 # the first concrete tool call.
 export PI_PROMPT="${PI_PROMPT:-Read the brief and execute it. Act now: make your first tool call (read/edit/bash) before ending your turn — do not end a turn on planning alone. When finished, print exactly DONE and nothing else.}"
 
-# Pass cf's env vars to the canonical dispatch. PI_CONFIG_FILES points at an omp config
-# overlay (e.g. ~/.omp/agent/config.codex.yml) carrying the worker's whole
-# modelRoles table; explicit PI_PROVIDER/PI_MODEL add a single-model override.
-# Pick the builder's overlay with the reviewer in mind: the doctrine's
+# Pass cf's env vars to the canonical dispatch. PI_PROVIDER/PI_MODEL route the
+# worker (pi --model provider/model); unset, pi's own settings.json decides.
+# Pick the builder's model with the reviewer in mind: the doctrine's
 # reviewer >= builder rule still holds, and nothing enforces it for you.
-export PI_CONFIG_FILES="${PI_CONFIG_FILES:-}"
 export PI_PROVIDER="${PI_PROVIDER:-}"
 export PI_MODEL="${PI_MODEL:-}"
 export PI_WALL_CLOCK_S="${PI_WALL_CLOCK_S:-1800}"

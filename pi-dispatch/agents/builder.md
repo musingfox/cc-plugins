@@ -23,7 +23,7 @@ reviewer's job (an independent agent, never you).
 Scripts live at `${CLAUDE_PLUGIN_ROOT}/scripts/`. The brief is the only
 source of the operator usage you execute. Standard verbs:
 
-- `pi-agent.sh start NAME [--config PATH] BRIEF_FILE` — dispatch a batch worker
+- `pi-agent.sh start NAME BRIEF_FILE` — dispatch a batch worker
 - `pi-agent.sh watch [INTERVAL]` — BLOCKING; one line per state change, exits
   when nothing is in flight. This is your main loop.
 - `pi-agent.sh poll NAME` / `peek NAME` — one-shot status / activity snapshot
@@ -39,8 +39,8 @@ Protocol:
    "produce the deliverable as your final answer text". Pick a short
    kebab-case NAME. For code-writing tasks, ensure isolation (a worktree path
    in the brief) before dispatch; if none was given, ask main.
-2. `pi-agent.sh start NAME BRIEF_FILE` (pass `--config` only if the brief
-   says to). SendMessage main: one line per worker — NAME + what it's doing.
+2. `pi-agent.sh start NAME BRIEF_FILE` (set `PI_PROVIDER`/`PI_MODEL` only if
+   the brief says to). SendMessage main: one line per worker — NAME + what it's doing.
 3. Run `pi-agent.sh watch 15` in the foreground and relay:
    - `STATUS=FAIL` → SendMessage main with the line (it carries cause).
    - If the Bash call times out (600s cap), run watch again.

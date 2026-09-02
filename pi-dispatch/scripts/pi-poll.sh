@@ -125,7 +125,7 @@ fail_cause() {
   local c=""
   [ -f "$OUTPUT_FILE" ] && \
     c="$(grep -m1 -o '"errorMessage":"[^"]*"' "$OUTPUT_FILE" 2>/dev/null | cut -d'"' -f4)"
-  [ -z "$c" ] && [ -s "$STDERR_FILE" ] && c="$(tail -1 "$STDERR_FILE" 2>/dev/null)"
+  [ -z "$c" ] && [ -s "$STDERR_FILE" ] && c="$(grep -v "^Warning:" "$STDERR_FILE" 2>/dev/null | tail -1)"
   [ -z "$c" ] && return 0
   printf ' cause:%s' "$(printf '%s' "$c" | tr '[:upper:]' '[:lower:]' | tr -d '=\t\n' | head -c 120)"
 }

@@ -1,11 +1,11 @@
 ---
 name: pi-dispatch
-description: Offload dispatch to cheap/fast omp models via pi-agent.sh — name-addressed sub-agent verbs (start/send/poll/peek/ls/stop/watch) over background omp workers with idempotent poll, worktree isolation, and distilled reports. Main loads this to write the offload usage it embeds in a builder brief.
+description: Offload dispatch to cheap/fast pi models via pi-agent.sh — name-addressed sub-agent verbs (start/send/poll/peek/ls/stop/watch) over background pi workers with idempotent poll, worktree isolation, and distilled reports. Main loads this to write the offload usage it embeds in a builder brief.
 ---
 
 # pi-dispatch — offload usage
 
-`scripts/pi-agent.sh` is the name-addressed unified entry point over the omp
+`scripts/pi-agent.sh` is the name-addressed unified entry point over the pi
 worker primitives. The registry is the filesystem: `$PI_RUNS_DIR/agents/<NAME>`
 symlinks to the run's RUNDIR. Main (the orchestrator) loads this usage and
 embeds it verbatim into a builder brief when offloading; the builder operates
@@ -37,7 +37,7 @@ check happens inside the worker's own session instead.
 
 ## Control plane — herdr by default, `pi-agent.sh` as the fallback
 
-Two control planes drive the same omp workers. Decide once, at the start of a
+Two control planes drive the same pi workers. Decide once, at the start of a
 dispatch:
 
 ```bash
@@ -51,7 +51,7 @@ request it explicitly before issuing any `herdr` command. Then:
 
 ```bash
 herdr pane split --current --direction right --cwd <ABS_DIR> --no-focus
-herdr agent start NAME --kind omp --pane <PANE_ID>
+herdr agent start NAME --kind pi --pane <PANE_ID>
 herdr agent prompt NAME <BRIEF> --wait --timeout <MS>
 ```
 
@@ -71,7 +71,7 @@ harness tool can reach them).
 
 | verb | command | purpose |
 |---|---|---|
-| dispatch a worker | `pi-agent.sh start NAME [--config PATH] BRIEF` | launch a worker in the background |
+| dispatch a worker | `pi-agent.sh start NAME BRIEF` | launch a worker in the background |
 | follow-up turn | `pi-agent.sh send NAME TEXT_OR_FILE` | resume a finished worker's session with context (SendMessage semantics) |
 | status poll | `pi-agent.sh poll NAME` | one-shot one-line status: `RUNNING` or a terminal `STATUS=OK\|FAIL …` |
 | activity snapshot | `pi-agent.sh peek NAME` | one-shot agent-view snapshot of a live run |
@@ -92,23 +92,21 @@ harness tool can reach them).
 
 ## Routing
 
-Routing is an omp config overlay passed through as `--config` (or `PI_CONFIG_FILES`):
+Routing is `PI_PROVIDER` + `PI_MODEL` in the environment, passed to pi as one
+`--model provider/model` spec:
 
 ```bash
-pi-agent.sh start NAME --config ~/.omp/agent/config.codex.yml BRIEF
+PI_PROVIDER=openai-codex PI_MODEL=gpt-5.4-mini pi-agent.sh start NAME BRIEF
 ```
 
-The overlay carries the whole `modelRoles` table, so one file routes every role
-the worker uses. Give none and omp resolves from its own
-`~/.omp/agent/config.yml`. `PI_PROVIDER`/`PI_MODEL` add a `--model` override on
-top when you need to pin a single model.
+Give none and pi resolves from its own `~/.pi/agent/settings.json`.
 
 Routing is recorded per run and replayed on resume, so `send` keeps the worker
-on the model it started with. Pick the reviewer's overlay to be at least as
+on the model it started with. Pick the reviewer's model to be at least as
 capable as the builder's — there is no ranked list to defer to, so that
 judgement is the dispatcher's.
 
 ## Prerequisites
 
-`omp` installed and authenticated (`omp` → `/login`), `jq`, `git` (for
+`pi` installed and authenticated (`pi` → `/login`), `jq`, `git` (for
 worktrees). Probe with `pi-probe.sh` before first dispatch in a session.

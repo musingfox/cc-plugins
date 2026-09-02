@@ -1,20 +1,20 @@
 # pi-dispatch
 
-Offload heavy work to cheap/fast models via [omp (oh-my-pi)](https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent), so Claude spends tokens only on briefs and review — never on the worker's reading, reasoning, or generation.
+Offload heavy work to cheap/fast models via [pi](https://github.com/earendil-works/pi) cheap/fast models, so Claude spends tokens only on briefs and review — never on the worker's reading, reasoning, or generation.
 
 ## Architecture
 
 ```
-Claude (main)          wrapper (haiku, optional)        omp worker (cheap model)
+Claude (main)          wrapper (haiku, optional)        pi worker (cheap model) 
   write brief   ──►    pi-dispatch.sh (instant)   ──►   background run in RUNDIR
   ...                  pi-poll.sh loop (1 line/round)     result.md + stream + rc
   review result ◄──    tight summary + file path   ◄──   distilled final text
 ```
 
-- **`scripts/pi-dispatch.sh [--config PATH] BRIEF [OUTDIR [PRIOR_RUNDIR]]`** — launches omp in the background (setsid process group), returns `OUTPUT=/PID=/RUNDIR=` instantly. `PRIOR_RUNDIR` resumes the prior run's session (`--resume`), preserving worker context across rounds without re-briefing.
+- **`scripts/pi-dispatch.sh BRIEF [OUTDIR [PRIOR_RUNDIR]]`** — launches pi in the background (setsid process group), returns `OUTPUT=/PID=/RUNDIR=` instantly. `PRIOR_RUNDIR` resumes the prior run's session (`--session <id>`), preserving worker context across rounds without re-briefing.
 - **`scripts/pi-poll.sh RUNDIR`** — stateless, idempotent one-line status: `RUNNING` or a terminal `STATUS=OK|FAIL …`. On OK it distills the final assistant text into `result.md` (raw stream kept as `pi.stream.jsonl`). Terminal verdicts persist in `RUNDIR/status` and replay on re-poll. Liveness guards (wall-clock, stall) group-kill orphans automatically.
 - **`scripts/pi-stop.sh RUNDIR`** — idempotent group-kill cancel.
-- **`scripts/pi-run.sh [--config PATH] [--deadline S] BRIEF [OUTDIR [PRIOR_RUNDIR]]`** — run-to-terminal: dispatch + block until terminal in ONE call, one `OUTCOME=OK|FAIL …` line. A detached setsid watchdog reaps the worker at the deadline even if the CALLER dies mid-wait (harness timeout, killed sub-agent) — orphan safety no longer depends on the caller passing the right timeout. Use from contexts that must block in a single Bash call (sub-agents can't be woken by Monitor).
+- **`scripts/pi-run.sh [--deadline S] BRIEF [OUTDIR [PRIOR_RUNDIR]]`** — run-to-terminal: dispatch + block until terminal in ONE call, one `OUTCOME=OK|FAIL …` line. A detached setsid watchdog reaps the worker at the deadline even if the CALLER dies mid-wait (harness timeout, killed sub-agent) — orphan safety no longer depends on the caller passing the right timeout. Use from contexts that must block in a single Bash call (sub-agents can't be woken by Monitor).
 - **`scripts/pi-probe.sh [--bin-only] [PROBE_DIR]`** — pre-flight gate: `--bin-only` checks the agent binary is on PATH (exit 0/1); the full probe runs `say ok` on the exact routing a dispatch would resolve. Callers never touch the agent binary themselves.
 - **`scripts/pi-watch.sh RUNDIR`** — one-shot monitoring snapshot of a live run (fixed 4 lines regardless of stream size): event/byte counts, tool progress + current tool, token usage, latest assistant text. `pi-poll.sh` answers "is it done?"; `pi-watch.sh` answers "what is it doing?". Safe on a mid-write stream (partial trailing line skipped).
 - **`scripts/pi-worktree.sh create|clean …`** — git-worktree isolation for code-writing tasks; cleanup captures the diff before removal.
@@ -27,7 +27,7 @@ Claude (main)          wrapper (haiku, optional)        omp worker (cheap model)
 
 | native experience | command |
 |---|---|
-| `Agent(name, prompt)` | `pi-agent.sh start NAME [--config PATH] BRIEF` |
+| `Agent(name, prompt)` | `pi-agent.sh start NAME BRIEF` |
 | `SendMessage(to)` | `pi-agent.sh send NAME TEXT_OR_FILE` |
 | poll / `TaskOutput` | `pi-agent.sh poll NAME` |
 | agent-view peek | `pi-agent.sh peek NAME` |
@@ -61,18 +61,15 @@ Either way, put the output contract in the brief — an absolute artifact path p
 
 ## Model routing
 
-Routing is an **omp config overlay**, passed through as `--config`:
+Routing is `PI_PROVIDER` + `PI_MODEL`, passed to pi as one `--model provider/model` spec:
 
 ```bash
-pi-dispatch.sh --config ~/.omp/agent/config.codex.yml BRIEF
-PI_CONFIG_FILES=~/.omp/agent/config.codex.yml pi-dispatch.sh BRIEF
+PI_PROVIDER=openai-codex PI_MODEL=gpt-5.4-mini pi-dispatch.sh BRIEF
 ```
 
-An overlay carries the whole `modelRoles` table (`default`, `smol`, `plan`, `slow`, …) plus per-provider workarounds, so one file routes every role a worker uses — a single `--model` cannot. Keep the overlays where omp keeps them (`~/.omp/agent/config.*.yml`); pi-dispatch ships none and holds no list of its own.
+Give it nothing and pi resolves from its own `~/.pi/agent/settings.json` (`defaultProvider`/`defaultModel`). `PI_BIN` swaps the binary (default `pi`).
 
-Give it nothing and omp resolves from its own `~/.omp/agent/config.yml`. `PI_PROVIDER`/`PI_MODEL` still add a `--model` spec when you want to override one model on top of (or instead of) an overlay. `PI_BIN` swaps the binary (default `omp`).
-
-Routing is recorded in `RUNDIR/routing` and replayed on resume: a follow-up turn that names a `PRIOR_RUNDIR` but no routing of its own inherits the original, so a resumed session never changes model mid-conversation.
+Routing is recorded in `RUNDIR/routing` and replayed on resume: a follow-up turn that names a `PRIOR_RUNDIR` always inherits the original routing, so a resumed session never changes model mid-conversation.
 
 ## Scaling to N parallel tasks (dispatch → review)
 
@@ -88,8 +85,8 @@ Context hygiene: main never reads worker streams or source material — only bri
 
 ## Prerequisites
 
-- `omp` installed and authenticated (`omp` → `/login`), `jq`, `git` (for worktrees).
+- `pi` installed and authenticated (`pi` → `/login`), `jq`, `git` (for worktrees).
 
 ## Tests
 
-`bash tests/routing-test.sh && bash tests/wrapper-test.sh && bash tests/poll-test.sh && bash tests/worktree-cleanup-test.sh && bash tests/probe-watch-test.sh && bash tests/agent-test.sh` — all pure-local, no network (agent-test uses a bash shim in place of `omp`).
+`bash tests/routing-test.sh && bash tests/wrapper-test.sh && bash tests/poll-test.sh && bash tests/worktree-cleanup-test.sh && bash tests/probe-watch-test.sh && bash tests/agent-test.sh` — all pure-local, no network (agent-test uses a bash shim in place of `pi`).

@@ -14,7 +14,7 @@ Phase 3 mechanics live in `${CLAUDE_PLUGIN_ROOT}/scripts/cf-pi-*.sh`. The orches
 
 ```bash
 SCRIPTS="${CLAUDE_PLUGIN_ROOT}/scripts"
-SESSION=$("$SCRIPTS/cf-pi-setup.sh" "<slug>")   # honors PI_CONFIG_FILES / PI_PROVIDER / PI_MODEL / PI_STALL_THRESHOLD_S / PI_WALL_CLOCK_S
+SESSION=$("$SCRIPTS/cf-pi-setup.sh" "<slug>")   # honors PI_PROVIDER / PI_MODEL / PI_STALL_THRESHOLD_S / PI_WALL_CLOCK_S
 # <slug> = task short name you derive from the goal: kebab-case, 1-3 words
 # (e.g. "rwd-setup"). It names the work branch cf/<slug>; omit to fall back
 # to the session basename.
@@ -53,7 +53,7 @@ to breaking-change-only.` — then apply these deltas:
 After setup, read `$PI_AVAILABLE` from env.sh:
 
 - `PI_AVAILABLE=1` → Phase 3 uses OMP (default).
-- `PI_AVAILABLE=0` → Phase 3 falls back to Claude `cf:implement` agent. Log: `omp CLI not on PATH — Phase 3 will use Claude implement agent. Install omp (bun i -g @oh-my-pi/pi-coding-agent) to use the OMP implementer.` Do NOT abort.
+- `PI_AVAILABLE=0` → Phase 3 falls back to Claude `cf:implement` agent. Log: `pi CLI not on PATH — Phase 3 will use Claude implement agent. Install pi (npm i -g @earendil-works/pi-coding-agent) to use the pi implementer.` Do NOT abort.
 
 The fallback path is also reachable mid-flow (a shard's `Status: FAIL` with unrecoverable probe error, the pre-dispatch quota gate reports the OMP provider near-saturated — §3.2, or the human selects "Fall back to Claude implement agent" at a recovery prompt). Procedure: §3.6.
 
@@ -69,7 +69,7 @@ The fallback path is also reachable mid-flow (a shard's `Status: FAIL` with unre
 | Implement (fallback) | `cf:implement` | Read, Edit, Write, Bash, Glob, Grep, WebFetch |
 | Review | `cf:review` | Read, Write, Grep, Glob, Bash |
 
-Phase 3 routes the OMP builder via `$PI_CONFIG_FILES` — an omp config overlay such as `~/.omp/agent/config.codex.yml`, carrying the worker's whole `modelRoles` table (explicit `$PI_PROVIDER`/`$PI_MODEL` add a single-model override on top); the Claude fallback runs on the default model. To activate the §3.2 quota gate, point `$PI_PROVIDER` at a provider whose quota `omp usage` can read (e.g. `openai-codex`) — set it in your own environment, not here. Choose the builder's overlay with the review seat in mind — the reviewer must sit at or above the builder's capability (dispatch doctrine: reviewer ≥ builder), and nothing enforces that for you. If a more specialized agent exists for the goal (e.g., a frontend-dev agent for UI work), prefer it.
+Phase 3 routes the OMP builder via `$PI_PROVIDER`/`$PI_MODEL` (pi `--model provider/model`; unset, pi's own settings decide); the Claude fallback runs on the default model. To activate the §3.2 quota gate, point `$PI_PROVIDER` at a provider whose quota `omp usage` can read (e.g. `openai-codex`) — set it in your own environment, not here. Choose the builder's model with the review seat in mind — the reviewer must sit at or above the builder's capability (dispatch doctrine: reviewer ≥ builder), and nothing enforces that for you. If a more specialized agent exists for the goal (e.g., a frontend-dev agent for UI work), prefer it.
 
 ### Agent Output Discipline (file-write + summary reply)
 

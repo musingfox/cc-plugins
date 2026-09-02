@@ -7,7 +7,7 @@ context) for one representative work brief, done two ways:
   and produces the result itself. Main pays for *all* of the input material plus the
   generated output.
 - **Dispatch:** Claude writes a short brief pointer, hands it to a haiku
-  builder sub-agent (main → builder offload via `pi-agent.sh` + omp), which
+  builder sub-agent (main → builder offload via `pi-agent.sh` + pi), which
   runs the brief on a cheap/fast Pi model in the background,
   polls with `pi-poll.sh`, and returns **only a path + a ≤3-sentence distillation**.
   Main never reads the source material or Pi's full output — that work is borne by the
