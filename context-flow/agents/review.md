@@ -43,7 +43,7 @@ Observations about code quality, security, performance, or correctness that are 
 Categories:
 - **security**: injection risks, auth gaps, secret exposure, unsafe operations
 - **performance**: O(n²) where O(n) is possible, missing pagination, unbounded queries
-- **maintainability**: dead code, unclear naming, missing error handling, tight coupling
+- **maintainability**: dead code, unclear naming, missing error handling, tight coupling, comments that restate the code or echo the plan (WHY-only comments are fine)
 - **correctness**: race conditions, edge cases not covered by tests, resource leaks
 
 Severities:
