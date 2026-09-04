@@ -317,7 +317,7 @@ cc-plugins/
 ├── adr/                          # ADR lifecycle management
 │   ├── .claude-plugin/
 │   │   └── plugin.json
-│   ├── skills/                   # adr (lifecycle), adr-ref-guard (advisory)
+│   ├── skills/                   # adr (lifecycle)
 │   └── README.md
 ├── spec/                         # Architecture spec library
 │   ├── .claude-plugin/

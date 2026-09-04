@@ -21,10 +21,6 @@ Triggered by natural language — "create an ADR", "supersede ADR-3", "list ADRs
 - **Supersede** (core differentiator): Create new ADR, update old ADR status, then scan the **entire repo** using a 4-layer search pattern (filename, ADR-N marker, markdown link, title substring). Categorize results (ADR files, docs, source code, config) and update with user confirmation per category.
 - **Check**: Validate cross-reference consistency — broken links, stale references, missing frontmatter, supersession chains/cycles, orphaned back-references.
 
-### Reference Guard (`adr-ref-guard` skill)
-
-Advisory skill — auto-warns when editing `.md` files that reference superseded or deprecated ADRs. Never auto-replaces — inform only.
-
 ## Installation
 
 ```bash

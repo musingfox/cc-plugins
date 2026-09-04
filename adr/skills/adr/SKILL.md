@@ -3,7 +3,6 @@ name: adr
 description: >-
   Create, list, supersede, deprecate, or audit Architecture Decision Records (MADR 4.0).
   Handles auto-numbering, directory detection, and cross-reference consistency.
-  For quick stale-reference scans in markdown, use adr-ref-guard instead.
 ---
 
 # ADR Lifecycle Management
