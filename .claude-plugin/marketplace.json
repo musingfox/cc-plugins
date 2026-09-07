@@ -66,7 +66,7 @@
     {
       "name": "pi-dispatch",
       "source": "./pi-dispatch",
-      "description": "[Experimental] Offload heavy work to Pi's cheap/fast models — a dispatcher subagent + dispatch.sh so Claude only writes briefs and reads summaries, saving tokens"
+      "description": "[Experimental] Offload heavy work to Pi's cheap/fast models — builder + reviewer subagents over pi-agent.sh/pi-dispatch.sh background workers, so Claude only writes briefs and reads summaries, saving tokens"
     }
   ]
 }

@@ -1,6 +1,13 @@
 ---
 name: pi-dispatch
-description: Offload dispatch to cheap/fast pi models via pi-agent.sh — name-addressed sub-agent verbs (start/send/poll/peek/ls/stop/watch) over background pi workers with idempotent poll, worktree isolation, and distilled reports. Main loads this to write the offload usage it embeds in a builder brief.
+description: >-
+  This skill should be used when the user asks to "offload this", "dispatch to pi",
+  "run this on a cheap model", "fan out these tasks in parallel", "save tokens on this
+  grunt work", or when the main thread is about to write a builder brief that hands
+  work to a background worker. Offload dispatch to cheap/fast pi models via
+  pi-agent.sh — name-addressed sub-agent verbs (start/send/poll/peek/ls/stop/watch)
+  over background pi workers with idempotent poll, worktree isolation, and distilled
+  reports. Main loads this to write the offload usage it embeds in a builder brief.
 ---
 
 # pi-dispatch — offload usage
