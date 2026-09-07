@@ -1,8 +1,12 @@
 ---
 name: adr
 description: >-
-  Create, list, supersede, deprecate, or audit Architecture Decision Records (MADR 4.0).
-  Handles auto-numbering, directory detection, and cross-reference consistency.
+  This skill should be used when the user asks to "write an ADR", "record this decision",
+  "create a decision record", "list ADRs", "supersede ADR-0007", "deprecate an ADR",
+  "audit our ADRs", or refers to `docs/decisions/` / MADR files. Creates, lists,
+  supersedes, deprecates, and audits Architecture Decision Records (MADR 4.0) with
+  auto-numbering, directory detection, and cross-reference consistency. For an
+  invariant that must hold across runs rather than a past choice, use spec.
 ---
 
 # ADR Lifecycle Management
