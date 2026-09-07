@@ -4,6 +4,7 @@ description: >-
   Use for live browser automation via the agent-browser CLI — open URLs, snapshot pages,
   click/fill/screenshot, inspect elements, scrape or read web pages. Ref-based workflow
   for AI agents. Not for writing Playwright test files (use playwright or web-test).
+allowed-tools: Bash(agent-browser *) Read Grep Glob
 ---
 
 # agent-browser
