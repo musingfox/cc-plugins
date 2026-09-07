@@ -8,13 +8,13 @@ Templates are deliberately **not** auto-loaded into Claude's context. They are p
 
 | Template | Purpose | Obsidian vars | Post-process |
 |----------|---------|---------------|--------------|
-| `task.md` | `/obw:pm` task | `{{title}}`, `{{date}}` | `property:set` for project/priority/due/tags |
-| `doc.md` | `/obw:pm` document | `{{title}}`, `{{date}}` | `property:set` for project |
-| `adr.md` | `/obw:pm` ADR | `{{title}}`, `{{date}}` | `property:set` for project/status |
+| `task.md` | `/obw:pm` task | `{{title}}`, `{{date}}` | `property:set` for title/project/priority/due/tags |
+| `doc.md` | `/obw:pm` document | `{{title}}`, `{{date}}` | `property:set` for title/project |
+| `adr.md` | `/obw:pm` ADR | `{{title}}`, `{{date}}` | `property:set` for title/project/status |
 | `dashboard-cross.base` | Cross-project Bases dashboard | — | none |
 | `dashboard-project.base` | Per-project Bases dashboard | `__PROJECT__` | `sed` replace `__PROJECT__` before create |
 
-Obsidian's Templates core plugin only resolves `{{title}}`, `{{date}}`, `{{time}}`. Anything project-scoped (`project`, `priority`, `due`) is set after creation via `obsidian property:set`.
+Obsidian's Templates core plugin only resolves `{{title}}`, `{{date}}`, `{{time}}` — and `{{title}}` is the filename, which is kebab-cased. The human-readable title is written to the `title` property after creation, alongside anything project-scoped (`project`, `priority`, `due`, relations), via `obsidian property:set`.
 
 Bases (`.base`) files are pure YAML — Obsidian's Templates plugin does not process them, so dashboard templates use shell `sed` substitution at create time and live in the plugin (not in the vault Templates folder).
 
@@ -22,9 +22,9 @@ Bases (`.base`) files are pure YAML — Obsidian's Templates plugin does not pro
 
 If you rewrite these templates, keep these fields — `/obw:pm` search and Bases dashboards depend on them:
 
-- Tasks: `type: task`, `status`, `priority`, `project`, `tags`, `due`, `completed`
-- Docs: `type: doc`, `project`
-- ADRs: `type: adr`, `project`, `status`
+- Tasks: `title`, `type: task`, `status`, `priority`, `project`, `tags`, `due`, `completed`, `parent`, `blocked_by`, `related`
+- Docs: `title`, `type: doc`, `project`
+- ADRs: `title`, `type: adr`, `project`, `status`
 
 ## Regenerating
 

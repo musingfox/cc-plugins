@@ -26,13 +26,25 @@ Missing config or `pm.project` → tell the user to run `/obw:init` and stop. Ne
 ```
 pm/
 ├── {project}/
-│   ├── tasks/       # active tasks
-│   ├── archive/     # completed tasks
-│   └── docs/        # docs + ADRs
-└── dashboard.base   # cross-project dashboard (optional)
+│   ├── dashboard.base   # project dashboard
+│   ├── tasks/           # active tasks
+│   │   └── archive/     # completed tasks
+│   └── docs/            # docs + ADRs
+└── dashboard.base       # cross-project dashboard (optional)
 ```
 
-Folders are created on demand — `create` / `move` auto-create missing parent folders. No `mkdir` needed.
+Every project has all three: `tasks/`, `docs/`, `dashboard.base`. `/obw:init` bootstraps them. If a pm operation finds `pm/{project}/dashboard.base` missing, regenerate it (see Dashboards) before reporting done.
+
+Beyond that, folders are created on demand — `create` / `move` auto-create missing parent folders. No `mkdir` needed.
+
+## Filenames
+
+Kebab-case, always: lowercase, whitespace and punctuation → `-`, collapse repeats, Unicode characters kept intact. Same rule as `/obw:jot` note mode.
+
+The human-readable title is not derivable from the filename, so it lives in the `title` property. Obsidian's `{{title}}` resolves to the filename, so the H1 stays kebab — `title` is what dashboards display.
+
+- `Implement Auth` → `pm/{project}/tasks/implement-auth.md`, `title: Implement Auth`
+- ADR `Switch to SQLite` → `pm/{project}/docs/adr-0007-switch-to-sqlite.md`, `title: Switch to SQLite`
 
 ## Template Names
 
@@ -44,22 +56,35 @@ If `obsidian vault=<v> templates` doesn't list one of these, `/obw:init` hasn't 
 
 Use **one call** per known-name read — never chain `search → read`. The pm-specific bits:
 
-- **Create task** → `create` at `pm/{project}/tasks/{name}.md` with `template=task`, then set properties `project` / `priority` / `due` / `tags`.
-- **Create doc** → `create` at `pm/{project}/docs/{name}.md` with `template=doc`, then set `project`.
-- **Create ADR** → `create` at `pm/{project}/docs/adr-{NNNN}-{title}.md` with `template=adr`, then set `project` / `status`. See ADR numbering below.
+- **Create task** → `create` at `pm/{project}/tasks/{kebab}.md` with `template=task`, then set properties `title` / `project` / `priority` / `due` / `tags`.
+- **Create doc** → `create` at `pm/{project}/docs/{kebab}.md` with `template=doc`, then set `title` / `project`.
+- **Create ADR** → `create` at `pm/{project}/docs/adr-{NNNN}-{kebab}.md` with `template=adr`, then set `title` / `project` / `status`. See ADR numbering below.
 - **List tasks** → `search` with `query="[type:task] [project:{project}] [status:<s>]" format=json`.
-- **Archive** → set `status=done` and `completed`, then `move` to `pm/{project}/archive`.
+- **Archive** → set `status=done` and `completed`, then `move` to `pm/{project}/tasks/archive`. Run the dependent check first (see Relations).
 - **Delete** → confirm first; fall back to `move` if the build lacks `delete`.
 
 ### ADR numbering
 
 Before creating an ADR, `search` with `query="[type:adr] [project:{project}]" format=json` and take max(number)+1, zero-padded to 4 digits.
 
+## Relations
+
+Three link properties on tasks, all holding wikilinks: `blocked_by` (list), `related` (list), `parent` (single).
+
+Only the stated direction is stored. The inverse — who this task blocks, its subtasks — is read from Obsidian's backlinks pane or a Bases `file.hasLink()` filter. Never write a `blocks` or `subtasks` field: two fields for one edge drift apart.
+
+- **Link** → `property:set` with `type=list` for `blocked_by` / `related`, plain for `parent`. Values are `[[kebab-name]]` — resolve the target with `search` first if the name is uncertain, and refuse a link to a note that does not exist.
+- **`property:set` replaces, never appends** — there is no property-append verb. To add one blocker, `read` the task's current `blocked_by`, and set the full list back with the new entry included. Setting a bare new value silently drops the existing links.
+- **`blocked_by` implies status** — after adding a blocker, set `status=blocked`. After removing the last blocker, ask whether to return the task to `todo` or `in-progress`.
+- **Archiving cascades a prompt** — before archiving `X`, `search` `query="[type:task] [project:{project}] [blocked_by:X]" format=json`. If any task depends on `X`, list them and ask whether to drop `X` from their `blocked_by` (and un-block those left with none). Never edit dependents silently.
+- **Cycles** — before adding `A` to `B.blocked_by`, walk `A`'s own `blocked_by` chain. If it reaches `B`, refuse and report the cycle.
+- `parent` is for epic → subtask decomposition only; use `related` for anything else.
+
 ## Property Schema
 
-**Task**: `type: task`, `status` (todo/in-progress/blocked/done), `priority` (high/medium/low), `project`, `due` (date), `tags` (list), `created`, `completed`.
-**Doc**: `type: doc`, `project`, `created`, `updated`.
-**ADR**: `type: adr`, `project`, `status` (proposed/accepted/deprecated/superseded), `created`, `deciders`.
+**Task**: `title`, `type: task`, `status` (todo/in-progress/blocked/done), `priority` (high/medium/low), `project`, `due` (date), `tags` (list), `parent` (link), `blocked_by` (list of links), `related` (list of links), `created`, `completed`.
+**Doc**: `title`, `type: doc`, `project`, `created`, `updated`.
+**ADR**: `title`, `type: adr`, `project`, `status` (proposed/accepted/deprecated/superseded), `created`, `deciders`.
 
 Property names are lowercase. Do not invent fields — dashboards depend on this schema.
 
@@ -80,13 +105,13 @@ Generated from plugin templates via shell (template contents never enter context
     content="$(sed "s/__PROJECT__/{project}/g" "${CLAUDE_PLUGIN_ROOT}/templates/dashboard-project.base")" overwrite
   ```
 
-Conversation-mode status (user asks in chat, not Obsidian): run the equivalent `search` and format a summary table in the reply. Don't write a `.base` file unless asked to.
+Conversation-mode status (user asks in chat, not Obsidian): run the equivalent `search` and format a summary table in the reply. Don't rewrite an existing `.base` file unless asked to — the only unprompted write is recreating a project dashboard that has gone missing.
 
 ## Important Rules
 
 1. Read `.obsidian.yaml` before any operation.
 2. Never `search` to locate a note whose name is known — go straight to `read`.
-3. Never bypass the CLI with filesystem Read/Write against the vault. Only exception: reading `.obsidian/templates.json` / `obsidian.json` during `/obw:init`. Dashboard creation uses the CLI via shell-piped content.
+3. Never bypass the CLI with filesystem Read/Write against the vault. Only exceptions, both inside `/obw:init`: reading `.obsidian/templates.json` / `obsidian.json`, and `mkdir` for the templates folder and the project skeleton (the CLI has no folder verb). Dashboard creation uses the CLI via shell-piped content.
 4. Confirm destructive intents (delete, archive-move, ADR supersede) before executing.
 5. A claim of "created" / "updated" needs a receipt — the CLI's own success output counts; an error output never does. Report failures as failures.
 6. Bulk scans (e.g. auditing all archived tasks) may be delegated to a read-only Explore agent to keep the listing out of context; single-entity operations never need one.

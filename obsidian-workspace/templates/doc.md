@@ -1,4 +1,5 @@
 ---
+title: 
 type: doc
 project: 
 created: {{date}}

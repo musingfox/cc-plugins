@@ -1,12 +1,14 @@
 filters:
   and:
     - file.inFolder("pm/__PROJECT__")
-    - 'type == "task"'
 
 formulas:
+  display: 'if(title, title, file.name)'
   days_until_due: 'if(due, (date(due) - today()).days, "")'
 
 properties:
+  formula.display:
+    displayName: "Title"
   formula.days_until_due:
     displayName: "Days Until Due"
 
@@ -15,9 +17,10 @@ views:
     name: "Active"
     filters:
       and:
+        - 'type == "task"'
         - 'status != "done"'
     order:
-      - file.name
+      - formula.display
       - status
       - priority
       - due
@@ -28,13 +31,42 @@ views:
       direction: ASC
 
   - type: table
+    name: "Blocked"
+    filters:
+      and:
+        - 'type == "task"'
+        - 'status != "done"'
+        - not:
+            - 'blocked_by.isEmpty()'
+    order:
+      - formula.display
+      - blocked_by
+      - priority
+      - due
+
+  - type: table
+    name: "By Parent"
+    filters:
+      and:
+        - 'type == "task"'
+        - 'status != "done"'
+    order:
+      - formula.display
+      - status
+      - priority
+      - due
+    groupBy:
+      property: parent
+      direction: ASC
+
+  - type: table
     name: "Recently Completed"
     filters:
       and:
+        - 'type == "task"'
         - 'status == "done"'
-        - file.inFolder("pm/__PROJECT__/archive")
     order:
-      - file.name
+      - formula.display
       - completed
       - tags
     limit: 10
@@ -43,11 +75,27 @@ views:
     name: "By Tag"
     filters:
       and:
+        - 'type == "task"'
         - 'status != "done"'
     order:
-      - file.name
+      - formula.display
       - status
       - tags
     groupBy:
       property: tags
+      direction: ASC
+
+  - type: table
+    name: "Docs"
+    filters:
+      or:
+        - 'type == "doc"'
+        - 'type == "adr"'
+    order:
+      - formula.display
+      - type
+      - status
+      - updated
+    groupBy:
+      property: type
       direction: ASC

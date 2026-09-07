@@ -3,6 +3,13 @@ filters:
     - file.inFolder("pm")
     - 'type == "task"'
 
+formulas:
+  display: 'if(title, title, file.name)'
+
+properties:
+  formula.display:
+    displayName: "Title"
+
 views:
   - type: table
     name: "By Project"
@@ -10,12 +17,12 @@ views:
       property: project
       direction: ASC
     order:
-      - file.name
+      - formula.display
       - status
       - priority
       - due
     summaries:
-      file.name: Unique
+      formula.display: Unique
 
   - type: table
     name: "Recently Completed (7d)"
@@ -24,7 +31,7 @@ views:
         - 'status == "done"'
         - 'completed && (today() - date(completed)).days <= 7'
     order:
-      - file.name
+      - formula.display
       - project
       - completed
       - tags

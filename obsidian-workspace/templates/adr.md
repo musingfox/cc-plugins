@@ -1,4 +1,5 @@
 ---
+title: 
 type: adr
 project: 
 status: proposed

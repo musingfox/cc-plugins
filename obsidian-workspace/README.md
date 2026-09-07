@@ -8,7 +8,7 @@ Plugin identifier: `obw` (skills invoked as `/obw:<name>` or via natural languag
 
 | Skill | Purpose |
 |-------|---------|
-| `/obw:init` | Pick a vault, write `.obsidian.yaml`, install starter templates into your vault's Templates folder |
+| `/obw:init` | Pick a vault, write `.obsidian.yaml`, install starter templates, bootstrap the project workspace, migrate an older layout |
 | `/obw:jot <text>` | Quick capture (timestamped bullet to today's daily note) or long-form note — triages by input shape |
 | `/obw:pm [intent]` | Task / document / ADR lifecycle, project-scoped; free-form natural language |
 
@@ -17,7 +17,7 @@ Plugin identifier: `obw` (skills invoked as `/obw:<name>` or via natural languag
 - **Vault I/O** goes through the `obsidian` CLI, run directly in the main context (no sub-agent). This plugin does not duplicate CLI syntax; it defers to the official `obsidian:obsidian-cli` skill and `obsidian help`.
 - **Daily notes** use Obsidian's **Daily Notes** core plugin (folder / filename / template). Quick capture calls `daily:append`.
 - **Templates** (`task`, `doc`, `adr`) live in your vault's Obsidian Templates folder. On `/obw:init` the plugin copies starter files from `templates/` only if the same name doesn't already exist — it never overwrites your edits.
-- **Dashboards** (optional) are **Obsidian Bases** (`.base` files — core in Obsidian 1.9+) generated from plugin-internal templates via shell substitution, so contents never enter Claude's context.
+- **Dashboards** are **Obsidian Bases** (`.base` files — core in Obsidian 1.9+) generated from plugin-internal templates via shell substitution, so contents never enter Claude's context.
 
 ## Prerequisites
 
@@ -77,19 +77,33 @@ Daily note folder / filename / template are **not** in `.obsidian.yaml` — they
 pm/
 ├── dashboard.base        # Cross-project dashboard (optional, Bases)
 └── {project}/
-    ├── dashboard.base    # Project dashboard (optional, Bases)
+    ├── dashboard.base    # Project dashboard (Bases)
     ├── tasks/            # Active tasks
-    ├── archive/          # Completed tasks
+    │   └── archive/      # Completed tasks
     └── docs/             # Docs + ADRs
 ```
+
+Every project gets `tasks/`, `docs/`, and `dashboard.base` — `/obw:init` creates all three up front, so a project is never a bare folder.
+
+Upgrading a vault from before 0.9: re-run `/obw:init`. It detects the old layout and offers, each separately, to move `archive/` into `tasks/archive/` (through the CLI, so links follow), backfill the `title` property on existing notes, and regenerate the dashboards with the new views. Existing filenames are never renamed.
+
+## Filenames
+
+All notes are kebab-cased (`Implement Auth` → `implement-auth.md`), for both `/obw:jot` notes and `/obw:pm` tasks / docs / ADRs. Because Obsidian's `{{title}}` resolves to the filename, the human-readable title lives in the `title` property — that is what the dashboards display.
 
 ## Property Schema
 
 Dashboards and searches depend on these frontmatter fields. If you edit the installed templates, keep the field names.
 
-- **Task** — `type: task`, `status` (`todo` / `in-progress` / `blocked` / `done`), `priority` (`high` / `medium` / `low`), `project`, `due` (date), `tags` (list), `created`, `completed`
-- **Doc** — `type: doc`, `project`, `created`, `updated`
-- **ADR** — `type: adr`, `project`, `status` (`proposed` / `accepted` / `deprecated` / `superseded`), `created`, `deciders`
+- **Task** — `title`, `type: task`, `status` (`todo` / `in-progress` / `blocked` / `done`), `priority` (`high` / `medium` / `low`), `project`, `due` (date), `tags` (list), `parent` (link), `blocked_by` (list of links), `related` (list of links), `created`, `completed`
+- **Doc** — `title`, `type: doc`, `project`, `created`, `updated`
+- **ADR** — `title`, `type: adr`, `project`, `status` (`proposed` / `accepted` / `deprecated` / `superseded`), `created`, `deciders`
+
+## Task Relations
+
+Tasks link to each other by wikilink through three properties — `blocked_by`, `related`, and `parent` (epic → subtask). There is no separate issue ID: the kebab filename is the handle, and Obsidian rewrites links when a note is renamed.
+
+Only one direction is stored. What a task *blocks*, and what its subtasks are, come from Obsidian's backlinks pane — a `blocks` field alongside `blocked_by` would only drift. Adding a blocker sets `status: blocked`; archiving a task lists whatever still depends on it and asks before unblocking.
 
 ## Examples
 
@@ -98,6 +112,7 @@ Dashboards and searches depend on these frontmatter fields. If you edit the inst
 /obw:jot API Redesign Proposal --folder Architecture --tag design
 /obw:pm add task implement-auth, high priority, due 2026-05-01
 /obw:pm create adr about switching to SQLite
+/obw:pm implement-auth is blocked by db-migration
 /obw:pm implement-auth is done, archive it
 /obw:pm refresh dashboard
 ```
