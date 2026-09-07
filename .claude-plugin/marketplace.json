@@ -14,29 +14,14 @@
       "description": "OMT - One Man Team: Your personal development squad powered by Agent-First workflow with 5 autonomous agents"
     },
     {
-      "name": "readability",
-      "source": "./readability",
-      "description": "Readability Formatting: Enhances AI-generated text readability through proper alignment and formatting of markdown tables, ASCII art, and text-based diagrams"
-    },
-    {
       "name": "viz",
       "source": "./viz",
       "description": "Visual output for chat and browser — inline code-shape visuals (viz-inline) plus markdown/Mermaid HTML rendering (viz-render)"
     },
     {
-      "name": "jj",
-      "source": "./jj",
-      "description": "Jujutsu (jj) VCS helper: workflow commands, natural language operations, and Git-to-jj translation"
-    },
-    {
       "name": "apple-podcasts",
       "source": "./apple-podcasts",
       "description": "Fetch Apple Podcasts episode audio download URLs via iTunes API and RSS feeds"
-    },
-    {
-      "name": "markitdown",
-      "source": "./markitdown",
-      "description": "Convert PDF, Office documents, images, audio, and more to Markdown using Microsoft's MarkItDown"
     },
     {
       "name": "context-flow",
@@ -47,11 +32,6 @@
       "name": "spiral",
       "source": "./spiral",
       "description": "[Experimental] Spiral — narrow a vague question into an implementation-sized goal, one layer at a time: diverge into distinct directions, you pick one, converge it into a plan or milestone, then dig another layer or stop; hands the goal to /cf and never writes code"
-    },
-    {
-      "name": "gog",
-      "source": "./gog",
-      "description": "Google Workspace CLI skills — Gmail, Calendar, and Drive via gogcli (gog)"
     },
     {
       "name": "spec",
@@ -82,11 +62,6 @@
       "name": "obsidian-workspace",
       "source": "./obsidian-workspace",
       "description": "Obsidian Workspace — personal vault productivity: quick capture to journal, long-form notes, and project management via Obsidian CLI"
-    },
-    {
-      "name": "discord-webhook",
-      "source": "./discord-webhook",
-      "description": "Send Discord webhook notifications with plain text or rich Embed format, multi-webhook routing"
     },
     {
       "name": "pi-dispatch",

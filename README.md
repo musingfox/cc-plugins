@@ -52,19 +52,6 @@ Visual output across the whole spectrum — inline chat shapes for short explana
 }
 ```
 
-### Jujutsu (jj) VCS Helper
-
-Workflow commands and Git-to-jj translation for [Jujutsu](https://github.com/martinvonz/jj):
-- **5 Workflow Commands**: `/jj-status`, `/jj-sync`, `/jj-submit`, `/jj-clean`, `/jj-undo`
-- **Natural Language VCS**: Describe operations like "split this change" or "squash the last two changes"
-- **Git Translation**: Automatically translates Git terminology to jj equivalents in jj repos
-- **Auto-Detection**: Supports both colocated (jj + git) and native jj repositories
-
-**Installation:**
-```bash
-/plugin install jj
-```
-
 ### Apple Podcasts
 
 Fetch Apple Podcasts episode audio download URLs:
@@ -106,34 +93,6 @@ See `spiral/docs/concept.md` for the full concept.
 **Installation:**
 ```bash
 /plugin install spiral
-```
-
-### gog (Google Workspace)
-
-Interact with Google Workspace services via the [gogcli](https://github.com/steipete/gogcli) CLI:
-- **3 Specialized Skills**: Gmail, Calendar, Drive — each triggered by natural language
-- **Gmail**: Search, send, reply, threads, labels, drafts, attachments
-- **Calendar**: Events, create, update, delete, freebusy, conflicts, RSVP, focus-time, OOO
-- **Drive**: List, search, upload, download, export, share, copy, move, permissions
-- **Safety-First**: All destructive operations require `--dry-run` preview before execution
-- **Prerequisites**: `brew install gogcli` + `gog auth add <email>`
-
-**Installation:**
-```bash
-/plugin install gog
-```
-
-### MarkItDown
-
-Convert non-plain-text files to Markdown using [MarkItDown](https://github.com/microsoft/markitdown):
-- **Wide Format Support**: PDF, Word, PowerPoint, Excel, images, audio, HTML, EPUB, CSV, JSON, XML, ZIP
-- **Auto-Triggered**: Activates when you ask to read, analyze, or summarize non-text files
-- **Explicit Conversion**: `/convert` skill for direct file-to-markdown conversion
-- **Prerequisite**: `pip install markitdown` or `uv tool install markitdown`
-
-**Installation:**
-```bash
-/plugin install markitdown
 ```
 
 ### ADR (Architecture Decision Records)
@@ -208,20 +167,6 @@ Personal Obsidian vault productivity — capture, notes, and project management 
 /plugin install obsidian-workspace
 ```
 
-### Discord Webhook
-
-Send Discord webhook notifications from Claude Code:
-- **Dual Format**: Plain text `content` and rich Embed (title, description, color, fields, footer)
-- **Multi-Webhook**: Route to named channels via `DISCORD_WEBHOOK_{NAME}` env vars
-- **Flexible Config**: Environment variables or `.claude/discord-webhook.local.md` settings file
-- **Composable**: Designed as a tool for other plugins, hooks, and agents to call
-- **Slash Command**: `/discord-notify "message"` for direct usage and testing
-
-**Installation:**
-```bash
-/plugin install discord-webhook
-```
-
 ### pi-dispatch (Experimental)
 
 Offload heavy work to [pi](https://github.com/earendil-works/pi) cheap/fast models so Claude only writes briefs and reviews summaries — saving tokens:
@@ -236,18 +181,6 @@ Offload heavy work to [pi](https://github.com/earendil-works/pi) cheap/fast mode
 **Installation:**
 ```bash
 /plugin install pi-dispatch
-```
-
-### Readability
-
-Enhances AI-generated text readability:
-- **Markdown Tables**: Properly aligned columns for terminal display
-- **ASCII Art**: Well-formatted text-based diagrams
-- **Text Diagrams**: Consistent formatting for visual elements
-
-**Installation:**
-```bash
-/plugin install readability
 ```
 
 ## Plugin Development
@@ -280,12 +213,6 @@ cc-plugins/
 │           ├── SKILL.md
 │           └── references/
 │               └── diagram-types.md
-├── jj/                           # Jujutsu VCS plugin
-│   ├── .claude-plugin/
-│   │   └── plugin.json
-│   ├── commands/                 # jj-status, jj-sync, jj-submit, jj-clean, jj-undo
-│   ├── skills/                   # jj-workflow, git-to-jj
-│   └── README.md
 ├── apple-podcasts/               # Apple Podcasts audio fetcher
 │   ├── .claude-plugin/
 │   │   └── plugin.json
@@ -296,23 +223,10 @@ cc-plugins/
 │   ├── commands/
 │   │   └── cf.md                 # Orchestrator — context flow + contract validation
 │   └── agents/                   # research, plan, implement, review
-├── gog/                          # Google Workspace CLI skills
-│   ├── .claude-plugin/
-│   │   └── plugin.json
-│   └── skills/                   # gog (single skill, references/{gmail,calendar,drive}.md)
-├── markitdown/                   # File-to-Markdown converter
-│   ├── .claude-plugin/
-│   │   └── plugin.json
-│   └── skills/                   # markitdown-read, convert
 ├── hook-guard/                   # Hook setup assistant
 │   ├── .claude-plugin/
 │   │   └── plugin.json
 │   ├── skills/                   # setup, doctor, update
-│   └── README.md
-├── readability/                  # Text formatting plugin
-│   ├── .claude-plugin/
-│   │   └── plugin.json
-│   ├── skills/                   # readable-text-formatting
 │   └── README.md
 ├── adr/                          # ADR lifecycle management
 │   ├── .claude-plugin/
@@ -335,11 +249,6 @@ cc-plugins/
 │   │   └── plugin.json
 │   ├── skills/                   # init, jot, pm
 │   ├── templates/                # task / doc / adr + dashboard .base
-│   └── README.md
-├── discord-webhook/              # Discord webhook notifications
-│   ├── .claude-plugin/
-│   │   └── plugin.json
-│   ├── skills/                   # discord-webhook (auto), discord-notify (slash cmd)
 │   └── README.md
 └── README.md
 ```
