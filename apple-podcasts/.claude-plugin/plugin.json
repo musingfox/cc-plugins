@@ -1,6 +1,6 @@
 {
   "name": "apple-podcasts",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Fetch Apple Podcasts episode audio download URLs via iTunes API and RSS feeds",
   "author": {
     "name": "Nick Huang"

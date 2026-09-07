@@ -1,5 +1,5 @@
 ---
-name: Apple Podcasts Fetch
+name: apple-podcasts-fetch
 description: >-
   This skill should be used when the user asks to "download an Apple Podcast episode",
   "get podcast audio from Apple Podcasts", "fetch podcast MP3", "extract audio URL from
