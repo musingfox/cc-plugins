@@ -124,6 +124,18 @@ Invariants and forward-looking interface contracts as verifiable, sliceable entr
 /plugin install spec
 ```
 
+### agent-browser
+
+Browser automation and Playwright test authoring:
+- **`agent-browser`**: live browser control via the agent-browser CLI — open URLs, snapshot pages, click/fill/screenshot, inspect elements. Ref-based interaction (`@e1`, `@e2`) from the accessibility tree instead of fragile CSS selectors
+- **`playwright`**: write or set up `@playwright/test` E2E tests — specs, locators, assertions, fixtures, config
+- **`web-test`**: debug a live page and convert the findings into Playwright regression tests — the debug-to-test workflow
+
+**Installation:**
+```bash
+/plugin install agent-browser
+```
+
 ### Hook Guard
 
 One-stop hook setup assistant for Claude Code projects:
@@ -189,67 +201,23 @@ This repository serves as both a marketplace and a development workspace for cus
 
 ### Structure
 
+Every plugin directory carries `.claude-plugin/plugin.json`; the rest is its components.
+
 ```
 cc-plugins/
-├── .claude-plugin/
-│   └── marketplace.json          # Marketplace configuration
-├── omt/                          # OMT - One Man Team plugin
-│   ├── .claude-plugin/
-│   │   └── plugin.json
-│   ├── agents/                   # 5 core agents (hive, pm, arch, dev, reviewer)
-│   ├── commands/                 # omt, init-agents, approve, git-commit, help
-│   ├── contracts/                # Agent contract definitions (hive, pm, arch, dev)
-│   ├── docs/                     # Workflow, quick-start, contract-validation docs
-│   ├── hooks/                    # PostToolUse state-sync hook
-│   ├── lib/                      # contract-validator, state-manager
-│   ├── skills/                   # contract-validation skill
-│   └── README.md
-├── viz/                          # Markdown & Mermaid HTML renderer
-│   ├── .claude-plugin/
-│   │   └── plugin.json
-│   ├── lib/                      # render.sh, template.html
-│   └── skills/
-│       └── viz-render/           # single skill — handles all input shapes
-│           ├── SKILL.md
-│           └── references/
-│               └── diagram-types.md
-├── apple-podcasts/               # Apple Podcasts audio fetcher
-│   ├── .claude-plugin/
-│   │   └── plugin.json
-│   └── skills/                   # apple-podcasts-fetch
-├── context-flow/                 # [Experimental] Context-flow pipeline
-│   ├── .claude-plugin/
-│   │   └── plugin.json
-│   ├── commands/
-│   │   └── cf.md                 # Orchestrator — context flow + contract validation
-│   └── agents/                   # research, plan, implement, review
-├── hook-guard/                   # Hook setup assistant
-│   ├── .claude-plugin/
-│   │   └── plugin.json
-│   ├── skills/                   # setup, doctor, update
-│   └── README.md
-├── adr/                          # ADR lifecycle management
-│   ├── .claude-plugin/
-│   │   └── plugin.json
-│   ├── skills/                   # adr (lifecycle)
-│   └── README.md
-├── spec/                         # Architecture spec library
-│   ├── .claude-plugin/
-│   │   └── plugin.json
-│   ├── skills/                   # spec (lifecycle + slicing)
-│   ├── scripts/                  # spec.sh (verify, slice)
-│   └── README.md
-├── fizzy/                        # Fizzy project management
-│   ├── .claude-plugin/
-│   │   └── plugin.json
-│   ├── skills/                   # fizzy CLI wrapper
-│   └── README.md
-├── obsidian-workspace/           # Obsidian vault: capture, notes, PM
-│   ├── .claude-plugin/
-│   │   └── plugin.json
-│   ├── skills/                   # init, jot, pm
-│   ├── templates/                # task / doc / adr + dashboard .base
-│   └── README.md
+├── .claude-plugin/marketplace.json   # Marketplace configuration
+├── adr/                skills: adr
+├── agent-browser/      skills: agent-browser, playwright, web-test
+├── apple-podcasts/     skills: apple-podcasts-fetch
+├── context-flow/       commands: cf  · agents: research, plan, implement, review · scripts, tests
+├── fizzy/              skills: fizzy
+├── hook-guard/         skills: hook-guard
+├── obsidian-workspace/ skills: init, jot, pm · templates
+├── omt/                skills: contract-validation · agents, commands, contracts, lib
+├── pi-dispatch/        skills: pi-dispatch · agents: builder, reviewer · scripts, tests
+├── spec/               skills: spec · scripts: spec.sh
+├── spiral/             commands: spiral · agents: divergence · scripts
+├── viz/                skills: viz-inline, viz-render · lib, tests
 └── README.md
 ```
 
