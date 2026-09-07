@@ -206,6 +206,7 @@ Every plugin directory carries `.claude-plugin/plugin.json`; the rest is its com
 ```
 cc-plugins/
 ├── .claude-plugin/marketplace.json   # Marketplace configuration
+├── .claude/skills/marketplace/       # Repo-internal: add/modify a plugin, version bump, sync
 ├── adr/                skills: adr
 ├── agent-browser/      skills: agent-browser, playwright, web-test
 ├── apple-podcasts/     skills: apple-podcasts-fetch

@@ -1,0 +1,80 @@
+---
+name: marketplace
+description: >-
+  This skill should be used when working on the cc-plugins repository itself and the
+  user asks to "add a plugin", "create a new plugin here", "rename a plugin", "remove
+  a plugin", "bump the version", "release this plugin", or after editing any plugin's
+  components. Enforces the repo's four-file invariant — plugin.json, marketplace.json,
+  README.md, and the version bump that makes Claude Code refresh its cache.
+allowed-tools: Read Edit Write Glob Grep Bash(git status *) Bash(git diff *) Bash(ls *)
+---
+
+# cc-plugins marketplace maintenance
+
+This repo is a marketplace of independent plugins. Four things must agree at all
+times; any one of them drifting is a defect, not a cosmetic issue.
+
+| Artifact | Where | What breaks if it drifts |
+|---|---|---|
+| Plugin manifest | `<plugin>/.claude-plugin/plugin.json` | Plugin does not load |
+| Marketplace entry | `.claude-plugin/marketplace.json` | Plugin is not installable |
+| README section + structure tree | `README.md` | Users cannot find or install it |
+| `version` in plugin.json | same manifest | **No bump → no cache refresh; users keep running the old copy** |
+
+The plugin / marketplace spec itself follows the official Claude Code documentation.
+Consult the docs (`ctx7 docs /websites/code_claude`) rather than inferring conventions
+from neighbouring plugins — the neighbours may be stale.
+
+## Adding a plugin
+
+1. Create `<plugin>/.claude-plugin/plugin.json`. Copy the field set from an existing
+   manifest (`name`, `description`, `version`, `author`, `keywords`, `homepage`,
+   `license`); `homepage` points at `.../tree/main/<plugin>`. Start at `0.1.0`.
+2. Add the components — `skills/`, `commands/`, `agents/`, `scripts/`. Auto-discovery
+   finds them by directory; no manifest wiring needed.
+3. Append an entry to `.claude-plugin/marketplace.json` `plugins[]`:
+   `{"name", "source": "./<plugin>", "description"}`. Keep `description` in sync with
+   the manifest's — they are read in different places and users compare them.
+4. Add a `### <Plugin>` section to README.md under **Available Plugins** (what each
+   component does, plus the `/plugin install <name>` block) **and** a row to the
+   structure tree under **Plugin Development**.
+
+## Modifying a plugin
+
+Edit the components, then check the same four artifacts. Specifically:
+
+- Component renamed, added, or deleted → update the README section and the structure
+  tree row.
+- Behaviour or scope changed → update both descriptions (manifest + marketplace entry).
+- Version: `.githooks/pre-commit` auto-bumps the **patch** for any plugin with staged
+  content changes. It skips the bump when `plugin.json` is already staged, so a manual
+  minor/major bump wins — edit the version and stage the manifest yourself.
+
+The hook only runs when the clone is wired up: `git config core.hooksPath .githooks`.
+Verify this before trusting auto-bump.
+
+## Removing a plugin
+
+Removal touches all four: `git rm -r <plugin>`, drop the `plugins[]` entry, drop the
+README section, drop the structure-tree row. A plugin whose last skill is deleted is a
+plugin with nothing left — remove the directory rather than leaving an empty shell in
+the marketplace.
+
+## Cross-marketplace dependencies
+
+`allowCrossMarketplaceDependenciesOn` at the marketplace root lists the outside
+marketplaces a plugin here may depend on. Adding a dependency on a new marketplace
+means adding it there first, otherwise the dependency does not resolve.
+
+## Before finishing
+
+Read back what you touched and confirm each holds:
+
+- Every `*/.claude-plugin/plugin.json` has a `plugins[]` entry, and vice versa. The
+  manifest `name` is the invocation namespace and may deliberately differ from the
+  directory and the entry name (`context-flow` → `cf:`, `obsidian-workspace` → `obw:`)
+  — do not "fix" those to match.
+- Every `plugins[]` entry has a README section and a structure-tree row.
+- Skill `name` in frontmatter is lowercase-hyphen and matches its directory — for a
+  plugin skill, that `name` becomes the last segment of `/<plugin>:<name>`, so spaces
+  or capitals produce a command nobody can type.
