@@ -195,6 +195,19 @@ Offload heavy work to [pi](https://github.com/earendil-works/pi) cheap/fast mode
 /plugin install pi-dispatch
 ```
 
+### Wizard
+
+Generate an interactive bash wizard that walks a human through steps only they can perform — ported from [mattpocock/skills](https://github.com/mattpocock/skills) (`wizard`), MIT, Copyright (c) 2026 Matt Pocock:
+- **Human-only stages**: Dashboard logins, credential capture, CI secret writes, one-off migrations — never the steps the agent can run itself
+- **Template UX**: Stage progress, confirmation gates, cross-platform URL opening, hidden secret entry, idempotent `.env` upserts, `gh secret`/`gh variable` writes
+- **Author stages only**: Copy the library template; do not hand-edit above the `STAGES` marker
+- **Ephemeral by default**: Built for one run and deleted when done; commit only as a repeatable setup path
+
+**Installation:**
+```bash
+/plugin install wizard
+```
+
 ## Plugin Development
 
 This repository serves as both a marketplace and a development workspace for custom Claude Code plugins.
