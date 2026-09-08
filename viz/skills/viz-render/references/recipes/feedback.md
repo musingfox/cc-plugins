@@ -4,9 +4,10 @@ The **generic** recipe for "render any markdown for a human, collect their
 feedback, write it back for an agent to read." Unlike `pr-review` (which hard-codes
 a code-review grammar), `feedback` makes **no assumption about the document**: the
 body is rendered read-only and kept verbatim, and only the human's feedback —
-`choice` (one selected option) and `notes` (free text) — round-trips through
+`choice` (the selected option/s) and `notes` (free text) — round-trips through
 frontmatter. Reach for this for decision briefs, approvals, "review this and tell
-me X" — anything that is a document plus a small structured response.
+me X" — anything that is a document plus a small structured response. One document
+can carry a single question or a whole **round** of independent ones (see below).
 
 ## Trigger
 
@@ -15,7 +16,7 @@ Use when a human needs to read a rendered document and return a structured answe
 human to edit many fields inside a structured document, that is the rare case
 `pr-review` covers — not this recipe.
 
-## Markdown structure
+## Markdown structure — single question
 
 ```markdown
 ---
@@ -47,9 +48,51 @@ notes:                                   # leave empty — the human fills it
   the recipe carries no domain-specific wording; all have defaults.
 - **Body** — rendered read-only and verbatim (markdown + mermaid); never rewritten.
 
+## Round mode — several independent decisions in one document
+
+A **dotted** frontmatter key (`q1.options`, `q1.choice`, …) declares a field of a
+per-question block. Any dotted key switches the recipe into round mode: the panel
+renders one block per question, in first-appearance order, and the top-level
+`options` / `recommend` / `choice` are ignored.
+
+```markdown
+---
+viz: feedback
+title: <header title>
+panel: <feedback-panel heading>
+prompt: <one-line instruction>
+q1.title: <question heading>
+q1.options: <A> | <B> | <C>              # optional; omit for a notes-only question
+q1.recommend: <one of q1's options>      # optional; tagged 建議
+q1.multi: true                           # optional; several picks allowed
+q1.choice:                               # leave empty — pipe-separated when saved
+q1.notes:                                # leave empty — this question's reasoning
+q2.title: <question heading>
+q2.options: <A> | <B>
+q2.choice:
+notes:                                   # round-level free text, still available
+---
+```
+
+### Rules
+
+- **Question id** — anything without a dot or whitespace (`q1`, `storage`). Order in
+  the frontmatter is order on screen.
+- **Fields** — only `title`, `options`, `recommend`, `multi`, `choice`, `notes` are
+  recognised after the dot. Everything else stays an ordinary top-level key.
+- **`<id>.multi: true`** — the option cards become checkboxes. Without it a question
+  is single-select, and re-clicking the selected card clears it.
+- **`<id>.choice`** — always a *list* on disk, pipe-separated, empty when unanswered.
+  A single-select answer is simply a one-element list, so a reader parses both the
+  same way.
+- **Missing answer keys** are written back inside their own question block, so `q1`'s
+  answer never lands under `q2`'s title.
+- **Put every genuinely independent decision in one round**; a question whose answer
+  depends on another question in the same round belongs to the next round.
+
 ## Bidirectional flow
 
-1. Agent writes the markdown file (canonical source), `choice`/`notes` empty.
+1. Agent writes the markdown file (canonical source), the answer keys empty.
 2. `bash "${CLAUDE_PLUGIN_ROOT}/lib/render.sh" <file.md> <name>` starts the server
    and opens the interactive page (http://, so Save works).
 3. Human reads the body, picks an option, writes notes.
@@ -65,8 +108,10 @@ the updated markdown to paste back instead.
 
 Body preserved byte-for-byte; frontmatter key order preserved. A no-op
 load→serialize is exact; setting feedback appends `choice`/`notes` once
-(idempotent) and leaves the body unchanged. Verified by
-`viz/tests/feedback.roundtrip.test.js`.
+(idempotent) and leaves the body unchanged. Round mode holds the same guarantees
+per question, and inserts a missing `<id>.choice` / `<id>.notes` inside its own
+block rather than at the end. Verified by `viz/tests/feedback.roundtrip.test.js`
+against `tests/fixtures/feedback/sample.md` and `round.md`.
 
 ## Example
 

@@ -39,6 +39,25 @@ seams, not to add a second flagship.
 > just drift. Revisit only when a real second feedback shape appears.
 > `kanban-board` remains an unbuilt sketch.
 
+> **Update (2026-09-09).** That revisit trigger fired: spiral needs to put a
+> whole **round** of independent decisions to a human at once, each with its own
+> candidates, and to let several candidates be carried forward together. It
+> landed as **frontmatter on `feedback`**, not a new recipe — a *dotted* key
+> (`q1.options`, `q1.choice`) declares a field of a per-question block, and any
+> dotted key switches the recipe into round mode.
+>
+> This is deliberately **not** the control-DSL the non-goal rules out: the
+> controls are unchanged (option cards + a notes box), only repeated, so no
+> new control type, layout language, or validation grammar entered the file.
+> A question's `choice` is always a list on disk, so serialization never learns
+> about `multi` — that flag only decides how the UI toggles. The lifecycle code
+> was untouched, so the extract-or-not question from this doc is still open and
+> still waiting on a genuine third recipe.
+>
+> Selection logic (`toggle`, answer-key placement) lives in `feedback.model.js`
+> and is covered by `tests/feedback.roundtrip.test.js`; the DOM wiring in
+> `feedback.html` is the one seam with no automated check.
+
 ## Current architecture
 
 ```mermaid

@@ -90,6 +90,17 @@ main { max-width: 880px; margin: 28px auto 120px; padding: 0 24px; }
     color: #2563eb; font-weight: 700; margin-bottom: 4px;
 }
 .decision .sub { font-size: 0.86em; color: #888; margin-bottom: 16px; }
+.question { border-top: 1px solid #eee; padding-top: 16px; margin-top: 16px; }
+.question:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+.q-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 1em; font-weight: 700; margin-bottom: 10px;
+}
+.q-title .multi-tag {
+    font-size: 0.66em; font-weight: 700; color: #6d28d9;
+    background: #f5f3ff; border: 1px solid #ddd6fe;
+    padding: 2px 8px; border-radius: 999px; letter-spacing: 0.04em;
+}
 .opts { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
 .opt {
     display: flex; align-items: center; gap: 12px;
@@ -107,6 +118,8 @@ main { max-width: 880px; margin: 28px auto 120px; padding: 0 24px; }
     content: ''; position: absolute; inset: 3px;
     background: #2563eb; border-radius: 999px;
 }
+.opt .dot.multi { border-radius: 5px; }
+.opt.selected .dot.multi::after { border-radius: 2px; }
 .opt .label { flex: 1; font-size: 0.96em; font-weight: 500; }
 .opt .rec {
     font-size: 0.68em; font-weight: 700; color: #047857;
@@ -114,13 +127,13 @@ main { max-width: 880px; margin: 28px auto 120px; padding: 0 24px; }
     padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.04em;
 }
 .notes-label { font-size: 0.82em; color: #666; font-weight: 600; margin-bottom: 6px; display: block; }
-textarea#notes {
+.decision textarea {
     width: 100%; min-height: 84px; resize: vertical;
     border: 1.5px solid #e0e0e0; border-radius: 8px; padding: 12px 14px;
     font: inherit; font-size: 0.92em; line-height: 1.6; color: inherit;
     background: #fcfcfd; outline: none; transition: border-color 0.13s;
 }
-textarea#notes:focus { border-color: #2563eb; background: white; }
+.decision textarea:focus { border-color: #2563eb; background: white; }
 .decision-foot {
     display: flex; align-items: center; gap: 12px; margin-top: 16px;
 }
@@ -182,8 +195,8 @@ textarea#notes:focus { border-color: #2563eb; background: white; }
     .opt { border-color: #3e3e44; }
     .opt:hover { border-color: #3b5b9a; background: #1f2433; }
     .opt.selected { border-color: #2563eb; background: #1e2a44; }
-    textarea#notes { background: #1f1f23; border-color: #3e3e44; color: #d4d4d8; }
-    textarea#notes:focus { background: #18181b; }
+    .decision textarea { background: #1f1f23; border-color: #3e3e44; color: #d4d4d8; }
+    .decision textarea:focus { background: #18181b; }
     .toast { background: #f5f5f7; color: #1f2937; }
     .reload-banner { background: #422006; color: #fde68a; border-color: #92400e; }
     .reload-banner button.ghost { color: #fde68a; }
@@ -258,7 +271,8 @@ window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
     }
 
     var currentModel = null;
-    var selected = '';        // chosen option label
+    var selected = '';        // chosen option label (single-question mode)
+    var answers = {};         // round mode: question id → { choices: [], notes: '' }
     var notesValue = '';
     var isDirty = false;
     var dismissedMtime = 0;
@@ -300,8 +314,52 @@ window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
         }
     }
 
+    // Option cards for one question. Selection state lives in the caller
+    // (M.toggle decides it); this only paints and wires clicks.
+    function optionList(opts, rec, multi, getChoices, onToggle) {
+        var list = document.createElement('div'); list.className = 'opts';
+        function paint() {
+            var cur = getChoices();
+            list.querySelectorAll('.opt').forEach(function (o) {
+                o.classList.toggle('selected', cur.indexOf(o.dataset.label) !== -1);
+            });
+        }
+        opts.forEach(function (label) {
+            var row = document.createElement('div');
+            row.className = 'opt';
+            row.dataset.label = label;
+            var dot = document.createElement('div'); dot.className = 'dot' + (multi ? ' multi' : '');
+            var lab = document.createElement('div'); lab.className = 'label'; lab.textContent = label;
+            row.appendChild(dot); row.appendChild(lab);
+            if (rec && label === rec) {
+                var tag = document.createElement('span'); tag.className = 'rec'; tag.textContent = '建議';
+                row.appendChild(tag);
+            }
+            row.addEventListener('click', function () {
+                onToggle(label); markDirty(); paint();
+            });
+            list.appendChild(row);
+        });
+        paint();
+        return list;
+    }
+
+    function notesBox(labelText, value, onInput, id) {
+        var frag = document.createDocumentFragment();
+        var nl = document.createElement('label'); nl.className = 'notes-label';
+        nl.textContent = labelText;
+        var ta = document.createElement('textarea');
+        if (id) { ta.id = id; nl.setAttribute('for', id); }
+        ta.placeholder = '補充說明、保留意見，或要 agent 接著做的事…';
+        ta.value = value;
+        ta.addEventListener('input', function () { onInput(ta.value); markDirty(); });
+        frag.appendChild(nl); frag.appendChild(ta);
+        return frag;
+    }
+
     function renderPanel(model) {
         var panel = document.getElementById('decision-panel');
+        var qs = M.questions(model);
         var opts = M.options(model);
         var rec = (model.fm.recommend || '').trim();
         selected = (model.fm.choice || '').trim();
@@ -311,40 +369,40 @@ window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
         var h = document.createElement('h2'); h.textContent = cfg(model, 'panel');
         var sub = document.createElement('div'); sub.className = 'sub';
         sub.textContent = (model.fm.prompt || '').trim()
-            || (opts.length ? DEFAULTS.promptWithOptions : DEFAULTS.promptNotesOnly);
+            || ((qs.length || opts.length) ? DEFAULTS.promptWithOptions : DEFAULTS.promptNotesOnly);
         panel.appendChild(h); panel.appendChild(sub);
 
-        if (opts.length) {
-            var list = document.createElement('div'); list.className = 'opts';
-            opts.forEach(function (label) {
-                var row = document.createElement('div');
-                row.className = 'opt' + (label === selected ? ' selected' : '');
-                row.dataset.label = label;
-                var dot = document.createElement('div'); dot.className = 'dot';
-                var lab = document.createElement('div'); lab.className = 'label'; lab.textContent = label;
-                row.appendChild(dot); row.appendChild(lab);
-                if (rec && label === rec) {
-                    var tag = document.createElement('span'); tag.className = 'rec'; tag.textContent = '建議';
-                    row.appendChild(tag);
+        answers = {};
+        if (qs.length) {
+            qs.forEach(function (q) {
+                answers[q.id] = { choices: q.choice.slice(), notes: q.notes };
+                var block = document.createElement('div'); block.className = 'question';
+                var qh = document.createElement('h3'); qh.className = 'q-title';
+                qh.appendChild(document.createTextNode(q.title || q.id));
+                if (q.multi) {
+                    var mt = document.createElement('span'); mt.className = 'multi-tag';
+                    mt.textContent = '可複選'; qh.appendChild(mt);
                 }
-                row.addEventListener('click', function () {
-                    selected = label; markDirty();
-                    list.querySelectorAll('.opt').forEach(function (o) {
-                        o.classList.toggle('selected', o.dataset.label === selected);
-                    });
-                });
-                list.appendChild(row);
+                block.appendChild(qh);
+                if (q.options.length) {
+                    block.appendChild(optionList(q.options, q.recommend, q.multi,
+                        function () { return answers[q.id].choices; },
+                        function (label) {
+                            answers[q.id].choices = M.toggle(answers[q.id].choices, label, q.multi);
+                        }));
+                }
+                block.appendChild(notesBox('這題的理由（選填）', answers[q.id].notes,
+                    function (v) { answers[q.id].notes = v; }));
+                panel.appendChild(block);
             });
-            panel.appendChild(list);
+        } else if (opts.length) {
+            panel.appendChild(optionList(opts, rec, false,
+                function () { return selected ? [selected] : []; },
+                function (label) { selected = M.toggle(selected ? [selected] : [], label, false)[0] || ''; }));
         }
 
-        var nl = document.createElement('label'); nl.className = 'notes-label';
-        nl.textContent = cfg(model, 'notes_label'); nl.setAttribute('for', 'notes');
-        var ta = document.createElement('textarea'); ta.id = 'notes';
-        ta.placeholder = '補充說明、保留意見，或要 agent 接著做的事…';
-        ta.value = notesValue;
-        ta.addEventListener('input', function () { notesValue = ta.value; markDirty(); });
-        panel.appendChild(nl); panel.appendChild(ta);
+        panel.appendChild(notesBox(cfg(model, 'notes_label'), notesValue,
+            function (v) { notesValue = v; }, 'notes'));
 
         var foot = document.createElement('div'); foot.className = 'decision-foot';
         var hint = document.createElement('span'); hint.className = 'hint';
@@ -416,7 +474,15 @@ window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
         setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
     }
 
-    function commitFeedback() { M.setFeedback(currentModel, selected, notesValue); }
+    function commitFeedback() {
+        var qs = M.questions(currentModel);
+        if (!qs.length) { M.setFeedback(currentModel, selected, notesValue); return; }
+        qs.forEach(function (q) {
+            var a = answers[q.id] || { choices: [], notes: '' };
+            M.setAnswer(currentModel, q.id, a.choices, a.notes);
+        });
+        M.setNotes(currentModel, notesValue);
+    }
 
     function saveToServer() {
         if (!currentModel) { showToast('還在載入…'); return; }

@@ -63,4 +63,88 @@ describe('feedback contract', () => {
         const noOpts = '---\nviz: feedback\ntitle: T\nnotes:\n---\n\nbody\n';
         expect(M.options(M.parse(noOpts))).toEqual([]);
     });
+
+    test('single-question doc exposes no questions', () => {
+        expect(M.questions(M.parse(md))).toEqual([]);
+    });
+});
+
+describe('feedback round mode', () => {
+    const md = readFileSync(join(FIXTURES_DIR, 'round.md'), 'utf-8');
+
+    test('dotted keys become questions in document order', () => {
+        const qs = M.questions(M.parse(md));
+        expect(qs.map(q => q.id)).toEqual(['q1', 'q2', 'q3']);
+        expect(qs[0].title).toBe('儲存層');
+        expect(qs[0].options).toEqual(['留在 SQLite', '換 Postgres', '兩個都探']);
+        expect(qs[0].recommend).toBe('換 Postgres');
+        expect(qs[0].multi).toBe(true);
+        expect(qs[1].multi).toBe(false);
+        expect(qs[2].options).toEqual([]);
+    });
+
+    test('round mode suppresses the top-level option list', () => {
+        expect(M.options(M.parse(md))).toEqual([]);
+    });
+
+    test('answers serialize pipe-joined and parse back as an array', () => {
+        const m = M.parse(md);
+        M.setAnswer(m, 'q1', ['留在 SQLite', '兩個都探'], '兩條都想探一下');
+        const out = M.serialize(m);
+        expect(out).toContain('q1.choice: 留在 SQLite | 兩個都探');
+        const qs = M.questions(M.parse(out));
+        expect(qs[0].choice).toEqual(['留在 SQLite', '兩個都探']);
+        expect(qs[0].notes).toBe('兩條都想探一下');
+        expect(qs[1].choice).toEqual([]);
+    });
+
+    test('a missing answer key is inserted inside its own question block', () => {
+        const m = M.parse(md);
+        M.setAnswer(m, 'q3', [], 'nothing else');
+        const lines = M.serialize(m).split('\n');
+        const at = k => lines.findIndex(l => l.startsWith(k));
+        expect(at('q3.notes:')).toBeGreaterThan(at('q3.title:'));
+        expect(at('q3.notes:')).toBeLessThan(at('notes:'));
+    });
+
+    test('answer keys are written once, not duplicated on re-answer', () => {
+        const m = M.parse(md);
+        M.setAnswer(m, 'q2', ['CSV'], '');
+        M.setAnswer(m, 'q2', ['JSON'], '');
+        const out = M.serialize(m);
+        expect(out.match(/^q2\.choice:/gm).length).toBe(1);
+        expect(out).toContain('q2.choice: JSON');
+    });
+
+    test('per-question notes round-trip multi-line on one line', () => {
+        const m = M.parse(md);
+        M.setAnswer(m, 'q1', [], 'line one\nline two');
+        const reparsed = M.parse(M.serialize(m));
+        expect(M.questions(reparsed)[0].notes).toBe('line one\nline two');
+        expect(reparsed.fm['q1.notes'].indexOf('\n')).toBe(-1);
+    });
+
+    test('body survives answers byte-for-byte', () => {
+        const m = M.parse(md);
+        const bodyBefore = m.body;
+        M.setAnswer(m, 'q1', ['換 Postgres'], 'x');
+        M.setAnswer(m, 'q2', ['JSON'], '');
+        expect(m.body).toBe(bodyBefore);
+        expect(M.serialize(m).endsWith(bodyBefore)).toBe(true);
+    });
+
+    test('round-level notes write without introducing a top-level choice', () => {
+        const m = M.parse(md);
+        M.setNotes(m, 'round-level remark');
+        const out = M.serialize(m);
+        expect(out).toContain('notes: round-level remark');
+        expect(out.match(/^choice:/gm)).toBe(null);
+    });
+
+    test('toggle: multi accumulates, single replaces', () => {
+        expect(M.toggle(['a'], 'b', true)).toEqual(['a', 'b']);
+        expect(M.toggle(['a', 'b'], 'a', true)).toEqual(['b']);
+        expect(M.toggle(['a'], 'b', false)).toEqual(['b']);
+        expect(M.toggle(['a'], 'a', false)).toEqual([]);
+    });
 });
