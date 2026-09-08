@@ -67,6 +67,11 @@
       "name": "pi-dispatch",
       "source": "./pi-dispatch",
       "description": "[Experimental] Offload heavy work to Pi's cheap/fast models — builder + reviewer subagents over pi-agent.sh/pi-dispatch.sh background workers, so Claude only writes briefs and reads summaries, saving tokens"
+    },
+    {
+      "name": "wizard",
+      "source": "./wizard",
+      "description": "Generate an interactive bash wizard that walks a human through the steps only a human can perform — dashboard logins, credential capture, CI secret writes, one-off migrations"
     }
   ]
 }
