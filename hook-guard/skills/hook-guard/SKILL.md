@@ -1,13 +1,10 @@
 ---
 name: hook-guard
 description: >-
-  Manage project hook-guard installation — set up, diagnose, or update Claude
-  Code hooks, git pre-commit, and commit-msg scripts with security checks,
-  code-quality gates, and CLAUDECODE skip logic. Triggers on "set up hooks",
-  "configure pre-commit", "add linting hooks", "initialize hook-guard", "check
-  hooks", "hook doctor", "verify hook setup", "troubleshoot hooks", "update
-  hooks", "regenerate hooks", "sync hooks with current tools", or similar
-  requests.
+  Set up, diagnose, or update a project's Claude Code hooks, git pre-commit, and
+  commit-msg scripts, with security checks, code-quality gates, and CLAUDECODE skip
+  logic. Covers first-time installation, a "hook doctor" check on an existing setup,
+  and regenerating hooks after the project's tooling changes.
 ---
 
 # Hook Guard
