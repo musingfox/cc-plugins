@@ -14,10 +14,15 @@ Plugin / marketplace spec, component structure, and frontmatter fields follow th
 
 Claude Code uses `plugin.json` `version` to detect updates — **no bump → no cache refresh**.
 
-`.githooks/pre-commit` auto-bumps patch version for plugins with staged changes. Setup once per clone:
+`.githooks/pre-push` auto-bumps the patch version once per push for every plugin with
+content changes in the pushed range. Setup once per clone:
 
 ```bash
 git config core.hooksPath .githooks
 ```
 
-Manual minor/major bump: edit `plugin.json` version and stage it — hook skips auto-bump.
+The bump is amended into the tip commit, which git cannot push in the same run — the
+hook aborts and asks for a second `git push`. That one goes through.
+
+Manual minor/major bump: edit `plugin.json` version and commit it — the hook skips any
+plugin whose version already changed in the pushed range.

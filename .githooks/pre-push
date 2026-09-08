@@ -1,0 +1,90 @@
+#!/bin/sh
+#
+# Pre-push hook: auto-bump patch version once per push for changed plugins.
+#
+# Plugins are discovered dynamically by scanning for */.claude-plugin/plugin.json,
+# so new plugins are picked up automatically without editing this hook.
+#
+# A bump amends HEAD, which git cannot push in the same invocation — the hook
+# aborts and asks for a second `git push`. On that second run the version change
+# is inside the pushed range, so no further bump happens.
+#
+# Skips the bump when:
+#   - plugin.json version already changed within the pushed range (manual or earlier bump)
+#   - Only plugin.json changed (no content changes)
+#
+
+remote=$1
+zero=$(git hash-object --stdin </dev/null | tr '[0-9a-f]' '0')
+head_sha=$(git rev-parse HEAD)
+bumped=0
+
+# Checked once: bumping stages manifests, so a later re-check would see its own work.
+index_clean=$(git diff --cached --quiet && echo 1)
+
+fail() {
+  echo "pre-push: $1" >&2
+  exit 1
+}
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue
+  case "$local_ref" in refs/heads/*) ;; *) continue ;; esac
+  [ "$local_sha" = "$head_sha" ] || continue
+
+  if [ "$remote_sha" != "$zero" ]; then
+    base=$remote_sha
+  else
+    oldest=$(git rev-list "$local_sha" --not --remotes="$remote" | tail -1)
+    [ -n "$oldest" ] || continue
+    base=$(git rev-parse -q --verify "${oldest}^") || base=$(git hash-object -t tree /dev/null)
+  fi
+
+  # Discover all plugins by locating their manifests.
+  for plugin_json in */.claude-plugin/plugin.json; do
+    [ -f "$plugin_json" ] || continue
+
+    plugin=${plugin_json%%/.claude-plugin/plugin.json}
+
+    # Content changes in this plugin, ignoring the manifest itself
+    changed=$(git diff --name-only "$base" "$local_sha" -- "$plugin/" | grep -v "^${plugin_json}$")
+    [ -n "$changed" ] || continue
+
+    read_version() {
+      git show "$1:$plugin_json" 2>/dev/null |
+        grep '"version"' | head -1 | sed 's/.*"version": *"\([^"]*\)".*/\1/'
+    }
+
+    current_version=$(read_version "$local_sha")
+    [ -n "$current_version" ] || continue
+
+    # Already bumped somewhere in the pushed range
+    [ "$(read_version "$base")" != "$current_version" ] && continue
+
+    [ -n "$index_clean" ] ||
+      fail "staged changes present; commit or unstage them before pushing (bump for ${plugin} skipped)"
+    git diff --quiet -- "$plugin_json" ||
+      fail "${plugin_json} has uncommitted edits; commit or stash them before pushing"
+
+    major=$(echo "$current_version" | cut -d. -f1)
+    minor=$(echo "$current_version" | cut -d. -f2)
+    patch=$(echo "$current_version" | cut -d. -f3)
+    new_version="${major}.${minor}.$((patch + 1))"
+
+    tmp=$(mktemp)
+    sed "s/\"version\": \"${current_version}\"/\"version\": \"${new_version}\"/" "$plugin_json" > "$tmp" &&
+      mv "$tmp" "$plugin_json"
+
+    git add "$plugin_json"
+    echo "Auto-bumped ${plugin} version: ${current_version} -> ${new_version}"
+    bumped=1
+  done
+done
+
+if [ "$bumped" = 1 ]; then
+  git commit --amend --no-edit --no-verify >/dev/null || fail "amend failed; version bump left staged"
+  echo "pre-push: version bump amended into HEAD. Run 'git push' again."
+  exit 1
+fi
+
+exit 0
