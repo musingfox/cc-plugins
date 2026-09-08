@@ -41,7 +41,7 @@
     {
       "name": "adr",
       "source": "./adr",
-      "description": "Architecture Decision Records lifecycle management with MADR 4.0 and cross-reference consistency enforcement"
+      "description": "Architecture Decision Records lifecycle management with MADR 4.0, a three-condition warrant test, and cross-reference consistency enforcement"
     },
     {
       "name": "agent-browser",

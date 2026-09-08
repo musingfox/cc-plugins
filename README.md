@@ -98,11 +98,11 @@ See `spiral/docs/concept.md` for the full concept.
 ### ADR (Architecture Decision Records)
 
 Lifecycle management for [MADR 4.0](https://adr.github.io/madr/) Architecture Decision Records with cross-reference consistency enforcement:
-- **Full Lifecycle**: Create, list, supersede, deprecate, check — all via natural language
+- **Full Lifecycle**: Create, list, supersede, deprecate, audit — all via natural language
+- **Warrant Test**: Three conditions — hard to reverse, confusing without context, a real trade-off — gate creation and flag existing ADRs that fail them
 - **Core Differentiator**: Supersession updates ALL cross-references across the entire repo, not just the old-new ADR pair
 - **4-Layer Search**: Filename, ADR-N marker, markdown link, title substring — catches every reference
 - **Categorized Updates**: Auto-update ADR/doc files, add markers to source code, skip config (user choice per category)
-- **Reference Guard**: Advisory skill warns when editing `.md` files that reference superseded ADRs
 - **Zero Dependencies**: Pure markdown instruction files, no CLI tools to install
 
 **Installation:**

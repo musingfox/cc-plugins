@@ -3,7 +3,8 @@ name: adr
 description: >-
   This skill should be used when the user asks to "write an ADR", "record this decision",
   "create a decision record", "list ADRs", "supersede ADR-0007", "deprecate an ADR",
-  "audit our ADRs", or refers to `docs/decisions/` / MADR files. Creates, lists,
+  "audit our ADRs", "should this be an ADR", or refers to `docs/decisions/` / MADR
+  files. Screens decisions against a three-condition warrant test, then creates, lists,
   supersedes, deprecates, and audits Architecture Decision Records (MADR 4.0) with
   auto-numbering, directory detection, and cross-reference consistency. For an
   invariant that must hold across runs rather than a past choice, use spec.
@@ -55,17 +56,36 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/adr/references/madr-template.md` for the full
 
 ---
 
+## Decision Warrant Test
+
+An ADR earns its place only when all three conditions hold. One missing and the answer is: do not write one.
+
+1. **Hard to reverse** — changing your mind later carries a real cost.
+2. **Confusing without context** — a future reader will ask "why was it done this way?"
+3. **A genuine trade-off existed** — alternatives were actually on the table, and one was chosen for a stated reason.
+
+Write ADRs sparingly. When a decision is borderline, it fails.
+
+Where a failed decision goes instead:
+- Fails 1 or 2 — the decision is cheap to undo, or its reason is self-evident. No record needed; a plain doc if someone still wants it written down.
+- Fails 3 — nothing was ever weighed, so this is a constraint that must hold, not a choice that was made. Use `spec`.
+
+Conditions adapted from [mattpocock/skills](https://github.com/mattpocock/skills) `domain-modeling` (MIT).
+
+---
+
 ## Operations
 
 ### 1. Create New ADR
 
-1. Detect ADR directory (or ask user to choose if none exists)
-2. If this is the first ADR in the directory, create the bootstrap ADR first (see below)
-3. Scan existing `[0-9][0-9][0-9][0-9]-*.md` files, determine next number
-4. Generate kebab-case filename from the title
-5. Read the template from `${CLAUDE_PLUGIN_ROOT}/skills/adr/references/madr-template.md` and apply with today's date
-6. Search existing ADR titles for keyword overlap and suggest related ADRs
-7. Present the created file path
+1. Apply the Decision Warrant Test. If a condition fails, name which one, point to where the decision belongs instead, and stop — continue only if the user reaffirms. The bootstrap ADR in step 3 is exempt: it records the format itself, not a decision under review.
+2. Detect ADR directory (or ask user to choose if none exists)
+3. If this is the first ADR in the directory, create the bootstrap ADR first (see below)
+4. Scan existing `[0-9][0-9][0-9][0-9]-*.md` files, determine next number
+5. Generate kebab-case filename from the title
+6. Read the template from `${CLAUDE_PLUGIN_ROOT}/skills/adr/references/madr-template.md` and apply with today's date
+7. Search existing ADR titles for keyword overlap and suggest related ADRs
+8. Present the created file path
 
 ### Bootstrap ADR (First Use)
 
@@ -107,6 +127,7 @@ This is the most critical operation. Execute ALL steps in order.
 #### Step 2 — Create new ADR
 
 - Follow the "Create New ADR" flow
+- If the replacement fails the Decision Warrant Test, there is no new decision to record — deprecate the old ADR instead of superseding it, and switch to the Deprecate operation
 - In the "More Information" section, add: `Supersedes [ADR-NNNN](old-adr-file.md)`
 
 #### Step 3 — Update old ADR
@@ -233,9 +254,9 @@ Cross-Reference Updates:
 
 ---
 
-### 5. Check ADR Consistency
+### 5. Audit ADRs
 
-Run these validation checks and report grouped by severity:
+Run these checks and report grouped by severity. The first three groups ask whether each ADR is well-formed; the fourth asks whether it should exist at all.
 
 #### ERRORS (must fix)
 
@@ -248,6 +269,16 @@ Run these validation checks and report grouped by severity:
 - **Missing frontmatter**: ADR files without `status` or `date` fields in YAML frontmatter.
 - **Orphaned supersession**: Status says "superseded by X" but X doesn't contain "Supersedes" back-reference in its More Information section.
 
+#### WARRANT (judgment — never auto-act)
+
+Apply the Decision Warrant Test to every ADR whose status is `proposed` or `accepted`. Skip the bootstrap ADR and anything already superseded or deprecated.
+
+- **No trade-off** — mechanical: "Considered Options" holds fewer than two real options (empty, a single entry, or one option plus "do nothing"). Condition 3 fails.
+- **Reversible** — read "Context and Problem Statement" and "Consequences". If the decision can be undone by an ordinary code change, with no migration, data loss, or external commitment, condition 1 fails.
+- **Self-evident** — read "Decision Outcome". If the rationale only restates the decision ("we use X because X is standard"), a future reader learns nothing. Condition 2 fails.
+
+Report one `[unwarranted]` line per ADR naming the failed condition. The default suggestion is deprecate, never supersede — there is no replacement decision. The user decides; never edit an ADR on this finding.
+
 #### INFO
 
 - **Supersession chains**: A -> B -> C (3+ links). Suggest simplification.
@@ -255,7 +286,7 @@ Run these validation checks and report grouped by severity:
 
 Output format:
 ```
-ADR Consistency Check:
+ADR Audit:
 
 ERRORS (2):
   [broken-link] docs/setup.md:15 links to 0009-missing.md — file does not exist
@@ -264,10 +295,13 @@ ERRORS (2):
 WARNINGS (1):
   [stale-ref] README.md:42 references ADR-0003 (superseded by ADR-0007)
 
+WARRANT (1):
+  [unwarranted] ADR-0005: Use Prettier — no trade-off (1 option considered) — suggest deprecate
+
 INFO (1):
   [gap] Missing numbers: 0004, 0006
 
-Summary: 2 errors, 1 warning, 1 info
+Summary: 2 errors, 1 warning, 1 unwarranted, 1 info
 ```
 
-If errors or warnings found, suggest running supersede or manual fixes.
+If errors or warnings found, suggest running supersede or manual fixes. Warrant findings are for the user to act on.

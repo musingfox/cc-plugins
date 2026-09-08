@@ -14,12 +14,13 @@ A Claude Code plugin that handles ADR lifecycle with a focus on **supersession c
 
 ### ADR Lifecycle (`adr` skill)
 
-Triggered by natural language — "create an ADR", "supersede ADR-3", "list ADRs", "check ADR references":
+Triggered by natural language — "create an ADR", "supersede ADR-3", "list ADRs", "audit our ADRs":
 
+- **Warrant test**: Before creating, a decision must be hard to reverse, confusing without context, and the product of a real trade-off. Any one missing and the skill declines and points elsewhere. Adapted from [mattpocock/skills](https://github.com/mattpocock/skills) `domain-modeling` (MIT).
 - **Create**: Auto-detect ADR directory, auto-number (4-digit zero-padded), apply MADR 4.0 template, suggest related ADRs. On first use, bootstraps with `0000-use-madr.md`.
 - **List**: Parse all ADRs, display status table with supersession chains and summary counts.
 - **Supersede** (core differentiator): Create new ADR, update old ADR status, then scan the **entire repo** using a 4-layer search pattern (filename, ADR-N marker, markdown link, title substring). Categorize results (ADR files, docs, source code, config) and update with user confirmation per category.
-- **Check**: Validate cross-reference consistency — broken links, stale references, missing frontmatter, supersession chains/cycles, orphaned back-references.
+- **Audit**: Validate cross-reference consistency — broken links, stale references, missing frontmatter, supersession chains/cycles, orphaned back-references — then apply the warrant test to every live ADR and flag the ones that should never have been written.
 
 ## Installation
 
@@ -35,7 +36,7 @@ All operations are triggered by natural language:
 "Create an ADR for choosing a message queue"
 "Supersede ADR-3 with a new decision to use SQLite"
 "List all ADRs"
-"Check ADR reference consistency"
+"Audit our ADRs"
 ```
 
 ## ADR Format (MADR 4.0)
