@@ -1,0 +1,19 @@
+{
+  "name": "wizard",
+  "description": "Generate an interactive bash wizard that walks a human through the steps only a human can perform — dashboard logins, credential capture, CI secret writes, one-off migrations",
+  "version": "0.1.0",
+  "author": {
+    "name": "Nick Huang",
+    "email": "nick12703990@gmail.com"
+  },
+  "keywords": [
+    "wizard",
+    "bash",
+    "interactive",
+    "credentials",
+    "ci",
+    "migrations"
+  ],
+  "homepage": "https://github.com/musingfox/cc-plugins/tree/main/wizard",
+  "license": "MIT"
+}
