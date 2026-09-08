@@ -1,7 +1,7 @@
 {
   "name": "wizard",
   "description": "Generate an interactive bash wizard that walks a human through the steps only a human can perform — dashboard logins, credential capture, CI secret writes, one-off migrations",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": {
     "name": "Nick Huang",
     "email": "nick12703990@gmail.com"
