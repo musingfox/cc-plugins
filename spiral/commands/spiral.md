@@ -7,14 +7,18 @@ allowed-tools: [Agent, Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion]
 # Spiral
 
 You drive the **main thread**: dispatch **Divergence** — the one isolated subagent, and the only
-thing here that must not see your hypotheses — then converge the picked direction into a plan
+thing here that must not see your hypotheses — then converge what they settled into a plan
 yourself, write what the human reads, and stop. You do **not** name directions or pick between
 them.
 
-Each round lands one **layer**: a plan or milestone, concrete at that layer's grain and no
-finer. The next round diverges from *that plan*, so the spiral descends — vague question →
-approach → milestone → an implementation-sized goal. It stops where the human says it is
-concrete enough. Spiral never writes code; `/cf` takes it from there.
+Each **layer** lands one plan or milestone, concrete at that layer's grain and no finer. The
+next layer diverges from *that plan*, so the spiral descends — vague question → approach →
+milestone → an implementation-sized goal. It stops where the human says it is concrete enough.
+Spiral never writes code; `/cf` takes it from there.
+
+A layer takes as many **rounds** as it needs. A round is one demand on the human's attention:
+every decision that is askable now, asked at once, answered, and folded back in — which is what
+makes the next ones askable. `concept.md` §5 defines the term; this file just runs it.
 
 Concept: `${CLAUDE_PLUGIN_ROOT}/docs/concept.md`. The question is `$ARGUMENTS`.
 
@@ -24,62 +28,97 @@ grep -qxF '.spiral/' .gitignore 2>/dev/null || echo '.spiral/' >> .gitignore
 ```
 
 **Two counters, and they move independently.** The **layer** `L` deepens only when the human
-says 再挖一層; the **attempt** `A` within a layer increments when they reject the menu (都不對).
-Start at `L1-a1`. Nothing is ever overwritten — a rejected menu and the reason it was rejected
-are the carry-over that keeps the next attempt from repeating it.
+says 再挖一層; the **round** `A` within a layer increments whenever the layer is not settled yet —
+they rejected the menu (都不對), or they answered some decisions and left others blank. Start at
+`L1-a1`. Nothing is ever overwritten — what was asked and what came back are the carry-over that
+keeps the next round from repeating it.
 
 ## 1 — Diverge
 
 > `Agent(subagent_type: "spiral:divergence", model: "opus")` with **what to widen from** plus
-> **every direction already rejected at this layer and the human's feedback on them, verbatim**:
+> the carry-over for this layer, **verbatim**: every direction already rejected and the human's
+> feedback on it, and every decision they have already settled here.
 >
 > - `L1-a1` → the question itself.
 > - `L<N>-a1` (N>1) → the previous layer's plan, `.spiral/L<N-1>-plan.md`.
 > - `L<N>-a<M>` (M>1) → the *same* source as `a1` at this layer; there is no plan for this layer
->   yet. What changed is the rejected set, not the artifact.
+>   yet. What changed is the rejected set and what they settled, not the artifact.
 
-That carry-over is not optional. The agent has no memory; without it, the next attempt re-lists
+That carry-over is not optional. The agent has no memory; without it, the next round re-lists
 the last one, which is the churn this tool exists to avoid. Read prior rounds back from
 `.spiral/L*.md` if they have fallen out of your context.
 
-It returns distinct directions, each tagged by cost to reverse (one-way / two-way door), plus
-any facts it resolved along the way.
+It returns **the decisions this layer can settle now** — every one whose prerequisites are
+already resolved — each tagged by cost to reverse (one-way / two-way door) and carrying its
+distinct candidates, plus any facts it resolved along the way. A decision that presupposes
+another in the same set is not in this round; settling that one is what makes it askable.
 
-## 2 — The human picks a direction
+## 2 — The human answers the round
 
 Write `.spiral/L<N>-a<M>-directions.md` — *you* write this; Divergence returns data, never
-human-facing prose. Frontmatter, then the body:
+human-facing prose.
+
+**One round asks every decision that is askable now, and only the one-way doors.** A two-way
+door is cheap to undo: give it a sane default in §3 and one line in the plan saying you took it.
+Putting it on the page spends the attention the real doors need. If only one decision survives
+that filter, the round is one question — a padded page is worse than a short one.
+
+Frontmatter carries one block per decision, in reading order; `d1`, `d2`, … are yours and mean
+nothing beyond order:
 
 ```
 ---
 viz: feedback
-title: <the question, or what this layer is deciding, in plain language>
+title: <what this layer is deciding, in plain language>
 panel: 你的決定
-options: <direction A> | <direction B> | <direction C> | 都不對，再想一輪
-recommend: <the one you lean to>   # optional
-choice:                            # leave empty
-notes:                             # leave empty
+prompt: 這幾題彼此獨立，可以分開回答；沒把握的留白，下一輪再問。
+d1.title: <the decision, phrased as a question>
+d1.options: <candidate A> | <candidate B> | <candidate C>
+d1.recommend: <the one you lean to>   # optional
+d1.choice:                            # leave empty
+d1.notes:                             # leave empty
+d2.title: <the next decision>
+d2.options: <candidate A> | <candidate B>
+d2.choice:
+d2.notes:
+notes:                                # leave empty — round-level remarks
 ---
 ```
 
-The body exists to be read by someone who has not watched the rounds:
+`recommend` is **yours, not Divergence's** — it never saw a recommendation and must not: whoever
+authored a menu has already weighted it. Say what you lean to and why in the body, so they can
+disagree with a reason rather than a hunch. Do not add a 都不對 option; leaving a decision blank
+already says it, and §Rendering reads it that way.
+
+The body exists to be read by someone who has not watched the layer being built:
 
 - Open with what is actually at stake in plain language — never "round 2" or role names.
-- Carry each direction's substance **inline**: what it is, what taking it commits to, how
+- One section per decision, in the same order as the frontmatter, headed by the same question.
+- Carry each candidate's substance **inline**: what it is, what taking it commits to, how
   expensive it is to undo. Never "see file X" — refs go in a closing footnote.
-- Options are the real paths, not spiral's mechanics. No untranslated jargon.
+- Candidates are the real paths, not spiral's mechanics. No untranslated jargon.
 - Facts Divergence resolved go in as facts, not as things to decide.
 
-Render it and read the answer back (§Rendering). Then:
-- **A direction** (with or without notes) → step 3.
-- **都不對 / feedback with no pick** → same layer, next attempt: `A+1`, back to step 1. The
-  rejected file stays on disk untouched — it *is* the carry-over.
+Render it and read the answers back (§Rendering). Then:
+
+- **Every decision answered** → step 3.
+- **Some answered, some blank** → the picks are settled and stay settled; the blanks are not.
+  `A+1`, back to step 1 carrying the settled ones. This is not a retry: settling some decisions
+  is exactly what makes the next ones askable, so the next round is a *different* round.
+- **Nothing answered, notes given** → 都不對. `A+1`, back to step 1 with their reasoning.
+
+The answered file stays on disk untouched — it *is* the carry-over.
 
 ## 3 — Converge
 
-**You write** `.spiral/L<N>-plan.md` — narrowing the chosen direction into one determinate
-result at this layer. Unlike the widening, this motion wants full context rather than
-blindness: the human has already picked, so there is nothing left to be unbiased about.
+**You write** `.spiral/L<N>-plan.md` — narrowing everything they settled at this layer into one
+determinate result. Several settled decisions make **one** plan, not one section each: the
+result is what they jointly commit to. Unlike the widening, this motion wants full context
+rather than blindness: the human has already picked, so there is nothing left to be unbiased
+about.
+
+The two-way doors you kept off the page (§2) get resolved here — a sane default and one line
+saying you took it, so nothing was decided silently.
 
 The result carries four things:
 
@@ -88,7 +127,7 @@ The result carries four things:
 - **What is now concrete enough to build on** — the shape a next layer can take as given:
   scope, boundaries, the pieces and how they relate. Concrete at *this* layer's grain, no finer.
 - **What is deliberately left to the next layer** — the choices you are consciously not making
-  yet, each with why it is premature. This is the seam the next round descends through; an empty
+  yet, each with why it is premature. This is the seam the next layer descends through; an empty
   list means you either over-specified or the layer is actually done.
 - **What would overturn this** — the observation that would make it the wrong call, plus one
   line each for the directions that lost. A result with no falsifier is a preference; say so
@@ -103,16 +142,16 @@ Hold these while writing it:
 
 - **Concrete at this layer, not the next one.** No file lists, no task breakdowns, no code, no
   API signatures — unless *this* layer is explicitly that grain. Over-specifying steals the next
-  round's job and forecloses choices nobody made.
+  layer's job and forecloses choices nobody made.
 - **Resolve, don't punt.** A sub-choice with a right answer gets looked up, not listed as an
   open question. A reversible one gets a sane default and a note — do not hand it back to the
   human. "Left to the next layer" is for what is genuinely premature, never for what you
   couldn't be bothered to settle.
-- **Do not re-open the choice.** They already picked; your job is to make that pick determinate,
-  not to re-argue it. The rejected rounds sitting in your context are input, not an invitation
-  to relitigate — you write the plan for the direction they chose, including the parts you would
-  have argued against. If the pick turns out to be internally contradictory, say so in one line
-  and stop, rather than silently substituting your own.
+- **Do not re-open their choices.** They already picked; your job is to make those picks
+  determinate, not to re-argue them. The rejected menus sitting in your context are input, not an
+  invitation to relitigate — you write the plan for the directions they chose, including the
+  parts you would have argued against. If their picks turn out to contradict each other, say so
+  in one line and stop, rather than silently substituting your own.
 
 ## 4 — The human decides whether to dig
 
@@ -158,11 +197,11 @@ layer's Divergence, `/cf`, a human) ignores it.
   The promoted file is the deliverable: hand it to `/cf <the goal, one line>` with the file as
   context — it is a **seed**, not a contract set, so `/cf` still runs its own research → plan →
   gate. Then stop. Executing is not yours.
-- **再挖一層** → `L+1`, attempt back to `a1`, and back to step 1 — diverging from *this plan*
+- **再挖一層** → `L+1`, round back to `a1`, and back to step 1 — diverging from *this plan*
   and carrying their notes.
 
 Do **not** dispatch Divergence before this answer. Putting a fresh menu of directions in front
-of someone who was ready to stop manufactures the next round — that is the churn, mechanized.
+of someone who was ready to stop manufactures the next layer — that is the churn, mechanized.
 
 ## Rendering
 
@@ -181,12 +220,17 @@ It ends with `[spiral] save-mode=browser|inline`.
   ```bash
   bash "${CLAUDE_PLUGIN_ROOT}/scripts/wait-decision.sh" <file>
   ```
-- **`inline`** (viz absent / headless) → **AskUserQuestion** with the same options plus "Other".
-- **On wake, branch on `choice:`, never on how you woke.** Grep `choice:`/`notes:` from the
-  file (`notes:` `\n` is literal — unescape it). `choice:` non-empty → that is the call.
-  `choice:` empty with `notes:` filled → they Saved without picking, which is 都不對 *plus* their
-  reasoning — the `A+1` path. Never read a no-pick as agreement with `recommend:` — an unpicked
-  option was not picked. Both empty → take the typed answer, or ask.
+  The waiter wakes on the Save itself, not on the round being complete — a partly answered round
+  is a legitimate answer (§2), and reading it is your job, not the waiter's.
+- **`inline`** (viz absent / headless) → **AskUserQuestion**, one question per decision plus
+  "Other". It caps at four; a wider round goes in batches, and a batch that comes back changing
+  what the later ones should ask is a new round, not a continuation.
+- **On wake, branch on what is in the file, never on how you woke.** Grep every
+  `<id>.choice:` / `<id>.notes:` and the round-level `notes:` (`\n` in a notes value is literal —
+  unescape it). A decision with a non-empty `choice` is settled. One left empty is **not** — never
+  read a blank as agreement with `recommend:`, an unpicked option was not picked. Then take the
+  §2 branch: all settled → §3; some settled → `A+1` carrying them; none settled → 都不對.
+  Every answer key empty and no `notes:` → take the typed answer, or ask.
   If you proceed from a typed answer while the waiter may still poll, `TaskStop` it.
 
 ## Rules
@@ -194,15 +238,15 @@ It ends with `[spiral] save-mode=browser|inline`.
 - **Spiral plans; it does not build.** No code, no gate, no commit. If the question is already
   determinate — "how do I implement X" — say so and point at `/cf`; a settled task does not
   need divergence.
-- **One layer per round, and never descend two.** You write the plan at the current grain; the
-  next layer is the next round's job. A plan that arrives with file lists and task breakdowns
+- **One layer at a time, and never descend two.** You write the plan at the current grain; the
+  next layer is the next pass's job. A plan that arrives with file lists and task breakdowns
   skipped a layer nobody approved. Writing it yourself is exactly where this gets tempting —
   you can see the implementation from here, and that is not a reason to put it on the page.
-- **The human owns the pick and the stop.** You never choose a direction for them, and you never
-  start another round on your own say-so.
+- **The human owns the picks and the stop.** You never choose a direction for them, and you never
+  start another layer on your own say-so.
 - **Keep the Divergence dispatch simple and goal-first** — what to widen from, the carry-over,
   the output shape. Don't pour in your own hypotheses: steering Divergence toward what you expect
   destroys the only thing it is for, and it is now the only isolation left in the loop. If it
-  returns one real direction, render one — padding the page to three options to look thorough is
-  the failure mode.
+  returns one real decision with two candidates, render exactly that — padding the page to look
+  thorough is the failure mode.
 - **Files are the source of truth.** Your prose is for the human, not the record.
