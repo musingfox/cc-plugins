@@ -1,11 +1,12 @@
 ---
 name: marketplace
 description: >-
-  This skill should be used when working on the cc-plugins repository itself and the
-  user asks to "add a plugin", "create a new plugin here", "rename a plugin", "remove
-  a plugin", "bump the version", "release this plugin", or after editing any plugin's
-  components. Enforces the repo's four-file invariant — plugin.json, marketplace.json,
-  README.md, and the version bump that makes Claude Code refresh its cache.
+  Use when working on the cc-plugins repository itself: adding a plugin, renaming one,
+  removing one, bumping a version, or after editing any plugin's components. Also when
+  writing or revising a skill's description or body, or editing CLAUDE.md — WRITING.md
+  carries the judgment for that. Enforces the repo's four-file invariant — plugin.json,
+  marketplace.json, README.md, and the version bump that makes Claude Code refresh its
+  cache.
 allowed-tools: Read Edit Write Glob Grep Bash(git status *) Bash(git diff *) Bash(ls *)
 ---
 
@@ -24,6 +25,18 @@ times; any one of them drifting is a defect, not a cosmetic issue.
 The plugin / marketplace spec itself follows the official Claude Code documentation.
 Consult the docs (`ctx7 docs /websites/code_claude`) rather than inferring conventions
 from neighbouring plugins — the neighbours may be stale.
+
+## Writing the components
+
+The four artifacts above are bookkeeping; what goes *inside* a skill is a separate
+craft. Read [WRITING.md](WRITING.md) whenever you write or revise a skill's
+`description` or body, or edit `CLAUDE.md`. It carries the judgment: how a description's
+wording decides whether the skill fires, when a skill should be user-invoked instead
+(`disable-model-invocation: true`) and pay no context load at all, what belongs in a
+sibling file rather than in `SKILL.md`, and which sentences are no-ops to delete.
+
+For the mechanics — frontmatter fields, directory layout, eval tooling — use
+`plugin-dev:skill-development` and `skill-creator` instead.
 
 ## Adding a plugin
 
@@ -78,3 +91,6 @@ Read back what you touched and confirm each holds:
 - Skill `name` in frontmatter is lowercase-hyphen and matches its directory — for a
   plugin skill, that `name` becomes the last segment of `/<plugin>:<name>`, so spaces
   or capitals produce a command nobody can type.
+- Any `description` you touched holds one trigger per branch, with synonyms collapsed,
+  and the invocation choice was made rather than defaulted — see
+  [WRITING.md](WRITING.md).
