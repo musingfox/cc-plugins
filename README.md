@@ -232,6 +232,7 @@ cc-plugins/
 ├── spec/               skills: spec · scripts: spec.sh
 ├── spiral/             commands: spiral · agents: divergence · scripts
 ├── viz/                skills: viz-inline, viz-render · lib, tests
+├── wizard/             skills: wizard
 └── README.md
 ```
 
