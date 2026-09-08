@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
-# Block until a spiral decision brief's `choice:` OR `notes:` frontmatter is
-# filled by the in-browser Save, then print both and exit 0; exit 2 on timeout.
-# Watching `notes:` too is what makes a Save with no option picked — a 都不對
-# with reasoning — resume the turn instead of polling to timeout.
+# Block until a spiral decision brief is written back by the in-browser Save,
+# then print the answer frontmatter and exit 0; exit 2 on timeout.
+#
+# The wake condition is "a Save happened", not "everything was answered": the
+# file's mtime changing is the one signal that works for both a single-question
+# brief (`choice:` / `notes:`) and a round brief (`q1.choice:` / `q1.notes:`),
+# and it still fires for a Save that picked nothing — a 都不對 with reasoning.
+# Deciding what an empty answer means belongs to the agent, not the waiter.
 #
 # Run this with the Bash tool's run_in_background — when it exits, the harness
 # re-invokes the agent. That makes the human's browser Save the ONLY action
@@ -21,18 +25,22 @@ if [ ! -f "$brief" ]; then
   exit 1
 fi
 
-field() {
-  grep -m1 "^$1:" "$brief" 2>/dev/null \
-    | sed "s/^$1:[[:space:]]*//" \
-    | sed 's/[[:space:]]*$//'
+mtime_of() {
+  stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null
 }
 
+# Every answer line in the frontmatter block: `choice:` / `notes:` and the
+# per-question `<id>.choice:` / `<id>.notes:` of a round brief.
+answers() {
+  sed -n '2,/^---$/p' "$brief" | grep -E '^([A-Za-z0-9_-]+\.)?(choice|notes):'
+}
+
+start="$(mtime_of "$brief")"
+
 while [ "$elapsed" -lt "$timeout" ]; do
-  choice="$(field choice)"
-  notes="$(field notes)"
-  if [ -n "$choice" ] || [ -n "$notes" ]; then
-    echo "choice: $choice"
-    echo "notes: $notes"
+  now="$(mtime_of "$brief")"
+  if [ -n "$now" ] && [ "$now" != "$start" ]; then
+    answers || echo "[spiral] saved, but no choice/notes keys in the frontmatter"
     exit 0
   fi
   sleep "$interval"
