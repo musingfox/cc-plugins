@@ -83,7 +83,8 @@ Beyond the two motions, one role completes the system.
 
 **The decision-maker** is the anchor, and owns what no other role may take:
 
-1. the **choice** — which direction, and when what is on the table is good enough to settle;
+1. the **choice** — which direction, or which several to carry forward together (§5), and
+   when what is on the table is good enough to settle;
 2. the **navigation** — when to widen again, when to descend a layer (§5), when to stop, and
    the hardest call of all, when to break the frame (§7).
 
@@ -101,6 +102,34 @@ A single pass rarely settles anything. More often you **oscillate** convergence 
 divergence several times at one layer before the conclusion is solid enough to act on. (A
 boss and a manager meet repeatedly — converge a draft, diverge on its flaws, converge
 again — before any plan is handed to an engineer.)
+
+**One oscillation has three parts**, and naming them is what keeps it from collapsing back
+into a single pass:
+
+- **Round** — the decisions that can be put to the decision-maker *at once*: every one whose
+  prerequisites are already settled, so that answering any of them presupposes no answer to
+  another still open. A decision waiting on one in the same round belongs to the next round.
+  A round is one demand on the decision-maker's attention, and it carries as many decisions
+  as are genuinely independent — not one.
+- **Probe** — a deliberately shallow, throwaway descent down a direction that was chosen but
+  is not yet settled, run to find what it *collides with*. Its output is the collision, never
+  a plan; the first hard thing it hits is where it stops. Several directions may be probed at
+  once, and that is the point — comparing what two paths actually run into beats comparing two
+  descriptions of them. What a probe reports is largely det (§2) — what a path hits has a
+  right answer — so probing is mechanism work and deserves little judgment, however many
+  probes run at once.
+- **The residual choice** — what is still open once the probes report. A direction that
+  collided with something hard is dead by right/wrong and is dropped without a vote (§4); only
+  where two or more survive *and* the difference between them is an opinion does the question
+  go back to the decision-maker. That return is the next oscillation at the same layer.
+
+**An oscillation counts only if it brought something back** (§6). A probe that collided with
+nothing, or a round that reshaped no decision, is not a licence to widen again — it is the
+signal that the layer is ready to converge. Rounds are not run until some list is exhausted:
+because a converged result is what makes the next decisions visible (§1), the decisions at a
+layer are never enumerable in advance. An empty round means *nothing more can be asked now*,
+never *the layer is done*. When a layer is done is the decision-maker's call (§4), and no
+other's.
 
 **Layers are scopes of concreteness, and they nest.** A layer's converged conclusion
 becomes the *vague seed* of the next, more concrete layer below it. The settled plan seeds
