@@ -6,10 +6,10 @@ allowed-tools: [Agent, Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion]
 
 # Spiral
 
-You drive the **main thread**: dispatch **Divergence** — the one isolated subagent, and the only
-thing here that must not see your hypotheses — then converge what they settled into a plan
-yourself, write what the human reads, and stop. You do **not** name directions or pick between
-them.
+You drive the **main thread**: dispatch **Divergence** — the one thing here that must not see
+your hypotheses — dispatch **Probes** to walk whatever the human leaves open, then converge what
+they settled into a plan yourself, write what the human reads, and stop. You do **not** name
+directions or pick between them.
 
 Each **layer** lands one plan or milestone, concrete at that layer's grain and no finer. The
 next layer diverges from *that plan*, so the spiral descends — vague question → approach →
@@ -59,7 +59,7 @@ Write `.spiral/L<N>-a<M>-directions.md` — *you* write this; Divergence returns
 human-facing prose.
 
 **One round asks every decision that is askable now, and only the one-way doors.** A two-way
-door is cheap to undo: give it a sane default in §3 and one line in the plan saying you took it.
+door is cheap to undo: give it a sane default in §4 and one line in the plan saying you took it.
 Putting it on the page spends the attention the real doors need. If only one decision survives
 that filter, the round is one question — a padded page is worse than a short one.
 
@@ -75,6 +75,7 @@ prompt: 這幾題彼此獨立，可以分開回答；沒把握的留白，下一
 d1.title: <the decision, phrased as a question>
 d1.options: <candidate A> | <candidate B> | <candidate C>
 d1.recommend: <the one you lean to>   # optional
+d1.multi: true                        # optional — they may keep several alive; see §3
 d1.choice:                            # leave empty
 d1.notes:                             # leave empty
 d2.title: <the next decision>
@@ -89,6 +90,11 @@ notes:                                # leave empty — round-level remarks
 authored a menu has already weighted it. Say what you lean to and why in the body, so they can
 disagree with a reason rather than a hunch. Do not add a 都不對 option; leaving a decision blank
 already says it, and §Rendering reads it that way.
+
+Set **`multi`** on a decision when the candidates cannot honestly be told apart from their
+descriptions — the difference is real but only shows up once you walk them. That invites them to
+keep several alive, and §3 walks the ones they kept. Do not set it as a courtesy: an invitation
+to defer is a cost, and a decision they can settle from the page should be settled from the page.
 
 The body exists to be read by someone who has not watched the layer being built:
 
@@ -109,7 +115,47 @@ Render it and read the answers back (§Rendering). Then:
 
 The answered file stays on disk untouched — it *is* the carry-over.
 
-## 3 — Converge
+## 3 — Probe what they left open
+
+A decision that came back with **one** pick is settled; there is nothing to walk. If no decision
+came back with more than one, skip straight to §4 — that is exactly the old behaviour, unchanged.
+
+Where they kept several candidates alive, walk them. **One probe per live candidate, dispatched
+in parallel in a single message:**
+
+> `Agent(subagent_type: "spiral:probe", model: "sonnet")` with **one** candidate, what taking it
+> would commit to, and the artifact this layer widens from. Nothing else — a probe that can see
+> the other candidates starts comparing, and comparing is not its job.
+
+Cheap models, as many as there are candidates. What a probe reports — what a path actually runs
+into — has a right answer, so it is mechanism work and deserves little judgment however many run
+at once (`concept.md` §2). Walking them at main-thread cost is what would make this unaffordable.
+
+Collect the reports into `.spiral/L<N>-a<M>-probe.md`, one section per candidate, complete enough
+that the collisions survive your context rolling over. Then sort them:
+
+- **Collided with something hard** → dead by right/wrong. Drop it and record the collision. This
+  does not go back to the human: a fact is nobody's vote (`concept.md` §4).
+- **Still standing** → it survived the walk.
+
+Then take one of four exits:
+
+- **One candidate left standing** → the probes settled the decision. Go to §4.
+- **Two or more left, and the difference between them is now an opinion** → back to §2, `A+1`, a
+  round asking just that decision, its candidates narrowed to the survivors and the collisions
+  carried in the body. This is the second oscillation at this layer, and it is the only reason to
+  put the same decision in front of them twice.
+- **Every candidate collided** → the decision has no live answer. Back to §2, `A+1`, carrying the
+  collisions — the menu was wrong, and now you know why.
+- **The probes brought nothing back** — no collisions, no new facts → do **not** ask again. An
+  oscillation that returns nothing is not a licence to widen (`concept.md` §6): take your
+  recommendation to §4 and say in the plan that the walk could not separate the candidates.
+
+If a probe reports that the only way to answer is to build or run the thing, that is not
+spiral's job. Say so and offer the handoff: spiral writes no code at any depth, and a throwaway
+walk is still a walk, not a prototype.
+
+## 4 — Converge
 
 **You write** `.spiral/L<N>-plan.md` — narrowing everything they settled at this layer into one
 determinate result. Several settled decisions make **one** plan, not one section each: the
@@ -119,6 +165,12 @@ about.
 
 The two-way doors you kept off the page (§2) get resolved here — a sane default and one line
 saying you took it, so nothing was decided silently.
+
+Where §3 walked candidates, the collisions are part of the result, not background. A candidate
+the probes killed belongs in the falsifier section with what it hit; a decision the probes
+settled is settled on evidence, and the plan should say so rather than presenting it as a
+preference. **Do not re-open a decision the probes closed** — a wall is a fact, and arguing with
+it here is the same mistake as putting it to a vote.
 
 The result carries four things:
 
@@ -133,7 +185,7 @@ The result carries four things:
   line each for the directions that lost. A result with no falsifier is a preference; say so
   rather than dressing it up.
 
-**The first and last sections must stand alone.** Once this plan is promoted (§4) they are the
+**The first and last sections must stand alone.** Once this plan is promoted (§5) they are the
 acceptance criteria a later verifier reads — with the plan file and nothing else. No "see the
 conversation", no `.spiral/` paths: those die with the run, and a criterion nobody can resolve
 is a criterion nobody can check.
@@ -153,7 +205,7 @@ Hold these while writing it:
   parts you would have argued against. If their picks turn out to contradict each other, say so
   in one line and stop, rather than silently substituting your own.
 
-## 4 — The human decides whether to dig
+## 5 — The human decides whether to dig
 
 The plan is on disk and they can read it. Ask **inline** — `AskUserQuestion`, options
 `夠了，就用這個目標` / `再挖一層`, plus the tool's "Other" — carrying a plain-language line on what
@@ -243,7 +295,8 @@ It ends with `[spiral] save-mode=browser|inline`.
   skipped a layer nobody approved. Writing it yourself is exactly where this gets tempting —
   you can see the implementation from here, and that is not a reason to put it on the page.
 - **The human owns the picks and the stop.** You never choose a direction for them, and you never
-  start another layer on your own say-so.
+  start another layer on your own say-so. Dropping a candidate a probe found a wall in is not a
+  pick — it was shown to be wrong, and right/wrong was never theirs to vote on.
 - **Keep the Divergence dispatch simple and goal-first** — what to widen from, the carry-over,
   the output shape. Don't pour in your own hypotheses: steering Divergence toward what you expect
   destroys the only thing it is for, and it is now the only isolation left in the loop. If it
