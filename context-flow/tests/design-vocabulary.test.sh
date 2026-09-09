@@ -70,3 +70,9 @@ if [ "$gloss_lines" -ge 20 ]; then
 else
   assert_eq ">=20" "$gloss_lines" "research glossary range has >= 20 lines"
 fi
+
+# DesignItTwiceRecorded
+for phrase in 'DESIGN-IT-TWICE' 'not imported' 'Agent tool'; do
+  assert_ge1 "$(count_f "$RESEARCH" "$phrase")" "research glossary has $phrase"
+  assert_ge1 "$(count_f "$PLAN" "$phrase")" "plan glossary has $phrase"
+done
