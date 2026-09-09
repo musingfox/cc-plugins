@@ -178,3 +178,28 @@ assert_eq "0" "$bound" "plan.md outside glossary has no boundar"
 assert_ge1 "$(count_in_range_f "$PLAN" '^### What counts as High' '^### What is NOT High' 'public API / SDK / CLI surface')" "plan High criteria keep public API / SDK / CLI surface"
 assert_ge1 "$(count_in_range_f "$PLAN" '^### What counts as High' '^### What is NOT High' 'vendor / service / paid dependency')" "plan High criteria keep vendor / service / paid dependency"
 assert_ge1 "$(count_in_range_f "$PLAN" '^## Output Schema' '^### contracts.json' 'no live services')" "plan Output Schema keeps no live services"
+
+# AntiDriftNegativeControl
+NEG=$(mktemp -d)
+awk '{print} /^## Visualization$/{print "components"}' "$PLAN" > "$NEG/plan.md"
+awk '{print} /^## Existing Capabilities$/{print "boundary"}' "$RESEARCH" > "$NEG/research.md"
+vis_copy=$(plan_vis_forbidden "$NEG/plan.md")
+schema_copy=$(research_schema_forbidden "$NEG/research.md")
+if [ "$vis_copy" -ge 1 ]; then
+  assert_eq ge1 ge1 "injected components in plan Visualization range is counted"
+else
+  assert_eq ">=1" "$vis_copy" "injected components in plan Visualization range is counted"
+fi
+if [ "$schema_copy" -ge 1 ]; then
+  assert_eq ge1 ge1 "injected boundary in research Output Schema range is counted"
+else
+  assert_eq ">=1" "$schema_copy" "injected boundary in research Output Schema range is counted"
+fi
+assert_eq "0" "$(plan_vis_forbidden "$PLAN")" "unmodified plan Visualization range has 0 forbidden"
+assert_eq "0" "$(research_schema_forbidden "$RESEARCH")" "unmodified research Output Schema range has 0 forbidden"
+rm -rf "$NEG"
+if [ ! -d "$NEG" ]; then
+  assert_eq gone gone "negative-control temp dir is removed"
+else
+  assert_eq "absent" "present" "negative-control temp dir is removed"
+fi
