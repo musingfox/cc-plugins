@@ -21,10 +21,10 @@ seq=$(grep -oE '^## Phase [0-6]' diagnose/docs/method.md | paste -sd, -)
 [ "$seq" = '## Phase 0,## Phase 1,## Phase 2,## Phase 3,## Phase 4,## Phase 5,## Phase 6' ] \
   || fail "T4: phase heading sequence was $seq"
 
-n=$(grep -cE '^### (Tighten the loop|Non-deterministic bugs|When you genuinely cannot build a loop|Completion criterion)' diagnose/docs/method.md || true)
+n=$(awk '/^## Phase 1/,/^## Phase 2/' diagnose/docs/method.md | grep -cE '^### (Tighten the loop|Non-deterministic bugs|When you genuinely cannot build a loop|Completion criterion)' || true)
 [ "$n" -eq 4 ] || fail "T5: expected Phase 1's four subsections, got $n"
 
-crit=$(awk '/^### Completion criterion/,/^## Phase 2/' diagnose/docs/method.md)
+crit=$(awk '/^### Completion criterion: a tight loop that goes red/,/^## Phase 2/' diagnose/docs/method.md)
 
 n=$(printf '%s\n' "$crit" | grep -cE '^- \[ \] \*\*' || true)
 [ "$n" -eq 4 ] || fail "T6: expected 4 completion checkboxes, got $n"
@@ -70,3 +70,24 @@ n=$(printf '%s\n' "$hitl" | grep -ciE 'drive _them_|the agent runs' || true)
 [ "$n" -eq 0 ] || fail "T16c: HITL construction must not tell the agent to drive the script"
 n=$(printf '%s\n' "$crit" | grep -F '**Agent-runnable**' | grep -ci 'exception' || true)
 [ "$n" -ge 1 ] || fail "T16d: Agent-runnable must name the HITL script as the exception, not a satisfier"
+
+# Phases 5 and 6 hinge on "the confirmed cause"; a run must be able to tell
+# when a hypothesis has earned that word.
+conf=$(awk '/^### Completion criterion: a cause is confirmed/,/^## Phase 5/' diagnose/docs/method.md)
+[ -n "$conf" ] || fail "T17: expected a confirmed-cause criterion at the end of Phase 4"
+n=$(printf '%s\n' "$conf" | grep -cE '^- \[ \] \*\*(Predicted|Flips the loop both ways)\*\*' || true)
+[ "$n" -eq 2 ] || fail "T17: expected the Predicted and Flips-both-ways conditions, got $n"
+n=$(printf '%s\n' "$conf" | grep -F 'Flips the loop both ways' | grep -c 'green' || true)
+[ "$n" -ge 1 ] || fail "T17b: the flip condition must require the loop to go green when the cause is neutralised"
+n=$(printf '%s\n' "$conf" | grep -F 'Flips the loop both ways' | grep -c 'red again' || true)
+[ "$n" -ge 1 ] || fail "T17c: the flip condition must require red again on restore"
+n=$(printf '%s\n' "$conf" | grep -ci 'discard it' || true)
+[ "$n" -ge 1 ] || fail "T17d: the neutralising probe must be discarded"
+n=$(printf '%s\n' "$conf" | grep -ci 'never reaches the commit' || true)
+[ "$n" -ge 1 ] || fail "T17e: the neutralising probe must be kept out of the commit"
+n=$(printf '%s\n' "$conf" | grep -cF 'No confirmed cause, no Phase 5' || true)
+[ "$n" -eq 1 ] || fail "T17f: expected the Phase 5 gate once, got $n"
+p4=$(grep -n '^## Phase 4' diagnose/docs/method.md | head -1 | cut -d: -f1)
+cc=$(grep -n '^### Completion criterion: a cause is confirmed' diagnose/docs/method.md | head -1 | cut -d: -f1)
+p5=$(grep -n '^## Phase 5' diagnose/docs/method.md | head -1 | cut -d: -f1)
+[ "$p4" -lt "$cc" ] && [ "$cc" -lt "$p5" ] || fail "T17g: the criterion must sit inside Phase 4 (p4=$p4 cc=$cc p5=$p5)"

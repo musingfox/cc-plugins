@@ -158,6 +158,15 @@ Tool preference:
 
 **Perf branch.** For performance regressions, logs are usually wrong. Instead: establish a baseline measurement (timing harness, `performance.now()`, profiler, query plan), then bisect. Measure first, fix second.
 
+### Completion criterion: a cause is confirmed, not just favoured
+
+Phases 5 and 6 speak of "the confirmed cause". A hypothesis is **confirmed** only when both hold:
+
+- [ ] **Predicted**: a Phase 4 probe observed the effect the hypothesis predicted in Phase 3, at the boundary it named.
+- [ ] **Flips the loop both ways**: neutralising the suspected cause alone — a stubbed call, a reverted commit, a swapped config value, nothing else changed — turns the loop green, and restoring it turns the loop red again.
+
+The neutralising change is a probe, not a repair: make it in the worktree, run the loop, then discard it. It never reaches the commit, and it is not the fix — `/cf` decides what the correct change is. A hypothesis that survives on evidence that also fits another surviving hypothesis is not confirmed; go back to Phase 3 and find the probe that separates them. No confirmed cause, no Phase 5.
+
 ## Phase 5: Failing test at the seam
 
 Turn the minimised repro into a failing test at the correct seam. Watch it fail. Commit it on the diagnose branch. Stop. The fix is `/cf`'s work; do not apply the fix.
