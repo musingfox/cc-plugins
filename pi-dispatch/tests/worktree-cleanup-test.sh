@@ -55,7 +55,7 @@ fresh_repo() {
   git -C "$d" init -q
   git -C "$d" config user.email "test@example.com"
   git -C "$d" config user.name  "Test User"
-  git -C "$d" commit -q --allow-empty -m "init"
+  git -C "$d" commit -q --allow-empty -m "chore: init"
   echo "$d"
 }
 

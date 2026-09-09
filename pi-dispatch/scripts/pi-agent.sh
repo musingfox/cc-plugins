@@ -22,11 +22,16 @@
 # run resumes it (new RUNDIR, same session context) and re-points the symlink,
 # so a NAME follows the conversation like a native agent id does.
 #
-# watch: loops over every registered agent, polls each, and prints ONE line per
-# MEANINGFUL state change (volatile elapsed/stale counters normalized away).
-# Exits 0 when no agent is in flight (nothing RUNNING) — arm it on the Monitor
-# tool and each emitted line becomes a chat notification, which is the native
-# "background agent completed" experience.
+# watch: loops over the agents NAMED ON ITS COMMAND LINE, polls each, and prints
+# ONE line per MEANINGFUL state change (volatile elapsed/stale counters normalized
+# away). Exits 0 when none of them is in flight — arm it on the Monitor tool and
+# each emitted line becomes a chat notification, which is the native "background
+# agent completed" experience.
+#
+# The names are required, and that is the point: the registry is machine-wide, so
+# a watch over all of it would report on — and, on a quota hit, KILL — workers
+# belonging to a dispatch it knows nothing about. `ls` is the global view; `watch`
+# is scoped to one batch.
 
 set -euo pipefail
 
@@ -38,7 +43,7 @@ usage() {
   echo "       pi-agent.sh send NAME TEXT_OR_FILE" >&2
   echo "       pi-agent.sh poll|peek|stop NAME" >&2
   echo "       pi-agent.sh ls" >&2
-  echo "       pi-agent.sh watch [INTERVAL_SECONDS]" >&2
+  echo "       pi-agent.sh watch INTERVAL_SECONDS NAME [NAME...]" >&2
   exit 2
 }
 
@@ -117,50 +122,64 @@ stop)
   ;;
 
 watch)
-  INTERVAL="${1:-15}"
+  INTERVAL="${1:-}"
+  case "$INTERVAL" in ''|*[!0-9]*) echo "pi-agent: watch needs INTERVAL_SECONDS as its first argument" >&2; usage ;; esac
+  shift
+  [ "$#" -gt 0 ] || {
+    echo "pi-agent: watch needs the NAMEs of the agents to watch." >&2
+    echo "  The registry is machine-wide. An unscoped watch would report on — and, on a" >&2
+    echo "  quota hit, kill — workers belonging to another dispatch. Use 'ls' for the" >&2
+    echo "  global view; name your own batch here." >&2
+    exit 2
+  }
+  for NAME in "$@"; do resolve "$NAME"; done   # fail fast on a typo'd name
+  NAMES=("$@")
   STATE="$(mktemp -d)"
   trap 'rm -rf "$STATE"' EXIT
   while :; do
     ACTIVE=0
-    if [ -d "$REG" ]; then
-      for link in "$REG"/*; do
-        [ -L "$link" ] || continue
-        name="$(basename "$link")"; dir="$(readlink "$link")"
-        [ -d "$dir" ] || continue
-        line="$("$SCRIPT_DIR/pi-poll.sh" "$dir")"
-        case "$line" in RUNNING*) ACTIVE=1 ;; esac
-        # Normalize volatile counters (elapsed/stale seconds, stream bytes) so a
-        # still-running turn doesn't re-emit every sweep; emit only on meaningful change.
-        norm="$(printf '%s' "$line" | sed -E 's/[0-9]+s/Ns/g; s/[0-9]+B/NB/g; s/ +/ /g')"
-        if [ "$norm" != "$(cat "$STATE/$name" 2>/dev/null || true)" ]; then
-          printf '%s\n' "$norm" > "$STATE/$name"
-          echo "$name: $line"
-          case "$line" in *QUOTA*) QUOTA_SEEN=1 ;; esac
-        fi
-      done
-      # Quota abort: one worker hit the provider wall, so every sibling still in
-      # flight is about to pay for the same wall. Kill them now and stamp a
-      # replayable terminal verdict; the caller sees one QUOTA line per worker
-      # and falls back to a Claude self-do builder for the lot.
-      # ponytail: assumes siblings share the provider/quota (true for one
-      # settings.json default); compare RUNDIR/routing if mixed routing appears.
-      if [ "${QUOTA_SEEN:-0}" = 1 ]; then
-        for link in "$REG"/*; do
-          [ -L "$link" ] || continue
-          name="$(basename "$link")"; dir="$(readlink "$link")"
-          [ -d "$dir" ] || continue
-          case "$("$SCRIPT_DIR/pi-poll.sh" "$dir")" in RUNNING*)
-            "$SCRIPT_DIR/pi-stop.sh" "$dir" >/dev/null 2>&1
-            line="STATUS=FAIL OUTPUT=$dir/result.md QUOTA sibling-abort"
-            printf '%s\n' "$line" > "$dir/status"
-            printf '%s\t%s\t%s\t%s\n' "$(date +%Y-%m-%dT%H:%M:%S%z)" "$(basename "$(dirname "$dir")")" "$line" "$dir" \
-              >> "${PI_RUNS_DIR:-$HOME/.cache/pi-runs}/index.log" 2>/dev/null || true
-            printf '%s\n' "$line" > "$STATE/$name"
-            echo "$name: $line" ;;
-          esac
-        done
-        ACTIVE=0
+    for name in "${NAMES[@]}"; do
+      dir="$(readlink "$REG/$name" 2>/dev/null || true)"
+      [ -n "$dir" ] && [ -d "$dir" ] || continue
+      line="$("$SCRIPT_DIR/pi-poll.sh" "$dir")"
+      case "$line" in RUNNING*) ACTIVE=1 ;; esac
+      # Normalize volatile counters (elapsed/stale seconds, stream bytes) so a
+      # still-running turn doesn't re-emit every sweep; emit only on meaningful change.
+      norm="$(printf '%s' "$line" | sed -E 's/[0-9]+s/Ns/g; s/[0-9]+B/NB/g; s/ +/ /g')"
+      if [ "$norm" != "$(cat "$STATE/$name" 2>/dev/null || true)" ]; then
+        printf '%s\n' "$norm" > "$STATE/$name"
+        echo "$name: $line"
+        # Carry the CLASS, not just the fact: siblings are stamped with it, and a
+        # QUOTA-WINDOW batch is retryable later while a QUOTA one is not. If both
+        # classes show up across workers, exhaustion is the stricter truth and wins.
+        case "$line" in
+          *QUOTA-WINDOW*) QUOTA_SEEN=1; [ "${QUOTA_TAG:-}" = QUOTA ] || QUOTA_TAG=QUOTA-WINDOW ;;
+          *QUOTA*)        QUOTA_SEEN=1; QUOTA_TAG=QUOTA ;;
+        esac
       fi
+    done
+    # Quota abort: one worker in this batch hit the provider wall, so every sibling
+    # in the batch is about to pay for the same wall. Kill them now and stamp a
+    # replayable terminal verdict carrying the SAME class the wall was reported
+    # with; the caller sees one QUOTA line per worker and falls back to a Claude
+    # self-do builder for the lot.
+    # ponytail: assumes the batch shares the provider/quota (true for one
+    # settings.json default); compare RUNDIR/routing if mixed routing appears.
+    if [ "${QUOTA_SEEN:-0}" = 1 ]; then
+      for name in "${NAMES[@]}"; do
+        dir="$(readlink "$REG/$name" 2>/dev/null || true)"
+        [ -n "$dir" ] && [ -d "$dir" ] || continue
+        case "$("$SCRIPT_DIR/pi-poll.sh" "$dir")" in RUNNING*)
+          "$SCRIPT_DIR/pi-stop.sh" "$dir" >/dev/null 2>&1
+          line="STATUS=FAIL OUTPUT=$dir/result.md ${QUOTA_TAG:-QUOTA} sibling-abort"
+          printf '%s\n' "$line" > "$dir/status"
+          printf '%s\t%s\t%s\t%s\n' "$(date +%Y-%m-%dT%H:%M:%S%z)" "$(basename "$(dirname "$dir")")" "$line" "$dir" \
+            >> "${PI_RUNS_DIR:-$HOME/.cache/pi-runs}/index.log" 2>/dev/null || true
+          printf '%s\n' "$line" > "$STATE/$name"
+          echo "$name: $line" ;;
+        esac
+      done
+      ACTIVE=0
     fi
     [ "$ACTIVE" = 1 ] || { echo "--- no agents in flight ---"; exit 0; }
     sleep "$INTERVAL"

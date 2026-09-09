@@ -84,7 +84,7 @@ harness tool can reach them).
 | activity snapshot | `pi-agent.sh peek NAME` | one-shot agent-view snapshot of a live run |
 | agent panel | `pi-agent.sh ls` | list registered agents + their state |
 | cancel | `pi-agent.sh stop NAME` | idempotent group-kill + unregister |
-| background notifications | `pi-agent.sh watch [INTERVAL]` | BLOCKING; polls every registered agent, prints one line per meaningful state change, exits when nothing is in flight |
+| background notifications | `pi-agent.sh watch INTERVAL NAME…` | BLOCKING; polls the NAMED agents only, prints one line per meaningful state change, exits when none is in flight |
 
 ## How main uses this
 
@@ -97,8 +97,11 @@ harness tool can reach them).
 3. Terminal verdicts persist in the RUNDIR and replay on re-poll; raw stream
    is kept as `pi.stream.jsonl`, distilled final text as `result.md`.
 4. `stop NAME` once a worker's result is consumed. The registry never
-   self-prunes, and every `watch` re-prints each registered terminal agent
+   self-prunes, and every `watch` re-prints each of ITS named terminal agents
    on its first sweep.
+5. `watch` requires the names because the registry is machine-wide: an
+   unscoped watch would report on — and quota-abort — another dispatch's
+   workers. `ls` is the global view.
 
 ## Waiting without burning tokens
 
@@ -106,7 +109,7 @@ Never poll from a Bash loop in the main thread — every poll is a tool call.
 Start the workers, then arm ONE blocking watch in the background:
 
 ```
-Bash(command: "pi-agent.sh watch 15", run_in_background: true)
+Bash(command: "pi-agent.sh watch 15 NAME1 NAME2 …", run_in_background: true)
 ```
 
 The command exits when nothing is in flight; the completion notification
@@ -133,7 +136,8 @@ line as one of two classes:
 | `QUOTA-WINDOW` | a rolling usage window ("usage limit … resets at") | yes, once it resets (hours) |
 
 `watch` then stops the siblings **it was given** and stamps them
-`STATUS=FAIL … QUOTA sibling-abort` — they share the wall. On either tag:
+`STATUS=FAIL … <tag> sibling-abort`, carrying the same class the wall was
+reported with — they share the wall. On either tag:
 
 1. Do not re-dispatch to pi **for this batch** — the wall does not move while
    it runs. The scope is the batch, not the session: a later dispatch is free

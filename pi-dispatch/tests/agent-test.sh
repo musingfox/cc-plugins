@@ -10,6 +10,9 @@
 #   send (batch) resumes the finished run (new RUNDIR), re-points the symlink
 #   ls           one line per agent, carrying that agent's poll status
 #   watch        emits per-agent lines, exits 0 when nothing is in flight
+#   quota class  the sibling stamp carries the class of the wall that triggered it
+#   watch scope  only the NAMED agents are polled and quota-aborted; an unnamed
+#                agent is neither reported nor killed, and no names is an error
 #   stop         unregisters the NAME
 #   unknown NAME poll fails non-zero
 
@@ -88,23 +91,40 @@ case "$LS" in *"worker-a STATUS=OK"*) ok "ls shows agent + status" ;; *) bad "ls
 [ ! -e "$REG/worker-b" ] && ok "ls prunes dangling link" || bad "ls prunes dangling link"
 
 # --- watch: emits lines, exits 0 with nothing in flight ---
-W="$("$SCRIPTS/pi-agent.sh" watch 1)"; RC=$?
+W="$("$SCRIPTS/pi-agent.sh" watch 1 worker-a)"; RC=$?
 [ "$RC" = 0 ] && ok "watch exits 0 when idle" || bad "watch exit rc=$RC"
 case "$W" in *"worker-a: STATUS=OK"*) ok "watch emits per-agent state" ;; *) bad "watch per-agent state (got: $W)" ;; esac
 case "$W" in *"no agents in flight"*) ok "watch terminal marker" ;; *) bad "watch terminal marker" ;; esac
 
-# --- watch quota-abort: one worker hits the provider wall -> siblings still in
-#     flight are killed and stamped QUOTA sibling-abort (replayable on poll) ---
+# --- watch without NAMEs: refused. The registry is machine-wide, so an unscoped
+#     watch would quota-abort another dispatch's workers ---
+if "$SCRIPTS/pi-agent.sh" watch 1 >/dev/null 2>&1; then
+  bad "watch without NAMEs must be refused"
+else
+  ok "watch without NAMEs is refused"
+fi
+
+# --- watch quota-abort: one worker hits the provider wall -> siblings IN THE
+#     WATCHED SET are killed and stamped QUOTA sibling-abort (replayable on poll),
+#     while an agent outside that set is left alone ---
 "$SCRIPTS/pi-agent.sh" start slow-w "SLOW_BRIEF" >/dev/null
+"$SCRIPTS/pi-agent.sh" start bystander-w "SLOW_BRIEF" >/dev/null
 "$SCRIPTS/pi-agent.sh" start quota-w "QUOTA_BRIEF" >/dev/null
 sleep 1
-W="$(PI_STALL_THRESHOLD_S=100000 "$SCRIPTS/pi-agent.sh" watch 1)"; RC=$?
+W="$(PI_STALL_THRESHOLD_S=100000 "$SCRIPTS/pi-agent.sh" watch 1 slow-w quota-w)"; RC=$?
 case "$W" in *"quota-w: STATUS=FAIL"*QUOTA*) ok "watch surfaces QUOTA" ;; *) bad "watch surfaces QUOTA (got: $W)" ;; esac
-case "$W" in *"slow-w: STATUS=FAIL"*"QUOTA sibling-abort"*) ok "watch aborts in-flight siblings on quota" ;; *) bad "watch sibling abort (got: $W)" ;; esac
+# The stub's wall is "The usage limit has been reached" -> QUOTA-WINDOW, so the
+# sibling stamp must carry that class too: a batch aborted by a resetting window
+# is retryable later, and a plain QUOTA stamp would tell the caller it is not.
+case "$W" in *"slow-w: STATUS=FAIL"*"QUOTA-WINDOW sibling-abort"*) ok "sibling abort carries the class the wall was reported with" ;; *) bad "watch sibling abort class (got: $W)" ;; esac
+case "$W" in *bystander-w*) bad "watch reported on an agent it was not given: $W" ;; *) ok "watch ignores agents outside its set" ;; esac
 [ "$RC" = 0 ] && ok "watch exits after quota abort" || bad "watch exit after quota abort rc=$RC"
 L="$("$SCRIPTS/pi-agent.sh" poll slow-w)"
-case "$L" in *"QUOTA sibling-abort"*) ok "sibling verdict replays on poll" ;; *) bad "sibling verdict replay (got: $L)" ;; esac
+case "$L" in *"QUOTA-WINDOW sibling-abort"*) ok "sibling verdict replays on poll" ;; *) bad "sibling verdict replay (got: $L)" ;; esac
+L="$(PI_STALL_THRESHOLD_S=100000 "$SCRIPTS/pi-agent.sh" poll bystander-w)"
+case "$L" in RUNNING*) ok "unwatched agent survives another batch's quota abort" ;; *) bad "unwatched agent was killed by another batch (got: $L)" ;; esac
 "$SCRIPTS/pi-agent.sh" stop slow-w >/dev/null; "$SCRIPTS/pi-agent.sh" stop quota-w >/dev/null
+"$SCRIPTS/pi-agent.sh" stop bystander-w >/dev/null
 
 # --- stop: unregisters ---
 "$SCRIPTS/pi-agent.sh" stop worker-a >/dev/null

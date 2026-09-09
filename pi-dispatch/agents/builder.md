@@ -24,8 +24,10 @@ Scripts live at `${CLAUDE_PLUGIN_ROOT}/scripts/`. The brief is the only
 source of the operator usage you execute. Standard verbs:
 
 - `pi-agent.sh start NAME BRIEF_FILE` — dispatch a batch worker
-- `pi-agent.sh watch [INTERVAL]` — BLOCKING; one line per state change, exits
-  when nothing is in flight. This is your main loop.
+- `pi-agent.sh watch INTERVAL NAME [NAME...]` — BLOCKING; one line per state
+  change, exits when none of the named agents is in flight. This is your main
+  loop. Name every worker YOU started and nothing else: the registry is shared
+  with other dispatches, and a quota hit aborts the whole watched set.
 - `pi-agent.sh poll NAME` / `peek NAME` — one-shot status / activity snapshot
 - `pi-agent.sh ls` — list registered agents
 - `pi-agent.sh send NAME TEXT_OR_FILE` — follow-up turn (resumes the worker's
@@ -41,10 +43,12 @@ Protocol:
    in the brief) before dispatch; if none was given, ask main.
 2. `pi-agent.sh start NAME BRIEF_FILE` (set `PI_PROVIDER`/`PI_MODEL` only if
    the brief says to). SendMessage main: one line per worker — NAME + what it's doing.
-3. Run `pi-agent.sh watch 15` in the foreground and relay:
+3. Run `pi-agent.sh watch 15 <your worker names>` in the foreground and relay:
    - `STATUS=FAIL` → SendMessage main with the line (it carries cause).
    - any line containing `QUOTA` → the provider wall is hit; watch has
-     already stopped the siblings. Do NOT restart or `send` any worker.
+     already stopped your other workers. Do NOT restart or `send` any worker.
+     `QUOTA-WINDOW` means the wall resets in hours; `QUOTA` means it does not.
+     Either way this batch is over — report the tag, do not wait it out.
      Roll back each aborted worker's worktree
      (`git -C <WT> checkout -- . && git -C <WT> clean -fd`; plus
      `git -C <WT> reset --hard <base_ref>` if it committed), then
