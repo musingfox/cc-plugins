@@ -48,7 +48,8 @@
 #   empty result                 STATUS=FAIL  empty    (dead-branch whitelist)
 #   no agent_end + rc==0         STATUS=FAIL  died-mid-stream
 #   no agent_end + no-rc         STATUS=FAIL  no-rc
-#   provider quota exhausted     QUOTA        STATUS=FAIL  (either branch; ALIVE kills on sight)
+#   provider spend wall          QUOTA        STATUS=FAIL  (either branch; ALIVE kills on sight)
+#     …resetting usage window    QUOTA-WINDOW STATUS=FAIL  (same, but a later batch may retry)
 #
 # Terminal lines carry " model=<provider/model> cost=$<sum over all turns> turns=<n>"
 # when the stream has usage, and back-fill a blank RUNDIR/routing with the model
@@ -135,17 +136,34 @@ fail_cause() {
   printf ' cause:%s' "$(printf '%s' "$c" | tr '[:upper:]' '[:lower:]' | tr -d '=\t\n' | head -c 120)"
 }
 
-# QUOTA: any errorMessage in the stream that reads as provider EXHAUSTION (usage
-# limit / credits / billing). Deliberately NOT rate limits or 429: those are
-# transient spikes that parallel siblings cause each other, and treating one as
-# exhaustion would kill the whole batch. Matched on extracted errorMessage VALUES
-# only, so prose that merely mentions "quota" can never trip it. A quota hit is
-# terminal the moment it appears — pi may retry, but every retry is a paid round
-# trip on a wall that will not move — so the ALIVE branch kills on sight.
-QUOTA_RE='usage.?limit|out of credits|insufficient.?(quota|credits|funds)|quota.?(exceeded|exhausted|reached)|billing'
-quota_hit() {
-  [ -f "$OUTPUT_FILE" ] && grep -o '"errorMessage":"[^"]*"' "$OUTPUT_FILE" 2>/dev/null \
-    | cut -d'"' -f4 | grep -qiE "$QUOTA_RE"
+# QUOTA: any errorMessage in the stream that reads as the provider refusing more
+# work for spend reasons. Deliberately NOT rate limits or 429: those are transient
+# spikes that parallel siblings cause each other, and treating one as a wall would
+# kill the whole batch. Matched on extracted errorMessage VALUES only, so prose
+# that merely mentions "quota" can never trip it. Either class is terminal the
+# moment it appears — pi may retry, but every retry is a paid round trip on a wall
+# that will not move within this batch — so the ALIVE branch kills on sight.
+#
+# Two classes, because they differ in what a LATER batch can do:
+#   QUOTA         balance/plan exhaustion — nothing resets it but paying.
+#   QUOTA-WINDOW  a rolling usage window ("usage limit"); it clears on its own in
+#                 hours, so a later batch may route to pi again.
+# The window class is keyed on "usage limit" and NOTHING else. Do not widen it to
+# the word "resets": a 429 that names its reset time is a transient rate limit,
+# which the paragraph above says must never trip either class.
+# Both tags contain "QUOTA", so every caller matching *QUOTA* keeps working.
+QUOTA_EXHAUST_RE='out of credits|insufficient.?(quota|credits|funds)|quota.?(exceeded|exhausted|reached)|billing'
+QUOTA_WINDOW_RE='usage.?limit'
+quota_class() {
+  [ -f "$OUTPUT_FILE" ] || return 0
+  local msgs
+  msgs="$(grep -o '"errorMessage":"[^"]*"' "$OUTPUT_FILE" 2>/dev/null | cut -d'"' -f4)"
+  [ -n "$msgs" ] || return 0
+  if printf '%s\n' "$msgs" | grep -qiE "$QUOTA_EXHAUST_RE"; then
+    printf 'QUOTA'
+  elif printf '%s\n' "$msgs" | grep -qiE "$QUOTA_WINDOW_RE"; then
+    printf 'QUOTA-WINDOW'
+  fi
 }
 
 # Spend + routing tail for terminal lines: " model=<provider/model> cost=$<sum> turns=<n>"
@@ -235,7 +253,7 @@ PI_RC=""
 # agent loop is OVER, so the result is terminal regardless of process liveness.
 judge_agent_end() {
   if [ "$STOP_REASON" = "error" ]; then
-    local tag="ERROR"; quota_hit && tag="ERROR QUOTA"
+    local tag="ERROR" q; q="$(quota_class)"; [ -n "$q" ] && tag="ERROR $q"
     emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE $tag terminal=error ${ELAPSED}s$(usage_tail)$(fail_cause)"
     exit 0
   fi
@@ -304,9 +322,10 @@ if [ -n "$AGENT_END_LINE" ]; then
 fi
 
 # ---- ALIVE: provider quota already hit? kill now, don't pay for pi's retries ----
-if quota_hit; then
+QUOTA_CLASS="$(quota_class)"
+if [ -n "$QUOTA_CLASS" ]; then
   "$SCRIPT_DIR/pi-stop.sh" "$RUNDIR" >/dev/null 2>&1
-  emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE QUOTA killed ${ELAPSED}s$(usage_tail)$(fail_cause)"
+  emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE $QUOTA_CLASS killed ${ELAPSED}s$(usage_tail)$(fail_cause)"
   exit 0
 fi
 

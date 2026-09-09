@@ -162,13 +162,26 @@ DA="$TMP/c-aborted"; make_run "$DA" "$DEAD" 100 "0" "$ABORTED_STREAM"
 OUT="$(bash "$POLL" "$DA")"
 case "$OUT" in STATUS=FAIL*) ok "(new-aborted) aborted not a clean OK -> $OUT";; *) bad "(new-aborted) expected STATUS=FAIL (not-stop), got: $OUT";; esac
 
-# --- (quota-dead) agent_end error whose errorMessage reads as quota exhaustion
-#     -> STATUS=FAIL tagged QUOTA (the fallback-to-Claude trigger) ---
+# --- (quota-window) a ROLLING usage window is a wall that clears on its own, so it
+#     is tagged QUOTA-WINDOW, not plain QUOTA: this batch still stops, but a later
+#     one may route to pi again ---
 QUOTA_STREAM="$SESSION_LINE
 {\"type\":\"agent_end\",\"messages\":[{\"role\":\"assistant\",\"stopReason\":\"error\",\"errorMessage\":\"Codex error: The usage limit has been reached (usage_limit_reached)\"}]}"
 DQ="$TMP/c-quota"; make_run "$DQ" "$DEAD" 100 "0" "$QUOTA_STREAM"
 OUT="$(bash "$POLL" "$DQ")"
-case "$OUT" in STATUS=FAIL*QUOTA*) ok "(quota-dead) quota error tagged -> $OUT";; *) bad "(quota-dead) expected STATUS=FAIL ... QUOTA, got: $OUT";; esac
+case "$OUT" in STATUS=FAIL*QUOTA-WINDOW*) ok "(quota-window) resetting window tagged QUOTA-WINDOW -> $OUT";; *) bad "(quota-window) expected STATUS=FAIL ... QUOTA-WINDOW, got: $OUT";; esac
+
+# --- (quota-exhaust) balance exhaustion is the OTHER class: plain QUOTA, never
+#     QUOTA-WINDOW — nothing but paying resets it ---
+QEXH_STREAM="$SESSION_LINE
+{\"type\":\"agent_end\",\"messages\":[{\"role\":\"assistant\",\"stopReason\":\"error\",\"errorMessage\":\"Your account is out of credits\"}]}"
+DQE="$TMP/c-quota-exhaust"; make_run "$DQE" "$DEAD" 100 "0" "$QEXH_STREAM"
+OUT="$(bash "$POLL" "$DQE")"
+case "$OUT" in
+  *QUOTA-WINDOW*) bad "(quota-exhaust) exhaustion wrongly tagged as a resetting window: $OUT";;
+  STATUS=FAIL*QUOTA*) ok "(quota-exhaust) exhaustion tagged QUOTA -> $OUT";;
+  *) bad "(quota-exhaust) expected STATUS=FAIL ... QUOTA, got: $OUT";;
+esac
 
 # --- (quota-429) a transient rate limit is NOT exhaustion: plain ERROR, no QUOTA
 #     (siblings on one provider 429 each other; killing the batch for that is wrong) ---
@@ -177,6 +190,14 @@ Q429_STREAM="$SESSION_LINE
 DQ429="$TMP/c-quota-429"; make_run "$DQ429" "$DEAD" 100 "0" "$Q429_STREAM"
 OUT="$(bash "$POLL" "$DQ429")"
 case "$OUT" in STATUS=FAIL*QUOTA*) bad "(quota-429) transient 429 wrongly tagged QUOTA: $OUT";; STATUS=FAIL*ERROR*) ok "(quota-429) transient 429 is plain ERROR";; *) bad "(quota-429) expected STATUS=FAIL ERROR, got: $OUT";; esac
+
+# --- (quota-429-resets) a 429 that names its reset is STILL just a rate limit: the
+#     window class is keyed on "usage limit", never on the word "resets" ---
+Q429R_STREAM="$SESSION_LINE
+{\"type\":\"agent_end\",\"messages\":[{\"role\":\"assistant\",\"stopReason\":\"error\",\"errorMessage\":\"429 rate limit exceeded, resets in 20s\"}]}"
+DQ429R="$TMP/c-quota-429-resets"; make_run "$DQ429R" "$DEAD" 100 "0" "$Q429R_STREAM"
+OUT="$(bash "$POLL" "$DQ429R")"
+case "$OUT" in STATUS=FAIL*QUOTA*) bad "(quota-429-resets) transient 429 wrongly tagged as a wall: $OUT";; STATUS=FAIL*ERROR*) ok "(quota-429-resets) a 429 naming its reset is still plain ERROR";; *) bad "(quota-429-resets) expected STATUS=FAIL ERROR, got: $OUT";; esac
 
 # --- (quota-prose) the word "quota" in RESULT TEXT (not an errorMessage) must NOT tag ---
 QPROSE_STREAM="$SESSION_LINE
@@ -194,7 +215,11 @@ sleep 60 & QPID=$!
 disown 2>/dev/null || true
 make_run "$DQA" "$QPID" 5 "" "$QALIVE_STREAM"
 OUT="$(PI_WALL_CLOCK_S=100000 PI_STALL_THRESHOLD_S=100000 bash "$POLL" "$DQA")"
-case "$OUT" in STATUS=FAIL*QUOTA*killed*) ok "(quota-alive) killed on sight -> $OUT";; *) bad "(quota-alive) expected STATUS=FAIL ... QUOTA killed, got: $OUT";; esac
+case "$OUT" in
+  *QUOTA-WINDOW*) bad "(quota-alive) exhaustion wrongly tagged as a resetting window: $OUT";;
+  STATUS=FAIL*QUOTA*killed*) ok "(quota-alive) killed on sight -> $OUT";;
+  *) bad "(quota-alive) expected STATUS=FAIL ... QUOTA killed, got: $OUT";;
+esac
 kill "$QPID" 2>/dev/null || true
 
 # --- (cost) OK line sums usage over EVERY assistant message_end (not just the last

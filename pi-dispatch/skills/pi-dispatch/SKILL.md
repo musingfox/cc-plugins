@@ -121,15 +121,23 @@ providers). Trim with `PI_EXTRA_ARGS="-nc -ns -np --tools read,bash,edit,write"`
 (measured 21.4K → 12.8K input/turn) — at the price of the dispatch-dir
 AGENTS.md and extension tools, so it is opt-in.
 
-## Quota exhaustion → abort early, roll back, fall back to Claude
+## The provider wall → abort early, roll back, fall back to Claude
 
-A worker that hits the provider wall is tagged `QUOTA` on its terminal line
-(`pi-poll.sh` kills it on the first quota `errorMessage`, before pi's retries
-cost anything). `watch` then stops every sibling still RUNNING and stamps
-them `STATUS=FAIL … QUOTA sibling-abort` — they share the wall. On any
-`QUOTA` line:
+A worker that hits the provider's spend wall is killed on the first such
+`errorMessage`, before pi's retries cost anything, and tagged on its terminal
+line as one of two classes:
 
-1. Do not re-dispatch to pi. The wall does not move within a session.
+| tag | what it means | can a later batch route to pi? |
+|---|---|---|
+| `QUOTA` | balance or plan exhausted | no — only paying clears it |
+| `QUOTA-WINDOW` | a rolling usage window ("usage limit … resets at") | yes, once it resets (hours) |
+
+`watch` then stops the siblings **it was given** and stamps them
+`STATUS=FAIL … QUOTA sibling-abort` — they share the wall. On either tag:
+
+1. Do not re-dispatch to pi **for this batch** — the wall does not move while
+   it runs. The scope is the batch, not the session: a later dispatch is free
+   to try pi again, and after `QUOTA-WINDOW` it will likely succeed.
 2. Roll back each aborted worker's half-done edits in its worktree:
    `git -C <WT> checkout -- . && git -C <WT> clean -fd`, and if the worker
    was allowed to commit, `git -C <WT> reset --hard <base_ref>` (the ref
