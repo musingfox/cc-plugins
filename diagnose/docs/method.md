@@ -16,9 +16,15 @@ WORK="${TMPDIR:-/tmp}/diagnose-$(basename "$REPO")-<slug>"
 EXCLUDE="$(git rev-parse --path-format=absolute --git-common-dir)/info/exclude"
 grep -qxF '.diagnose/' "$EXCLUDE" 2>/dev/null || echo '.diagnose/' >> "$EXCLUDE"
 git -C "$REPO" worktree add -b diagnose/<slug> "$WORK" HEAD
+if ! git -C "$REPO" diff --quiet HEAD; then
+  git -C "$REPO" diff --binary HEAD | git -C "$WORK" apply && echo "carried: uncommitted changes to tracked files"
+fi
+git -C "$REPO" ls-files --others --exclude-standard | sed 's/^/not carried (untracked): /'
 echo "repo path: $REPO"
 echo "worktree path: $WORK"
 ```
+
+The worktree starts from HEAD **plus the user's uncommitted changes to tracked files**. The bug is usually in the code they are looking at, and `worktree add` alone checks out only the last commit — a loop built against that never goes red, and Phase 1's "refuse to give up" then sends you hunting a bug that is not in the tree. Untracked files are not carried; the command lists them. If the symptom lives in one, say so and ask before going on.
 
 The worktree lives outside the repository. A second full checkout inside it would be invisible to git but not to anything that walks the filesystem — the user's test runner, linter, `rg`, or a file watcher running in the meantime would traverse it too. Only the patch file lands inside the repository, under `.diagnose/`, and that directory is what the exclude line is for.
 
@@ -194,3 +200,5 @@ Patch: .diagnose/<slug>.patch
 ```
 
 When the artifact is a repro rather than a test, label that line `Repro:` instead of `Test:`.
+
+If Phase 0 carried uncommitted changes, add one line, `Carried: uncommitted changes to tracked files`. The test is red against HEAD plus those changes, not against HEAD alone, so `/cf` must have the same changes in place before it expects red.

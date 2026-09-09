@@ -81,4 +81,14 @@ n=$(printf '%s\n' "$add_line" | grep -cF '$REPO/' || true)
 n=$(grep -cF 'WORK="${TMPDIR:-/tmp}/diagnose-' diagnose/docs/method.md || true)
 [ "$n" -eq 1 ] || fail "T15b: worktree path must resolve under TMPDIR, got $n"
 
+# worktree add checks out HEAD alone; a bug in the user's uncommitted edits is
+# then absent from the tree the loop runs against.
+block=$(awk '/^```bash/{f=1;next} /^```/{if(f)exit} f' diagnose/docs/method.md)
+n=$(printf '%s\n' "$block" | grep -cE 'diff --binary HEAD \| git -C "\$WORK" apply' || true)
+[ "$n" -eq 1 ] || fail "T16: Phase 0 must carry uncommitted tracked changes into the worktree, got $n"
+n=$(printf '%s\n' "$block" | grep -cF 'ls-files --others --exclude-standard' || true)
+[ "$n" -eq 1 ] || fail "T16b: Phase 0 must list the untracked files it does not carry, got $n"
+n=$(awk '/^## Hand-off/,0' diagnose/docs/method.md | grep -cF 'Carried: uncommitted changes to tracked files' || true)
+[ "$n" -eq 1 ] || fail "T16c: hand-off must be able to say the run carried uncommitted changes, got $n"
+
 echo "ok - method-worktree.test.sh"
