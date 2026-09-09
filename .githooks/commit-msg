@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# Commit-msg hook: enforce Conventional Commits on the subject line.
+#
+#   <type>[(scope)][!]: <description>
+#
+# The plugin name is a scope, never a type: `feat(spiral):`, not `spiral:`.
+#
+# Exempt, because this repo's own workflows produce them:
+#   - fixup! / squash!  — `git commit --fixup` + `git rebase --autosquash`
+#   - Merge… / Revert…  — written by git itself
+#
+# History predating this hook does not conform and is deliberately left alone;
+# the hook exists to stop new subjects from joining it.
+
+msg_file=$1
+subject=$(sed -n '1p' "$msg_file")
+
+# An empty or all-comment message: git aborts the commit on its own.
+case "$subject" in
+  ''|'#'*) exit 0 ;;
+  'fixup! '*|'squash! '*|'Merge '*|'Revert '*) exit 0 ;;
+esac
+
+types='feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert'
+
+if printf '%s\n' "$subject" | grep -qE "^($types)(\([a-z0-9._/-]+\))?!?: .+"; then
+  exit 0
+fi
+
+echo "commit-msg: subject is not a Conventional Commit." >&2
+echo >&2
+echo "  got:      $subject" >&2
+echo "  expected: <type>[(scope)][!]: <description>" >&2
+echo "  type:     $types" >&2
+echo >&2
+echo "The plugin name is a scope, not a type — 'feat(spiral): …', not 'spiral: …'." >&2
+exit 1

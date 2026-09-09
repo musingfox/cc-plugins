@@ -10,16 +10,25 @@ Plugin / marketplace spec, component structure, and frontmatter fields follow th
 2. Add entry to root `.claude-plugin/marketplace.json`.
 3. Keep root `README.md` in sync (plugin listing, install commands).
 
+Both hooks below live in `.githooks/`. Setup once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+## Commit Messages
+
+`.githooks/commit-msg` enforces Conventional Commits on the subject:
+`<type>[(scope)][!]: <description>`. **The plugin name is a scope, not a type** —
+`feat(spiral):`, not `spiral:`. `fixup!` / `squash!` and git's own merge and revert
+subjects pass through. Commits made before the hook do not conform; leave them alone.
+
 ## Version Management
 
 Claude Code uses `plugin.json` `version` to detect updates — **no bump → no cache refresh**.
 
 `.githooks/pre-push` auto-bumps the patch version once per push for every plugin with
-content changes in the pushed range. Setup once per clone:
-
-```bash
-git config core.hooksPath .githooks
-```
+content changes in the pushed range.
 
 The bump is amended into the tip commit, which git cannot push in the same run — the
 hook aborts and asks for a second `git push`. That one goes through.
