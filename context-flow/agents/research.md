@@ -105,7 +105,7 @@ The plan agent uses this to spell out Loading / Empty / Error / Success states i
 - **Existing state patterns**:
   - Loading: [how the codebase currently handles in-flight state — e.g., `<Skeleton />` in `components/ui/skeleton.tsx`, spinner inside button]
   - Empty: [empty-state pattern — e.g., centered illustration + CTA in `EmptyState.tsx`]
-  - Error: [error UX — toast via `sonner`, inline `<FormMessage />`, error fallback at `app/error.tsx`]
+  - Error: [error UX — toast via `sonner`, inline `<FormMessage />`, error boundary at `app/error.tsx`]
   - Success: [success feedback — toast, optimistic update, redirect convention]
 - **Accessibility infra**: [a11y conventions — e.g., `aria-*` usage, focus management library, keyboard-shortcut system; "none observed" is a valid finding]
 - **Internationalization**: [i18n setup — e.g., `next-intl` with locale files at `messages/`, English-only, or none]

@@ -132,8 +132,9 @@ assert_ge1 "$(count_in_range_f "$RESEARCH" '^## Reporting Style' '^## Output Sch
 assert_ge1 "$(count_in_range_f "$RESEARCH" '^## What to Investigate' '^## Reporting Style' 'seam')" "research What to Investigate has seam"
 sig=$(grep -cF 'interface signatures' "$RESEARCH" || true)
 assert_eq "0" "$sig" "research.md has no 'interface signatures'"
-bound=$(without_glossary "$RESEARCH" | grep -ci 'boundar' || true)
-assert_eq "0" "$bound" "research.md outside glossary has no boundar"
+bound=$(without_glossary "$RESEARCH" | awk '/^## Design System Audit/{skip=1} /^## Decision Points/{skip=0} !skip' | grep -ci 'boundar' || true)
+assert_eq "0" "$bound" "research.md outside glossary and Design System Audit has no boundar"
+assert_ge1 "$(count_in_range_f "$RESEARCH" '^## Design System Audit' '^## Decision Points' 'error boundary')" "research Design System Audit keeps React error boundary"
 assert_ge1 "$(count_in_range_f "$RESEARCH" '^## Design System Audit' '^## Decision Points' 'Component library')" "research Design System Audit keeps Component library"
 assert_ge1 "$(count_in_range_f "$RESEARCH" '^## What to Investigate' '^## Reporting Style' 'API rate limits')" "research What to Investigate keeps API rate limits"
 
