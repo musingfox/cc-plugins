@@ -71,4 +71,14 @@ n=$(grep -i 'fresh shell' diagnose/docs/method.md | grep -ci 'literally' || true
 n=$(printf '%s\n' "$early_stop" | grep -cF 'worktree add' || true)
 [ "$n" -ge 1 ] || fail "T14: early-stop must condition teardown on worktree add having succeeded"
 
+# The worktree must not be a second checkout inside the repository: git ignores
+# it via info/exclude, but test runners, linters and watchers walking the tree
+# do not.
+add_line=$(grep -F 'worktree add -b diagnose/<slug>' diagnose/docs/method.md | head -1)
+[ -n "$add_line" ] || fail "T15: expected the worktree add line"
+n=$(printf '%s\n' "$add_line" | grep -cF '$REPO/' || true)
+[ "$n" -eq 0 ] || fail "T15: worktree must not be created under the repository"
+n=$(grep -cF 'WORK="${TMPDIR:-/tmp}/diagnose-' diagnose/docs/method.md || true)
+[ "$n" -eq 1 ] || fail "T15b: worktree path must resolve under TMPDIR, got $n"
+
 echo "ok - method-worktree.test.sh"

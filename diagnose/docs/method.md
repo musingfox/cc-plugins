@@ -12,12 +12,15 @@ Resolve the paths and open the worktree in **one** command:
 
 ```bash
 REPO="$(git rev-parse --show-toplevel)"
+WORK="${TMPDIR:-/tmp}/diagnose-$(basename "$REPO")-<slug>"
 EXCLUDE="$(git rev-parse --path-format=absolute --git-common-dir)/info/exclude"
 grep -qxF '.diagnose/' "$EXCLUDE" 2>/dev/null || echo '.diagnose/' >> "$EXCLUDE"
-git -C "$REPO" worktree add -b diagnose/<slug> "$REPO/.diagnose/<slug>" HEAD
+git -C "$REPO" worktree add -b diagnose/<slug> "$WORK" HEAD
 echo "repo path: $REPO"
-echo "worktree path: $REPO/.diagnose/<slug>"
+echo "worktree path: $WORK"
 ```
+
+The worktree lives outside the repository. A second full checkout inside it would be invisible to git but not to anything that walks the filesystem — the user's test runner, linter, `rg`, or a file watcher running in the meantime would traverse it too. Only the patch file lands inside the repository, under `.diagnose/`, and that directory is what the exclude line is for.
 
 `--path-format=absolute` is not optional: without it `--git-common-dir` answers relative to the current directory, so the same string names a different file the moment you move.
 
@@ -33,7 +36,7 @@ Build inside the worktree. Prefix each command with `cd <the literal worktree pa
 
 Every exit path removes the worktree: the success path (once the commit and the patch file exist) and the early-stop path.
 
-Write `<the literal repo path>/.diagnose/<slug>.patch` from the commit **before** removing the worktree. The path sits beside the removed directory, not inside it, so the patch survives.
+Write `<the literal repo path>/.diagnose/<slug>.patch` from the commit **before** removing the worktree. The path is inside the repository, not inside the worktree, so the patch survives.
 
 Then, from the repository root:
 
@@ -178,7 +181,7 @@ The worktree is about to be removed, so assert over the commit that crosses the 
 
 Print the hand-off only once the commit exists.
 
-The patch file is already produced in Phase 0, before the worktree is removed, at `<the literal repo path>/.diagnose/<slug>.patch` (beside the directory, not inside it). If removing the worktree fails, still print the hand-off and name the leftover directory — the branch is what matters. If the patch file could not be written, omit its line rather than print a path that does not exist.
+The patch file is already produced in Phase 0, before the worktree is removed, at `<the literal repo path>/.diagnose/<slug>.patch` (inside the repository, not the worktree). If removing the worktree fails, still print the hand-off and name the leftover directory — the branch is what matters. If the patch file could not be written, omit its line rather than print a path that does not exist.
 
 On the success path, print exactly this:
 
