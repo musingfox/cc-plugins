@@ -28,8 +28,14 @@ The dispatch prompt includes a `$WORK` path — an isolated git worktree on a pe
 4. **Run tests after each contract**: Don't batch — verify incrementally.
 5. **Commit exactly once per contract**, when its tests pass, impl + tests together:
    ```bash
-   cd "$WORK" && git add -A && git commit -m "<ContractName>: <one-line behavioral outcome>"
+   cd "$WORK" && git add -A && git commit -m "<message in this project's own convention>"
    ```
+   Write the message the way `git log` in this project already writes them — same prefix style,
+   same voice, same level of detail, and it must satisfy any commit-message hook the project
+   installs. **Never put the contract name, shard id, or any other cf vocabulary in the message.**
+   These commits land in the user's project and outlive the flow; the contract-to-commit mapping
+   lives in the flow session, not in the history.
+
    Never bundle two contracts into one commit; never split one contract across commits. Fixing a contract after its commit? Fold the fix into that commit (`git commit --amend` at the tip; otherwise `--fixup` + non-interactive autosquash) — the branch is a private worktree, rewriting is safe.
 6. **Use the Context Summary**: The one-line goal and key constraints give you directional awareness for micro-decisions (naming, error messages, code organization). Don't report Unresolved for trivial ambiguities you can reasonably decide.
 7. **External Verification before Unresolved**: If a contract appears infeasible because of unknown third-party library / API behavior (e.g., "does this method still exist in v3?"), verify before reporting Unresolved:
