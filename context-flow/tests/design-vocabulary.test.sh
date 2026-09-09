@@ -76,3 +76,14 @@ for phrase in 'DESIGN-IT-TWICE' 'not imported' 'Agent tool'; do
   assert_ge1 "$(count_f "$RESEARCH" "$phrase")" "research glossary has $phrase"
   assert_ge1 "$(count_f "$PLAN" "$phrase")" "plan glossary has $phrase"
 done
+
+# UpstreamAttribution
+for phrase in \
+  'https://github.com/mattpocock/skills' \
+  '`codebase-design`' \
+  'MIT' \
+  'Copyright (c) 2026 Matt Pocock' \
+  '3cca18b368ae95cdbdebbff572ccafa662551015'; do
+  assert_ge1 "$(count_f "$RESEARCH" "$phrase")" "research glossary has $phrase"
+  assert_ge1 "$(count_f "$PLAN" "$phrase")" "plan glossary has $phrase"
+done
