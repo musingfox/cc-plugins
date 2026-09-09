@@ -334,6 +334,12 @@ It ends with `[spiral] save-mode=browser|inline`.
   ```
   The waiter wakes on the Save itself, not on the round being complete — a partly answered round
   is a legitimate answer (§2), and reading it is your job, not the waiter's.
+
+  **A timeout (exit 2) is not an answer and not a failure.** Nothing was saved, the page is still
+  open, and the brief is untouched. Say exactly that, re-arm the waiter on the same file, and end
+  your turn again. Ending the turn silently is what makes the timeout look like the run died,
+  which is the one reading that is certainly wrong; treating it as 都不對 is worse still, because
+  it manufactures a round out of someone being away from their desk.
 - **`inline`** (viz absent / headless) → **AskUserQuestion**, one question per decision plus
   "Other". It caps at four; a wider round goes in batches, and a batch that comes back changing
   what the later ones should ask is a new round, not a continuation.

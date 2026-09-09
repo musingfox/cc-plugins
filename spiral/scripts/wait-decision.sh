@@ -47,5 +47,7 @@ while [ "$elapsed" -lt "$timeout" ]; do
   elapsed=$((elapsed + interval))
 done
 
-echo "[spiral] wait-decision: timeout after ${timeout}s — no Save detected; fall back to terminal." >&2
+echo "[spiral] wait-decision: timeout after ${timeout}s — no Save detected. The page is still" >&2
+echo "[spiral] live and the brief is unchanged; re-arm this waiter on the same file, or take a" >&2
+echo "[spiral] typed answer in the terminal instead." >&2
 exit 2
