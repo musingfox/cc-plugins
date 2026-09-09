@@ -1,6 +1,6 @@
 ---
-status: accepted    # accepted | done | superseded
-delivered:          # commit or tag ref — filled when acceptance passes
+status: done        # accepted | done | superseded
+delivered: 3b10904, fe775e6, a330148   # prototype role, then the diagnose plugin
 depends: []         # milestone slugs that must land first
 ---
 
