@@ -90,8 +90,7 @@ main { max-width: 880px; margin: 28px auto 120px; padding: 0 24px; }
     color: #2563eb; font-weight: 700; margin-bottom: 4px;
 }
 .decision .sub { font-size: 0.86em; color: #888; margin-bottom: 16px; }
-.question { border-top: 1px solid #eee; padding-top: 16px; margin-top: 16px; }
-.question:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+.question + .question { border-top: 1px solid #eee; padding-top: 16px; margin-top: 16px; }
 .q-title {
     display: flex; align-items: center; gap: 8px;
     font-size: 1em; font-weight: 700; margin-bottom: 10px;
@@ -192,6 +191,8 @@ main { max-width: 880px; margin: 28px auto 120px; padding: 0 24px; }
     .brief hr { border-top-color: #2e2e33; }
     .mermaid-shell { background: #1f1f23; border-color: #3e3e44; }
     .decision .sub { color: #a1a1aa; }
+    .question + .question { border-top-color: #2e2e33; }
+    .q-title .multi-tag { color: #c4b5fd; background: #2c2440; border-color: #4c3d75; }
     .opt { border-color: #3e3e44; }
     .opt:hover { border-color: #3b5b9a; background: #1f2433; }
     .opt.selected { border-color: #2563eb; background: #1e2a44; }
