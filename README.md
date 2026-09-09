@@ -87,7 +87,7 @@ Narrows a vague question into an implementation-sized goal, one layer at a time 
 - **Probes walk what you cannot settle from the page**: where candidates only differ once you take them, cheap throwaway descents run one per candidate and report the first hard thing each hits. A candidate that collides is dropped on evidence, never put to a vote.
 - **Convergence lands a layer**: what you settled becomes a plan or milestone — what this layer settles, what is concrete enough to build on, what it deliberately leaves to the next layer, and what would overturn it. Load-bearing facts cite their source.
 - **You own both directions**: the decision page renders in the browser; the depth gate afterwards is a one-line ask in the terminal, on a plan you already have. Dig another layer, stop, or — when a layer falsifies what the one above it rested on — go back up and retake that decision. It only widens again when you ask.
-- **Output is a goal, not code**: the run is promoted to `docs/milestones/<slug>.md`, composed from every layer that still stands — `.spiral/` is scratch, the milestone outlives it — then handed to `/cf` as a seed, not a contract set. No gate, no commit.
+- **Output is a goal, not code**: the run is promoted to `docs/milestones/<slug>.md`, composed from every layer that still stands — `.spiral/` is scratch, the milestone outlives it — then handed to `/cf` as a seed, not a contract set. No gate, nothing merged. A prototype may build a throwaway thing to settle a decision, but only with the human's say-so, and its code is abandoned on its own branch.
 - **Single command**: `/spiral "the question"`.
 
 See `spiral/docs/concept.md` for the full concept.
@@ -232,7 +232,7 @@ cc-plugins/
 ├── omt/                skills: contract-validation · agents, commands, contracts, lib
 ├── pi-dispatch/        skills: pi-dispatch · agents: builder, reviewer · scripts, tests
 ├── spec/               skills: spec · scripts: spec.sh
-├── spiral/             commands: spiral · agents: divergence, probe · scripts
+├── spiral/             commands: spiral · agents: divergence, probe, prototype · scripts
 ├── viz/                skills: viz-inline, viz-render · lib, tests
 ├── wizard/             skills: wizard
 └── README.md

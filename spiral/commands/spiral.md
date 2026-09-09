@@ -1,5 +1,5 @@
 ---
-description: "Spiral — narrow a vague question into an implementation-sized goal, one layer at a time: diverge into the decisions a layer can settle, you answer a round of them, probes walk what you left open, converge into a plan or milestone, then dig another layer, go back up, or stop. Produces a goal to hand to /cf; never writes code."
+description: "Spiral — narrow a vague question into an implementation-sized goal, one layer at a time: diverge into the decisions a layer can settle, you answer a round of them, probes walk what you left open, converge into a plan or milestone, a prototype builds one throwaway thing when a walk cannot answer it, then dig another layer, go back up, or stop. Produces a goal to hand to /cf; ships no code."
 argument-hint: "<the question or vague goal>"
 allowed-tools: [Agent, Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion]
 ---
@@ -7,14 +7,16 @@ allowed-tools: [Agent, Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion]
 # Spiral
 
 You drive the **main thread**: dispatch **Divergence** — the one thing here that must not see
-your hypotheses — dispatch **Probes** to walk whatever the human leaves open, then converge what
-they settled into a plan yourself, write what the human reads, and stop. You do **not** name
-directions or pick between them.
+your hypotheses — dispatch **Probes** to walk whatever the human leaves open, and a **Prototype**
+where a walk can only be settled by building the thing, then converge what they settled into a
+plan yourself, write what the human reads, and stop. You do **not** name directions or pick
+between them.
 
 Each **layer** lands one plan or milestone, concrete at that layer's grain and no finer. The
 next layer diverges from *that plan*, so the spiral descends — vague question → approach →
 milestone → an implementation-sized goal. It stops where the human says it is concrete enough.
-Spiral never writes code; `/cf` takes it from there.
+Spiral ships no code — the one thing it ever builds is a throwaway prototype to settle a
+decision (§3), abandoned on its own branch. `/cf` takes the goal from there.
 
 A layer takes as many **rounds** as it needs. A round is one demand on the human's attention:
 every decision that is askable now, asked at once, answered, and folded back in — which is what
@@ -166,6 +168,10 @@ that the collisions survive your context rolling over. Then sort them:
   candidate that reason touched, including the ones nobody walked. Re-price the whole menu before
   sorting anything: narrowing to "the survivors" is wrong when what fell was the baseline the
   others were measured against.
+- **Reading cannot answer it — the thing has to be built and run** → not a collision and not a
+  fact, but a request for a different instrument. Send a **Prototype** (below) and re-sort on what
+  it brings back. Do not route this to the exits: a probe that ends here brought back a real
+  result, and reading it as "nothing came back" retires a live candidate on a technicality.
 
 Then take one of five exits:
 
@@ -176,9 +182,10 @@ Then take one of five exits:
   put the same decision in front of them twice.
 - **Every candidate collided** → the decision has no live answer. Back to §2, `A+1`, carrying the
   collisions — the menu was wrong, and now you know why.
-- **The probes brought nothing back** — no collisions, no new facts → do **not** ask again. An
-  oscillation that returns nothing is not a licence to widen (`concept.md` §6): take your
-  recommendation to §4 and say in the plan that the walk could not separate the candidates.
+- **The probes brought nothing back** — no collisions, no new facts, and none of them asked for a
+  build → do **not** ask again. An oscillation that returns nothing is not a licence to widen
+  (`concept.md` §6): take your recommendation to §4 and say in the plan that the walk could not
+  separate the candidates.
 - **The collision is with the plan this layer widened from** → nothing at this layer can repair
   it, because every candidate here inherits it. Stop and put the ascent to the human — inline,
   `AskUserQuestion`, `退回上一層，重看那個決定` / `就在這一層繼續` plus "Other", quoting the parent
@@ -189,9 +196,30 @@ Then take one of five exits:
   without writing a plan here. Do **not** take `A+1` instead: another round at this layer would
   re-decide on the same false footing.
 
-If a probe reports that the only way to answer is to build or run the thing, that is not
-spiral's job. Say so and offer the handoff: spiral writes no code at any depth, and a throwaway
-walk is still a walk, not a prototype.
+### When reading is not enough — the Prototype
+
+A probe stops at the first hard thing it can *read*. Where the answer only exists once the thing
+runs, send a prototype — a deeper reach of the same walk, not a new phase:
+
+> `Agent(subagent_type: "spiral:prototype", model: "sonnet")` with the **question the build must
+> answer**, the candidate or design at stake, the artifact this layer widens from, and the branch
+> name `spiral/prototype-<slug>`. The slug comes from the question, never from `L<N>`.
+
+One prototype, for one question. You send it on your own say-so, the way you send probes: it is
+throwaway and reversible by construction, and a reversible step does not go to the decision-maker
+(`concept.md` §4). What it costs is model time, and that is bought by the tier it runs on.
+
+Fold its verdict into `.spiral/L<N>-a<M>-probe.md` beside the probe reports, then re-sort and take
+one of the five exits with the verdict in hand.
+
+**Record the branch it reports back** — which may not be the one you handed it, since a same-named
+branch from an earlier run makes it pick another. That branch is the only durable thing the
+prototype leaves: `.spiral/` dies with the run, so if the verdict is load-bearing for the plan, §4
+cites **the branch**, not the probe file (`git show <branch>:verdict.md`). A branch is a source a
+later reader can resolve; a scratch path is not.
+
+**A prototype does not make spiral a builder.** Its code is evidence, it lives on a branch nobody
+merges, and what comes back is a verdict, not a deliverable. Spiral still ships no code.
 
 ## 4 — Converge
 
@@ -360,9 +388,11 @@ It ends with `[spiral] save-mode=browser|inline`.
 
 ## Rules
 
-- **Spiral plans; it does not build.** No code, no gate, no commit. If the question is already
-  determinate — "how do I implement X" — say so and point at `/cf`; a settled task does not
-  need divergence.
+- **Spiral plans; it ships no code.** No gate, no deliverable, nothing merged. If the question is
+  already determinate — "how do I implement X" — say so and point at `/cf`; a settled task does
+  not need divergence. The one place code gets written is a prototype (§3), and only after the
+  human approves it: that code is evidence for a decision, it is built in its own worktree, and it
+  is abandoned on a branch. You yourself never write code at any depth.
 - **One layer at a time, and never descend two.** You write the plan at the current grain; the
   next layer is the next pass's job. A plan that arrives with file lists and task breakdowns
   skipped a layer nobody approved. Writing it yourself is exactly where this gets tempting —
