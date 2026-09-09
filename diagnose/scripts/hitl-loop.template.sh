@@ -4,11 +4,13 @@
 # Upstream: https://github.com/mattpocock/skills
 # Commit:   321658273cb1d20b76026717d027d505790106d4
 # Upstream path: skills/engineering/diagnosing-bugs/scripts/hitl-loop.template.sh
-# This attribution header is the only sanctioned edit; the rest is verbatim.
+# Edits from upstream: this header, and the usage line below naming who runs
+# it. The code is verbatim.
 #
 # Human-in-the-loop reproduction loop.
 # Copy this file, edit the steps below, and run it.
-# The agent runs the script; the user follows prompts in their terminal.
+# The user runs the script in their own terminal and pastes the KEY=VALUE
+# tail back; the agent fills in the steps and never executes it.
 #
 # Usage:
 #   bash hitl-loop.template.sh
