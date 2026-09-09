@@ -25,8 +25,12 @@ if [ ! -f "$brief" ]; then
   exit 1
 fi
 
+# GNU first: on GNU stat, `-f` means --file-system and would print a whole
+# filesystem block whose free-space figures drift on any disk write — two such
+# readings compare unequal and would be reported as a Save that never happened.
+# BSD stat rejects `-c` cleanly with no stdout, so the fallback is safe.
 mtime_of() {
-  stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null
+  stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null
 }
 
 # Every answer line in the frontmatter block: `choice:` / `notes:` and the
@@ -34,6 +38,15 @@ mtime_of() {
 answers() {
   sed -n '2,/^---$/p' "$brief" | grep -E '^([A-Za-z0-9_-]+\.)?(choice|notes):'
 }
+
+# A Save can land before this waiter starts — between a timeout and the re-arm
+# the agent is told to do, or before a waiter relaunched after TaskStop or a
+# resumed session. mtime alone cannot see one that already happened, so read the
+# brief's answer state first and return immediately if it is already answered.
+if answers | grep -qE ':[[:space:]]*[^[:space:]]'; then
+  answers
+  exit 0
+fi
 
 start="$(mtime_of "$brief")"
 
