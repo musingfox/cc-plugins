@@ -199,6 +199,12 @@ Hold these while writing it:
   open question. A reversible one gets a sane default and a note — do not hand it back to the
   human. "Left to the next layer" is for what is genuinely premature, never for what you
   couldn't be bothered to settle.
+- **Load-bearing facts carry their source.** Any claim the result rests on — what a component
+  requires, what a file contains, what something costs — cites where it came from: a `path:line`
+  for anything in this tree, a link for anything outside it. What you cannot source goes in as an
+  unverified assumption, named as one, with what would settle it. Convergence is the one motion
+  here that no independent reader checks: a fact invented at this step is a fact nothing
+  downstream will catch, and the layers built on it are built on nothing.
 - **Do not re-open their choices.** They already picked; your job is to make those picks
   determinate, not to re-argue them. The rejected menus sitting in your context are input, not an
   invitation to relitigate — you write the plan for the directions they chose, including the
