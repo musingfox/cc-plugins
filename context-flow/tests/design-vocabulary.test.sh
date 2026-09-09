@@ -60,3 +60,13 @@ for f in "$RESEARCH" "$PLAN"; do
     assert_eq "dv<meth" "$dv,$meth" "$(basename "$f"): Design Vocabulary before Methodology"
   fi
 done
+
+# GlossaryCopiesIdentical
+diff_out=$(diff <(glossary_range "$RESEARCH") <(glossary_range "$PLAN") || true)
+assert_eq "" "$diff_out" "research and plan glossary ranges are byte-identical"
+gloss_lines=$(glossary_range "$RESEARCH" | wc -l | tr -d ' ')
+if [ "$gloss_lines" -ge 20 ]; then
+  assert_eq "ge20" "ge20" "research glossary range has >= 20 lines"
+else
+  assert_eq ">=20" "$gloss_lines" "research glossary range has >= 20 lines"
+fi
