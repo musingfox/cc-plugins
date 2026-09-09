@@ -31,7 +31,7 @@
     {
       "name": "spiral",
       "source": "./spiral",
-      "description": "[Experimental] Spiral — narrow a vague question into an implementation-sized goal, one layer at a time: diverge into distinct directions, you pick one, converge it into a plan or milestone, then dig another layer or stop; hands the goal to /cf and never writes code"
+      "description": "[Experimental] Spiral — narrow a vague question into an implementation-sized goal, one layer at a time: diverge into the decisions a layer can settle, you answer a round of them, probes walk what you left open, converge into a plan or milestone, then dig another layer, go back up, or stop; hands the goal to /cf and never writes code"
     },
     {
       "name": "spec",

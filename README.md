@@ -81,11 +81,13 @@ Experimental agentic workflow based on the **Context + Goal + Tools** principle:
 
 ### Spiral (Experimental)
 
-Narrows a vague question into an implementation-sized goal, one layer at a time — **diverge → you pick → converge** — for the layers where there is no compiler: strategy, approach, milestones.
-- **Divergence names the options**: an isolated subagent lists the genuinely *distinct* directions and what each one commits to, sorted by cost to reverse (one-way vs two-way door). It describes; it never decides, and it never re-lists last round.
-- **Convergence lands a layer**: the direction you picked becomes a plan or milestone — what this layer settles, what is concrete enough to build on, what it deliberately leaves to the next layer.
-- **You stay on the converging side**: picking a direction renders as a readable decision page in the browser; the depth gate afterwards is a one-line ask in the terminal, on a plan you already have. It only widens again when you ask — no menu is pushed at someone ready to stop.
-- **Output is a goal, not code**: the settled plan is promoted to `docs/milestones/<slug>.md` — `.spiral/` is scratch, the milestone outlives it — then handed to `/cf` as a seed, not a contract set. No gate, no commit.
+Narrows a vague question into an implementation-sized goal, one layer at a time — **diverge → you answer → probe → converge** — for the layers where there is no compiler: strategy, approach, milestones.
+- **Divergence names the options**: an isolated subagent lists the decisions this layer can settle now and the genuinely *distinct* candidates for each, sorted by cost to reverse (one-way vs two-way door). It describes; it never decides, and it never re-lists last round.
+- **A round, not a question**: every decision that is independent right now is asked at once, and only the one-way doors — the reversible ones get a default and a line in the plan. Answering some and leaving others blank is a legitimate answer; what you settle is what makes the rest askable.
+- **Probes walk what you cannot settle from the page**: where candidates only differ once you take them, cheap throwaway descents run one per candidate and report the first hard thing each hits. A candidate that collides is dropped on evidence, never put to a vote.
+- **Convergence lands a layer**: what you settled becomes a plan or milestone — what this layer settles, what is concrete enough to build on, what it deliberately leaves to the next layer, and what would overturn it. Load-bearing facts cite their source.
+- **You own both directions**: the decision page renders in the browser; the depth gate afterwards is a one-line ask in the terminal, on a plan you already have. Dig another layer, stop, or — when a layer falsifies what the one above it rested on — go back up and retake that decision. It only widens again when you ask.
+- **Output is a goal, not code**: the run is promoted to `docs/milestones/<slug>.md`, composed from every layer that still stands — `.spiral/` is scratch, the milestone outlives it — then handed to `/cf` as a seed, not a contract set. No gate, no commit.
 - **Single command**: `/spiral "the question"`.
 
 See `spiral/docs/concept.md` for the full concept.
@@ -230,7 +232,7 @@ cc-plugins/
 ├── omt/                skills: contract-validation · agents, commands, contracts, lib
 ├── pi-dispatch/        skills: pi-dispatch · agents: builder, reviewer · scripts, tests
 ├── spec/               skills: spec · scripts: spec.sh
-├── spiral/             commands: spiral · agents: divergence · scripts
+├── spiral/             commands: spiral · agents: divergence, probe · scripts
 ├── viz/                skills: viz-inline, viz-render · lib, tests
 ├── wizard/             skills: wizard
 └── README.md

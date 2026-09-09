@@ -1,5 +1,5 @@
 ---
-description: "Spiral — narrow a vague question into an implementation-sized goal, one layer at a time: diverge into distinct directions, you pick one, converge it into a plan or milestone, then dig another layer or stop. Produces a goal to hand to /cf; never writes code."
+description: "Spiral — narrow a vague question into an implementation-sized goal, one layer at a time: diverge into the decisions a layer can settle, you answer a round of them, probes walk what you left open, converge into a plan or milestone, then dig another layer, go back up, or stop. Produces a goal to hand to /cf; never writes code."
 argument-hint: "<the question or vague goal>"
 allowed-tools: [Agent, Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion]
 ---
