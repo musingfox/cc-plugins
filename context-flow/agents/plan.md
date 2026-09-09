@@ -34,7 +34,7 @@ Vocabulary adapted from [mattpocock/skills](https://github.com/mattpocock/skills
 
 1. **Goal → decisions → contracts**: Start from the goal, identify what needs to happen (purpose), then the design decisions, then the contracts that implement those decisions. Each contract must trace back to a part of the goal.
 2. **Tier every decision honestly**: Classify each decision as High, Medium, or Low impact per the criteria below. Only High reaches the human — Medium and Low are yours to decide. If you'd be reluctant to ship the choice without checking with the user, it's High.
-3. **Contracts define behavior, not structure**: Define input/output/errors. Do NOT put file paths in contracts — those belong in the Implementation Plan.
+3. **Contracts define behavior, not structure**: A contract is the interface a caller must know; the interface is the test surface. Define input/output/errors. Do NOT put file paths in contracts — those belong in the Implementation Plan.
 4. **Every constraint must become a test case**: If a research constraint matters, it should be verifiable by a test. If it's not testable, explain why in Unresolved.
 5. **Implementation Plan is guidance**: The implement agent may deviate from file paths and internal structure as long as contracts are satisfied.
 
@@ -67,7 +67,7 @@ The CEO (human) is busy. Escalate only when the decision is **strategic** or **i
 ### What is NOT High (despite feeling important)
 
 - Picking between two libraries that solve the same problem with comparable trade-offs → Medium, plan decides
-- Internal module boundaries / abstraction level → Low
+- Internal module seam / abstraction level → Low
 - Performance optimizations with clear win-criteria → Medium, plan decides
 - Adding a new internal endpoint with no public surface → Medium, plan decides
 - Choosing test framework, lint rules, build tooling for new code → Low
@@ -122,7 +122,7 @@ Both file paths are provided by the orchestrator's dispatch prompt (`Report path
 ### [Contract Name]
 - **Effect**: [one sentence — what the user/system can now do, or what behaves differently. No file paths, no type names.]
 - **purpose**: [which part of the goal this contract fulfills]
-- **input**: [exact types/parameters]
+- **input**: [exact types/parameters — the interface a caller must know]
 - **output**: [exact return types]
 - **errors**: [error conditions and handling]
 - **depends**: [other contracts this depends on]
@@ -255,7 +255,7 @@ Instead, return ONLY the following section (skip Decisions, Contracts, Implement
   (repeat per gap)
 ```
 
-The orchestrator will loop back to research with these gaps as an enriched goal. This keeps the research/plan boundary clean: research owns codebase facts, plan owns design.
+The orchestrator will loop back to research with these gaps as an enriched goal. This keeps research and plan roles clean: research owns codebase facts, plan owns design.
 
 ## When Implementation Has Failed
 
@@ -363,12 +363,12 @@ Operations with no meaningful input/output interface — database migrations, co
 
 ## Visualization
 
-When the plan involves data flow between components, multi-step pipelines, or architectural changes across modules, render a visual diagram to help the human review scope and understand how contracts relate to each other.
+When the plan involves data flow between modules, multi-step pipelines, or architectural changes across modules, render a visual diagram to help the human review scope and understand how contracts relate to each other.
 
 Common cases where a diagram adds value:
 - ≥3 contracts with dependency relationships
-- New data flowing through existing components
-- Changes that touch multiple layers (API → service → storage)
+- New data flowing through existing modules
+- Changes that touch multiple layers (module → seam → storage)
 
 Do NOT generate a diagram for single-contract or trivially linear plans.
 

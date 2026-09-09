@@ -136,3 +136,45 @@ bound=$(without_glossary "$RESEARCH" | grep -ci 'boundar' || true)
 assert_eq "0" "$bound" "research.md outside glossary has no boundar"
 assert_ge1 "$(count_in_range_f "$RESEARCH" '^## Design System Audit' '^## Decision Points' 'Component library')" "research Design System Audit keeps Component library"
 assert_ge1 "$(count_in_range_f "$RESEARCH" '^## What to Investigate' '^## Reporting Style' 'API rate limits')" "research What to Investigate keeps API rate limits"
+
+plan_not_high_forbidden() {
+  local t n1 n2
+  t=$(range_awk "$1" '^### What is NOT High' '^If a Medium decision')
+  n1=$(printf '%s\n' "$t" | grep -Ei 'component|service|boundar' | wc -l | tr -d ' ')
+  n2=$(printf '%s\n' "$t" | grep -E 'API' | wc -l | tr -d ' ')
+  echo $((n1 + n2))
+}
+
+plan_schema_forbidden() {
+  local t n1 n2
+  t=$(range_awk "$1" '^## Output Schema' '^### contracts.json')
+  n1=$(printf '%s\n' "$t" | grep -Ei 'component|boundar' | wc -l | tr -d ' ')
+  n2=$(printf '%s\n' "$t" | grep -E 'API' | wc -l | tr -d ' ')
+  echo $((n1 + n2))
+}
+
+plan_vis_forbidden() {
+  local t n1 n2
+  t=$(range_awk "$1" '^## Visualization' '^## Rules')
+  n1=$(printf '%s\n' "$t" | grep -Ei 'component|service|boundar' | wc -l | tr -d ' ')
+  n2=$(printf '%s\n' "$t" | grep -E 'API' | wc -l | tr -d ' ')
+  echo $((n1 + n2))
+}
+
+# PlanDescribesDesignInVocabulary
+assert_ge1 "$(count_in_range_f "$PLAN" '^## Methodology' '^## Decision Tiering Criteria' 'interface is the test surface')" "plan Methodology has interface is the test surface"
+assert_ge1 "$(count_in_range_f "$PLAN" '^## Methodology' '^## Decision Tiering Criteria' 'caller must know')" "plan Methodology has caller must know"
+assert_eq "0" "$(plan_not_high_forbidden "$PLAN")" "plan What is NOT High has no forbidden terms"
+assert_ge1 "$(count_in_range_f "$PLAN" '^### What is NOT High' '^If a Medium decision' 'seam')" "plan What is NOT High has seam"
+assert_eq "0" "$(plan_schema_forbidden "$PLAN")" "plan Output Schema..contracts.json has no forbidden terms"
+input_hint=$(range_awk "$PLAN" '^## Output Schema' '^### contracts.json' | grep -F '**input**' || true)
+case "$input_hint" in *[Ii]nterface*) assert_eq ge1 ge1 "plan input hint has interface" ;; *) assert_eq "interface in input hint" "$input_hint" "plan input hint has interface" ;; esac
+case "$input_hint" in *'caller must know'*) assert_eq ge1 ge1 "plan input hint has caller must know" ;; *) assert_eq "caller must know in input hint" "$input_hint" "plan input hint has caller must know" ;; esac
+assert_eq "0" "$(plan_vis_forbidden "$PLAN")" "plan Visualization..Rules has no forbidden terms"
+assert_ge1 "$(count_in_range_fi "$PLAN" '^## Visualization' '^## Rules' 'module')" "plan Visualization has module"
+assert_ge1 "$(count_in_range_f "$PLAN" '^## Visualization' '^## Rules' 'seam')" "plan Visualization has seam"
+bound=$(without_glossary "$PLAN" | grep -ci 'boundar' || true)
+assert_eq "0" "$bound" "plan.md outside glossary has no boundar"
+assert_ge1 "$(count_in_range_f "$PLAN" '^### What counts as High' '^### What is NOT High' 'public API / SDK / CLI surface')" "plan High criteria keep public API / SDK / CLI surface"
+assert_ge1 "$(count_in_range_f "$PLAN" '^### What counts as High' '^### What is NOT High' 'vendor / service / paid dependency')" "plan High criteria keep vendor / service / paid dependency"
+assert_ge1 "$(count_in_range_f "$PLAN" '^## Output Schema' '^### contracts.json' 'no live services')" "plan Output Schema keeps no live services"
