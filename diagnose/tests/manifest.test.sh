@@ -5,7 +5,15 @@ fail() { echo "  ✗ $1" >&2; exit 1; }
 
 [ "$(jq -r .name diagnose/.claude-plugin/plugin.json)" = diagnose ] || fail "T1 name"
 [ "$(jq -r .version diagnose/.claude-plugin/plugin.json)" = 0.1.0 ] || fail "T2 version"
-[ "$(jq -c .dependencies diagnose/.claude-plugin/plugin.json)" = '["cf"]' ] || fail "T3 dependencies"
+# A dependency resolves within the same marketplace by the marketplace entry
+# name, which is what /plugin install and enabledPlugins key on — not by the
+# dependency's own plugin.json name when the two differ (context-flow vs cf).
+deps="$(jq -r '.dependencies[]' diagnose/.claude-plugin/plugin.json)"
+[ -n "$deps" ] || fail "T3 dependencies must not be empty"
+entries="$(jq -r '.plugins[].name' .claude-plugin/marketplace.json)"
+while IFS= read -r d; do
+  printf '%s\n' "$entries" | grep -qx "$d" || fail "T3 dependency '$d' is not a marketplace entry name"
+done <<< "$deps"
 [ "$(jq 'has("commands") or has("skills")' diagnose/.claude-plugin/plugin.json)" = false ] || fail "T4 no component keys"
 [ "$(jq -r .homepage diagnose/.claude-plugin/plugin.json)" = 'https://github.com/musingfox/cc-plugins/tree/main/diagnose' ] || fail "T5 homepage"
 
