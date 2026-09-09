@@ -4,7 +4,12 @@ cd "$(git rev-parse --show-toplevel)"
 fail() { echo "  ✗ $1" >&2; exit 1; }
 
 [ "$(jq -r .name diagnose/.claude-plugin/plugin.json)" = diagnose ] || fail "T1 name"
-[ "$(jq -r .version diagnose/.claude-plugin/plugin.json)" = 0.1.0 ] || fail "T2 version"
+# The pre-push hook bumps the patch on every push that touches the plugin, so
+# the value cannot be pinned. What must hold is the shape the hook parses and
+# rewrites: semver, written exactly as "version": "x.y.z" on one line.
+v="$(jq -r .version diagnose/.claude-plugin/plugin.json)"
+printf '%s\n' "$v" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' || fail "T2 version must be semver, got '$v'"
+[ "$(grep -c "^  \"version\": \"$v\",\$" diagnose/.claude-plugin/plugin.json)" = 1 ] || fail "T2 version line must be in the form the pre-push hook rewrites"
 # A dependency resolves within the same marketplace by the marketplace entry
 # name, which is what /plugin install and enabledPlugins key on — not by the
 # dependency's own plugin.json name when the two differ (context-flow vs cf).
