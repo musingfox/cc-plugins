@@ -35,7 +35,7 @@ Vocabulary adapted from [mattpocock/skills](https://github.com/mattpocock/skills
 1. **Start broad, then narrow**: First understand the project structure (package.json, directory layout, framework). Then drill into areas relevant to the goal.
 2. **Follow the dependency chain**: When you find a relevant file, trace what it imports and what imports it. This reveals constraints and coupling.
 3. **Look for existing patterns**: Before proposing new code, find how similar things are done in this codebase. Check for existing utilities, abstractions, and conventions.
-4. **Gather evidence, not opinions**: Every constraint you report must reference a specific file and line. Every capability must cite the actual interface.
+4. **Gather evidence, not opinions**: Every constraint you report must reference a specific file and line. Every capability must cite the actual interface — everything a caller must know.
 5. **Surface what you DON'T know**: If the goal requires information that isn't in the codebase (expected data volume, user requirements, external API behavior), report it explicitly as Unresolved.
 6. **External Verification**: If the goal hinges on third-party library / API behavior, verify before reporting Unresolved:
    - **Probe `ctx7` first** — run `ctx7 --version` (cross-shell safe; do NOT use `command -v`). If it errors, ctx7 is unavailable; skip to WebFetch.
@@ -52,7 +52,7 @@ Any item in Existing Capabilities, Constraints, or Decision Points that comes fr
 ## What to Investigate
 
 - **Directly relevant code**: Files that will be modified or extended
-- **Adjacent code**: Files that import/export from relevant code (coupling surface)
+- **Adjacent code**: Files that import/export from relevant code (coupling at the seam)
 - **Patterns and conventions**: How similar features are built in this codebase
 - **Test infrastructure**: Existing test framework, test patterns, test utilities
 - **Configuration and dependencies**: package.json, tsconfig, database schema, env vars
@@ -63,10 +63,12 @@ Any item in Existing Capabilities, Constraints, or Decision Points that comes fr
 Your output is read by both the plan agent (needs technical detail) and the human (needs plain language). Lead with a plain-language summary, then provide the technical detail as evidence.
 
 - **Summary lines**: describe in user/system terms — "the codebase already handles X via Y", "Z is missing", "W is risky because…"
-- **Evidence sections**: file paths, interface signatures, line references — these support the summary, they don't replace it
+- **Evidence sections**: file paths, invariants, line references — these support the summary, they don't replace it
 - Never make a file path or function name the headline of a finding. Headlines should describe behavior or constraint in plain words.
 
 ## Output Schema
+
+Inventory each module at its seam. Apply the deletion test. Cite the interface.
 
 ```markdown
 ## Summary
@@ -103,7 +105,7 @@ The plan agent uses this to spell out Loading / Empty / Error / Success states i
 - **Existing state patterns**:
   - Loading: [how the codebase currently handles in-flight state — e.g., `<Skeleton />` in `components/ui/skeleton.tsx`, spinner inside button]
   - Empty: [empty-state pattern — e.g., centered illustration + CTA in `EmptyState.tsx`]
-  - Error: [error UX — toast via `sonner`, inline `<FormMessage />`, error boundary at `app/error.tsx`]
+  - Error: [error UX — toast via `sonner`, inline `<FormMessage />`, error fallback at `app/error.tsx`]
   - Success: [success feedback — toast, optimistic update, redirect convention]
 - **Accessibility infra**: [a11y conventions — e.g., `aria-*` usage, focus management library, keyboard-shortcut system; "none observed" is a valid finding]
 - **Internationalization**: [i18n setup — e.g., `next-intl` with locale files at `messages/`, English-only, or none]
