@@ -210,6 +210,19 @@ Generate an interactive bash wizard that walks a human through steps only they c
 /plugin install wizard
 ```
 
+### Diagnose
+
+Confirm the cause of a bug and leave one failing test on a branch — ported from [mattpocock/skills](https://github.com/mattpocock/skills) (`diagnosing-bugs`), MIT, Copyright (c) 2026 Matt Pocock:
+- **Own worktree**: diagnosis runs on a throwaway worktree; the current checkout stays untouched
+- **Stops at red**: a confirmed cause plus one failing test; applying the fix is `/cf`'s work
+- **Read the branch**: the branch is a source to read from, not something to check out
+- **Two entries**: `/diagnose:diagnose` asks before it starts; `/diagnose:diagnose-now` starts immediately
+
+**Installation:**
+```bash
+/plugin install diagnose
+```
+
 ## Plugin Development
 
 This repository serves as both a marketplace and a development workspace for custom Claude Code plugins.
@@ -226,6 +239,7 @@ cc-plugins/
 ├── agent-browser/      skills: agent-browser, playwright, web-test
 ├── apple-podcasts/     skills: apple-podcasts-fetch
 ├── context-flow/       commands: cf  · agents: research, plan, implement, review · scripts, tests
+├── diagnose/           skills: diagnose, diagnose-now · docs, scripts, tests
 ├── fizzy/              skills: fizzy
 ├── hook-guard/         skills: hook-guard
 ├── obsidian-workspace/ skills: init, jot, pm · templates
