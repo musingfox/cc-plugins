@@ -147,4 +147,25 @@ describe('feedback round mode', () => {
         expect(M.toggle(['a'], 'b', false)).toEqual(['b']);
         expect(M.toggle(['a'], 'a', false)).toEqual([]);
     });
+
+    // '#' is an ordinary character in a value, so a template written with trailing
+    // "# leave empty" annotations produces a brief whose every decision already reads
+    // as answered. Authors keep templates comment-free; the parser stays literal so a
+    // title or an answer may contain '#' without being truncated.
+    test('a trailing # is part of the value, not a comment', () => {
+        const m = M.parse([
+            '---',
+            'viz: feedback',
+            'q1.title: which #tag wins?',
+            'q1.options: A | B',
+            'q1.multi: true  # optional',
+            'q1.choice:  # leave empty',
+            '---',
+            'body'
+        ].join('\n'));
+        const q = M.questions(m)[0];
+        expect(q.title).toBe('which #tag wins?');
+        expect(q.multi).toBe(false);
+        expect(q.choice).toEqual(['# leave empty']);
+    });
 });

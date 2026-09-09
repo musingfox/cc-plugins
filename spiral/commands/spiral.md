@@ -83,17 +83,24 @@ panel: 你的決定
 prompt: 這幾題彼此獨立，可以分開回答；沒把握的留白，下一輪再問。
 d1.title: <the decision, phrased as a question>
 d1.options: <candidate A> | <candidate B> | <candidate C>
-d1.recommend: <the one you lean to>   # optional
-d1.multi: true                        # optional — they may keep several alive; see §3
-d1.choice:                            # leave empty
-d1.notes:                             # leave empty
+d1.recommend: <the one you lean to>
+d1.multi: true
+d1.choice:
+d1.notes:
 d2.title: <the next decision>
 d2.options: <candidate A> | <candidate B>
 d2.choice:
 d2.notes:
-notes:                                # leave empty — round-level remarks
+notes:
 ---
 ```
+
+`recommend` and `multi` are optional; the answer keys and the round-level `notes` are written
+empty and stay that way until the human saves. **Write no trailing comments** — `#` is not a
+comment character here, so `d1.choice:  # leave empty` sets the choice to `# leave empty`, which
+§Rendering reads as a settled decision and no rendered card contradicts, because no option label
+matches it. A brief written from a commented template is one where every decision arrives
+pre-answered with a string nobody chose.
 
 `recommend` is **yours, not Divergence's** — it never saw a recommendation and must not: whoever
 authored a menu has already weighted it. Say what you lean to and why in the body, so they can

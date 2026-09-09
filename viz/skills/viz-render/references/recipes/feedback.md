@@ -28,8 +28,8 @@ prompt: <one-line instruction>           # optional, sensible default
 options: <A> | <B> | <C>                 # optional; present → selectable cards
 recommend: <one of the options>          # optional; tagged 建議
 notes_label: <textarea label>            # optional, default "回饋 / 理由（選填）"
-choice:                                  # leave empty — the human fills it
-notes:                                   # leave empty — the human fills it
+choice:                                  (leave empty — the human fills it)
+notes:                                   (leave empty — the human fills it)
 ---
 
 <any markdown body: prose, tables, mermaid — rendered read-only and verbatim>
@@ -64,9 +64,9 @@ prompt: <one-line instruction>
 q1.title: <question heading>
 q1.options: <A> | <B> | <C>              # optional; omit for a notes-only question
 q1.recommend: <one of q1's options>      # optional; tagged 建議
-q1.multi: true                           # optional; several picks allowed
-q1.choice:                               # leave empty — pipe-separated when saved
-q1.notes:                                # leave empty — this question's reasoning
+q1.multi: true                           (optional; several picks allowed)
+q1.choice:                               (leave empty — pipe-separated when saved)
+q1.notes:                                (leave empty — this question's reasoning)
 q2.title: <question heading>
 q2.options: <A> | <B>
 q2.choice:
