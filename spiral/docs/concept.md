@@ -103,7 +103,7 @@ divergence several times at one layer before the conclusion is solid enough to a
 boss and a manager meet repeatedly — converge a draft, diverge on its flaws, converge
 again — before any plan is handed to an engineer.)
 
-**One oscillation has three parts**, and naming them is what keeps it from collapsing back
+**One oscillation has four parts**, and naming them is what keeps it from collapsing back
 into a single pass:
 
 - **Round** — the decisions that can be put to the decision-maker *at once*: every one whose
@@ -118,14 +118,25 @@ into a single pass:
   descriptions of them. What a probe reports is largely det (§2) — what a path hits has a
   right answer — so probing is mechanism work and deserves little judgment, however many
   probes run at once.
-- **The residual choice** — what is still open once the probes report. A direction that
+- **Prototype** — what a probe escalates to when the collision cannot be *read*. Some questions
+  have no answer until the thing exists and runs: the probe reports that it cannot get there by
+  reading, and a prototype builds the smallest thing that produces a red/green signal, runs it,
+  and reports what happened. Its output is that observation, never a plan and never a
+  recommendation, and its code is evidence rather than a deliverable — throwaway in the same
+  sense a probe is. **Running it is det; deciding what would count as red is not** — that line is
+  a threshold seam (§2), so it is anchored in the question the prototype is handed and never
+  redrawn by the prototype itself. With the seam anchored above it, the prototype is mechanism
+  work and deserves little judgment, exactly as probing does. Sending one is no more the
+  decision-maker's to approve than sending a probe: both walk a direction the round already
+  chose, and this one simply walks it past what reading can reach.
+- **The residual choice** — what is still open once the walk reports. A direction that
   collided with something hard is dead by right/wrong and is dropped without a vote (§4); only
   where two or more survive *and* the difference between them is an opinion does the question
   go back to the decision-maker. That return is the next oscillation at the same layer.
 
 **An oscillation counts only if it brought something back** (§6). A probe that collided with
-nothing, or a round that reshaped no decision, is not a licence to widen again — it is the
-signal that the layer is ready to converge. Rounds are not run until some list is exhausted:
+nothing, a prototype whose verdict separated nothing, or a round that reshaped no decision, is
+not a licence to widen again — it is the signal that the layer is ready to converge. Rounds are not run until some list is exhausted:
 because a converged result is what makes the next decisions visible (§1), the decisions at a
 layer are never enumerable in advance. An empty round means *nothing more can be asked now*,
 never *the layer is done*. When a layer is done is the decision-maker's call (§4), and no
@@ -196,9 +207,11 @@ concretize when a layer is solid, and ascending to reframe when a layer is stuck
 > verdict is **MECHANICAL** (right/wrong), bias is structurally immune, so no independence
 > is required.
 
-At these layers *every* verdict is an opinion — there is no compiler for a strategy (§5) — so
-the split is not a convenience, it is the only thing standing in for the machine that does not
-exist here.
+At these layers a verdict about *the work* is an opinion — there is no compiler for a strategy
+(§5) — so the split is not a convenience, it is the only thing standing in for the machine that
+does not exist here. The one mechanical verdict these layers can produce is a prototype's (§5),
+and it is the exception that shows the rule: nobody asks for a second opinion on whether the
+thing ran.
 
 Convergence and Divergence are **separate roles** because the one that narrowed a question is
 structurally blind to what it narrowed away. Having committed to a reading of the goal, it can

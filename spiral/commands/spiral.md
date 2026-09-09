@@ -199,15 +199,21 @@ Then take one of five exits:
 ### When reading is not enough — the Prototype
 
 A probe stops at the first hard thing it can *read*. Where the answer only exists once the thing
-runs, send a prototype — a deeper reach of the same walk, not a new phase:
+runs, that is what a prototype is for — the oscillation's fourth part (`concept.md` §5):
 
 > `Agent(subagent_type: "spiral:prototype", model: "sonnet")` with the **question the build must
-> answer**, the candidate or design at stake, the artifact this layer widens from, and the branch
-> name `spiral/prototype-<slug>`. The slug comes from the question, never from `L<N>`.
+> answer**, **what would count as red and what as green**, the candidate or design at stake, the
+> artifact this layer widens from, and the branch name `spiral/prototype-<slug>`. The slug comes
+> from the question, never from `L<N>`.
 
-One prototype, for one question. You send it on your own say-so, the way you send probes: it is
-throwaway and reversible by construction, and a reversible step does not go to the decision-maker
-(`concept.md` §4). What it costs is model time, and that is bought by the tier it runs on.
+**You draw the red/green line, not the prototype.** Running the thing is mechanical; deciding
+what result would settle the question is a threshold seam (`concept.md` §2), and a seam the
+prototype draws for itself is one it can move until the answer is whatever it built. Say it in
+the dispatch, concretely enough that the run either meets it or does not.
+
+One prototype, for one question. You send it on your own say-so, the way you send probes: both
+walk a direction the round already chose (`concept.md` §5), and this one simply walks it past
+what reading can reach. What it costs is model time, and that is bought by the tier it runs on.
 
 Fold its verdict into `.spiral/L<N>-a<M>-probe.md` beside the probe reports, then re-sort and take
 one of the five exits with the verdict in hand.
@@ -274,7 +280,8 @@ Hold these while writing it:
   couldn't be bothered to settle.
 - **Load-bearing facts carry their source.** Any claim the result rests on — what a component
   requires, what a file contains, what something costs — cites where it came from: a `path:line`
-  for anything in this tree, a link for anything outside it. What you cannot source goes in as an
+  for anything in this tree, a `git show <branch>:<path>` for anything a prototype left on a
+  branch (§3), a link for anything outside it. What you cannot source goes in as an
   unverified assumption, named as one, with what would settle it. Convergence is the one motion
   here that no independent reader checks: a fact invented at this step is a fact nothing
   downstream will catch, and the layers built on it are built on nothing.
@@ -390,9 +397,9 @@ It ends with `[spiral] save-mode=browser|inline`.
 
 - **Spiral plans; it ships no code.** No gate, no deliverable, nothing merged. If the question is
   already determinate — "how do I implement X" — say so and point at `/cf`; a settled task does
-  not need divergence. The one place code gets written is a prototype (§3), and only after the
-  human approves it: that code is evidence for a decision, it is built in its own worktree, and it
-  is abandoned on a branch. You yourself never write code at any depth.
+  not need divergence. The one place code gets written is a prototype (§3): that code is evidence
+  for a decision, it is built in its own worktree, and it is abandoned on a branch. You yourself
+  never write code at any depth.
 - **One layer at a time, and never descend two.** You write the plan at the current grain; the
   next layer is the next pass's job. A plan that arrives with file lists and task breakdowns
   skipped a layer nobody approved. Writing it yourself is exactly where this gets tempting —
