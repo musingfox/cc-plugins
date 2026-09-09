@@ -58,3 +58,15 @@ rc_line=$(grep -n 'red-capable' diagnose/docs/method.md | head -1 | cut -d: -f1)
 ho_line=$(grep -n '^## Hand-off' diagnose/docs/method.md | head -1 | cut -d: -f1)
 [ -n "$rc_line" ] && [ -n "$ho_line" ] && [ "$rc_line" -lt "$ho_line" ] \
   || fail "T15: red-capable must be defined before Hand-off (rc=$rc_line ho=$ho_line)"
+
+# The HITL template blocks on read; the agent's shell has nobody at the keyboard,
+# so the user runs it and pastes the captured tail back.
+hitl=$(printf '%s\n' "$loops" | grep -E '^10\. \*\*HITL bash script\*\*')
+n=$(printf '%s\n' "$hitl" | grep -ci 'tell the user to run it' || true)
+[ "$n" -ge 1 ] || fail "T16: HITL construction must hand the script to the user to run"
+n=$(printf '%s\n' "$hitl" | grep -ci 'never execute it' || true)
+[ "$n" -ge 1 ] || fail "T16b: HITL construction must forbid the agent from executing the script"
+n=$(printf '%s\n' "$hitl" | grep -ciE 'drive _them_|the agent runs' || true)
+[ "$n" -eq 0 ] || fail "T16c: HITL construction must not tell the agent to drive the script"
+n=$(printf '%s\n' "$crit" | grep -F '**Agent-runnable**' | grep -ci 'exception' || true)
+[ "$n" -ge 1 ] || fail "T16d: Agent-runnable must name the HITL script as the exception, not a satisfier"
