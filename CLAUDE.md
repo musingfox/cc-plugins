@@ -26,3 +26,8 @@ hook aborts and asks for a second `git push`. That one goes through.
 
 Manual minor/major bump: edit `plugin.json` version and commit it — the hook skips any
 plugin whose version already changed in the pushed range.
+
+A slash command runs the **installed** copy, not this working tree, so a plugin edited here
+is not what `/<plugin>:<command>` loads in the session that edited it. To exercise the change
+now, drive the workflow from the working-tree file by hand; to exercise it as a command, push,
+reinstall, and start a fresh session.
