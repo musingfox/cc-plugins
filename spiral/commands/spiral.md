@@ -43,10 +43,19 @@ keeps the next round from repeating it.
 > - `L<N>-a1` (N>1) → the previous layer's plan, `.spiral/L<N-1>-plan.md`.
 > - `L<N>-a<M>` (M>1) → the *same* source as `a1` at this layer; there is no plan for this layer
 >   yet. What changed is the rejected set and what they settled, not the artifact.
+> - A layer **reopened by an ascent** (§3, §5) → the same source as `a1` at that layer. Its
+>   round counter continues past whatever is already on disk there; nothing below it is deleted.
 
 That carry-over is not optional. The agent has no memory; without it, the next round re-lists
 the last one, which is the churn this tool exists to avoid. Read prior rounds back from
 `.spiral/L*.md` if they have fallen out of your context.
+
+**A reopened layer's carry-over has a different shape**, and getting it wrong makes the reopening
+pointless. Carry, verbatim: the claim that was falsified and what falsified it; the superseded
+plan; and, of what was settled here, only what did not rest on that claim. A candidate that was
+rejected *because of* the false claim is not a rejected candidate any more — it is live again,
+and Divergence has to be told which is which, or it will honour the old rejection and hand back
+the same menu the falsification was supposed to re-price.
 
 It returns **the decisions this layer can settle now** — every one whose prerequisites are
 already resolved — each tagged by cost to reverse (one-way / two-way door) and carrying its
@@ -96,6 +105,11 @@ descriptions — the difference is real but only shows up once you walk them. Th
 keep several alive, and §3 walks the ones they kept. Do not set it as a courtesy: an invitation
 to defer is a cost, and a decision they can settle from the page should be settled from the page.
 
+**`multi` carries one meaning only: "I cannot tell these apart — go walk them."** It never means
+"several of these could be taken together". A combination that is itself a live answer is its own
+candidate: list `A`, `C`, and `A and C` as three options on an ordinary single-pick decision. Let
+the flag carry both meanings and §3 can no longer tell whether it was handed work or an answer.
+
 The body exists to be read by someone who has not watched the layer being built:
 
 - Open with what is actually at stake in plain language — never "round 2" or role names.
@@ -107,7 +121,10 @@ The body exists to be read by someone who has not watched the layer being built:
 
 Render it and read the answers back (§Rendering). Then:
 
-- **Every decision answered** → step 3.
+- **Every decision answered** → step 3. Answers that make *new* decisions askable do not extend
+  this round; they go into §4's "left to the next layer", and §5's gate is where the human
+  decides whether to go get them. A layer never ends because a list ran out (`concept.md` §5),
+  and it never continues because one grew.
 - **Some answered, some blank** → the picks are settled and stay settled; the blanks are not.
   `A+1`, back to step 1 carrying the settled ones. This is not a retry: settling some decisions
   is exactly what makes the next ones askable, so the next round is a *different* round.
@@ -137,8 +154,13 @@ that the collisions survive your context rolling over. Then sort them:
 - **Collided with something hard** → dead by right/wrong. Drop it and record the collision. This
   does not go back to the human: a fact is nobody's vote (`concept.md` §4).
 - **Still standing** → it survived the walk.
+- **Falsified a premise rather than the candidate** → the candidate is not dead; the *menu* is.
+  A probe that shows the reason a candidate looked expensive was never true has re-priced every
+  candidate that reason touched, including the ones nobody walked. Re-price the whole menu before
+  sorting anything: narrowing to "the survivors" is wrong when what fell was the baseline the
+  others were measured against.
 
-Then take one of four exits:
+Then take one of five exits:
 
 - **One candidate left standing** → the probes settled the decision. Go to §4.
 - **Two or more left, and the difference between them is now an opinion** → back to §2, `A+1`, a
@@ -150,6 +172,15 @@ Then take one of four exits:
 - **The probes brought nothing back** — no collisions, no new facts → do **not** ask again. An
   oscillation that returns nothing is not a licence to widen (`concept.md` §6): take your
   recommendation to §4 and say in the plan that the walk could not separate the candidates.
+- **The collision is with the plan this layer widened from** → nothing at this layer can repair
+  it, because every candidate here inherits it. Stop and put the ascent to the human — inline,
+  `AskUserQuestion`, `退回上一層，重看那個決定` / `就在這一層繼續` plus "Other", quoting the parent
+  plan's claim verbatim beside what the probe found. Not §5: there is no plan at this layer yet
+  to ask over or to record on, so the answer goes into `.spiral/L<N>-a<M>-probe.md` beside the
+  collision that raised it. Going up is the decision-maker's move and no one else's
+  (`concept.md` §7), so you offer it and never take it. On 退回上一層, go to §5's ascent branch
+  without writing a plan here. Do **not** take `A+1` instead: another round at this layer would
+  re-decide on the same false footing.
 
 If a probe reports that the only way to answer is to build or run the thing, that is not
 spiral's job. Say so and offer the handoff: spiral writes no code at any depth, and a throwaway
@@ -165,6 +196,13 @@ about.
 
 The two-way doors you kept off the page (§2) get resolved here — a sane default and one line
 saying you took it, so nothing was decided silently.
+
+**A layer can be converged more than once.** If you are re-converging after an ascent, do not
+overwrite `.spiral/L<N>-plan.md`: rename the existing one to `.spiral/L<N>-a<M>-plan.md` for the
+round that produced it, write the new plan in its place, and open the new one by naming the claim
+that was wrong and correcting it. Do that at this step, not at the ascent itself — a reopened
+layer may well confirm what it already had. The superseded plan stays on disk: something that was
+acted on for two layers is part of the record, not a draft.
 
 Where §3 walked candidates, the collisions are part of the result, not background. A candidate
 the probes killed belongs in the falsifier section with what it hit; a decision the probes
@@ -215,7 +253,10 @@ Hold these while writing it:
 
 The plan is on disk and they can read it. Ask **inline** — `AskUserQuestion`, options
 `夠了，就用這個目標` / `再挖一層`, plus the tool's "Other" — carrying a plain-language line on what
-the layer settled. No browser render here: §2 is where they weigh substance against substance;
+the layer settled. Add a third option, `退回上一層，重看那個決定`, only when there is something to
+go back for: the plan this layer widened from rests on a claim this layer has shown to be false,
+or the frame itself is what is stuck rather than its contents (`concept.md` §7). Offering the ascent on every
+gate invites a reframe nobody needed. No browser render here: §2 is where they weigh substance against substance;
 this gate is one binary call on a document they already have, and rendering it again buys
 nothing but a round trip.
 
@@ -226,7 +267,7 @@ paraphrase it into a second document:
 ---
 spiral: gate
 title: <what this layer settled, in plain language>
-choice: <夠了，就用這個目標 | 再挖一層>
+choice: <夠了，就用這個目標 | 再挖一層 | 退回上一層，重看那個決定>
 notes: <their reasoning, verbatim — empty if they gave none>
 ---
 ```
@@ -236,9 +277,9 @@ diverges with, and they are the only account of *why* a layer was settled once y
 rolled over. That block is scaffolding, not content: whoever reads the plan next (the next
 layer's Divergence, `/cf`, a human) ignores it.
 
-- **夠了** → **promote the plan, then report.** `.spiral/` is scratch — gitignored, and it dies
-  with the run. This plan is the one thing here that must outlive it, so copy it to
-  `docs/milestones/<slug>.md` and put the milestone frontmatter on the front:
+- **夠了** → **promote, then report.** `.spiral/` is scratch — gitignored, and it dies with the
+  run. What the run decided is the one thing that must outlive it, so write
+  `docs/milestones/<slug>.md` with the milestone frontmatter on the front:
 
   ```
   ---
@@ -248,7 +289,14 @@ layer's Divergence, `/cf`, a human) ignores it.
   ---
   ```
 
-  The slug comes from what the layer settled, never from `L<N>` — that counter is run-local and
+  **The milestone is composed from every layer, not copied from the last one.** Its commitment
+  and its falsifiers gather the "what this layer settles" and "what would overturn this" of every
+  plan still standing — a superseded plan (§4) contributes nothing — because each layer settled
+  something the ones below it took as given and never restated. "Concrete enough to build on" and
+  "left open" come from the deepest layer alone: those it did restate, and its versions replace
+  the upper ones'. Copying `L<N>-plan.md` on its own silently drops most of what the run decided.
+
+  The slug comes from what the run settled, never from `L<N>` — that counter is run-local and
   collides across runs. `status: done` with an empty `delivered:` is a claim with no receipt;
   the two move together.
 
@@ -257,6 +305,12 @@ layer's Divergence, `/cf`, a human) ignores it.
   gate. Then stop. Executing is not yours.
 - **再挖一層** → `L+1`, round back to `a1`, and back to step 1 — diverging from *this plan*
   and carrying their notes.
+- **退回上一層** → `L-1`, reopened, and back to step 1 with the carry-over §1 describes for that
+  case. The round counter at that layer continues past whatever is already on disk there; nothing
+  is deleted. Everything from the reopened layer downward **stops standing**: its plan is renamed
+  per §4 when that layer is re-converged, and the plans below it — built on the claim that
+  fell — contribute nothing to promotion until they are re-earned. Say that plainly rather than
+  quietly leaving them in `.spiral/` for a later step to gather.
 
 Do **not** dispatch Divergence before this answer. Putting a fresh menu of directions in front
 of someone who was ready to stop manufactures the next layer — that is the churn, mechanized.

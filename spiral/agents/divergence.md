@@ -39,6 +39,10 @@ attention at all — the driver puts the one-way doors to them and defaults the 
   outward contract, anything public). Frame it by *the door it opens or closes*, not by its
   label.
 
+Judge that cost by **what will depend on the choice once it is published**, never by how much
+code the change touches. A one-line switch that other people write scripts against is a one-way
+door; a whole module nobody outside can see is a two-way one.
+
 Hold these always:
 - **Distinct, not shaded.** Three directions that differ only in degree are one direction. If
   you can only find one real direction, say that — a padded list is worse than a short one.
