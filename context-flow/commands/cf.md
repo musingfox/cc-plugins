@@ -76,7 +76,7 @@ Phase 3 routes the OMP builder via `$PI_PROVIDER`/`$PI_MODEL` (pi `--model provi
 Every research/plan/review agent dispatch follows the same contract:
 
 1. The dispatch prompt MUST include a `Report path:` line with the absolute target file (e.g., `Report path: $SESSION/research.md`). The agent writes its full Output Schema to this file before replying.
-2. The agent's reply is **summary-only** (verdict + ≤200-word summary + report path) — never the full schema body. The per-agent `Return Format` section spells out the exact reply shape.
+2. The agent's reply is **summary-only** (a verdict only where the agent's `Return Format` has one — the Standards review has none — plus a ≤200-word summary and the report path) — never the full schema body. The per-agent `Return Format` section spells out the exact reply shape.
 3. **You (the orchestrator) do NOT save the agent's reply to disk** — the agent already wrote the canonical file. Treat the reply as a routing signal: act on the verdict / blocking issues, then read selectively from the report file when you need detail.
 4. **Bounded reads only** on the report file. Use `head -N`, `tail -N`, `sed -n '/^## Section/,/^## NextSection/p'`, or `grep -m N` — never `cat` the entire file. Common targets:
    - `head -30 "$SESSION/research.md"` → Summary block

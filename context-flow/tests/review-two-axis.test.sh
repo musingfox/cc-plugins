@@ -449,6 +449,8 @@ assert_ge1 "$(printf '%s\n' "$p4" | grep -cF 're-dispatch that axis only' || tru
 hd=$(handling)
 assert_ge1 "$(printf '%s\n' "$hd" | grep -F 'documented-convention violation' | grep -cF 'warning advisory' || true)" "convention violation is treated like a warning advisory"
 assert_ge1 "$(printf '%s\n' "$hd" | grep -F 'APPROVE with advisories' | grep -cF 'documented-convention violation' || true)" "APPROVE-with-advisories prompt covers convention violations"
+assert_ge1 "$(outdisc | grep -F 'Return Format' | grep -cF 'Standards review has none' || true)" "Output Discipline does not demand a verdict from the Standards reply"
+assert_eq "0" "$(outdisc | grep -cF '(verdict + ' || true)" "Output Discipline no longer requires a bare verdict from every reply"
 
 # NoSpecEscalation T3: the no-spec AskUserQuestion enumerates its options
 for opt in 'Supply the spec path' 'abort-flow' 'Other'; do
