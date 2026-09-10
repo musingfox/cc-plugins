@@ -387,3 +387,31 @@ done
 # UpstreamAttribution T2
 assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'not imported' || true)" "Standards records what was not imported"
 assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'issue-tracker' || true)" "Standards records issue-tracker was not imported"
+
+# --- Review-round fixes: each clause below was a FAIL that the assertions above did not cover.
+
+line_of() {
+  printf '%s\n' "$1" | grep -n -m1 -F -- "$2" | cut -d: -f1
+}
+
+assert_before() {
+  local a="$1" b="$2" msg="$3"
+  if [ -n "$a" ] && [ -n "$b" ] && [ "$a" -lt "$b" ]; then
+    assert_eq "order" "order" "$msg"
+  else
+    assert_eq "a<b" "$a,$b" "$msg"
+  fi
+}
+
+# AxisSelection T5: the Spec-shaped body sits under ## Spec Axis, after ## Standards Axis
+rv=$(cat "$REVIEW")
+spec_h=$(line_of "$rv" '## Spec Axis')
+assert_before "$(line_of "$rv" '## Standards Axis')" "$(line_of "$rv" '## Contract Verification')" "Spec schema comes after the Standards brief"
+assert_before "$spec_h" "$(line_of "$rv" '## Contract Verification')" "Spec schema is under ## Spec Axis"
+assert_before "$spec_h" "$(line_of "$rv" 'MUST appear')" "Verdict-must-appear rule is under ## Spec Axis"
+assert_before "$spec_h" "$(line_of "$rv" 'Verify that the implementation satisfies every behavioral contract')" "contract-verification mandate is under ## Spec Axis"
+st=$(standards_range)
+assert_eq "0" "$(printf '%s\n' "$st" | grep -cF '## Contract Verification' || true)" "Standards range has no Contract Verification"
+assert_eq "0" "$(printf '%s\n' "$st" | grep -vF 'never emits' | grep -cF '## Verdict' || true)" "Standards range mentions ## Verdict only to forbid it"
+sr=$(spec_range)
+assert_before "$(line_of "$sr" 'Spec brief — selected')" "$(line_of "$sr" 'no spec available')" "Spec scope marker precedes the no-spec rule"
