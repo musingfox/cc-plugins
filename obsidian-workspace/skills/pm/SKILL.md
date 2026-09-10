@@ -81,6 +81,10 @@ Only the stated direction is stored. The inverse — who this task blocks, its s
 - **Cycles** — before adding `A` to `B.blocked_by`, walk `A`'s own `blocked_by` chain. If it reaches `B`, refuse and report the cycle.
 - `parent` is for epic → subtask decomposition only; use `related` for anything else.
 
+## To Tickets
+
+Ticket splitting adapted from [mattpocock/skills](https://github.com/mattpocock/skills) `to-tickets` (MIT, Copyright (c) 2026 Matt Pocock), commit 3cca18b368ae95cdbdebbff572ccafa662551015. Upstream's wide refactor expand-contract sequencing is not imported: this skill keeps the three vertical-slice rules plus prefactor and maps blocking edges onto existing `blocked_by`.
+
 ## Property Schema
 
 **Task**: `title`, `type: task`, `status` (todo/in-progress/blocked/done), `priority` (high/medium/low), `project`, `due` (date), `tags` (list), `parent` (link), `blocked_by` (list of links), `related` (list of links), `created`, `completed`.
