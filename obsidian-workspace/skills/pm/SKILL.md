@@ -1,6 +1,6 @@
 ---
 name: pm
-description: Obsidian Workspace PM — tasks, documents, and ADRs in your Obsidian vault. Triggers on task/doc/ADR lifecycle requests ("add a task", "create an ADR", "archive X", "list in-progress tasks", "refresh dashboard") and via `/obw:pm`. Requires `.obsidian.yaml` with a `pm.project` section.
+description: Obsidian Workspace PM — tasks, documents, and ADRs in your Obsidian vault. Triggers on task/doc/ADR lifecycle requests ("add a task", "create an ADR", "archive X", "list in-progress tasks", "refresh dashboard", "split this spec into tickets") and via `/obw:pm`. Requires `.obsidian.yaml` with a `pm.project` section.
 ---
 
 # pm — Obsidian Project Management
@@ -60,6 +60,7 @@ Use **one call** per known-name read — never chain `search → read`. The pm-s
 - **Create doc** → `create` at `pm/{project}/docs/{kebab}.md` with `template=doc`, then set `title` / `project`.
 - **Create ADR** → `create` at `pm/{project}/docs/adr-{NNNN}-{kebab}.md` with `template=adr`, then set `title` / `project` / `status`. See ADR numbering below.
 - **List tasks** → `search` with `query="[type:task] [project:{project}] [status:<s>]" format=json`.
+- **To tickets** → split a spec, task, or conversation into tickets with blocking edges; see To Tickets.
 - **Archive** → set `status=done` and `completed`, then `move` to `pm/{project}/tasks/archive`. Run the dependent check first (see Relations).
 - **Delete** → confirm first; fall back to `move` if the build lacks `delete`.
 
