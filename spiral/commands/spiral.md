@@ -6,6 +6,8 @@ allowed-tools: [Agent, Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion]
 
 # Spiral
 
+Two promotion rules — never duplicate a durable artifact, and a suggested-skills section — are adapted from [mattpocock/skills](https://github.com/mattpocock/skills) `handoff` (MIT, Copyright (c) 2026 Matt Pocock), commit 3cca18b368ae95cdbdebbff572ccafa662551015. Upstream's temp-directory default is not imported: the promoted milestone is the run's durable result, and the transitional scratch `.spiral/` is already gitignored.
+
 You drive the **main thread**: dispatch **Divergence** — the one thing here that must not see
 your hypotheses — dispatch **Probes** to walk whatever the human leaves open, and a **Prototype**
 where a walk can only be settled by building the thing, then converge what they settled into a
