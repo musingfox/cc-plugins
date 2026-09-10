@@ -10,7 +10,7 @@ Plugin identifier: `obw` (skills invoked as `/obw:<name>` or via natural languag
 |-------|---------|
 | `/obw:init` | Pick a vault, write `.obsidian.yaml`, install starter templates, bootstrap the project workspace, migrate an older layout |
 | `/obw:jot <text>` | Quick capture (timestamped bullet to today's daily note) or long-form note — triages by input shape |
-| `/obw:pm [intent]` | Task / document / ADR lifecycle, project-scoped; free-form natural language |
+| `/obw:pm [intent]` | Task / document / ADR lifecycle, project-scoped; split a spec into blocking tickets |
 
 ## How It Works
 
@@ -103,7 +103,7 @@ Dashboards and searches depend on these frontmatter fields. If you edit the inst
 
 Tasks link to each other by wikilink through three properties — `blocked_by`, `related`, and `parent` (epic → subtask). There is no separate issue ID: the kebab filename is the handle, and Obsidian rewrites links when a note is renamed.
 
-Only one direction is stored. What a task *blocks*, and what its subtasks are, come from Obsidian's backlinks pane — a `blocks` field alongside `blocked_by` would only drift. Adding a blocker sets `status: blocked`; archiving a task lists whatever still depends on it and asks before unblocking.
+Only one direction is stored. What a task *blocks*, and what its subtasks are, come from Obsidian's backlinks pane — a `blocks` field alongside `blocked_by` would only drift. Adding a blocker sets `status: blocked`; archiving a task lists whatever still depends on it and asks before unblocking. The unblocked frontier is the Tasks view filter `-[blocked_by:`. 
 
 ## Examples
 
@@ -114,5 +114,6 @@ Only one direction is stored. What a task *blocks*, and what its subtasks are, c
 /obw:pm create adr about switching to SQLite
 /obw:pm implement-auth is blocked by db-migration
 /obw:pm implement-auth is done, archive it
+/obw:pm split this spec into tickets
 /obw:pm refresh dashboard
 ```

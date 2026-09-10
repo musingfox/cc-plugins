@@ -61,7 +61,7 @@
     {
       "name": "obsidian-workspace",
       "source": "./obsidian-workspace",
-      "description": "Obsidian Workspace — personal vault productivity: quick capture to journal, long-form notes, and project management via Obsidian CLI"
+      "description": "Obsidian Workspace — personal vault productivity: quick capture to journal, long-form notes, and project management via Obsidian CLI; /obw:pm splits a spec into blocking tickets"
     },
     {
       "name": "pi-dispatch",
