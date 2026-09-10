@@ -171,6 +171,8 @@ Do **never infer** a spec from the diff — **no spec available** is a stop, not
 
 (Spec brief — selected when the dispatch Axis is Spec.)
 
+Classify every Spec FAIL as **missing or partial**, **scope creep**, or **implemented but wrong**, and **quote the contract** line that failed. Verdict rules are unchanged: `fuzzy_criteria` are binding; emit `## What Changed` and `## Verdict` using `APPROVE`, `APPROVE-with-advisories`, or `REQUEST_CHANGES`.
+
 ## Rules
 
 - PASS/FAIL is based on the **contract specification**, not your opinion of how it should have been designed.

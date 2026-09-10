@@ -299,3 +299,22 @@ fi
 
 # NoSpecAvailable T3
 assert_ge1 "$(spec_range | grep -cF 'never infer' || true)" "Spec axis never infers a spec from the diff"
+
+# SpecReportShape T1
+sr=$(spec_range)
+assert_ge1 "$(printf '%s\n' "$sr" | grep -cF 'missing or partial' || true)" "Spec FAIL: missing or partial"
+assert_ge1 "$(printf '%s\n' "$sr" | grep -cF 'scope creep' || true)" "Spec FAIL: scope creep"
+assert_ge1 "$(printf '%s\n' "$sr" | grep -cF 'implemented but wrong' || true)" "Spec FAIL: implemented but wrong"
+assert_ge1 "$(printf '%s\n' "$sr" | grep -cF 'quote the contract' || true)" "Spec FAIL quotes the contract"
+
+# SpecReportShape T2
+assert_ge1 "$(printf '%s\n' "$sr" | grep -cF '## Verdict' || true)" "Spec range has ## Verdict"
+assert_ge1 "$(printf '%s\n' "$sr" | grep -cF 'APPROVE-with-advisories' || true)" "Spec range has APPROVE-with-advisories"
+assert_ge1 "$(printf '%s\n' "$sr" | grep -cF 'REQUEST_CHANGES' || true)" "Spec range has REQUEST_CHANGES"
+assert_ge1 "$(printf '%s\n' "$sr" | grep -cF '## What Changed' || true)" "Spec range has ## What Changed"
+assert_ge1 "$(printf '%s\n' "$sr" | grep -cF 'fuzzy_criteria' || true)" "Spec range has fuzzy_criteria"
+
+# SpecReportShape T3
+rr=$(rules_range)
+assert_ge1 "$(printf '%s\n' "$rr" | grep -cF 'Verdict enum is exact' || true)" "Rules: Verdict enum is exact"
+assert_ge1 "$(printf '%s\n' "$rr" | grep -cF 'You do NOT receive research constraints' || true)" "Rules: no research constraints"
