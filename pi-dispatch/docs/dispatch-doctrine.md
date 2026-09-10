@@ -94,7 +94,10 @@ hand it; anything not in the brief does not exist. A brief carries:
 - the task, verbatim where possible (don't let a wrapper reinterpret it)
 - acceptance criteria (what "done" observably looks like)
 - the operating environment: working directory (absolute paths, never cd
-  out), available tools/CLIs, credential assumptions, output path.
+  out), available tools/CLIs, credential assumptions, output path. The
+  directory is also where the dispatcher *launches* the worker (`PI_CWD`):
+  a brief can tell the worker where to work, but only the launch decides
+  where a bare command runs.
 
 **Return end — independent review (builder ↔ advisor).** Every dispatch
 names its reviewer, and the reviewer is never the builder (self-acceptance)

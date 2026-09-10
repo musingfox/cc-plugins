@@ -42,7 +42,9 @@ Main writes one self-contained brief per task. The brief carries:
 - acceptance criteria (what "done" observably looks like),
 - the operating environment: working directory (absolute paths, never cd out),
   available tools/CLIs, credential assumptions, output path,
-- for code-writing tasks, an isolation worktree path.
+- for code-writing tasks, an isolation worktree path — and launch the worker
+  inside it (`PI_CWD`). A brief rule cannot move the worker's cwd; only the
+  dispatcher can.
 
 **Offload path**: main loads the `pi-agent.sh` operator usage from
 `skills/pi-dispatch/SKILL.md` and embeds it verbatim into the brief. The

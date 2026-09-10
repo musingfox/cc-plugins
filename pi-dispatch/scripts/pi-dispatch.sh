@@ -44,6 +44,11 @@
 #                Override this to pass a custom system/user prompt (e.g. spiral's
 #                BUILD brief prompt) without modifying this script.
 #
+# Worker directory:
+#   PI_CWD       optional; pi is launched inside it. Recorded with the routing and
+#                replayed on resume. Sets up the fence: shims/git on PATH (with
+#                PI_REAL_GIT) and extensions/worktree-fence.ts via -e.
+#
 # Process-group model (macOS-first; darwin has no `setsid` binary):
 #   We launch pi through a perl POSIX::setsid THIN WRAPPER, backgrounded + disowned.
 #   perl setsid() makes the wrapper a NEW session + process-group LEADER, so its
@@ -95,6 +100,55 @@ BRIEF="${1:?usage: pi-dispatch.sh BRIEF [OUTDIR [PRIOR_RUNDIR]]}"
 OUTDIR="${2:-${PI_RUNS_DIR:-$HOME/.cache/pi-runs}/pi-dispatch}"
 PRIOR_RUNDIR="${3:-}"
 
+abs() { # physical absolute path of an existing directory, or of a file in one
+  if [ -d "$1" ]; then (cd "$1" && pwd -P); else printf '%s/%s\n' "$(cd "$(dirname "$1")" && pwd -P)" "$(basename "$1")"; fi
+}
+
+# Every path is absolutized once, here: the worker may be launched in PI_CWD
+# (below), and the paths handed to pi must survive that cd.
+[ -f "$BRIEF" ] && BRIEF="$(abs "$BRIEF")"
+mkdir -p "$OUTDIR"; OUTDIR="$(abs "$OUTDIR")"
+case "$PI_BIN" in */*) PI_BIN="$(abs "$PI_BIN")" ;; esac
+[ -n "$PRIOR_RUNDIR" ] && [ -d "$PRIOR_RUNDIR" ] && PRIOR_RUNDIR="$(abs "$PRIOR_RUNDIR")"
+
+# PI_CWD: the directory pi is launched in. pi has no --cwd flag and takes
+# process.cwd(), so without this the worker inherits the CALLER's directory —
+# for cf that was the human's real checkout, and a bare `git commit` landed there.
+# Recorded in RUNDIR/routing and, like the model, the record beats the env on a
+# resume: a worker picking its context back up must not move.
+PI_CWD="${PI_CWD:-}"
+if [ -n "$PRIOR_RUNDIR" ]; then
+  if [ -f "$PRIOR_RUNDIR/routing" ] && grep -q '^CWD=.' "$PRIOR_RUNDIR/routing"; then
+    PI_CWD="$(sed -n 's/^CWD=//p' "$PRIOR_RUNDIR/routing")"
+  else
+    # A run recorded before CWD= existed: pi keys the session on the directory
+    # it started in and, moved elsewhere, asks "Fork this session?" on a stdin
+    # that is /dev/null — the resume dies mid-stream. Take the cwd from the
+    # session header instead, and say so.
+    for f in "$PRIOR_RUNDIR/pi.stream.jsonl" "$PRIOR_RUNDIR/result.md"; do
+      [ -f "$f" ] || continue
+      hdr="$(jq -rs 'map(select(.type=="session"))[0].cwd // empty' "$f" 2>/dev/null || true)"
+      [ -n "$hdr" ] && { PI_CWD="$hdr"; echo "pi-dispatch: warning: prior run recorded no CWD; resuming in the session's own directory $hdr" >&2; break; }
+    done
+  fi
+fi
+if [ -n "$PI_CWD" ]; then
+  if [ ! -d "$PI_CWD" ]; then
+    echo "pi-dispatch: PI_CWD is not a directory: $PI_CWD" >&2
+    exit 2
+  fi
+  PI_CWD="$(abs "$PI_CWD")"
+  export PI_CWD
+  # The fence: shims/git first on the worker's PATH (it needs the real git's
+  # location, since it can no longer find it by scanning PATH) and the
+  # write/edit extension via -e below.
+  SHIMS="$(abs "$SCRIPT_DIR/../shims")"
+  PI_REAL_GIT="$(command -v git)"
+  export PI_REAL_GIT
+  PATH="$SHIMS:$PATH"
+  export PATH
+fi
+
 # A resume inherits the prior run's routing. The recorded routing beats the env
 # (a shell that says grok must not hijack a session started on codex). Without
 # this a follow-up turn silently changes model mid-session.
@@ -117,7 +171,7 @@ START_FILE="$RUNDIR/pi-start.ts"
 mkdir -p "$SESSION_DIR"
 
 # Record the resolved routing so a later resume can replay it (see the inherit above).
-printf 'PROVIDER=%s\nMODEL=%s\n' "$PROVIDER" "$MODEL" > "$RUNDIR/routing"
+printf 'PROVIDER=%s\nMODEL=%s\nCWD=%s\n' "$PROVIDER" "$MODEL" "$PI_CWD" > "$RUNDIR/routing"
 
 # Normalize the brief into a file so we can hand it to Pi via @file (never via
 # inline command substitution).
@@ -191,7 +245,11 @@ fi
 # ~40%, at the price of the dispatch AGENTS.md and extension tools).
 # shellcheck disable=SC2206
 [ -n "${PI_EXTRA_ARGS:-}" ] && PI_ARGS+=(${PI_EXTRA_ARGS})
+[ -n "$PI_CWD" ] && PI_ARGS+=(-e "$SCRIPT_DIR/../extensions/worktree-fence.ts")
 PI_ARGS+=(--session-dir "$SESSION_DIR" @"$BRIEF_FILE" "$PROMPT")
+
+# Every path pi receives is absolute by now, so the cd only moves the worker.
+[ -n "$PI_CWD" ] && cd "$PI_CWD"
 
 perl -MPOSIX -e '
   POSIX::setsid();
