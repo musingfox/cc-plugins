@@ -16,6 +16,7 @@ if [ ! -f "$report" ]; then
   echo "[deepen] report not found: $report" >&2
   exit 1
 fi
+report="$(cd "$(dirname "$report")" && pwd)/$(basename "$report")"
 
 root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 
@@ -25,7 +26,7 @@ render="$(ls "$root"/../viz/lib/render.sh \
              "$root"/../../viz/*/lib/render.sh 2>/dev/null | sort -V | tail -1)"
 
 inline() {
-  echo "report at: $report" >&2
+  echo "[deepen] $1 — report at: $report" >&2
   cat "$report"
   echo "[deepen] render=inline"
   exit 0
@@ -41,6 +42,7 @@ if [ -n "$render" ] && [ -f "$render" ]; then
     echo "[deepen] render=viz"
     exit 0
   fi
+  inline "viz render failed"
 fi
 
-inline
+inline "viz render.sh not found"

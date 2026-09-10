@@ -52,7 +52,7 @@ setup
 run_render "$T/r.md"
 printf '%s\n' "$out" | grep -q '# hello' || fail "T3: stdout must contain # hello"
 [ "$(printf '%s\n' "$out" | tail -n 1)" = '[deepen] render=inline' ] || fail "T3: last line must be [deepen] render=inline"
-printf '%s\n' "$err" | grep -q 'report at:' || fail "T3: stderr must contain report at:"
+[ "$err" = "[deepen] viz render.sh not found — report at: $T/r.md" ] || fail "T3: stderr must be the not-found line, got '$err'"
 [ "$rc" -eq 0 ] || fail "T3: exit code must be 0, got $rc"
 teardown
 
@@ -63,6 +63,7 @@ printf '%s\n' '#!/bin/bash' 'exit 1' > "$T/mp/viz/lib/render.sh"
 chmod +x "$T/mp/viz/lib/render.sh"
 run_render "$T/r.md"
 [ "$(printf '%s\n' "$out" | tail -n 1)" = '[deepen] render=inline' ] || fail "T4: last line must be [deepen] render=inline"
+[ "$err" = "[deepen] viz render failed — report at: $T/r.md" ] || fail "T4: stderr must be the render-failed line, got '$err'"
 [ "$rc" -eq 0 ] || fail "T4: exit code must be 0, got $rc"
 teardown
 
@@ -81,4 +82,14 @@ chmod +x "$T/mp/viz/lib/render.sh"
 run_render "$T/r.md" 'survey-x'
 printf '%s\n' "$out" | grep -q "STUB-RENDER $T/r.md survey-x" || fail "T6: stub must receive survey-x as \$2"
 [ "$rc" -eq 0 ] || fail "T6: exit code must be 0, got $rc"
+teardown
+
+# T7: a relative report path is reported absolute
+setup
+set +e
+err="$(cd "$T" && CLAUDE_PLUGIN_ROOT="$T/mp/deepen" bash "$script" r.md 2>&1 >/dev/null)"
+rc=$?
+set -e
+[ "$rc" -eq 0 ] || fail "T7: exit code must be 0, got $rc"
+[ "$err" = "[deepen] viz render.sh not found — report at: $T/r.md" ] || fail "T7: relative path must be absolutised, got '$err'"
 teardown
