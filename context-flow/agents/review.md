@@ -12,6 +12,8 @@ tools: Read, Write, Grep, Glob, Bash
 
 Verify that the implementation satisfies every behavioral contract. Also review for non-contract concerns and report them as advisories.
 
+The builder transcript is **forbidden** — never requested, never read.
+
 ## Two Scopes
 
 ### 1. Contract Compliance (binding)
