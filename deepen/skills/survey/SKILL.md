@@ -9,6 +9,8 @@ disable-model-invocation: true
 
 # Survey
 
+Survey adapted from [mattpocock/skills](https://github.com/mattpocock/skills) `improve-codebase-architecture` (MIT, Copyright (c) 2026 Matt Pocock), commit 3cca18b368ae95cdbdebbff572ccafa662551015. HTML-REPORT.md is not imported: viz renders markdown and Mermaid only, so hand-built SVG and Tailwind cannot port. Step 3 grilling is not imported: the skill ends at the report; `/spiral` narrows.
+
 ## 1. Scope
 
 If `$ARGUMENTS` is non-empty, that string is the scope. Skip hotspot inference. Tell the user the chosen scope in one line, then go to Context.
