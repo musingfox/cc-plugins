@@ -157,3 +157,22 @@ if [ -n "$ng" ]; then
 else
   assert_eq "present" "absent" "empty diff write is on the non-git scratch mode line"
 fi
+
+phase4_line() {
+  awk '/^## Phase 4: Review/{p=1} p{print} /^## Context Compression/{exit}' "$CFMD" | grep -n -F -- "$1" | head -1 | cut -d: -f1
+}
+
+# DiffNonEmpty T1
+assert_ge1 "$(phase4 | grep -cF -- '-s "$SESSION/implement.diff"' || true)" "Phase 4 tests implement.diff with -s"
+
+# DiffNonEmpty T2
+empty_ln=$(awk '/^## Phase 4: Review/{p=1} p{print} /^## Context Compression/{exit}' "$CFMD" | grep -n -F -- '-s "$SESSION/implement.diff"' | head -1 | cut -d: -f1)
+agent_ln=$(phase4_line 'Agent(')
+if [ -n "$empty_ln" ] && [ -n "$agent_ln" ] && [ "$empty_ln" -lt "$agent_ln" ]; then
+  assert_eq "order" "order" "empty-diff check precedes Agent("
+else
+  assert_eq "empty<agent" "$empty_ln,$agent_ln" "empty-diff check precedes Agent("
+fi
+
+# DiffNonEmpty T3
+assert_ge1 "$(phase4 | grep -cF 'implement.diff is empty' || true)" "Phase 4 names an empty implement.diff"

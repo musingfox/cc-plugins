@@ -510,6 +510,10 @@ Capture the review diff unconditionally on both implementer paths — never into
 integration_branch="cf/$CF_SLUG-integrated"
 if [ -n "${REPO_ROOT:-}" ]; then
   git -C "$REPO_ROOT" diff "$BASE_HEAD" "$integration_branch" > "$SESSION/implement.diff"
+  if [ ! -s "$SESSION/implement.diff" ]; then
+    echo "implement.diff is empty — nothing reviewable was produced. Stop; do not dispatch review."
+    exit 1
+  fi
 else
   : > "$SESSION/implement.diff"   # non-git scratch mode
 fi
