@@ -6,3 +6,5 @@ description: >-
 ---
 
 # Domain glossary
+
+Read `${CLAUDE_PLUGIN_ROOT}/skills/glossary/references/context-format.md` before the first write.
