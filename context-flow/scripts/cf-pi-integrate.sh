@@ -158,12 +158,9 @@ clear_sequencer() {
 }
 
 # Clean any prior integration worktree (idempotent retry).
-if git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | grep -Fq "worktree $integration_work"; then
-  git -C "$REPO_ROOT" worktree remove --force "$integration_work" >/dev/null 2>&1 || true
-fi
-if git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$integration_branch"; then
-  git -C "$REPO_ROOT" branch -D "$integration_branch" >/dev/null 2>&1 || true
-fi
+git -C "$REPO_ROOT" worktree remove --force "$integration_work" >/dev/null 2>&1 || true
+git -C "$REPO_ROOT" worktree prune >/dev/null 2>&1 || true
+git -C "$REPO_ROOT" branch -D "$integration_branch" >/dev/null 2>&1 || true
 rm -rf "$integration_work"
 
 # Create integration worktree.

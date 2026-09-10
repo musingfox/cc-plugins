@@ -155,3 +155,185 @@ assert_json "$FLOW/integration-result.json" '.reason' "dependency_cycle" "T3 rea
 head_now=$(git -C "$FLOW/work" rev-parse HEAD)
 assert_eq "$BASE_HEAD" "$head_now" "T3 parent HEAD unchanged"
 cleanup_flow "$REPO" "$FLOW" "$TMP"
+
+# Fixture 3: A, C independent; D depends_on [A,C] via merge commit + D1.
+setup_fixture_3() {
+  TMP="$(mktemp -d)"
+  REPO="$TMP/repo"
+  FLOW="$TMP/flow"
+  mkdir -p "$REPO" "$FLOW"
+  init_repo "$REPO"
+  echo base > "$REPO/base.txt"
+  git -C "$REPO" add -A && git -C "$REPO" commit -qm base
+  BASE_HEAD=$(git -C "$REPO" rev-parse HEAD)
+
+  write_flow_env "$FLOW" "$REPO" "$BASE_HEAD"
+  cat > "$FLOW/shards.json" <<'EOF'
+{"schema_version":1,"groups":{
+  "A":{"shard_id":"A","contracts":["CA"],"files":["a.txt"],"depends_on":[]},
+  "C":{"shard_id":"C","contracts":["CC"],"files":["c.txt"],"depends_on":[]},
+  "D":{"shard_id":"D","contracts":["CD"],"files":["d.txt"],"depends_on":["A","C"]}
+}}
+EOF
+  write_shard_env "$FLOW" A
+  write_shard_env "$FLOW" C
+  write_shard_env "$FLOW" D
+
+  local base slug
+  base=$(basename "$FLOW")
+  slug="cf/${base}-shard"
+
+  git -C "$REPO" checkout -qb "${slug}-A"
+  echo a > "$REPO/a.txt"
+  git -C "$REPO" add -A && git -C "$REPO" commit -qm A1
+  TAG_A=$(tag_and_checkpoint "$REPO" "$FLOW" A)
+
+  git -C "$REPO" checkout -q main
+  git -C "$REPO" checkout -qb "${slug}-C"
+  echo c > "$REPO/c.txt"
+  git -C "$REPO" add -A && git -C "$REPO" commit -qm C1
+  TAG_C=$(tag_and_checkpoint "$REPO" "$FLOW" C)
+
+  git -C "$REPO" checkout -qb "${slug}-D" "$TAG_A"
+  git -C "$REPO" merge --no-edit "$TAG_C" >/dev/null
+  echo d > "$REPO/d.txt"
+  git -C "$REPO" add -A && git -C "$REPO" commit -qm D1
+  TAG_D=$(tag_and_checkpoint "$REPO" "$FLOW" D)
+  git -C "$REPO" checkout -q main
+
+  jq -n --arg a "$TAG_A" --arg c "$TAG_C" --arg d "$TAG_D" \
+    '{checkpoints:{A:$a,C:$c,D:$d}}' > "$FLOW/dispatch-state.json"
+
+  git -C "$REPO" worktree add -b "cf/$base" "$FLOW/work" "$BASE_HEAD" >/dev/null
+}
+
+# Fixture 4: A and B both touch f.txt; merge is clean, linear replay is not.
+setup_fixture_4() {
+  TMP="$(mktemp -d)"
+  REPO="$TMP/repo"
+  FLOW="$TMP/flow"
+  mkdir -p "$REPO" "$FLOW"
+  init_repo "$REPO"
+  echo base > "$REPO/f.txt"
+  git -C "$REPO" add -A && git -C "$REPO" commit -qm base
+  BASE_HEAD=$(git -C "$REPO" rev-parse HEAD)
+
+  write_flow_env "$FLOW" "$REPO" "$BASE_HEAD"
+  cat > "$FLOW/shards.json" <<'EOF'
+{"schema_version":1,"groups":{
+  "A":{"shard_id":"A","contracts":["CA"],"files":["f.txt"],"depends_on":[]},
+  "B":{"shard_id":"B","contracts":["CB"],"files":["f.txt","b.txt"],"depends_on":[]}
+}}
+EOF
+  write_shard_env "$FLOW" A
+  write_shard_env "$FLOW" B
+
+  local base slug
+  base=$(basename "$FLOW")
+  slug="cf/${base}-shard"
+
+  git -C "$REPO" checkout -qb "${slug}-A"
+  echo x > "$REPO/f.txt"
+  git -C "$REPO" add -A && git -C "$REPO" commit -qm A1
+  TAG_A=$(tag_and_checkpoint "$REPO" "$FLOW" A)
+
+  git -C "$REPO" checkout -q main
+  git -C "$REPO" checkout -qb "${slug}-B"
+  echo y > "$REPO/f.txt"
+  git -C "$REPO" add -A && git -C "$REPO" commit -qm B1
+  echo base > "$REPO/f.txt"
+  echo b > "$REPO/b.txt"
+  git -C "$REPO" add -A && git -C "$REPO" commit -qm B2
+  TAG_B=$(tag_and_checkpoint "$REPO" "$FLOW" B)
+  git -C "$REPO" checkout -q main
+
+  jq -n --arg a "$TAG_A" --arg b "$TAG_B" \
+    '{checkpoints:{A:$a,B:$b}}' > "$FLOW/dispatch-state.json"
+
+  git -C "$REPO" worktree add -b "cf/$base" "$FLOW/work" "$BASE_HEAD" >/dev/null
+}
+
+assert_no_sequencer() {
+  local wt="$1" msg="$2"
+  local cp seq porcelain
+  cp=$(git -C "$wt" rev-parse --git-path CHERRY_PICK_HEAD)
+  seq=$(git -C "$wt" rev-parse --git-path sequencer)
+  if [ -e "$cp" ]; then _assert_fail "$msg CHERRY_PICK_HEAD present"; else _assert_pass; fi
+  if [ -e "$seq" ]; then _assert_fail "$msg sequencer present"; else _assert_pass; fi
+  porcelain=$(git -C "$wt" status --porcelain)
+  assert_eq "" "$porcelain" "$msg porcelain empty"
+}
+
+# --- LinearizeConflictAborts T1 ----------------------------------------------
+
+setup_fixture_4
+run_integrate >/dev/null 2>&1
+rc=$?
+assert_eq "5" "$rc" "L1 exit 5"
+assert_json "$FLOW/integration-result.json" '.status' "LINEARIZE_CONFLICT" "L1 status"
+assert_json "$FLOW/integration-result.json" '.reason' "cherry_pick_conflict" "L1 reason"
+assert_json "$FLOW/integration-result.json" '.offending_shard' "B" "L1 offending_shard"
+base=$(basename "$FLOW")
+assert_json "$FLOW/integration-result.json" '.integration_branch' "cf/${base}-integrated" "L1 integration_branch"
+head_now=$(git -C "$FLOW/work" rev-parse HEAD)
+assert_eq "$BASE_HEAD" "$head_now" "L1 parent HEAD is BASE_HEAD"
+assert_no_sequencer "$FLOW/work" "L1"
+git -C "$REPO" show-ref --verify --quiet "refs/heads/cf/${base}-integrated"
+assert_eq "0" "$?" "L1 integrated branch exists"
+git -C "$REPO" show-ref --verify --quiet "refs/heads/cf/${base}-shard-A"
+assert_eq "0" "$?" "L1 shard A exists"
+git -C "$REPO" show-ref --verify --quiet "refs/heads/cf/${base}-shard-B"
+assert_eq "0" "$?" "L1 shard B exists"
+cleanup_flow "$REPO" "$FLOW" "$TMP"
+
+# --- LinearizeConflictAborts T2: conflict on rerun keeps prior landing --------
+
+setup_fixture_4
+# First run with only A registered.
+base=$(basename "$FLOW")
+slug="cf/${base}-shard"
+jq -n --arg a "$TAG_A" '{checkpoints:{A:$a}}' > "$FLOW/dispatch-state.json"
+cat > "$FLOW/shards.json" <<'EOF'
+{"schema_version":1,"groups":{
+  "A":{"shard_id":"A","contracts":["CA"],"files":["f.txt"],"depends_on":[]}
+}}
+EOF
+run_integrate >/dev/null 2>&1
+rc=$?
+assert_eq "0" "$rc" "L2 first run exit 0"
+T2_HEAD=$(git -C "$FLOW/work" rev-parse HEAD)
+assert_eq "A1" "$(git -C "$FLOW/work" log -1 --pretty=%s)" "L2 first landing is A1"
+
+# Register B and rerun.
+write_shard_env "$FLOW" B
+cat > "$FLOW/shards.json" <<'EOF'
+{"schema_version":1,"groups":{
+  "A":{"shard_id":"A","contracts":["CA"],"files":["f.txt"],"depends_on":[]},
+  "B":{"shard_id":"B","contracts":["CB"],"files":["f.txt","b.txt"],"depends_on":[]}
+}}
+EOF
+jq -n --arg a "$TAG_A" --arg b "$TAG_B" '{checkpoints:{A:$a,B:$b}}' > "$FLOW/dispatch-state.json"
+run_integrate >/dev/null 2>&1
+rc=$?
+assert_eq "5" "$rc" "L2 second run exit 5"
+head_now=$(git -C "$FLOW/work" rev-parse HEAD)
+assert_eq "$T2_HEAD" "$head_now" "L2 parent stays at first landing"
+assert_json "$FLOW/integration-result.json" '.parent_prior_tip' "$T2_HEAD" "L2 parent_prior_tip"
+cleanup_flow "$REPO" "$FLOW" "$TMP"
+
+# --- LinearizeConflictAborts T3: wrong prereq-refs -> tree_mismatch ----------
+
+setup_fixture_3
+printf 'refs/tags/%s\n' "$TAG_D" > "$FLOW/shards/C/prereq-refs"
+run_integrate >/dev/null 2>&1
+rc=$?
+assert_eq "5" "$rc" "L3 exit 5"
+assert_json "$FLOW/integration-result.json" '.reason' "tree_mismatch" "L3 reason"
+assert_json "$FLOW/integration-result.json" '.offending_shard' "null" "L3 offending_shard"
+head_now=$(git -C "$FLOW/work" rev-parse HEAD)
+assert_eq "$BASE_HEAD" "$head_now" "L3 parent HEAD is BASE_HEAD"
+assert_no_sequencer "$FLOW/work" "L3"
+base=$(basename "$FLOW")
+git -C "$REPO" show-ref --verify --quiet "refs/heads/cf/${base}-integrated"
+assert_eq "0" "$?" "L3 integrated branch exists"
+cleanup_flow "$REPO" "$FLOW" "$TMP"
