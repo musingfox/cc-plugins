@@ -20,6 +20,5 @@ n=$(printf '%s\n' "$range" | grep -cF 'docs/spec/' || true)
 n=$(grep -ci 'scaffold' "$skill" || true)
 [ "$n" -eq 0 ] || fail "T3: scaffold must be absent"
 
-if test -e CONTEXT.md; then
-  fail "T4: CONTEXT.md must not exist at repo root"
-fi
+n=$(git ls-files spec/ | grep -c 'CONTEXT.md' || true)
+[ "$n" -eq 0 ] || fail "T4: the plugin must not ship a CONTEXT.md"

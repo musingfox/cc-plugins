@@ -25,3 +25,10 @@ n=$(grep -cF 'CONTEXT-MAP.md' "$skill" || true)
 
 n=$(grep -cF 'not imported' "$skill" || true)
 [ "$n" -ge 1 ] || fail "T4: not imported missing"
+
+for f in spec/skills/glossary/SKILL.md spec/skills/glossary/references/context-format.md; do
+  n=$(grep -c 'adapted from .*mattpocock/skills.*MIT.*3cca18b368ae95cdbdebbff572ccafa662551015' "$f" || true)
+  [ "$n" -eq 1 ] || fail "attribution in $f is not one unwrapped line, got $n"
+done
+n=$(grep -c "CONTEXT-MAP.md is not imported: " spec/skills/glossary/SKILL.md || true)
+[ "$n" -eq 1 ] || fail "SKILL.md must say why CONTEXT-MAP.md is not imported, got $n"
