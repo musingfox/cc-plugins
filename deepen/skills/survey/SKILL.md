@@ -31,3 +31,45 @@ Tell the user the chosen scope in one line before anything else runs: the direct
 ## 2. Context
 
 Before dispatch, read `CONTEXT.md` if it exists and any ADRs under `docs/adr/`. They constrain what a candidate may contradict.
+
+## 3. Explore
+
+Print the one-line scope and how many explorers will run. Dispatch them in one message, at most three.
+
+For each scope path (or one explorer for the whole tree), call:
+
+`Agent(subagent_type: "deepen:explorer", prompt: "Report path: /tmp/viz/<project>/deepen-explorer-<timestamp>-<n>.md\nScope: <path or whole tree>\n")`
+
+`<project>` is `$(basename "$PWD")`. Timestamp the files so a stale report from an earlier run cannot be mistaken for this one. Explorers run in parallel. Print nothing else until they return.
+
+If a report file is missing after dispatch, say which scope produced nothing and continue with the others.
+
+## 4. Read
+
+Do not Read an explorer report whole. For each `/tmp/viz/<project>/deepen-explorer-*.md` that exists, take only:
+
+```bash
+sed -n '/^## Summary/,/^## Notes/p' /tmp/viz/<project>/deepen-explorer-<timestamp>-<n>.md
+```
+
+That range stops at `## Notes` (inclusive of the heading, exclusive of the trail). Never load `## Notes`.
+
+## 5. Report
+
+Write the candidate report yourself, following `${CLAUDE_PLUGIN_ROOT}/docs/report.md`, to `/tmp/viz/<project>/deepen-survey-<timestamp>.md`. Do NOT propose interfaces. Zero friction entries across all explorers: put `No candidates` under `## Top recommendation`, name the scope, and still render.
+
+## 6. Render
+
+From the repository root:
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/render-survey.sh" /tmp/viz/<project>/deepen-survey-<timestamp>.md
+```
+
+Print the report path.
+
+## 7. Hand-off
+
+Which of these would you like to explore?
+
+Narrowing a chosen candidate is `/spiral`'s job. This skill ends at the report.
