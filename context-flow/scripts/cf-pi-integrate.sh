@@ -319,6 +319,10 @@ if [ "$have_cycle" -eq 1 ]; then
   write_linearize_conflict dependency_cycle
 fi
 
+if [ "${#merged_shards[@]}" -eq 0 ]; then
+  write_linearize_conflict no_shards_merged
+fi
+
 git -C "$parent_work" reset --hard "$base_commit" >/dev/null
 
 for sid in ${merged_shards[@]+"${merged_shards[@]}"}; do

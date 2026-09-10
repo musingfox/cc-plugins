@@ -192,6 +192,22 @@ git -C "$REPO" show-ref --verify --quiet "refs/heads/cf/${base}"
 assert_eq "1" "$?" "T4 cf/<slug> was never created"
 cleanup_flow "$REPO" "$FLOW" "$TMP"
 
+# --- LandingPreconditionRefusal T5: every shard skipped (bash 3.2 empty array)
+
+setup_fixture_2
+base=$(basename "$FLOW")
+git -C "$REPO" branch -D "cf/${base}-shard-A" "cf/${base}-shard-C" >/dev/null
+run_integrate >/dev/null 2>"$TMP/stderr"
+rc=$?
+assert_eq "5" "$rc" "T5 exit 5"
+assert_eq "yes" "$([ -f "$FLOW/integration-result.json" ] && echo yes || echo no)" "T5 result JSON written"
+assert_json "$FLOW/integration-result.json" '.reason' "no_shards_merged" "T5 reason"
+assert_conflict_keys "$FLOW/integration-result.json" "T5"
+assert_json "$FLOW/integration-result.json" '.merged_shards | length' "0" "T5 merged_shards empty"
+assert_eq "$BASE_HEAD" "$(git -C "$FLOW/work" rev-parse HEAD)" "T5 parent HEAD unchanged"
+assert_eq "0" "$(grep -c 'unbound variable' "$TMP/stderr" || true)" "T5 no unbound-variable crash"
+cleanup_flow "$REPO" "$FLOW" "$TMP"
+
 # Fixture 3: A, C independent; D depends_on [A,C] via merge commit + D1.
 setup_fixture_3() {
   TMP="$(mktemp -d)"
