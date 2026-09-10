@@ -22,3 +22,7 @@ CONTEXT.md is a glossary and nothing else.
 The words layer, port, adapter, seam, module, and interface stay out of CONTEXT.md.
 Domain words keep their own meaning; those six are design terms. The mirror
 rule is context-flow's Design Vocabulary — it need not list every one of them.
+
+## Clean architecture
+
+Entities and use cases take their names from this glossary.
