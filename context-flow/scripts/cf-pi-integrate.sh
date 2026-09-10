@@ -306,6 +306,11 @@ fi
 
 parent_prior_tip=$(git -C "$parent_work" rev-parse HEAD)
 
+parent_head_ref=$(git -C "$parent_work" symbolic-ref -q HEAD 2>/dev/null || true)
+if [ "$parent_head_ref" != "refs/heads/$parent_branch" ]; then
+  write_linearize_conflict parent_wrong_branch
+fi
+
 if [ -n "$(git -C "$parent_work" status --porcelain)" ]; then
   write_linearize_conflict parent_dirty
 fi

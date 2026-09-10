@@ -174,6 +174,24 @@ head_now=$(git -C "$FLOW/work" rev-parse HEAD)
 assert_eq "$BASE_HEAD" "$head_now" "T3 parent HEAD unchanged"
 cleanup_flow "$REPO" "$FLOW" "$TMP"
 
+# --- LandingPreconditionRefusal T4: parent checked out on a foreign branch ----
+
+setup_fixture_2 no
+base=$(basename "$FLOW")
+git -C "$REPO" worktree add -b some/other-branch "$FLOW/work" "$BASE_HEAD" >/dev/null
+run_integrate >/dev/null 2>"$TMP/stderr"
+rc=$?
+assert_eq "5" "$rc" "T4 exit 5"
+assert_json "$FLOW/integration-result.json" '.reason' "parent_wrong_branch" "T4 reason"
+assert_conflict_keys "$FLOW/integration-result.json" "T4"
+assert_json "$FLOW/integration-result.json" '.parent_prior_tip' "$BASE_HEAD" "T4 parent_prior_tip"
+assert_eq "refs/heads/some/other-branch" "$(git -C "$FLOW/work" symbolic-ref HEAD)" "T4 parent still on its own branch"
+assert_eq "$BASE_HEAD" "$(git -C "$FLOW/work" rev-parse HEAD)" "T4 parent HEAD unchanged"
+assert_eq "0" "$(grep -c 'fatal:' "$TMP/stderr" || true)" "T4 no raw git fatal on stderr"
+git -C "$REPO" show-ref --verify --quiet "refs/heads/cf/${base}"
+assert_eq "1" "$?" "T4 cf/<slug> was never created"
+cleanup_flow "$REPO" "$FLOW" "$TMP"
+
 # Fixture 3: A, C independent; D depends_on [A,C] via merge commit + D1.
 setup_fixture_3() {
   TMP="$(mktemp -d)"
