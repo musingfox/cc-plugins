@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-n=10
+n=200
 while getopts 'n:' opt; do
   case "$opt" in
     n) n=$OPTARG ;;
@@ -13,11 +13,12 @@ while getopts 'n:' opt; do
 done
 
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
-  echo "not a git repository" >&2
+  echo "[deepen] not a git repository: $PWD" >&2
   exit 1
 fi
 
-log=$(git log -n "$n" --no-merges --name-only --pretty=format:'COMMIT')
+# An unborn branch makes git log exit 128; an empty log is a valid zero-window answer.
+log=$(git log -n "$n" --no-merges --name-only --pretty=format:'COMMIT' 2>/dev/null || true)
 window=$(printf '%s\n' "$log" | grep -c '^COMMIT$' || true)
 
 ranked=$(
@@ -44,7 +45,7 @@ if [ "$window" -gt 0 ]; then
   share=$((100 * top / window))
 fi
 
-if [ "$window" -ge 10 ] && [ "$share" -ge 50 ]; then
+if [ "$window" -ge 10 ] && [ "$share" -ge 25 ]; then
   scope=hotspot
 else
   scope=wide

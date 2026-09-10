@@ -120,7 +120,8 @@ err="$(cd "$t6" && bash "$script" 2>&1 >/dev/null)"
 rc=$?
 set -e
 [ "$rc" -eq 1 ] || fail "T6: expected exit 1, got $rc"
-printf '%s\n' "$err" | grep -q 'not a git repository' || fail "T6: stderr must contain 'not a git repository'"
+want="[deepen] not a git repository: $(cd "$t6" && pwd)"
+[ "$err" = "$want" ] || fail "T6: stderr must be exactly '$want', got '$err'"
 rm -rf "$t6"
 
 # T7: depth-3 path buckets at depth 2
@@ -131,3 +132,39 @@ out="$(cd "$t7" && run "$t7")"
 printf '%s\n' "$out" | grep -qx '1 src/orders' || fail "T7: expected ranked line '1 src/orders'"
 if printf '%s\n' "$out" | grep -q 'src/orders/deep'; then fail "T7: must not rank src/orders/deep"; fi
 rm -rf "$t7"
+
+# T8: default window is 200, threshold is 25 — 20 commits, 6 in src/orders -> hotspot
+t8="$(mktemp -d)"
+init_git "$t8"
+i=0
+while [ "$i" -lt 6 ]; do
+  commit_file "$t8" "src/orders/${i}.txt"
+  i=$((i + 1))
+done
+i=0
+while [ "$i" -lt 14 ]; do
+  commit_file "$t8" "src/d$(printf '%02d' "$i")/f.txt"
+  i=$((i + 1))
+done
+out="$(cd "$t8" && run "$t8")"
+printf '%s\n' "$out" | grep -qx 'window: 20' || fail "T8: default window must cover all 20 commits"
+printf '%s\n' "$out" | grep -qx 'top-share: 30' || fail "T8: expected top-share: 30"
+printf '%s\n' "$out" | grep -qx 'scope: hotspot' || fail "T8: top-share 30 must be a hotspot"
+first_ranked="$(printf '%s\n' "$out" | grep -E '^[0-9]+ ' | head -n 1)"
+[ "$first_ranked" = '6 src/orders' ] || fail "T8: first ranked line must be '6 src/orders', got '$first_ranked'"
+rm -rf "$t8"
+
+# T9: empty repository (unborn branch) -> zero window, wide, exit 0
+t9="$(mktemp -d)"
+init_git "$t9"
+set +e
+out="$(cd "$t9" && bash "$script" 2>"$t9.err")"
+rc=$?
+set -e
+[ "$rc" -eq 0 ] || fail "T9: expected exit 0, got $rc ($(cat "$t9.err"))"
+printf '%s\n' "$out" | grep -qx 'window: 0' || fail "T9: expected window: 0"
+printf '%s\n' "$out" | grep -qx 'top-share: 0' || fail "T9: expected top-share: 0"
+printf '%s\n' "$out" | grep -qx 'scope: wide' || fail "T9: expected scope: wide"
+ranked_n="$(printf '%s\n' "$out" | grep -cE '^[0-9]+ ' || true)"
+[ "$ranked_n" -eq 0 ] || fail "T9: expected no ranked lines, got $ranked_n"
+rm -rf "$t9" "$t9.err"
