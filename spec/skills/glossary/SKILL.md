@@ -2,7 +2,7 @@
 name: glossary
 description: >-
   Terminology for CONTEXT.md. Use when a word is overloaded, or when a
-  concept conflicts with CONTEXT.md.
+  concept conflicts with CONTEXT.md. For architecture invariants, use spec.
 ---
 
 # Domain glossary

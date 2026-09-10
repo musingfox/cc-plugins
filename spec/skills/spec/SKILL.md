@@ -5,7 +5,7 @@ description: >-
   the invariants and forward-looking interface contracts a project must not
   break. Use when writing down a rule that must survive across runs, when an
   agent needs to know what constrains the files it is about to touch, or when
-  auditing whether the specs still hold. For "why we chose A over B", use adr.
+  auditing whether the specs still hold. For domain terms, use glossary. For "why we chose A over B", use adr.
 ---
 
 # Architecture Spec Library
