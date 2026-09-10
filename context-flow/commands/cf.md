@@ -523,6 +523,7 @@ if [ -n "${REPO_ROOT:-}" ]; then
     exit 1
   fi
 else
+  echo "fail-early skipped (non-git scratch mode)"
   : > "$SESSION/implement.diff"   # non-git scratch mode
 fi
 ```

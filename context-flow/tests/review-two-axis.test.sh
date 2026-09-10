@@ -220,3 +220,9 @@ fi
 # FixedPointResolves T4
 assert_ge1 "$(phase4 | grep -cF 'Phase 4 fail-early:' || true)" "Phase 4 fail-early prefix"
 assert_ge1 "$(phase4 | grep -cF 'integration branch missing' || true)" "Phase 4 names integration branch missing"
+
+# ScratchModeSkip T1
+assert_ge1 "$(phase4 | grep -cF 'fail-early skipped (non-git scratch mode)' || true)" "scratch mode skips fail-early"
+
+# ScratchModeSkip T2
+assert_ge1 "$(phase4 | grep -cF -- '-n "${REPO_ROOT:-}"' || true)" "fail-early is guarded by REPO_ROOT"
