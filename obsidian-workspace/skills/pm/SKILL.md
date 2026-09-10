@@ -85,6 +85,15 @@ Only the stated direction is stored. The inverse — who this task blocks, its s
 
 Ticket splitting adapted from [mattpocock/skills](https://github.com/mattpocock/skills) `to-tickets` (MIT, Copyright (c) 2026 Matt Pocock), commit 3cca18b368ae95cdbdebbff572ccafa662551015. Upstream's wide refactor expand-contract sequencing is not imported: this skill keeps the three vertical-slice rules plus prefactor and maps blocking edges onto existing `blocked_by`.
 
+Look for prefactor opportunities first: make the change easy, then make the easy change.
+
+Every ticket is a vertical slice:
+
+- A complete narrow path through schema, API, UI, and tests — not a horizontal layer.
+- Demoable or verifiable on its own.
+- Sized to one fresh context window.
+- Prefactor done first.
+
 ## Property Schema
 
 **Task**: `title`, `type: task`, `status` (todo/in-progress/blocked/done), `priority` (high/medium/low), `project`, `due` (date), `tags` (list), `parent` (link), `blocked_by` (list of links), `related` (list of links), `created`, `completed`.
