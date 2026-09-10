@@ -428,3 +428,6 @@ for token in '## Findings' '- **Label**' '- **Where**' '- **Detail**' '## Implem
 done
 assert_before "$(line_of "$st" '### Documented-convention violations')" "$(line_of "$st" '### Baseline smells')" "Standards schema lists violations before smells"
 assert_ge1 "$(printf '%s\n' "$st" | grep -F 'report file' | grep -cF 'reply' || true)" "Standards says which shape is the file and which is the reply"
+
+# SmellBaselinePrecedence T5: every finding quotes the hunk
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'quoting the hunk' || true)" "Standards findings quote the hunk"

@@ -49,19 +49,19 @@ If the dispatch carries `## Implement Concerns`, answer each one under `## Imple
 
 ### Output Schema (Standards)
 
-This is the body of the report file. Documented-convention violations come first, then baseline smells. A baseline-smell entry is named after one of the twelve smells above.
+This is the body of the report file. Documented-convention violations come first, then baseline smells. Every entry quotes the offending hunk under `- **Where**`; a baseline-smell entry is named after one of the twelve smells above.
 
 ```markdown
 ## Findings
 
 ### Documented-convention violations
 - **Label**: [file and rule cited — e.g. `CLAUDE.md` "Repo markdown in English"]
-- **Where**: [path:line]
+- **Where**: [path:line, quoting the hunk]
 - **Detail**: [what violates the rule and the smallest fix]
 
 ### Baseline smells
 - **Label**: [one of the twelve smells]
-- **Where**: [path:line]
+- **Where**: [path:line, quoting the hunk]
 - **Detail**: [why it is that smell here, and why no documented convention overrides the call]
 
 (`No findings.` as the sole body of a list that is empty)
