@@ -94,6 +94,10 @@ Every ticket is a vertical slice:
 - Sized to one fresh context window.
 - Prefactor done first.
 
+Split a spec, task, or conversation already in context — or a vault reference the user names. A missing reference stops with the CLI error. Nothing to split → say so and write nothing.
+
+Before any vault write, show a numbered list. Per ticket: **Title**, **Blocked by** (other titles or none), **What it delivers**. Then `AskUserQuestion` with at least: approve / too coarse / too fine / edges wrong. Repeat until the user approves. Only then publish.
+
 ## Property Schema
 
 **Task**: `title`, `type: task`, `status` (todo/in-progress/blocked/done), `priority` (high/medium/low), `project`, `due` (date), `tags` (list), `parent` (link), `blocked_by` (list of links), `related` (list of links), `created`, `completed`.
