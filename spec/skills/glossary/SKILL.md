@@ -8,3 +8,8 @@ description: >-
 # Domain glossary
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/glossary/references/context-format.md` before the first write.
+
+## What goes in
+
+A term belongs here when it names a thing in the problem domain. Write what it IS.
+CONTEXT.md is a glossary and nothing else.
