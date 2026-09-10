@@ -98,6 +98,10 @@ Split a spec, task, or conversation already in context — or a vault reference 
 
 Before any vault write, show a numbered list. Per ticket: **Title**, **Blocked by** (other titles or none), **What it delivers**. Then `AskUserQuestion` with at least: approve / too coarse / too fine / edges wrong. Repeat until the user approves. Only then publish.
 
+Create tickets blockers first so no link targets a missing note. Per ticket, in that order: one **Create task** (kebab filename, `template=task`, `title` and `project`); fill `## Description` from what it delivers and `## Acceptance Criteria`. If it has blockers, set `blocked_by` once with its complete list of `[[kebab]]` wikilinks and `status=blocked`. If the source is a task note in the same project, set `parent` to `[[source]]`. Any later blocker on an already-existing task follows Relations. The source is never modified.
+
+A `create` error mid-publish → stop, receipt of which tickets landed and which did not, never re-run `create`. End with a receipt of created filenames.
+
 ## Property Schema
 
 **Task**: `title`, `type: task`, `status` (todo/in-progress/blocked/done), `priority` (high/medium/low), `project`, `due` (date), `tags` (list), `parent` (link), `blocked_by` (list of links), `related` (list of links), `created`, `completed`.
