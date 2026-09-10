@@ -9,6 +9,11 @@ description: >-
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/glossary/references/context-format.md` before the first write.
 
+## Where it lives
+
+CONTEXT.md sits at the repo root. Create it when the first term is resolved —
+not earlier, and not under `docs/spec/`. Specs live there; the glossary does not.
+
 ## What goes in
 
 A term belongs here when it names a thing in the problem domain. Write what it IS.
