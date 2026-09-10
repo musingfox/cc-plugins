@@ -16,7 +16,7 @@ export PI_BIN="$TMP/no-such-omp" # probe fails fast, after the parts under test
 
 # --- repo: main with a base commit -------------------------------------------
 mkdir -p "$REPO"
-git -C "$REPO" init -q -b main
+git -C "$REPO" init -q -b main && git -C "$REPO" config core.hooksPath /dev/null
 echo base > "$REPO/base.txt"
 git -C "$REPO" add -A && git -C "$REPO" commit -qm base
 

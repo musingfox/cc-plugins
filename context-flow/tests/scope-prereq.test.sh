@@ -38,7 +38,7 @@ JSON
 {"checkpoints": {"A": "cf-checkpoint-A"}}
 JSON
 
-  git -C "$WORK" init -q -b main
+  git -C "$WORK" init -q -b main && git -C "$WORK" config core.hooksPath /dev/null
   git -C "$WORK" config user.email t@t; git -C "$WORK" config user.name t
   echo base > "$WORK/base.txt"
   git -C "$WORK" add -A; git -C "$WORK" commit -qm base

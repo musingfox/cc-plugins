@@ -12,7 +12,7 @@ FLOW_SESSION="$(mktemp -d)"
 export FLOW_SESSION
 mkdir -p "$FLOW_SESSION"
 cd "$REPO_ROOT"
-git init -q
+git init -q && git config core.hooksPath /dev/null
 git commit --allow-empty -m init -q
 git checkout -b cf/myflow-shard-A -q
 sha=$(git rev-parse HEAD)
@@ -30,7 +30,7 @@ FLOW_SESSION="$(mktemp -d)"
 export FLOW_SESSION
 mkdir -p "$FLOW_SESSION"
 cd "$REPO_ROOT"
-git init -q
+git init -q && git config core.hooksPath /dev/null
 git commit --allow-empty -m init -q
 git checkout -b cf/myflow-shard-A -q
 "$CF_TESTS_DIR/../scripts/cf-pi-record-round.sh" --round 1 --result A=PASS
@@ -46,7 +46,7 @@ FLOW_SESSION="$(mktemp -d)"
 export FLOW_SESSION
 mkdir -p "$FLOW_SESSION"
 cd "$REPO_ROOT"
-git init -q
+git init -q && git config core.hooksPath /dev/null
 git commit --allow-empty -m init -q
 git checkout -b cf/myflow-shard-B -q
 "$CF_TESTS_DIR/../scripts/cf-pi-record-round.sh" --round 1 --result B=NEEDS_REPLAN
@@ -65,7 +65,7 @@ export REPO_ROOT
 FLOW_SESSION="$(mktemp -d)"
 export FLOW_SESSION
 cd "$REPO_ROOT"
-git init -q -b main
+git init -q -b main && git config core.hooksPath /dev/null
 git commit --allow-empty -m init -q
 WT_PARENT="$(mktemp -d)"
 WT="$WT_PARENT/wt"
