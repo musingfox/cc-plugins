@@ -93,3 +93,44 @@ assert_eq "0" "$(grep -cF 'Dispatch a single review agent' "$CFMD" || true)" "cf
 # TwoAxisFanOut T4
 assert_ge1 "$(phase4 | grep -cF 'single message' || true)" "Phase 4 launches both in a single message"
 assert_ge1 "$(phase4 | grep -cF 'read-only' || true)" "Phase 4 reviews are read-only"
+
+standards_block() {
+  awk '
+    /Report path: \$SESSION\/review-standards.md/ {p=1}
+    /Report path: \$SESSION\/review-spec.md/ {exit}
+    p {print}
+  ' "$CFMD"
+}
+
+spec_block() {
+  awk '
+    /Report path: \$SESSION\/review-spec.md/ {p=1}
+    /^### Presenting Results/ {exit}
+    p {print}
+  ' "$CFMD"
+}
+
+# AxisBriefIsolation T1
+sb=$(standards_block)
+assert_ge1 "$(printf '%s\n' "$sb" | grep -cF '## Axis: Standards' || true)" "standards block has ## Axis: Standards"
+assert_ge1 "$(printf '%s\n' "$sb" | grep -cF '## Implement Concerns' || true)" "standards block has ## Implement Concerns"
+assert_ge1 "$(printf '%s\n' "$sb" | grep -cF '## Convention sources' || true)" "standards block has ## Convention sources"
+assert_eq "0" "$(printf '%s\n' "$sb" | grep -cF '## Behavioral Contracts' || true)" "standards block has no Behavioral Contracts"
+assert_eq "0" "$(printf '%s\n' "$sb" | grep -cF 'review-spec.md' || true)" "standards block has no review-spec.md"
+
+# AxisBriefIsolation T2
+spb=$(spec_block)
+assert_ge1 "$(printf '%s\n' "$spb" | grep -cF '## Axis: Spec' || true)" "spec block has ## Axis: Spec"
+assert_ge1 "$(printf '%s\n' "$spb" | grep -cF '## Behavioral Contracts' || true)" "spec block has ## Behavioral Contracts"
+assert_ge1 "$(printf '%s\n' "$spb" | grep -cF '## Test Cases' || true)" "spec block has ## Test Cases"
+assert_eq "0" "$(printf '%s\n' "$spb" | grep -cF 'Implement Concerns' || true)" "spec block has no Implement Concerns"
+assert_eq "0" "$(printf '%s\n' "$spb" | grep -cF 'review-standards.md' || true)" "spec block has no review-standards.md"
+
+# AxisBriefIsolation T3
+p4=$(phase4)
+assert_ge1 "$(printf '%s\n' "$p4" | grep -cF 'Do NOT pass' || true)" "Phase 4 says Do NOT pass"
+assert_ge1 "$(printf '%s\n' "$p4" | grep -cF 'research constraints' || true)" "Phase 4 mentions research constraints"
+assert_ge1 "$(printf '%s\n' "$p4" | grep -cF 'Do NOT inline' || true)" "Phase 4 says Do NOT inline"
+
+# AxisBriefIsolation T4
+assert_eq "0" "$(printf '%s\n' "$sb" | grep -cF '~/.claude/CLAUDE.md' || true)" "standards dispatch never cites ~/.claude/CLAUDE.md"

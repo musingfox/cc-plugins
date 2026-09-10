@@ -526,12 +526,36 @@ Agent(
   subagent_type: "cf:review",
   prompt: "
     Report path: $SESSION/review-standards.md
+
+    ## Axis: Standards
+
+    ## Implement Concerns
+    {concerns from implement agent, if any — otherwise omit this section}
+
+    ## Convention sources
+    {repo-checked-in conventions: CLAUDE.md, docs/, status: accepted}
+
+    ## Diff path
+    $SESSION/implement.diff
+    (Read the diff directly from this file — do NOT inline the diff in the prompt.)
   "
 )
 Agent(
   subagent_type: "cf:review",
   prompt: "
     Report path: $SESSION/review-spec.md
+
+    ## Axis: Spec
+
+    ## Behavioral Contracts
+    {contracts from Phase 3 — extract from $SESSION/plan.md via `sed -n '/^## Behavioral Contracts/,/^## Implementation Plan/p'`}
+
+    ## Test Cases
+    {same test cases from Phase 3}
+
+    ## Diff path
+    $SESSION/implement.diff
+    (Read the diff directly from this file — do NOT inline the diff in the prompt.)
   "
 )
 ```
