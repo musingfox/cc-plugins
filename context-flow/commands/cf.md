@@ -523,7 +523,7 @@ if [ -n "${REPO_ROOT:-}" ]; then
   fi
   git -C "$REPO_ROOT" diff "$BASE_HEAD" "$integration_branch" > "$SESSION/implement.diff"
   if [ ! -s "$SESSION/implement.diff" ]; then
-    echo "implement.diff is empty — nothing reviewable was produced. Stop; do not dispatch review."
+    echo "Phase 4 fail-early: implement.diff is empty"
     exit 1
   fi
 else

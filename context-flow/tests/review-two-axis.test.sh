@@ -438,3 +438,6 @@ assert_ge1 "$(printf '%s\n' "$p4" | grep -cF 'Phase 4 fail-early: integration br
 assert_ge1 "$(printf '%s\n' "$p4" | grep -F 'jq -r' | grep -cF '.integration_branch' || true)" "Phase 4 reads .integration_branch with jq"
 assert_eq "0" "$(printf '%s\n' "$p4" | grep -cF 'cf/$CF_SLUG-integrated' || true)" "Phase 4 does not re-derive the integration branch name"
 assert_ge1 "$(printf '%s\n' "$p4" | grep -F 'Phase 4 fail-early:' | grep -F 'surface' | grep -cF 'halt' || true)" "every fail-early line is surfaced to the human and halts Phase 4"
+
+# DiffNonEmpty T4: exact empty-diff line carries the fail-early prefix
+assert_ge1 "$(printf '%s\n' "$p4" | grep -cF 'Phase 4 fail-early: implement.diff is empty' || true)" "exact empty-diff fail-early line"
