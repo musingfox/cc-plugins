@@ -441,3 +441,11 @@ assert_ge1 "$(printf '%s\n' "$p4" | grep -F 'Phase 4 fail-early:' | grep -F 'sur
 
 # DiffNonEmpty T4: exact empty-diff line carries the fail-early prefix
 assert_ge1 "$(printf '%s\n' "$p4" | grep -cF 'Phase 4 fail-early: implement.diff is empty' || true)" "exact empty-diff fail-early line"
+
+# SideBySidePresent T5: violations render before smells; missing report re-dispatches one axis; violation acts as a warning advisory
+pr=$(presenting)
+assert_before "$(line_of "$pr" 'documented-convention violations')" "$(line_of "$pr" 'baseline smells')" "Standards renders violations before smells"
+assert_ge1 "$(printf '%s\n' "$p4" | grep -cF 're-dispatch that axis only' || true)" "missing report file re-dispatches that axis only"
+hd=$(handling)
+assert_ge1 "$(printf '%s\n' "$hd" | grep -F 'documented-convention violation' | grep -cF 'warning advisory' || true)" "convention violation is treated like a warning advisory"
+assert_ge1 "$(printf '%s\n' "$hd" | grep -F 'APPROVE with advisories' | grep -cF 'documented-convention violation' || true)" "APPROVE-with-advisories prompt covers convention violations"

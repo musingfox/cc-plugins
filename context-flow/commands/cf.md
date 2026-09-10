@@ -581,27 +581,32 @@ Agent(
 
 **Do NOT pass**: research constraints (those should have been captured as test cases by plan). **Do NOT inline the git diff** — pass the file path so the diff bytes never pass through your context.
 
+If either report file is missing after both replies arrive, re-dispatch that axis only — the other axis's report stands.
+
 ### Presenting Results to Human
 
 Show Standards findings beside the Spec verdict. Spec alone drives routing. Do not merge axes and do not rerank findings across them.
 
 Use changelog format from the Spec report — Added / Changed / Fixed sections describing **what the user/system can now do**, not which files were edited. Group related changes; use feature names over contract names. Then present both reports:
 
+```markdown
 ## Standards
-{bounded read of `$SESSION/review-standards.md`; if the axis reported none, show `No findings.`}
+{bounded read of `$SESSION/review-standards.md` `## Findings`: documented-convention violations first,}
+{then baseline smells — never reordered; if the axis reported none, show `No findings.`}
 
 ## Spec
 {bounded read of `$SESSION/review-spec.md` — `## Contract Status` (N/M passed) and `## Advisories` (critical/warning only — drop info unless relevant)}
+```
 
 When describing the run, mention which implementer ran (`Implementation by OMP ($PI_DESC)` or `Fallback: Claude implement agent`).
 
 ### Handling the Verdict
 
-Route on the **Spec verdict** only. A Standards documented-convention violation is shown beside it; it does not change routing.
+Route on the **Spec verdict** only. A Standards documented-convention violation is shown beside it and is treated like a warning advisory when choosing between the two APPROVE branches below; it never turns an APPROVE into REQUEST_CHANGES.
 
 - **no spec available** → call `AskUserQuestion` (nothing to judge; do not send this back to implement).
-- **APPROVE, no critical advisories** → present changelog to human → **run post-PASS rebase** (see below). Done.
-- **APPROVE with advisories** → present changelog + advisories to human, then call `AskUserQuestion` with options: "Address all now (loop to implement)", "Address only critical advisories", "Ship as-is — accept advisories", "Other". On "Ship as-is" or after advisories addressed, **run post-PASS rebase**.
+- **APPROVE, no advisories and no Standards documented-convention violation** → present changelog to human → **run post-PASS rebase** (see below). Done.
+- **APPROVE with advisories** (Spec advisories, or any Standards documented-convention violation) → present changelog + advisories + Standards findings to human, then call `AskUserQuestion` with options: "Address all now (loop to implement)", "Address only critical advisories", "Ship as-is — accept advisories", "Other". On "Ship as-is" or after advisories addressed, **run post-PASS rebase**.
 - **REQUEST_CHANGES with contract failures** → re-run implement with the failure details as additional context (treat as `retry-different-approach`; increment `retries_used`). Do NOT rebase yet — the cf branch accumulates more commits.
 - **REQUEST_CHANGES with fundamental design issues** → this means a contract is wrong, not just the implementation. Loop back to plan via the `## Implement Failure` mechanism in §3.4 with class `loop-back-to-plan`. Increment `retries_used`. Do NOT rebase.
 
