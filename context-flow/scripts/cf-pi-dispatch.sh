@@ -14,6 +14,8 @@
 #                        exit 0 (no dispatch, no session required).
 #
 # Hard rules (inherited from the canonical):
+#   - The worker is launched inside $WORK (PI_CWD); brief discipline alone did not
+#     keep bare git commands out of the parent checkout.
 #   - Pass brief via @"$BRIEF_FILE"; never via "$(cat file)".
 #   - --mode json always; stdout is the json event stream (result.md in RUNDIR).
 #   - Background + disown (canonical does this internally).
@@ -70,6 +72,9 @@ export PI_PROMPT="${PI_PROMPT:-Read the brief and execute it. Act now: make your
 # reviewer >= builder rule still holds, and nothing enforces it for you.
 export PI_PROVIDER="${PI_PROVIDER:-}"
 export PI_MODEL="${PI_MODEL:-}"
+# The worker starts inside its worktree. Without this it inherited cf's own
+# directory — the human's checkout — and a bare `git commit` landed there.
+export PI_CWD="$WORK"
 export PI_WALL_CLOCK_S="${PI_WALL_CLOCK_S:-1800}"
 export PI_STALL_THRESHOLD_S="${PI_STALL_THRESHOLD_S:-180}"
 

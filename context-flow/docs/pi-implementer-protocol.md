@@ -155,7 +155,7 @@ After writing it, print `DONE` — do NOT also write a success-claiming report (
 
 Every brief carries an `## Environment` block — absolute values for `WORK_DIR`, `CF_BRANCH`, `BASE_HEAD`, `REPORT_FILE`, `ESCALATE_FILE`, `TEST_RUNNER`, `SHARD_GROUP` — generated from the shard's `env.sh`; the worker trusts them verbatim. It is the worker's only window into the orchestration. Worker rules:
 
-- Write only inside `WORK_DIR`; never `cd` out or edit the parent checkout.
+- Write only inside `WORK_DIR`; never `cd` out or edit the parent checkout. The worker is launched inside `WORK_DIR` (`cf-pi-dispatch.sh` sets `PI_CWD`), so a bare `git` command lands in the worktree; the rule is the second line of defence, not the first.
 - Stay on `CF_BRANCH`; no `git push`, no remotes, no branch switching.
 - Implement only the contracts in this brief — each shard's brief is a complete unit of work.
 
