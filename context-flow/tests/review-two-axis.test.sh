@@ -134,3 +134,26 @@ assert_ge1 "$(printf '%s\n' "$p4" | grep -cF 'Do NOT inline' || true)" "Phase 4 
 
 # AxisBriefIsolation T4
 assert_eq "0" "$(printf '%s\n' "$sb" | grep -cF '~/.claude/CLAUDE.md' || true)" "standards dispatch never cites ~/.claude/CLAUDE.md"
+
+# DiffCaptured T1
+p4=$(phase4)
+assert_ge1 "$(printf '%s\n' "$p4" | grep -cF 'integration_branch' || true)" "Phase 4 names integration_branch"
+assert_ge1 "$(printf '%s\n' "$p4" | grep -cF 'implement.diff' || true)" "Phase 4 names implement.diff"
+
+# DiffCaptured T2
+assert_eq "0" "$(grep -cF 'written by the integration gate' "$CFMD" || true)" "cf.md does not say written by the integration gate"
+assert_eq "0" "$(grep -cF 'Diff path is' "$CFMD" || true)" "cf.md does not say Diff path is"
+
+# DiffCaptured T3
+assert_eq "0" "$(printf '%s\n' "$p4" | grep -cF '${BASE_HEAD:-HEAD}' || true)" "Phase 4 does not fallback BASE_HEAD to HEAD"
+
+# DiffCaptured T4
+assert_eq "0" "$(printf '%s\n' "$p4" | grep -cE 'diff .*\.\.\.' || true)" "Phase 4 does not use three-dot git diff"
+
+# DiffCaptured T5
+ng=$(printf '%s\n' "$p4" | grep -F 'non-git scratch mode' | grep -F ': >' || true)
+if [ -n "$ng" ]; then
+  assert_eq "ge1" "ge1" "empty diff write is on the non-git scratch mode line"
+else
+  assert_eq "present" "absent" "empty diff write is on the non-git scratch mode line"
+fi

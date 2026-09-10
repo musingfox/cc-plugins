@@ -426,7 +426,7 @@ Per-shard, per-round FAIL retry budget = 1 (design §6).
 INT_STATUS=$(jq -r '.status' "$SESSION/integration-result.json")
 ```
 
-- `INT_STATUS=PASS` → proceed to Phase 4. Diff path is `$SESSION/implement.diff`.
+- `INT_STATUS=PASS` → proceed to Phase 4. Phase 4 captures `$SESSION/implement.diff`.
 - `INT_STATUS=NEEDS_REPLAN` → integration gate auto-injects NEEDS_REPLAN for the affected contracts (`jq -r '.affected_contracts[]' "$SESSION/integration-result.json"`). Funnel into the partial-replan path below as if they came from shard outcomes.
 
 #### Any NEEDS_REPLAN (after FAIL resolution)
@@ -503,19 +503,19 @@ The fallback fills the SAME seat under the SAME contract — only the builder ch
 
 Launch the Standards and Spec reviews as two separate read-only sub-agents in a **single message**, each writing its own report file.
 
-Capture the diff to a file before dispatching review — never into a shell variable, which would inject the full diff into the orchestrator's context. For OMP the diff is already at `$SESSION/implement.diff` (written by the integration gate). For Claude-fallback, capture it from the worktree now:
+Capture the review diff unconditionally on both implementer paths — never into a shell variable, which would inject the full diff into the orchestrator's context. Phase 4 itself writes `$SESSION/implement.diff` from the flow's fixed point to the integrated branch:
 
 ```bash
 . "$SESSION/env.sh"
+integration_branch="cf/$CF_SLUG-integrated"
 if [ -n "${REPO_ROOT:-}" ]; then
-  git -C "$WORK" add --intent-to-add -- . 2>/dev/null || true
-  git -C "$WORK" diff "${BASE_HEAD:-HEAD}" > "$SESSION/implement.diff"
+  git -C "$REPO_ROOT" diff "$BASE_HEAD" "$integration_branch" > "$SESSION/implement.diff"
 else
   : > "$SESSION/implement.diff"   # non-git scratch mode
 fi
 ```
 
-The diff spans from `$BASE_HEAD` (flow-start HEAD) to the current cf-branch tip, so per-contract commits collapse into the review payload cleanly.
+The diff spans from `$BASE_HEAD` (flow-start HEAD) to `$integration_branch`, so per-contract commits collapse into the review payload cleanly.
 
 The reviewer Reads this file directly; the orchestrator never reads its body.
 
