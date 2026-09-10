@@ -38,6 +38,10 @@ Describe design in these terms exactly. Do not substitute "component", "service"
 
 Criteria to apply when judging or proposing a module:
 
+Apply these before you write a finding.
+Name the seam you stood at.
+Say whether depth sits at the interface.
+
 - **Deletion test**: imagine deleting the module. If complexity vanishes, it was a pass-through layer. If complexity reappears across N callers, it earns its keep.
 - **The interface is the test surface**: callers and tests cross the same seam. Needing to test past the interface means the module is the wrong shape.
 - **One adapter is a hypothetical seam. Two adapters make a real one.** Do not propose a seam unless something actually varies across it.
