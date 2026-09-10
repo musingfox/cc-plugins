@@ -109,6 +109,26 @@ printf '{"type":"session","id":"sess-old","cwd":"%s"}\n' "$WORK2" > "$PRIOR/pi.s
 RD="$(launch PI_BIN="$SHIM" PI_CWD="$WORK" "$DISPATCH" "$CALLER/brief.md" "$OUT" "$PRIOR")"
 if [ "$(field "$RD" CWD)" = "$WORK2" ] && grep -q "^CWD=$WORK2$" "$RD/routing"; then ok "resume of a pre-CWD run -> session header cwd, now recorded"; else bad "pre-CWD resume -> $(field "$RD" CWD)"; fi
 
+# --- Case 5c: on macOS the worker's process tree cannot write outside the worktree ---
+if [ "$(uname -s)" = Darwin ] && command -v sandbox-exec >/dev/null 2>&1; then
+  cat > "$TMP/pi-writer" <<'EOF2'
+#!/usr/bin/env bash
+outside="${@: -1}"   # the PROMPT is pi's last argv; the test passes the outside dir there
+: > "$outside/outside" 2>/dev/null && echo OUTSIDE=written || echo OUTSIDE=denied
+: > "$PI_CWD/inside" 2>/dev/null && echo INSIDE=written || echo INSIDE=denied
+d="$(mktemp -d 2>/dev/null)" && : > "$d/t" 2>/dev/null && echo TMP=written || echo TMP=denied
+EOF2
+  chmod +x "$TMP/pi-writer"
+  # The "outside" dir must not be under the per-user temp dir: that is the
+  # sandbox's own escape hatch for test scaffolding.
+  OUTSIDE="$(mktemp -d /tmp/cwd-test-outside.XXXXXX)"; trap 'rm -rf "$TMP" "$OUTSIDE"' EXIT
+  RD="$(launch PI_BIN="$TMP/pi-writer" PI_CWD="$WORK" PI_PROMPT="$OUTSIDE" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
+  if [ -f "$RD/sandbox.sb" ] && grep -q "(subpath \"$WORK\")" "$RD/sandbox.sb"; then ok "sandbox profile written with the worktree"; else bad "sandbox profile missing"; fi
+  if [ "$(field "$RD" OUTSIDE)" = denied ] && [ "$(field "$RD" INSIDE)" = written ] && [ "$(field "$RD" TMP)" = written ]; then ok "sandbox: outside denied, worktree and mktemp allowed"; else bad "sandbox enforcement -> $(grep -E '^(OUTSIDE|INSIDE|TMP)=' "$RD/result.md" | tr '\n' ' ')"; fi
+  RD2="$(launch PI_BIN="$TMP/pi-writer" PI_CWD="$WORK" PI_SANDBOX=0 PI_PROMPT="$OUTSIDE" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
+  if [ ! -f "$RD2/sandbox.sb" ] && [ "$(field "$RD2" OUTSIDE)" = written ]; then ok "PI_SANDBOX=0 -> no sandbox"; else bad "PI_SANDBOX=0 -> $(grep OUTSIDE= "$RD2/result.md")"; fi
+fi
+
 # --- Case 6: a relative PI_BIN survives the cd ---
 RD="$(launch PI_BIN="../pi-shim" PI_CWD="$WORK" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
 if [ "$(field "$RD" CWD)" = "$WORK" ] && [ "$(cat "$RD/rc")" = "0" ]; then ok "relative PI_BIN resolves before the cd"; else bad "relative PI_BIN -> rc=$(cat "$RD/rc" 2>/dev/null || echo MISSING)"; fi

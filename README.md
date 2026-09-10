@@ -259,7 +259,7 @@ cc-plugins/
 ├── hook-guard/         skills: hook-guard
 ├── obsidian-workspace/ skills: init, jot, pm · templates, tests
 ├── omt/                skills: contract-validation · agents, commands, contracts, lib
-├── pi-dispatch/        skills: pi-dispatch · agents: builder, reviewer · scripts, tests
+├── pi-dispatch/        skills: pi-dispatch · agents: builder, reviewer · scripts, shims, extensions, tests
 ├── spec/               skills: spec, glossary · scripts: spec.sh · tests
 ├── spiral/             commands: spiral · agents: divergence, probe, prototype · scripts · tests
 ├── viz/                skills: viz-inline, viz-render · lib, tests

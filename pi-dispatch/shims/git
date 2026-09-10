@@ -1,0 +1,173 @@
+#!/usr/bin/env bash
+# git shim — keeps a dispatched worker's git mutations inside PI_CWD.
+#
+# pi-dispatch.sh puts this directory first on the worker's PATH and exports
+# PI_REAL_GIT when PI_CWD is set. The shim sees the shell-expanded argv of every
+# git the worker runs — quoted paths, $VARs, subshells, `bash -c`, `pushd`,
+# scripts calling git — which is why it replaced a tool_call regex over the
+# command text.
+#
+# Deny by default: only verbs known to be read-only pass without a repo check.
+# Aliases are expanded first (`git config --get alias.<verb>`), and an alias that
+# shells out counts as mutating. The repo a mutation lands in is what the real
+# git resolves for the same global options and environment: the top level AND
+# the git dir must both belong to the worktree, because with only GIT_DIR set
+# git reports the cwd as the work tree while the commit goes elsewhere. A git
+# dir under some `.git/worktrees/` is the worktree's own link back to the parent
+# repo and is allowed for commits, but verbs that rewrite shared refs (branch
+# delete, update-ref, tag, worktree remove, gc …) are judged against that parent.
+# `config --global/--system/--file` is judged by the file it writes. `init`/`clone`
+# have no repo yet and are judged by target.
+#
+# Escape hatch: anything under the per-user temp dir ($TMPDIR, or macOS's
+# DARWIN_USER_TEMP_DIR when unset) is allowed, so test suites that scaffold
+# scratch repos with mktemp keep working inside a worker. Shard worktrees live
+# under /tmp/cf-*, which on macOS is not that dir, so this opens no door between
+# shards. On Linux with TMPDIR unset there is no hatch.
+#
+# Not covered: libgit2-based tools and `gh` do not go through PATH's git.
+
+set -u
+
+real="${PI_REAL_GIT:-}"
+[ -n "$real" ] || { echo "git shim: PI_REAL_GIT is not set; pi-dispatch.sh exports it alongside PI_CWD" >&2; exit 127; }
+[ -n "${PI_CWD:-}" ] || exec "$real" "$@"
+
+canon() {
+  local p="$1" tail=""
+  while [ ! -e "$p" ]; do
+    tail="/$(basename "$p")$tail"
+    p="$(dirname "$p")"
+    [ "$p" = "/" ] && break
+  done
+  printf '%s%s\n' "$(cd "$p" 2>/dev/null && pwd -P || printf '%s' "$p")" "$tail"
+}
+under() { case "$2" in "$1"|"$1"/*) return 0 ;; esac; return 1; }
+
+globals=(); verb=""; args=()
+argv=("$@"); n=$#; i=0
+while [ $i -lt $n ]; do
+  a="${argv[$i]}"
+  case "$a" in
+    -C|-c|--git-dir|--work-tree|--namespace|--exec-path|--super-prefix|--config-env)
+      globals+=("$a" "${argv[$((i+1))]:-}"); i=$((i+2)); continue ;;
+    -*) globals+=("$a"); i=$((i+1)); continue ;;
+    *)  verb="$a"; k=$((i+1)); while [ $k -lt $n ]; do args+=("${argv[$k]}"); k=$((k+1)); done; break ;;
+  esac
+done
+[ -n "$verb" ] || exec "$real" "$@"
+
+g() { "$real" ${globals[@]+"${globals[@]}"} "$@"; }
+
+alias_target="$(g config --get "alias.$verb" 2>/dev/null || true)"
+if [ -n "$alias_target" ]; then
+  case "$alias_target" in
+    '!'*) verb="__shell_alias__" ;;
+    *)    set -- $alias_target; verb="$1" ;;
+  esac
+fi
+
+positionals() { local c=0 a; for a in "$@"; do case "$a" in -*) ;; *) c=$((c+1));; esac; done; echo $c; }
+has() { local want="$1"; shift; local a; for a in "$@"; do case "$a" in $want) return 0;; esac; done; return 1; }
+
+readonly_verb() {
+  local v="$1"; shift
+  case "$v" in
+    log|status|diff|show|rev-parse|ls-files|ls-tree|ls-remote|cat-file|blame|describe|grep|shortlog|rev-list|name-rev|check-ignore|check-attr|for-each-ref|merge-base|count-objects|fsck|whatchanged|var|version|help|diff-tree|diff-index|diff-files|show-ref|verify-commit|verify-tag|cherry|range-diff|show-branch|archive|bundle|hash-object|--version|--help)
+      return 0 ;;
+    branch)
+      has '-[dDmMcCfu]|--delete|--move|--copy|--force|--set-upstream-to*|--unset-upstream|--edit-description' "$@" && return 1
+      has '-l|--list|--contains|--no-contains|--merged|--no-merged|--points-at|--show-current|-a|-r|-v|-vv' "$@" && return 0
+      [ "$(positionals "$@")" = 0 ] ;;
+    tag)
+      has '-[dfasm]|--delete|--force|--annotate|--sign|--message*' "$@" && return 1
+      has '-l|--list|--contains|--no-contains|--merged|--no-merged|--points-at|-n*' "$@" && return 0
+      [ "$(positionals "$@")" = 0 ] ;;
+    stash)    case "${1:-}" in list|show) return 0;; *) return 1;; esac ;;
+    worktree) case "${1:-}" in list) return 0;; *) return 1;; esac ;;
+    config)
+      has '--unset|--unset-all|--add|--replace-all|--edit|-e|--rename-section|--remove-section' "$@" && return 1
+      has '--get|--get-all|--get-regexp|--get-urlmatch|-l|--list|--show-origin|--show-scope' "$@" && return 0
+      [ "$(positionals "$@")" -le 1 ] ;;
+    remote)   case "${1:-}" in ""|-v|--verbose|show|get-url) return 0;; *) return 1;; esac ;;
+    notes)    case "${1:-}" in ""|list|show) return 0;; *) return 1;; esac ;;
+    reflog)   case "${1:-}" in ""|show|exists) return 0;; *) return 1;; esac ;;
+    submodule) case "${1:-}" in ""|status|summary) return 0;; *) return 1;; esac ;;
+    *) return 1 ;;
+  esac
+}
+
+readonly_verb "$verb" ${args[@]+"${args[@]}"} && exec "$real" "$@"
+
+work="$(canon "$PI_CWD")"
+tmp="${TMPDIR:-}"
+[ -n "$tmp" ] || tmp="$(getconf DARWIN_USER_TEMP_DIR 2>/dev/null || true)"
+[ -z "$tmp" ] || tmp="$(canon "$tmp")"
+allowed() {
+  under "$work" "$1" && return 0
+  [ -n "$tmp" ] && under "$tmp" "$1" && return 0
+  return 1
+}
+
+# Verbs that rewrite refs or objects shared with the parent repo. A cf worktree
+# is a linked worktree of the human's checkout: its own commits touch only its
+# branch, but a branch delete, update-ref, tag or worktree removal lands on the
+# repo both share.
+shared_ref_verb() {
+  case "$1" in
+    branch|tag|update-ref|symbolic-ref|worktree|gc|prune|reflog|replace|filter-branch) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+case "$verb" in
+  config)
+    if has '--global' ${args[@]+"${args[@]}"}; then targets=("${XDG_CONFIG_HOME:-$HOME/.config}/git/config" "$HOME/.gitconfig")
+    elif has '--system' ${args[@]+"${args[@]}"}; then targets=("/etc/gitconfig")
+    else
+      f=""; prev=""; for a in ${args[@]+"${args[@]}"}; do
+        case "$a" in --file=*) f="${a#--file=}";; esac
+        [ "$prev" = "--file" ] || [ "$prev" = "-f" ] && f="$a"; prev="$a"
+      done
+      if [ -n "$f" ]; then case "$f" in /*) targets=("$f");; *) targets=("$PWD/$f");; esac
+      else targets=("$(g rev-parse --absolute-git-dir 2>/dev/null || echo "$PWD")"); fi
+    fi
+    ;;
+  init|clone)
+    base="$PWD"
+    j=0; while [ $j -lt ${#globals[@]} ]; do
+      [ "${globals[$j]}" = "-C" ] && base="${globals[$((j+1))]}"; j=$((j+1))
+    done
+    last=""; for a in ${args[@]+"${args[@]}"}; do case "$a" in -*) ;; *) last="$a";; esac; done
+    target="$base"
+    if [ -n "$last" ] && { [ "$verb" = init ] || [ "$(positionals ${args[@]+"${args[@]}"})" -ge 2 ]; }; then
+      case "$last" in /*) target="$last";; *) target="$base/$last";; esac
+    fi
+    case "$target" in /*) ;; *) target="$PWD/$target";; esac
+    targets=("$target")
+    ;;
+  *)
+    top="$(g rev-parse --show-toplevel 2>/dev/null || true)"
+    gitdir="$(g rev-parse --absolute-git-dir 2>/dev/null || true)"
+    targets=()
+    [ -n "$top" ] && targets+=("$top")
+    if [ -n "$gitdir" ]; then
+      case "$gitdir" in
+        */.git/worktrees/*) shared_ref_verb "$verb" && targets+=("${gitdir%/.git/worktrees/*}") ;;
+        *) targets+=("$gitdir") ;;
+      esac
+    fi
+    [ ${#targets[@]} -gt 0 ] || targets=("$PWD")
+    ;;
+esac
+
+for t in "${targets[@]}"; do
+  if ! allowed "$(canon "$t")"; then
+    cat >&2 <<EOF
+BLOCKED by worktree-fence: git $verb would act on $t, outside your worktree $work.
+Run it inside the worktree (git -C $work $verb …) or use read-only git against the other repo.
+EOF
+    exit 1
+  fi
+done
+exec "$real" "$@"

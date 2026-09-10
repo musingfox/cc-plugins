@@ -90,7 +90,11 @@ harness tool can reach them).
 
 1. Decompose the work into self-contained briefs (one observable outcome
    each). For code-writing tasks, create one worktree per task with
-   `pi-worktree.sh create` and put its ABSOLUTE path in the brief.
+   `pi-worktree.sh create`, put its ABSOLUTE path in the brief, and launch
+   with `PI_CWD=<worktree> pi-agent.sh start …`. The brief tells the worker
+   where to work; only `PI_CWD` makes it start there, and it is what arms the
+   worktree fence (git shim + write/edit extension). Without it a bare
+   `git commit` from the worker lands in whatever directory main ran from.
 2. Embed this usage section + the per-task brief into a builder dispatch.
    The builder runs `pi-agent.sh start` per task and `pi-agent.sh watch` as
    its main loop, and runs each worker's acceptance check when it settles.

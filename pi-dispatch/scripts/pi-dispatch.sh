@@ -47,7 +47,9 @@
 # Worker directory:
 #   PI_CWD       optional; pi is launched inside it. Recorded with the routing and
 #                replayed on resume. Sets up the fence: shims/git on PATH (with
-#                PI_REAL_GIT) and extensions/worktree-fence.ts via -e.
+#                PI_REAL_GIT), extensions/worktree-fence.ts via -e, and on macOS
+#                a sandbox-exec profile (RUNDIR/sandbox.sb) that denies writes
+#                outside the worktree. PI_SANDBOX=0 skips the sandbox.
 #
 # Process-group model (macOS-first; darwin has no `setsid` binary):
 #   We launch pi through a perl POSIX::setsid THIN WRAPPER, backgrounded + disowned.
@@ -149,6 +151,24 @@ if [ -n "$PI_CWD" ]; then
   export PATH
 fi
 
+# Filesystem sandbox (macOS, PI_CWD set, PI_SANDBOX not 0): the whole worker
+# process tree may write only inside the worktree, the run dir, the per-user
+# temp and cache dirs, pi's own state, and the shared git dir a linked worktree
+# commits through. This is the fence the shim cannot be: it catches /usr/bin/git
+# by absolute path, a rewritten PATH, gh, libgit2, and plain shell writes.
+SANDBOX=()
+if [ -n "$PI_CWD" ] && [ "${PI_SANDBOX:-1}" != "0" ] && [ "$(uname -s)" = Darwin ] && command -v sandbox-exec >/dev/null 2>&1; then
+  sb_paths=("$PI_CWD")
+  common="$(git -C "$PI_CWD" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+  [ -n "$common" ] && sb_paths+=("$(abs "$common")")
+  for d in "${TMPDIR:-}" "$(getconf DARWIN_USER_TEMP_DIR 2>/dev/null || true)" "$(getconf DARWIN_USER_CACHE_DIR 2>/dev/null || true)" \
+           "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}" "$HOME/.pi" "$HOME/.cache" "$HOME/.npm" "$HOME/.bun/install/cache" "$HOME/Library/Caches"; do
+    [ -n "$d" ] && [ -d "$d" ] && sb_paths+=("$(abs "$d")")
+  done
+  SANDBOX_PROFILE_PATHS=("${sb_paths[@]}")
+  SANDBOX=(pending)
+fi
+
 # A resume inherits the prior run's routing. The recorded routing beats the env
 # (a shell that says grok must not hijack a session started on codex). Without
 # this a follow-up turn silently changes model mid-session.
@@ -172,6 +192,21 @@ mkdir -p "$SESSION_DIR"
 
 # Record the resolved routing so a later resume can replay it (see the inherit above).
 printf 'PROVIDER=%s\nMODEL=%s\nCWD=%s\n' "$PROVIDER" "$MODEL" "$PI_CWD" > "$RUNDIR/routing"
+
+if [ ${#SANDBOX[@]} -gt 0 ]; then
+  {
+    echo '(version 1)'
+    echo '(allow default)'
+    echo '(deny file-write*)'
+    echo '(allow file-write*'
+    echo '  (literal "/dev/null") (regex #"^/dev/tty") (regex #"^/dev/fd/") (regex #"^/private/var/run/")'
+    # pi's bundled subagents extension keeps its scratch under /tmp/pi-subagents-uid-<uid>/.
+    echo '  (regex #"^/private/tmp/pi-subagents-uid-[0-9]+(/|$)")'
+    for d in "${SANDBOX_PROFILE_PATHS[@]}" "$RUNDIR"; do printf '  (subpath "%s")\n' "$d"; done
+    echo ')'
+  } > "$RUNDIR/sandbox.sb"
+  SANDBOX=(sandbox-exec -f "$RUNDIR/sandbox.sb")
+fi
 
 # Normalize the brief into a file so we can hand it to Pi via @file (never via
 # inline command substitution).
@@ -262,7 +297,7 @@ perl -MPOSIX -e '
   open(my $fh, ">", $rcfile) or exit 255;
   print $fh "$rc\n";
   close($fh);
-' "$RC_FILE" "$PI_BIN" "${PI_ARGS[@]}" \
+' "$RC_FILE" ${SANDBOX[@]+"${SANDBOX[@]}"} "$PI_BIN" "${PI_ARGS[@]}" \
   < /dev/null > "$OUTPUT_FILE" 2> "$STDERR_FILE" &
 
 WRAP_PID=$!
