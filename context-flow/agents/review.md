@@ -181,6 +181,8 @@ Where the repo records no convention, fall back to Fowler, *Refactoring*, ch. 3.
 - **Middle Man**
 - **Refused Bequest**
 
+Standards text adapted from [mattpocock/skills](https://github.com/mattpocock/skills) `code-review` (MIT, Copyright (c) 2026 Matt Pocock), commit 3cca18b368ae95cdbdebbff572ccafa662551015. Upstream's issue-tracker filing is not imported: this seat writes a findings list, it does not open tickets.
+
 This axis never emits a `## Verdict`. It is a labelled findings list: a documented-convention violation, a baseline smell, and Implement Concerns forwarded from implement.
 
 Write:

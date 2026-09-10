@@ -372,3 +372,18 @@ assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'tooling already enforces' || true)
 
 # SmellBaselinePrecedence T4
 assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'repo convention > baseline' || true)" "repo convention > baseline"
+
+# UpstreamAttribution T1
+st=$(standards_range)
+for phrase in \
+  'https://github.com/mattpocock/skills' \
+  '`code-review`' \
+  'MIT' \
+  'Copyright (c) 2026 Matt Pocock' \
+  '3cca18b368ae95cdbdebbff572ccafa662551015'; do
+  assert_ge1 "$(printf '%s\n' "$st" | grep -cF "$phrase" || true)" "Standards attribution has $phrase"
+done
+
+# UpstreamAttribution T2
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'not imported' || true)" "Standards records what was not imported"
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'issue-tracker' || true)" "Standards records issue-tracker was not imported"
