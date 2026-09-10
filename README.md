@@ -247,7 +247,7 @@ cc-plugins/
 ├── omt/                skills: contract-validation · agents, commands, contracts, lib
 ├── pi-dispatch/        skills: pi-dispatch · agents: builder, reviewer · scripts, tests
 ├── spec/               skills: spec, glossary · scripts: spec.sh · tests
-├── spiral/             commands: spiral · agents: divergence, probe, prototype · scripts
+├── spiral/             commands: spiral · agents: divergence, probe, prototype · scripts · tests
 ├── viz/                skills: viz-inline, viz-render · lib, tests
 ├── wizard/             skills: wizard
 └── README.md
