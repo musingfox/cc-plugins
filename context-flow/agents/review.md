@@ -52,7 +52,7 @@ baseline smells:
 
 (Spec brief — selected when the dispatch Axis is Spec.)
 
-If the dispatch has no behavioral contracts, stop with Blocker **no spec available**. Write that exact line.
+If the dispatch has no behavioral contracts, stop with Blocker **no spec available**. Write that exact line as the sole entry under `## Blockers`, make the `## Contract Verification` body the single line `no spec available`, and omit `## What Changed`; the verdict is `REQUEST_CHANGES` because a Blocker is present.
 **no spec available** is a stop, not a prompt to invent one — never infer a spec from the diff.
 
 Verify that the implementation satisfies every behavioral contract. Also review for non-contract concerns and report them as advisories.

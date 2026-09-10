@@ -415,3 +415,8 @@ assert_eq "0" "$(printf '%s\n' "$st" | grep -cF '## Contract Verification' || tr
 assert_eq "0" "$(printf '%s\n' "$st" | grep -vF 'never emits' | grep -cF '## Verdict' || true)" "Standards range mentions ## Verdict only to forbid it"
 sr=$(spec_range)
 assert_before "$(line_of "$sr" 'Spec brief — selected')" "$(line_of "$sr" 'no spec available')" "Spec scope marker precedes the no-spec rule"
+
+# NoSpecAvailable T4: the blocked report's shape is fully specified
+assert_ge1 "$(printf '%s\n' "$sr" | grep -F '`## Contract Verification`' | grep -F 'single line' | grep -cF 'no spec available' || true)" "Contract Verification body is the single line no spec available"
+assert_ge1 "$(printf '%s\n' "$sr" | grep -F '`## What Changed`' | grep -cF 'omit' || true)" "What Changed is omitted under no spec available"
+assert_ge1 "$(printf '%s\n' "$sr" | grep -F 'no spec available' | grep -cF 'REQUEST_CHANGES' || true)" "no spec available verdict is REQUEST_CHANGES"
