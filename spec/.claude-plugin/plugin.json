@@ -1,6 +1,6 @@
 {
   "name": "spec",
-  "description": "Architecture spec library — invariants and forward-looking interface contracts as verifiable, sliceable entries that reach workers through their briefs",
+  "description": "Architecture spec library — invariants and forward-looking interface contracts as verifiable, sliceable entries that reach workers through their briefs, plus a CONTEXT.md domain glossary",
   "version": "0.1.2",
   "author": {
     "name": "Nick Huang",

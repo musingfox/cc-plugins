@@ -36,7 +36,7 @@
     {
       "name": "spec",
       "source": "./spec",
-      "description": "Architecture spec library — invariants and forward-looking interface contracts as verifiable, sliceable entries that reach workers through their briefs"
+      "description": "Architecture spec library — invariants and forward-looking interface contracts as verifiable, sliceable entries that reach workers through their briefs, plus a CONTEXT.md domain glossary"
     },
     {
       "name": "adr",
