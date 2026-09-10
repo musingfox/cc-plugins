@@ -102,7 +102,7 @@ Create tickets blockers first so no link targets a missing note. Per ticket, in 
 
 A `create` error mid-publish → stop, receipt of which tickets landed and which did not, never re-run `create`. End with a receipt of created filenames.
 
-Startable tickets — the frontier — are one `search` with `query="[type:task] [project:{project}] -[status:done] -[blocked_by:"[["]" format=json`. `blocked_by` values are always `[[kebab]]` wikilinks; an empty list `[]` is not excluded by presence, only by value. A linear chain yields one at a time.
+Startable tickets — the frontier — are one `search` with `query="[type:task] [project:{project}] -[status:done] -[blocked_by:\"[[\"]" format=json`. `blocked_by` values are always `[[kebab]]` wikilinks; an empty list `[]` is not excluded by presence, only by value. A linear chain yields one at a time.
 
 ## Property Schema
 

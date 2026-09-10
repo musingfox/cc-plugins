@@ -30,3 +30,7 @@ n="$(awk '/"name": "obsidian-workspace"/,/}/' .claude-plugin/marketplace.json | 
 
 n="$(grep -cF '"name": "obsidian-workspace"' .claude-plugin/marketplace.json || true)"
 [ "$n" -eq 1 ] || fail "marketplace.json plugin name count is $n, want 1"
+n="$(awk '/^## Task Relations/,/^## Examples/' obsidian-workspace/README.md | grep -c 'Tasks view' || true)"
+[ "$n" -eq 0 ] || fail "Task Relations must not point at a nonexistent Tasks view"
+n="$(awk '/^## Task Relations/,/^## Examples/' obsidian-workspace/README.md | grep -c 'frontier is a `search`' || true)"
+[ "$n" -eq 1 ] || fail "Task Relations must say the frontier is a search, got $n"
