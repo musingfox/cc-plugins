@@ -35,6 +35,20 @@ assert_ge1 "$(printf '%s\n' "$lc_line" | grep -c . || true)" \
   "cf.md has INT_STATUS=LINEARIZE_CONFLICT"
 assert_contains "$lc_line" ".integration_branch" \
   "LINEARIZE_CONFLICT line names .integration_branch"
+assert_contains "$lc_line" ".reason, .offending_shard, .offending_commit" \
+  "LINEARIZE_CONFLICT line tells the orchestrator to read the reason"
+assert_eq "0" "$(grep -cF 'cherry-pick onto `cf/$CF_SLUG` failed' "$CFMD" || true)" \
+  "cf.md no longer blames every LINEARIZE_CONFLICT on a cherry-pick"
+
+# Every reason cf-pi-integrate.sh can emit is documented as its own bullet.
+for reason in parent_missing parent_wrong_branch parent_dirty dependency_cycle \
+              no_shards_merged cherry_pick_conflict tree_mismatch; do
+  assert_ge1 "$(grep -cF "  - \`$reason\` — " "$CFMD" || true)" \
+    "cf.md documents LINEARIZE_CONFLICT reason $reason"
+  assert_ge1 "$(grep -cF "write_linearize_conflict $reason" \
+      "$(cd "$CF_TESTS_DIR/.." && pwd)/scripts/cf-pi-integrate.sh" || true)" \
+    "cf-pi-integrate.sh emits reason $reason"
+done
 
 # T4
 assert_ge1 "$(grep -cF "already carries the integration gate's linear landing" "$CFMD" || true)" \

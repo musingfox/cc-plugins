@@ -428,7 +428,14 @@ INT_STATUS=$(jq -r '.status' "$SESSION/integration-result.json")
 
 - `INT_STATUS=PASS` → proceed to Phase 4. Phase 4 captures `$SESSION/implement.diff`.
 - `INT_STATUS=NEEDS_REPLAN` → integration gate auto-injects NEEDS_REPLAN for the affected contracts (`jq -r '.affected_contracts[]' "$SESSION/integration-result.json"`). Funnel into the partial-replan path below as if they came from shard outcomes.
-- `INT_STATUS=LINEARIZE_CONFLICT` → cherry-pick onto `cf/$CF_SLUG` failed; the passing tree remains on `.integration_branch`. Escalate — do not proceed to Phase 4.
+- `INT_STATUS=LINEARIZE_CONFLICT` → the commits could not be replayed onto `cf/$CF_SLUG` as linear history, or the parent worktree was refused before any rewrite; the passing tree remains on `.integration_branch` and the parent sits at `.parent_prior_tip`. Read `jq -r '.reason, .offending_shard, .offending_commit' "$SESSION/integration-result.json"` and escalate with the cause named — never proceed to Phase 4 on this status. Reasons:
+  - `parent_missing` — `$SESSION/work` is absent or not a git worktree. Nothing was written; the gate can be rerun once the worktree exists on `cf/$CF_SLUG`.
+  - `parent_wrong_branch` — `$SESSION/work` is checked out on a branch other than `cf/$CF_SLUG`. Nothing was written; rerun once it is back on `cf/$CF_SLUG`.
+  - `parent_dirty` — `$SESSION/work` has uncommitted changes. Nothing was written; show the human `git -C "$SESSION/work" status --porcelain` and rerun once it is clean.
+  - `dependency_cycle` — `shards.json` `depends_on` is cyclic. Nothing was written; the plan needs repair before the gate can land anything.
+  - `no_shards_merged` — every checkpoint shard was skipped (missing `shards/<id>/env.sh` or a deleted shard branch). Nothing was written; dispatch state and branches disagree.
+  - `cherry_pick_conflict` — `.offending_commit` from `.offending_shard` did not apply on top of the earlier shards; the parent was restored to `.parent_prior_tip`. Hand both values to the human — do not resolve the conflict by hand.
+  - `tree_mismatch` — the replay completed but the parent tree differs from `.integration_branch` (typically a wrong `shards/<id>/prereq-refs`); the parent was restored to `.parent_prior_tip`.
 
 #### Any NEEDS_REPLAN (after FAIL resolution)
 
