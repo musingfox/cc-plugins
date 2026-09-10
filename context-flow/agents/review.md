@@ -41,12 +41,56 @@ Standards text adapted from [mattpocock/skills](https://github.com/mattpocock/sk
 
 This axis never emits a `## Verdict`. It is a labelled findings list: every finding is either a documented-convention violation or a baseline smell, plus a response to each of the Implement Concerns forwarded from implement.
 
-Write:
+### Handling Implement Concerns
 
-documented-convention violations:
-baseline smells:
+If the dispatch carries `## Implement Concerns`, answer each one under `## Implement Concerns` in the report:
+- **agree** — restate the concern as a finding with your own assessment.
+- **disagree** — say that you reviewed it and why it is not a concern.
 
-`No findings.` when a list is empty.
+### Output Schema (Standards)
+
+This is the body of the report file. Documented-convention violations come first, then baseline smells. A baseline-smell entry is named after one of the twelve smells above.
+
+```markdown
+## Findings
+
+### Documented-convention violations
+- **Label**: [file and rule cited — e.g. `CLAUDE.md` "Repo markdown in English"]
+- **Where**: [path:line]
+- **Detail**: [what violates the rule and the smallest fix]
+
+### Baseline smells
+- **Label**: [one of the twelve smells]
+- **Where**: [path:line]
+- **Detail**: [why it is that smell here, and why no documented convention overrides the call]
+
+(`No findings.` as the sole body of a list that is empty)
+
+## Implement Concerns
+- [concern as forwarded] — agree | disagree: [your assessment]
+
+(omit when the dispatch carried no concerns)
+
+## Completed
+- [what the axis inspected — files/hunks covered]
+
+## Unresolved
+- [anything you could not judge — e.g. a convention source you could not read]
+```
+
+### Return Format (Standards)
+
+Write the report file to the dispatch's `Report path:` first. Your reply to the orchestrator is only this:
+
+```
+Report written: <absolute path>
+
+## Standards summary
+- documented-convention violations: N
+- baseline smells: M
+```
+
+`No findings.` is the report's empty state; the summary then reads `documented-convention violations: 0` and `baseline smells: 0`. Do not paste findings or the diff into the reply.
 
 ## Spec Axis
 

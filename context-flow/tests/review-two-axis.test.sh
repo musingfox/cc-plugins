@@ -420,3 +420,11 @@ assert_before "$(line_of "$sr" 'Spec brief — selected')" "$(line_of "$sr" 'no 
 assert_ge1 "$(printf '%s\n' "$sr" | grep -F '`## Contract Verification`' | grep -F 'single line' | grep -cF 'no spec available' || true)" "Contract Verification body is the single line no spec available"
 assert_ge1 "$(printf '%s\n' "$sr" | grep -F '`## What Changed`' | grep -cF 'omit' || true)" "What Changed is omitted under no spec available"
 assert_ge1 "$(printf '%s\n' "$sr" | grep -F 'no spec available' | grep -cF 'REQUEST_CHANGES' || true)" "no spec available verdict is REQUEST_CHANGES"
+
+# StandardsReportShape T4: the Standards axis has its own report schema and reply shape
+for token in '## Findings' '- **Label**' '- **Where**' '- **Detail**' '## Implement Concerns' '## Completed' '## Unresolved' \
+  'Report written:' '## Standards summary' 'documented-convention violations: N' 'baseline smells: M' 'agree' 'disagree'; do
+  assert_ge1 "$(printf '%s\n' "$st" | grep -cF -- "$token" || true)" "Standards report shape has $token"
+done
+assert_before "$(line_of "$st" '### Documented-convention violations')" "$(line_of "$st" '### Baseline smells')" "Standards schema lists violations before smells"
+assert_ge1 "$(printf '%s\n' "$st" | grep -F 'report file' | grep -cF 'reply' || true)" "Standards says which shape is the file and which is the reply"
