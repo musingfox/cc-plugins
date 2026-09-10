@@ -170,7 +170,11 @@ rm -rf "$integration_work"
 git -C "$REPO_ROOT" worktree add -b "$integration_branch" "$integration_work" "$base_commit" >/dev/null
 echo "integration worktree: $integration_work (base $base_commit, branch $integration_branch)"
 
-merge_order=$(topo_order_shards || printf '%s\n' $shard_ids)
+have_cycle=0
+if ! merge_order=$(topo_order_shards); then
+  have_cycle=1
+  merge_order=$(printf '%s\n' $shard_ids)
+fi
 
 merged_shards=()
 for sid in $merge_order; do
@@ -258,7 +262,42 @@ fi
 
 echo "integration tests PASS"
 
+if [ ! -d "$parent_work" ] || ! git -C "$parent_work" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "LINEARIZE_CONFLICT parent_missing"
+  jq -n \
+    --arg ts "$(date +%s)" \
+    --arg branch "$integration_branch" \
+    '{schema_version: 1, status: "LINEARIZE_CONFLICT", timestamp: ($ts|tonumber), reason: "parent_missing", integration_branch: $branch, parent_prior_tip: null}' \
+    > "$INTEGRATION_RESULT"
+  echo "LINEARIZE_CONFLICT"
+  exit 5
+fi
+
 parent_prior_tip=$(git -C "$parent_work" rev-parse HEAD)
+
+if [ -n "$(git -C "$parent_work" status --porcelain)" ]; then
+  echo "LINEARIZE_CONFLICT parent_dirty"
+  jq -n \
+    --arg ts "$(date +%s)" \
+    --arg branch "$integration_branch" \
+    --arg prior "$parent_prior_tip" \
+    '{schema_version: 1, status: "LINEARIZE_CONFLICT", timestamp: ($ts|tonumber), reason: "parent_dirty", integration_branch: $branch, parent_prior_tip: $prior}' \
+    > "$INTEGRATION_RESULT"
+  echo "LINEARIZE_CONFLICT"
+  exit 5
+fi
+
+if [ "$have_cycle" -eq 1 ]; then
+  echo "LINEARIZE_CONFLICT dependency_cycle"
+  jq -n \
+    --arg ts "$(date +%s)" \
+    --arg branch "$integration_branch" \
+    --arg prior "$parent_prior_tip" \
+    '{schema_version: 1, status: "LINEARIZE_CONFLICT", timestamp: ($ts|tonumber), reason: "dependency_cycle", integration_branch: $branch, parent_prior_tip: $prior}' \
+    > "$INTEGRATION_RESULT"
+  echo "LINEARIZE_CONFLICT"
+  exit 5
+fi
 
 git -C "$parent_work" reset --hard "$base_commit" >/dev/null
 
