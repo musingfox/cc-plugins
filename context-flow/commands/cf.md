@@ -604,7 +604,7 @@ When describing the run, mention which implementer ran (`Implementation by OMP (
 
 Route on the **Spec verdict** only. A Standards documented-convention violation is shown beside it and is treated like a warning advisory when choosing between the two APPROVE branches below; it never turns an APPROVE into REQUEST_CHANGES.
 
-- **no spec available** → call `AskUserQuestion` (nothing to judge; do not send this back to implement).
+- **no spec available** → call `AskUserQuestion` with options: "Supply the spec path", "abort-flow", "Other" (nothing to judge; do not send this back to implement).
 - **APPROVE, no advisories and no Standards documented-convention violation** → present changelog to human → **run post-PASS rebase** (see below). Done.
 - **APPROVE with advisories** (Spec advisories, or any Standards documented-convention violation) → present changelog + advisories + Standards findings to human, then call `AskUserQuestion` with options: "Address all now (loop to implement)", "Address only critical advisories", "Ship as-is — accept advisories", "Other". On "Ship as-is" or after advisories addressed, **run post-PASS rebase**.
 - **REQUEST_CHANGES with contract failures** → re-run implement with the failure details as additional context (treat as `retry-different-approach`; increment `retries_used`). Do NOT rebase yet — the cf branch accumulates more commits.
