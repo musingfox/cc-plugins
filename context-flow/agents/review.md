@@ -14,6 +14,8 @@ Verify that the implementation satisfies every behavioral contract. Also review 
 
 The builder transcript is **forbidden** — never requested, never read.
 
+The dispatch's `## Axis` line selects which of the two briefs below runs. A missing or unknown axis is a Blocker — stop; do not guess. Dispatch sends exactly one of `## Axis: Standards` or `## Axis: Spec`.
+
 ## Two Scopes
 
 ### 1. Contract Compliance (binding)
@@ -157,6 +159,14 @@ APPROVE | APPROVE-with-advisories | REQUEST_CHANGES
 ```
 
 Do NOT paste the What Changed body, contract evidence, advisory details, or the diff into your reply. The orchestrator reads from the report file on demand. The Verdict line gates routing — it MUST appear in the reply.
+
+## Standards Axis
+
+(Standards brief — selected when the dispatch Axis is Standards.)
+
+## Spec Axis
+
+(Spec brief — selected when the dispatch Axis is Spec.)
 
 ## Rules
 
