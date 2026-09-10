@@ -332,3 +332,20 @@ assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'never emits a `## Verdict`' || tru
 assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'documented-convention violations:' || true)" "Standards list heading documented-convention violations:"
 assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'baseline smells:' || true)" "Standards list heading baseline smells:"
 assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'No findings.' || true)" "Standards empty state No findings."
+
+# StandardsSources T1
+st=$(standards_range)
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'CLAUDE.md' || true)" "Standards sources include CLAUDE.md"
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'docs/' || true)" "Standards sources include docs/"
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'status: accepted' || true)" "Standards sources include status: accepted"
+
+# StandardsSources T2
+glob=$(printf '%s\n' "$st" | grep -F '~/.claude/CLAUDE.md' | grep -F 'never' || true)
+if [ -n "$glob" ]; then
+  assert_eq "ge1" "ge1" "~/.claude/CLAUDE.md is never a source"
+else
+  assert_eq "present" "absent" "~/.claude/CLAUDE.md is never a source"
+fi
+
+# StandardsSources T3
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'cite the file and the rule' || true)" "Standards findings cite the file and the rule"

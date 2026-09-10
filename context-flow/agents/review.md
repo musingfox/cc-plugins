@@ -164,6 +164,8 @@ Do NOT paste the What Changed body, contract evidence, advisory details, or the 
 
 (Standards brief — selected when the dispatch Axis is Standards.)
 
+Cite only conventions checked into the repo: `CLAUDE.md`, `docs/`, and entries with `status: accepted`. For each finding, cite the file and the rule. `~/.claude/CLAUDE.md` is never a source.
+
 This axis never emits a `## Verdict`. It is a labelled findings list: a documented-convention violation, a baseline smell, and Implement Concerns forwarded from implement.
 
 Write:
