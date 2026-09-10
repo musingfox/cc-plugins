@@ -59,10 +59,20 @@ on a small model with no dependency and no glue. An offload carrier would have b
 dependency, sibling-resolver glue, workspace ownership, and a hand-written quota-failure path — for
 a saving already available.
 
+**The prototype role's write access is granted openly, and the fence is where it writes, not
+which tools it holds.** The role lists `Write` and `Edit` explicitly rather than smuggling writes
+through `Bash`, which the loop's other roles already hold. No tool grant can bound where `Bash`
+writes, so the bound is the same prose constraint the loop already uses: only inside its own
+worktree, never the user's tree. A guard that `Bash` walks around would only suggest a protection
+that is not there.
+
 ## What is deliberately left open
 
-- **Whether the prototype role's write access needs bounding, and how.** It is the loop's first
-  dispatched role that writes; the only guard so far is that its output is a verdict, not a merge.
+- **Whether the prototype role stays a named part of the oscillation or folds back into the probe.**
+  It differs from a probe only in reach (run instead of read). The criterion is empirical: after
+  three full `spiral` runs, if no probe has ever reported "this can only be answered by building",
+  the role is one name for one probe outcome and folds back; if one has, it stays. Zero runs have
+  reached that cell so far.
 - **When a `diagnose` workspace is cleaned up.** Off the critical path, so this is hygiene, not
   correctness.
 - **What the confirmation on the automatic entry says**, and how the two entry surfaces divide the
