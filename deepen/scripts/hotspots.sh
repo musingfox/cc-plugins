@@ -17,8 +17,12 @@ if ! git rev-parse --git-dir >/dev/null 2>&1; then
   exit 1
 fi
 
-# An unborn branch makes git log exit 128; an empty log is a valid zero-window answer.
-log=$(git log -n "$n" --no-merges --name-only --pretty=format:'COMMIT' 2>/dev/null || true)
+# An unborn branch is a valid zero-window answer; any other git log failure is an error.
+if git rev-parse --verify --quiet HEAD >/dev/null; then
+  log=$(git log -n "$n" --no-merges --name-only --pretty=format:'COMMIT')
+else
+  log=""
+fi
 window=$(printf '%s\n' "$log" | grep -c '^COMMIT$' || true)
 
 ranked=$(

@@ -168,3 +168,8 @@ printf '%s\n' "$out" | grep -qx 'scope: wide' || fail "T9: expected scope: wide"
 ranked_n="$(printf '%s\n' "$out" | grep -cE '^[0-9]+ ' || true)"
 [ "$ranked_n" -eq 0 ] || fail "T9: expected no ranked lines, got $ranked_n"
 rm -rf "$t9" "$t9.err"
+
+# T10: a git log failure that is not an unborn branch must not read as empty history
+T10=$(mktemp -d); git -C "$T10" init -q -b main; git -C "$T10" -c core.hooksPath=/dev/null commit -q --allow-empty -m init
+if (cd "$T10" && bash "$script" -n abc >/dev/null 2>&1); then fail "T10: bad -n must exit non-zero"; fi
+rm -rf "$T10"
