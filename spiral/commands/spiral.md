@@ -345,6 +345,11 @@ layer's Divergence, `/cf`, a human) ignores it.
   demands — never re-copied into the milestone. `.spiral/` and the conversation are not durable
   artifacts: what only they hold, the milestone must restate.
 
+  **A `## Suggested skills` section in the body, from the deepest layer alone.** It names the
+  skills the next agent should invoke, one line each on why — the same source as "concrete enough
+  to build on"; upper layers contribute nothing. `none` is a valid entry and omitting the section
+  is not: the next reader cannot tell a considered nothing from a forgotten one.
+
   The slug comes from what the run settled, never from `L<N>` — that counter is run-local and
   collides across runs. `status: done` with an empty `delivered:` is a claim with no receipt;
   the two move together.

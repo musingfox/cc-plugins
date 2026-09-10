@@ -38,3 +38,21 @@ n=$(grep -cF 'depends: []         # milestone slugs that must land first' "$cmd"
 
 n=$(grep -cF 'status: accepted    # accepted | done | superseded' "$cmd" || true)
 [ "$n" -eq 1 ] || fail "status frontmatter once, got $n"
+
+n=$(grep -c 'Suggested skills.*deepest layer alone' "$cmd" || true)
+[ "$n" -eq 1 ] || fail "Suggested skills deepest layer alone once, got $n"
+
+n=$(grep -cF '`## Suggested skills`' "$cmd" || true)
+[ "$n" -eq 1 ] || fail "backticked ## Suggested skills once, got $n"
+
+n=$(grep -cF 'omitting the section' "$cmd" || true)
+[ "$n" -eq 1 ] || fail "omitting the section once, got $n"
+
+n=$(grep -cE '^[[:space:]]*suggested[-_ ]?skills:' "$cmd" || true)
+[ "$n" -eq 0 ] || fail "no suggested-skills frontmatter key, got $n"
+
+n=$(grep -c '^## Suggested skills' "$cmd" || true)
+[ "$n" -eq 0 ] || fail "no column-0 Suggested skills heading, got $n"
+
+n=$(grep -cF 'closes the body' "$cmd" || true)
+[ "$n" -eq 0 ] || fail "must not claim last-section slot, got $n"
