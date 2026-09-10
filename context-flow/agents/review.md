@@ -164,6 +164,15 @@ Do NOT paste the What Changed body, contract evidence, advisory details, or the 
 
 (Standards brief — selected when the dispatch Axis is Standards.)
 
+This axis never emits a `## Verdict`. It is a labelled findings list: a documented-convention violation, a baseline smell, and Implement Concerns forwarded from implement.
+
+Write:
+
+documented-convention violations:
+baseline smells:
+
+`No findings.` when a list is empty.
+
 ## Spec Axis
 
 If the dispatch has no behavioral contracts, stop with Blocker **no spec available**. Write that exact line.

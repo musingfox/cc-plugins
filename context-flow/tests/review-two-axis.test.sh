@@ -318,3 +318,17 @@ assert_ge1 "$(printf '%s\n' "$sr" | grep -cF 'fuzzy_criteria' || true)" "Spec ra
 rr=$(rules_range)
 assert_ge1 "$(printf '%s\n' "$rr" | grep -cF 'Verdict enum is exact' || true)" "Rules: Verdict enum is exact"
 assert_ge1 "$(printf '%s\n' "$rr" | grep -cF 'You do NOT receive research constraints' || true)" "Rules: no research constraints"
+
+# StandardsReportShape T1
+st=$(standards_range)
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'documented-convention violation' || true)" "Standards: documented-convention violation"
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'baseline smell' || true)" "Standards: baseline smell"
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'Implement Concerns' || true)" "Standards: Implement Concerns"
+
+# StandardsReportShape T2
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'never emits a `## Verdict`' || true)" "Standards never emits a Verdict"
+
+# StandardsReportShape T3
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'documented-convention violations:' || true)" "Standards list heading documented-convention violations:"
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'baseline smells:' || true)" "Standards list heading baseline smells:"
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'No findings.' || true)" "Standards empty state No findings."
