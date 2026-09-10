@@ -294,7 +294,7 @@ Before sharding, materialize the parent worktree that all shard branches will be
 . "$SESSION/env.sh"                          # picks up REPO_ROOT, BASE_BRANCH, BASE_HEAD, WORK
 ```
 
-After this, `$WORK` is a git worktree on `cf/$CF_SLUG` forked from the user's HEAD at flow start. Per-shard branches (`cf/$CF_SLUG-shard-A`, `-B`, …) are created from this parent inside `cf-pi-run.sh`; the integration gate merges them back here. The user's host working tree is never touched during implement. After Phase 4 PASS, the parent branch is rebased onto the latest `$BASE_BRANCH`.
+After this, `$WORK` is a git worktree on `cf/$CF_SLUG` forked from the user's HEAD at flow start. Per-shard branches (`cf/$CF_SLUG-shard-A`, `-B`, …) are created from this parent inside `cf-pi-run.sh`; the integration gate lands the same tree here as linear history. The user's host working tree is never touched during implement. After Phase 4 PASS, the parent branch is rebased onto the latest `$BASE_BRANCH`.
 
 If `$REPO_ROOT` is empty (host is non-git): `$WORK` is a scratch directory; integration and rollback degrade gracefully (each script reports the limitation in its result JSON).
 
@@ -419,7 +419,7 @@ Per-shard, per-round FAIL retry budget = 1 (design §6).
 
 #### All PASS (after FAIL resolution)
 
-"All" means every shard in `shards.json`, not just this wave — if undispatched dependent shards remain, they are now READY (their prerequisites just passed): dispatch them as the next wave (§3.2) instead. Only with no shard left un-PASS, run the integration gate — merge all PASS shard branches into `cf/$CF_SLUG-integrated` and run the full test suite:
+"All" means every shard in `shards.json`, not just this wave — if undispatched dependent shards remain, they are now READY (their prerequisites just passed): dispatch them as the next wave (§3.2) instead. Only with no shard left un-PASS, run the integration gate — merge all PASS shard branches into `cf/$CF_SLUG-integrated`, run the full test suite, and land the result on `cf/$CF_SLUG` as linear history:
 
 ```bash
 "$SCRIPTS/cf-pi-integrate.sh" "$SESSION" "$TEST_RUNNER"
@@ -428,6 +428,7 @@ INT_STATUS=$(jq -r '.status' "$SESSION/integration-result.json")
 
 - `INT_STATUS=PASS` → proceed to Phase 4. Phase 4 captures `$SESSION/implement.diff`.
 - `INT_STATUS=NEEDS_REPLAN` → integration gate auto-injects NEEDS_REPLAN for the affected contracts (`jq -r '.affected_contracts[]' "$SESSION/integration-result.json"`). Funnel into the partial-replan path below as if they came from shard outcomes.
+- `INT_STATUS=LINEARIZE_CONFLICT` → cherry-pick onto `cf/$CF_SLUG` failed; the passing tree remains on `.integration_branch`. Escalate — do not proceed to Phase 4.
 
 #### Any NEEDS_REPLAN (after FAIL resolution)
 
@@ -725,7 +726,7 @@ for t in $(git tag -l "cf-checkpoint/$(basename "$SESSION")/*"); do
 done
 ```
 
-Every shard's commits are already in `cf/$CF_SLUG` via integration, so nothing is lost. **On the escalation path, delete none of it** — §5's worst case has the human cherry-picking validated contract commits off those very branches and tags.
+`cf/$CF_SLUG` already carries the integration gate's linear landing, so nothing is lost. **On the escalation path, delete none of it** — §5's worst case has the human cherry-picking validated contract commits off those very branches and tags.
 
 Then tell the user the one command that erases cf from the project entirely, and say it plainly — after they merge, nothing about which tool produced the work should remain:
 
