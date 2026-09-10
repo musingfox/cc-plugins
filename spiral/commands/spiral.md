@@ -338,6 +338,11 @@ layer's Divergence, `/cf`, a human) ignores it.
   "left open" come from the deepest layer alone: those it did restate, and its versions replace
   the upper ones'. Copying `L<N>-plan.md` on its own silently drops most of what the run decided.
 
+  **Never duplicate what a durable artifact already records.** Whatever a spec, plan, ADR,
+  issue, commit, or diff already holds is pointed to by path, URL, or commit — the sourcing §4
+  demands — never re-copied into the milestone. `.spiral/` and the conversation are not durable
+  artifacts: what only they hold, the milestone must restate.
+
   The slug comes from what the run settled, never from `L<N>` — that counter is run-local and
   collides across runs. `status: done` with an empty `delivered:` is a claim with no receipt;
   the two move together.
