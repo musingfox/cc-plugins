@@ -267,3 +267,35 @@ else
 fi
 assert_eq "0" "$(printf '%s\n' "$nospec_line" | grep -cF 're-run implement' || true)" "no-spec line does not re-run implement"
 assert_eq "0" "$(printf '%s\n' "$nospec_line" | grep -cF 'retries_used' || true)" "no-spec line does not increment retries_used"
+
+spec_range() {
+  range_awk "$REVIEW" '^## Spec Axis' '^## Rules'
+}
+
+standards_range() {
+  range_awk "$REVIEW" '^## Standards Axis' '^## Spec Axis'
+}
+
+rules_range() {
+  awk '/^## Rules/{p=1} p{print}' "$REVIEW"
+}
+
+# NoSpecAvailable T1
+assert_ge1 "$(spec_range | grep -cF 'no spec available' || true)" "Spec axis mentions no spec available"
+nsa=$(spec_range | grep -cF 'no spec available' || true)
+if [ "$nsa" -ge 2 ]; then
+  assert_eq "ge2" "ge2" "Spec axis says no spec available at least twice"
+else
+  assert_eq ">=2" "$nsa" "Spec axis says no spec available at least twice"
+fi
+
+# NoSpecAvailable T2
+nsa_blocker=$(spec_range | grep -F 'no spec available' | grep -F 'Blocker' || true)
+if [ -n "$nsa_blocker" ]; then
+  assert_eq "ge1" "ge1" "no spec available is a Blocker"
+else
+  assert_eq "present" "absent" "no spec available is a Blocker"
+fi
+
+# NoSpecAvailable T3
+assert_ge1 "$(spec_range | grep -cF 'never infer' || true)" "Spec axis never infers a spec from the diff"

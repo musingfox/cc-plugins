@@ -166,6 +166,9 @@ Do NOT paste the What Changed body, contract evidence, advisory details, or the 
 
 ## Spec Axis
 
+If the dispatch has no behavioral contracts, stop with Blocker **no spec available**. Write that exact line.
+Do **never infer** a spec from the diff — **no spec available** is a stop, not a prompt to invent one.
+
 (Spec brief — selected when the dispatch Axis is Spec.)
 
 ## Rules
