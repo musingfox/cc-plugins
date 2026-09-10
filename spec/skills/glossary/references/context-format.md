@@ -1,5 +1,9 @@
 # CONTEXT.md Format
 
+Adapted from [mattpocock/skills](https://github.com/mattpocock/skills)
+`domain-modeling` (MIT, Copyright (c) 2026 Matt Pocock),
+commit 3cca18b368ae95cdbdebbff572ccafa662551015.
+
 Single-context glossary. Read this before the first write.
 
 ## Structure

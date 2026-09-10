@@ -7,6 +7,11 @@ description: >-
 
 # Domain glossary
 
+Adapted from [mattpocock/skills](https://github.com/mattpocock/skills)
+`domain-modeling` (MIT, Copyright (c) 2026 Matt Pocock),
+commit 3cca18b368ae95cdbdebbff572ccafa662551015. Upstream's CONTEXT-MAP.md is
+not imported.
+
 Read `${CLAUDE_PLUGIN_ROOT}/skills/glossary/references/context-format.md` before the first write.
 
 ## Where it lives
