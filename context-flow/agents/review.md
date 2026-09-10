@@ -166,6 +166,21 @@ Do NOT paste the What Changed body, contract evidence, advisory details, or the 
 
 Cite only conventions checked into the repo: `CLAUDE.md`, `docs/`, and entries with `status: accepted`. For each finding, cite the file and the rule. `~/.claude/CLAUDE.md` is never a source.
 
+Where the repo records no convention, fall back to Fowler, *Refactoring*, ch. 3. Each smell is a **judgement call**. A documented repo convention always wins (`repo convention > baseline`). Do not report what tooling already enforces.
+
+- **Mysterious Name**
+- **Duplicated Code**
+- **Feature Envy**
+- **Data Clumps**
+- **Primitive Obsession**
+- **Repeated Switches**
+- **Shotgun Surgery**
+- **Divergent Change**
+- **Speculative Generality**
+- **Message Chains**
+- **Middle Man**
+- **Refused Bequest**
+
 This axis never emits a `## Verdict`. It is a labelled findings list: a documented-convention violation, a baseline smell, and Implement Concerns forwarded from implement.
 
 Write:

@@ -349,3 +349,26 @@ fi
 
 # StandardsSources T3
 assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'cite the file and the rule' || true)" "Standards findings cite the file and the rule"
+
+# SmellBaselinePrecedence T1
+st=$(standards_range)
+for smell in \
+  '**Mysterious Name**' '**Duplicated Code**' '**Feature Envy**' '**Data Clumps**' \
+  '**Primitive Obsession**' '**Repeated Switches**' '**Shotgun Surgery**' \
+  '**Divergent Change**' '**Speculative Generality**' '**Message Chains**' \
+  '**Middle Man**' '**Refused Bequest**'; do
+  assert_ge1 "$(printf '%s\n' "$st" | grep -cF "$smell" || true)" "Standards baseline has $smell"
+done
+
+# SmellBaselinePrecedence T2
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'Fowler' || true)" "Standards cites Fowler"
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'Refactoring' || true)" "Standards cites Refactoring"
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'ch. 3' || true)" "Standards cites ch. 3"
+
+# SmellBaselinePrecedence T3
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'A documented repo convention always wins' || true)" "repo convention always wins"
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'judgement call' || true)" "each smell is a judgement call"
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'tooling already enforces' || true)" "skip what tooling already enforces"
+
+# SmellBaselinePrecedence T4
+assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'repo convention > baseline' || true)" "repo convention > baseline"
