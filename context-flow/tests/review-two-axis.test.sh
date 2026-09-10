@@ -70,3 +70,26 @@ fi
 # AxisSelection T4
 fm=$(sed -n '1,10p' "$REVIEW")
 assert_contains "$fm" 'name: review' "frontmatter name: review"
+
+range_awk() {
+  awk -v s="$2" -v e="$3" '$0 ~ s {p=1} p {print} $0 ~ e && p {exit}' "$1"
+}
+
+phase4() {
+  range_awk "$CFMD" '^## Phase 4: Review' '^## Context Compression'
+}
+
+# TwoAxisFanOut T1
+assert_eq "2" "$(phase4 | grep -cF 'subagent_type: "cf:review"' || true)" "Phase 4 dispatches cf:review twice"
+
+# TwoAxisFanOut T2
+assert_ge1 "$(phase4 | grep -cF 'Report path: $SESSION/review-standards.md' || true)" "Phase 4 has standards report path"
+assert_ge1 "$(phase4 | grep -cF 'Report path: $SESSION/review-spec.md' || true)" "Phase 4 has spec report path"
+
+# TwoAxisFanOut T3
+assert_eq "0" "$(grep -cF '$SESSION/review.md' "$CFMD" || true)" "cf.md has no \$SESSION/review.md"
+assert_eq "0" "$(grep -cF 'Dispatch a single review agent' "$CFMD" || true)" "cf.md does not dispatch a single review agent"
+
+# TwoAxisFanOut T4
+assert_ge1 "$(phase4 | grep -cF 'single message' || true)" "Phase 4 launches both in a single message"
+assert_ge1 "$(phase4 | grep -cF 'read-only' || true)" "Phase 4 reviews are read-only"

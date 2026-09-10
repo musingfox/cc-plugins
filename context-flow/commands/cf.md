@@ -82,7 +82,7 @@ Every research/plan/review agent dispatch follows the same contract:
    - `head -30 "$SESSION/research.md"` → Summary block
    - `sed -n '/^## Unresolved/,$p' "$SESSION/research.md"` → Unresolved tail
    - `sed -n '/^## Decisions/,/^## Behavioral Contracts/p' "$SESSION/plan.md"` → Decisions only (for the Human Gate)
-   - `sed -n '/^## Contract Verification/,/^## Advisories/p' "$SESSION/review.md"` → contract PASS/FAIL table
+   - `sed -n '/^## Contract Verification/,/^## Advisories/p' "$SESSION/review-spec.md"` → contract PASS/FAIL table
 5. If the agent's reply is missing the `Report written:` line or the file doesn't exist, treat it as a dispatch failure: do NOT continue with phase output — re-dispatch or escalate.
 
 ---
@@ -501,7 +501,7 @@ The fallback fills the SAME seat under the SAME contract — only the builder ch
 
 ## Phase 4: Review
 
-Dispatch a single review agent.
+Launch the Standards and Spec reviews as two separate read-only sub-agents in a **single message**, each writing its own report file.
 
 Capture the diff to a file before dispatching review — never into a shell variable, which would inject the full diff into the orchestrator's context. For OMP the diff is already at `$SESSION/implement.diff` (written by the integration gate). For Claude-fallback, capture it from the worktree now:
 
@@ -521,21 +521,19 @@ The reviewer Reads this file directly; the orchestrator never reads its body.
 
 ### Dispatch
 
-```markdown
-Report path: $SESSION/review.md
-
-## Behavioral Contracts
-{contracts from Phase 3 — extract from $SESSION/plan.md via `sed -n '/^## Behavioral Contracts/,/^## Implementation Plan/p'`}
-
-## Test Cases
-{same test cases from Phase 3}
-
-## Implement Concerns
-{concerns from implement agent, if any — otherwise omit this section}
-
-## Diff path
-$SESSION/implement.diff
-(Read the diff directly from this file — do NOT inline the diff in the prompt.)
+```
+Agent(
+  subagent_type: "cf:review",
+  prompt: "
+    Report path: $SESSION/review-standards.md
+  "
+)
+Agent(
+  subagent_type: "cf:review",
+  prompt: "
+    Report path: $SESSION/review-spec.md
+  "
+)
 ```
 
 **Do NOT pass**: research constraints (those should have been captured as test cases by plan). **Do NOT inline the git diff** — pass the file path so the diff bytes never pass through your context.
