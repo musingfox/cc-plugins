@@ -48,7 +48,7 @@ Say whether depth sits at the interface.
 - **Depth is a property of the interface, not the implementation.** A deep module may be composed of small swappable parts inside; they are not part of its interface.
 - Rejected: depth as the ratio of implementation lines to interface lines (Ousterhout). It rewards padded implementations; depth is leverage.
 
-Vocabulary adapted from [mattpocock/skills](https://github.com/mattpocock/skills) `codebase-design` (MIT, Copyright (c) 2026 Matt Pocock), commit 3cca18b368ae95cdbdebbff572ccafa662551015. Upstream's DESIGN-IT-TWICE (parallel sub-agents draft several radically different interfaces, then compare) is not imported: this agent has no Agent tool, so do not attempt to draft competing interfaces in parallel; name the one interface you recommend and its seam.
+Vocabulary adapted from [mattpocock/skills](https://github.com/mattpocock/skills) `codebase-design` (MIT, Copyright (c) 2026 Matt Pocock), commit 3cca18b368ae95cdbdebbff572ccafa662551015. Upstream's DESIGN-IT-TWICE (parallel sub-agents draft several radically different interfaces, then compare) is not imported: this agent has no Agent tool, so do not attempt to draft competing interfaces in parallel. Record the friction and the seam you stood at; do not draft an interface — designing it is `/spiral`'s job.
 
 ## Output schema
 
