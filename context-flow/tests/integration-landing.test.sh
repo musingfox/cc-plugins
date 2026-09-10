@@ -360,3 +360,23 @@ else
   _assert_pass
 fi
 cleanup_flow "$REPO" "$FLOW" "$TMP"
+
+# --- RerunRelandsFromBase T1: second run replaces the first landing ----------
+
+setup_fixture_1
+run_integrate >/dev/null 2>&1
+rc=$?
+assert_eq "0" "$rc" "R1 first run exit 0"
+T1_HEAD=$(git -C "$FLOW/work" rev-parse HEAD)
+run_integrate >/dev/null 2>&1
+rc=$?
+assert_eq "0" "$rc" "R1 second run exit 0"
+assert_json "$FLOW/integration-result.json" '.parent_prior_tip' "$T1_HEAD" "R1 parent_prior_tip"
+count=$(git -C "$FLOW/work" rev-list --count "$BASE_HEAD"..HEAD)
+assert_eq "2" "$count" "R1 still two commits from base"
+merges=$(git -C "$FLOW/work" rev-list --merges --count "$BASE_HEAD"..HEAD)
+assert_eq "0" "$merges" "R1 no merge commits"
+base=$(basename "$FLOW")
+diff_out=$(git -C "$REPO" diff "refs/heads/cf/${base}-integrated" "refs/heads/cf/${base}" || true)
+assert_eq "" "$diff_out" "R1 integrated vs parent empty"
+cleanup_flow "$REPO" "$FLOW" "$TMP"
