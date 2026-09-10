@@ -226,3 +226,34 @@ assert_ge1 "$(phase4 | grep -cF 'fail-early skipped (non-git scratch mode)' || t
 
 # ScratchModeSkip T2
 assert_ge1 "$(phase4 | grep -cF -- '-n "${REPO_ROOT:-}"' || true)" "fail-early is guarded by REPO_ROOT"
+
+presenting() {
+  range_awk "$CFMD" '^### Presenting Results' '^### Handling the Verdict'
+}
+
+handling() {
+  range_awk "$CFMD" '^### Handling the Verdict' '^### Post-PASS spec maintenance'
+}
+
+outdisc() {
+  range_awk "$CFMD" '^### Agent Output Discipline' '^## Phase 1'
+}
+
+# SideBySidePresent T1
+pr=$(presenting)
+assert_ge1 "$(printf '%s\n' "$pr" | grep -cF '## Standards' || true)" "Presenting has ## Standards"
+assert_ge1 "$(printf '%s\n' "$pr" | grep -cF '## Spec' || true)" "Presenting has ## Spec"
+assert_ge1 "$(printf '%s\n' "$pr" | grep -cF 'rerank' || true)" "Presenting forbids rerank"
+assert_ge1 "$(printf '%s\n' "$pr" | grep -cF 'No findings.' || true)" "Presenting has No findings."
+
+# SideBySidePresent T2
+hd=$(handling)
+assert_ge1 "$(printf '%s\n' "$hd" | grep -cF 'Spec verdict' || true)" "Handling routes on Spec verdict"
+assert_ge1 "$(printf '%s\n' "$hd" | grep -cF 'documented-convention violation' || true)" "Handling mentions documented-convention violation"
+
+# SideBySidePresent T3
+assert_ge1 "$(outdisc | grep -cF 'review-spec.md' || true)" "Output Discipline names review-spec.md"
+
+# SideBySidePresent T4
+assert_ge1 "$(printf '%s\n' "$pr" | grep -cF 'review-standards.md' || true)" "Presenting names review-standards.md"
+assert_ge1 "$(printf '%s\n' "$pr" | grep -cF 'review-spec.md' || true)" "Presenting names review-spec.md"

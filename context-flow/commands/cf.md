@@ -577,11 +577,21 @@ Agent(
 
 ### Presenting Results to Human
 
-Use changelog format — Added / Changed / Fixed sections describing **what the user/system can now do**, not which files were edited. Group related changes; use feature names over contract names. Then: `## Contract Status` (N/M passed) and `## Advisories` (critical/warning only — drop info unless relevant). See `agents/review.md` for full schema and rules.
+Show Standards findings beside the Spec verdict. Spec alone drives routing. Do not merge axes and do not rerank findings across them.
+
+Use changelog format from the Spec report — Added / Changed / Fixed sections describing **what the user/system can now do**, not which files were edited. Group related changes; use feature names over contract names. Then present both reports:
+
+## Standards
+{bounded read of `$SESSION/review-standards.md`; if the axis reported none, show `No findings.`}
+
+## Spec
+{bounded read of `$SESSION/review-spec.md` — `## Contract Status` (N/M passed) and `## Advisories` (critical/warning only — drop info unless relevant)}
 
 When describing the run, mention which implementer ran (`Implementation by OMP ($PI_DESC)` or `Fallback: Claude implement agent`).
 
 ### Handling the Verdict
+
+Route on the **Spec verdict** only. A Standards documented-convention violation is shown beside it; it does not change routing.
 
 - **APPROVE, no critical advisories** → present changelog to human → **run post-PASS rebase** (see below). Done.
 - **APPROVE with advisories** → present changelog + advisories to human, then call `AskUserQuestion` with options: "Address all now (loop to implement)", "Address only critical advisories", "Ship as-is — accept advisories", "Other". On "Ship as-is" or after advisories addressed, **run post-PASS rebase**.
