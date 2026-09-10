@@ -120,6 +120,7 @@ Invariants and forward-looking interface contracts as verifiable, sliceable entr
 - **`slice <path>...`**: prints the entries constraining those paths, ready to paste into a worker's brief — a spec nobody reads is a document, one that injects itself is a constraint
 - **`verify`**: runs every accepted entry's check; a check that would false-positive is downgraded to prose and reported as debt every run
 - **Forward-looking contracts**: describe an interface before it exists — the case code cannot cover
+- **Domain glossary**: `/spec:glossary` keeps a living glossary of domain terms in `CONTEXT.md` at the repo root
 
 **Installation:**
 ```bash
@@ -245,7 +246,7 @@ cc-plugins/
 ├── obsidian-workspace/ skills: init, jot, pm · templates
 ├── omt/                skills: contract-validation · agents, commands, contracts, lib
 ├── pi-dispatch/        skills: pi-dispatch · agents: builder, reviewer · scripts, tests
-├── spec/               skills: spec · scripts: spec.sh
+├── spec/               skills: spec, glossary · scripts: spec.sh · tests
 ├── spiral/             commands: spiral · agents: divergence, probe, prototype · scripts
 ├── viz/                skills: viz-inline, viz-render · lib, tests
 ├── wizard/             skills: wizard

@@ -61,6 +61,7 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/spec.sh slice context-flow/scripts/cf-pi-env.sh
 
 Or through the `spec` skill, which covers the lifecycle: propose (`status:
 proposed`), main accepts, supersede with a link to the ADR that replaced it.
+`/spec:glossary` keeps a domain glossary in `CONTEXT.md` at the repository root.
 
 `verify` exits 1 on drift and 2 on a missing library — never 0 for either.
 `SPEC_DIR` overrides the default `docs/spec`.
