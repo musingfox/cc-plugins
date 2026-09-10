@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 fail() { echo "  ✗ $1" >&2; exit 1; }
@@ -25,5 +26,3 @@ awk '
 mut="$(grep -oE '^├── (context-flow|deepen|diagnose)/' "$tmp" | paste -sd, -)"
 rm -f "$tmp"
 [ "$mut" != "$want" ] || fail "T11 negative control should mismatch"
-
-echo "ok - readme.test.sh"

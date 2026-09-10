@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 fail() { echo "  ✗ $1" >&2; exit 1; }
@@ -23,5 +24,3 @@ for f in deepen/tests/*.test.sh; do
   [ "$hits" -gt 0 ] || unanchored=$((unanchored + 1))
 done
 [ "$unanchored" -eq 0 ] || fail "T12 unanchored files: $unanchored"
-
-echo "ok - manifest.test.sh"
