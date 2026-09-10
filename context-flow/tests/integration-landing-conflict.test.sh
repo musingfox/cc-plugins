@@ -110,6 +110,20 @@ run_integrate() {
   bash "$INTEGRATE" "$FLOW" true
 }
 
+# Every LINEARIZE_CONFLICT result carries the full contract key set.
+assert_conflict_keys() {
+  local file="$1" msg="$2"
+  if jq -e 'has("merged_shards") and has("parent_branch") and has("parent_prior_tip")
+            and has("offending_shard") and has("offending_commit") and has("integration_branch")' \
+      "$file" >/dev/null 2>&1; then
+    _assert_pass
+  else
+    _assert_fail "$msg: result JSON missing a contract key: $(jq -c 'keys' "$file" 2>/dev/null)"
+  fi
+  assert_json "$file" '.status' "LINEARIZE_CONFLICT" "$msg status"
+  assert_json "$file" '.parent_branch' "cf/$(basename "$FLOW")" "$msg parent_branch"
+}
+
 # --- LandingPreconditionRefusal T1: dirty parent -----------------------------
 
 setup_fixture_2
@@ -118,6 +132,8 @@ run_integrate >/dev/null 2>&1
 rc=$?
 assert_eq "5" "$rc" "T1 exit 5"
 assert_json "$FLOW/integration-result.json" '.reason' "parent_dirty" "T1 reason"
+assert_conflict_keys "$FLOW/integration-result.json" "T1"
+assert_json "$FLOW/integration-result.json" '.merged_shards | join(",")' "A,C" "T1 merged_shards"
 assert_json "$FLOW/integration-result.json" '.parent_prior_tip' "$BASE_HEAD" "T1 parent_prior_tip"
 head_now=$(git -C "$FLOW/work" rev-parse HEAD)
 assert_eq "$BASE_HEAD" "$head_now" "T1 parent HEAD unchanged"
@@ -134,6 +150,7 @@ run_integrate >/dev/null 2>&1
 rc=$?
 assert_eq "5" "$rc" "T2 exit 5"
 assert_json "$FLOW/integration-result.json" '.reason' "parent_missing" "T2 reason"
+assert_conflict_keys "$FLOW/integration-result.json" "T2"
 base=$(basename "$FLOW")
 assert_json "$FLOW/integration-result.json" '.integration_branch' "cf/${base}-integrated" "T2 integration_branch"
 assert_json "$FLOW/integration-result.json" '.parent_prior_tip' "null" "T2 parent_prior_tip null"
@@ -152,6 +169,7 @@ run_integrate >/dev/null 2>&1
 rc=$?
 assert_eq "5" "$rc" "T3 exit 5"
 assert_json "$FLOW/integration-result.json" '.reason' "dependency_cycle" "T3 reason"
+assert_conflict_keys "$FLOW/integration-result.json" "T3"
 head_now=$(git -C "$FLOW/work" rev-parse HEAD)
 assert_eq "$BASE_HEAD" "$head_now" "T3 parent HEAD unchanged"
 cleanup_flow "$REPO" "$FLOW" "$TMP"
@@ -241,6 +259,7 @@ EOF
   git -C "$REPO" checkout -qb "${slug}-B"
   echo y > "$REPO/f.txt"
   git -C "$REPO" add -A && git -C "$REPO" commit -qm B1
+  SHA_B1=$(git -C "$REPO" rev-parse HEAD)
   echo base > "$REPO/f.txt"
   echo b > "$REPO/b.txt"
   git -C "$REPO" add -A && git -C "$REPO" commit -qm B2
@@ -273,6 +292,9 @@ assert_eq "5" "$rc" "L1 exit 5"
 assert_json "$FLOW/integration-result.json" '.status' "LINEARIZE_CONFLICT" "L1 status"
 assert_json "$FLOW/integration-result.json" '.reason' "cherry_pick_conflict" "L1 reason"
 assert_json "$FLOW/integration-result.json" '.offending_shard' "B" "L1 offending_shard"
+assert_conflict_keys "$FLOW/integration-result.json" "L1"
+assert_json "$FLOW/integration-result.json" '.offending_commit' "$SHA_B1" "L1 offending_commit is B1"
+assert_json "$FLOW/integration-result.json" '.merged_shards | join(",")' "A,B" "L1 merged_shards"
 base=$(basename "$FLOW")
 assert_json "$FLOW/integration-result.json" '.integration_branch' "cf/${base}-integrated" "L1 integration_branch"
 head_now=$(git -C "$FLOW/work" rev-parse HEAD)
@@ -319,6 +341,7 @@ assert_eq "5" "$rc" "L2 second run exit 5"
 head_now=$(git -C "$FLOW/work" rev-parse HEAD)
 assert_eq "$T2_HEAD" "$head_now" "L2 parent stays at first landing"
 assert_json "$FLOW/integration-result.json" '.parent_prior_tip' "$T2_HEAD" "L2 parent_prior_tip"
+assert_conflict_keys "$FLOW/integration-result.json" "L2"
 cleanup_flow "$REPO" "$FLOW" "$TMP"
 
 # --- LinearizeConflictAborts T3: wrong prereq-refs -> tree_mismatch ----------
@@ -330,6 +353,9 @@ rc=$?
 assert_eq "5" "$rc" "L3 exit 5"
 assert_json "$FLOW/integration-result.json" '.reason' "tree_mismatch" "L3 reason"
 assert_json "$FLOW/integration-result.json" '.offending_shard' "null" "L3 offending_shard"
+assert_conflict_keys "$FLOW/integration-result.json" "L3"
+assert_json "$FLOW/integration-result.json" '.offending_commit' "null" "L3 offending_commit null"
+assert_json "$FLOW/integration-result.json" '.merged_shards | join(",")' "A,C,D" "L3 merged_shards"
 head_now=$(git -C "$FLOW/work" rev-parse HEAD)
 assert_eq "$BASE_HEAD" "$head_now" "L3 parent HEAD is BASE_HEAD"
 assert_no_sequencer "$FLOW/work" "L3"

@@ -157,6 +157,46 @@ clear_sequencer() {
   [ -n "$seq_path" ] && rm -rf "$seq_path"
 }
 
+# bash 3.2 + set -u: an empty array is unbound, and printf with no args still
+# prints one empty line -- so emit [] explicitly.
+merged_shards_json() {
+  if [ "${#merged_shards[@]}" -eq 0 ]; then
+    echo '[]'
+  else
+    printf '%s\n' "${merged_shards[@]}" | jq -R . | jq -s .
+  fi
+}
+
+# write_linearize_conflict REASON [OFFENDING_SHARD] [OFFENDING_COMMIT]
+# Always emits the same key set so consumers never see a path-dependent shape.
+write_linearize_conflict() {
+  local reason="$1" sid="${2:-}" sha="${3:-}"
+  echo "LINEARIZE_CONFLICT $reason${sid:+ (shard $sid)}"
+  jq -n \
+    --arg ts "$(date +%s)" \
+    --arg reason "$reason" \
+    --arg branch "$integration_branch" \
+    --argjson shards "$(merged_shards_json)" \
+    --arg pbranch "$parent_branch" \
+    --arg prior "${parent_prior_tip:-}" \
+    --arg sid "$sid" \
+    --arg sha "$sha" \
+    '{
+      schema_version: 1,
+      status: "LINEARIZE_CONFLICT",
+      timestamp: ($ts|tonumber),
+      reason: $reason,
+      integration_branch: $branch,
+      merged_shards: $shards,
+      parent_branch: $pbranch,
+      parent_prior_tip: (if $prior == "" then null else $prior end),
+      offending_shard: (if $sid == "" then null else $sid end),
+      offending_commit: (if $sha == "" then null else $sha end)
+    }' > "$INTEGRATION_RESULT"
+  echo "LINEARIZE_CONFLICT"
+  exit 5
+}
+
 # Clean any prior integration worktree (idempotent retry).
 git -C "$REPO_ROOT" worktree remove --force "$integration_work" >/dev/null 2>&1 || true
 git -C "$REPO_ROOT" worktree prune >/dev/null 2>&1 || true
@@ -237,7 +277,7 @@ if [ "$test_exit" -ne 0 ]; then
   jq -n \
     --arg ts "$(date +%s)" \
     --arg branch "$integration_branch" \
-    --argjson shards "$(printf '%s\n' "${merged_shards[@]}" | jq -R . | jq -s .)" \
+    --argjson shards "$(merged_shards_json)" \
     --argjson failures "$attribution_json" \
     --argjson affected "$affected_contracts" \
     --arg log "$test_log" \
@@ -259,46 +299,24 @@ fi
 
 echo "integration tests PASS"
 
+parent_prior_tip=""
 if [ ! -d "$parent_work" ] || ! git -C "$parent_work" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  echo "LINEARIZE_CONFLICT parent_missing"
-  jq -n \
-    --arg ts "$(date +%s)" \
-    --arg branch "$integration_branch" \
-    '{schema_version: 1, status: "LINEARIZE_CONFLICT", timestamp: ($ts|tonumber), reason: "parent_missing", integration_branch: $branch, parent_prior_tip: null}' \
-    > "$INTEGRATION_RESULT"
-  echo "LINEARIZE_CONFLICT"
-  exit 5
+  write_linearize_conflict parent_missing
 fi
 
 parent_prior_tip=$(git -C "$parent_work" rev-parse HEAD)
 
 if [ -n "$(git -C "$parent_work" status --porcelain)" ]; then
-  echo "LINEARIZE_CONFLICT parent_dirty"
-  jq -n \
-    --arg ts "$(date +%s)" \
-    --arg branch "$integration_branch" \
-    --arg prior "$parent_prior_tip" \
-    '{schema_version: 1, status: "LINEARIZE_CONFLICT", timestamp: ($ts|tonumber), reason: "parent_dirty", integration_branch: $branch, parent_prior_tip: $prior}' \
-    > "$INTEGRATION_RESULT"
-  echo "LINEARIZE_CONFLICT"
-  exit 5
+  write_linearize_conflict parent_dirty
 fi
 
 if [ "$have_cycle" -eq 1 ]; then
-  echo "LINEARIZE_CONFLICT dependency_cycle"
-  jq -n \
-    --arg ts "$(date +%s)" \
-    --arg branch "$integration_branch" \
-    --arg prior "$parent_prior_tip" \
-    '{schema_version: 1, status: "LINEARIZE_CONFLICT", timestamp: ($ts|tonumber), reason: "dependency_cycle", integration_branch: $branch, parent_prior_tip: $prior}' \
-    > "$INTEGRATION_RESULT"
-  echo "LINEARIZE_CONFLICT"
-  exit 5
+  write_linearize_conflict dependency_cycle
 fi
 
 git -C "$parent_work" reset --hard "$base_commit" >/dev/null
 
-for sid in "${merged_shards[@]}"; do
+for sid in ${merged_shards[@]+"${merged_shards[@]}"}; do
   shard_branch=$(shard_branch_name "$sid") || continue
   while IFS= read -r sha; do
     [ -n "$sha" ] || continue
@@ -317,38 +335,21 @@ for sid in "${merged_shards[@]}"; do
       git -C "$parent_work" cherry-pick --abort >/dev/null 2>&1 || true
       clear_sequencer "$parent_work"
       git -C "$parent_work" reset --hard "$parent_prior_tip" >/dev/null
-      echo "LINEARIZE_CONFLICT cherry_pick_conflict (shard $sid)"
-      jq -n \
-        --arg ts "$(date +%s)" \
-        --arg sid "$sid" \
-        --arg branch "$integration_branch" \
-        --arg prior "$parent_prior_tip" \
-        '{schema_version: 1, status: "LINEARIZE_CONFLICT", timestamp: ($ts|tonumber), reason: "cherry_pick_conflict", offending_shard: $sid, integration_branch: $branch, parent_prior_tip: $prior}' \
-        > "$INTEGRATION_RESULT"
-      echo "LINEARIZE_CONFLICT"
-      exit 5
+      write_linearize_conflict cherry_pick_conflict "$sid" "$sha"
     fi
   done < <(unique_shard_commits "$sid" "$shard_branch")
 done
 
 if ! git -C "$REPO_ROOT" diff --quiet "refs/heads/$integration_branch" "refs/heads/$parent_branch"; then
   git -C "$parent_work" reset --hard "$parent_prior_tip" >/dev/null
-  echo "LINEARIZE_CONFLICT tree_mismatch"
-  jq -n \
-    --arg ts "$(date +%s)" \
-    --arg branch "$integration_branch" \
-    --arg prior "$parent_prior_tip" \
-    '{schema_version: 1, status: "LINEARIZE_CONFLICT", timestamp: ($ts|tonumber), reason: "tree_mismatch", offending_shard: null, integration_branch: $branch, parent_prior_tip: $prior}' \
-    > "$INTEGRATION_RESULT"
-  echo "LINEARIZE_CONFLICT"
-  exit 5
+  write_linearize_conflict tree_mismatch
 fi
 
 parent_tip=$(git -C "$parent_work" rev-parse HEAD)
 jq -n \
   --arg ts "$(date +%s)" \
   --arg branch "$integration_branch" \
-  --argjson shards "$(printf '%s\n' "${merged_shards[@]}" | jq -R . | jq -s .)" \
+  --argjson shards "$(merged_shards_json)" \
   --arg prior "$parent_prior_tip" \
   --arg tip "$parent_tip" \
   --arg pbranch "$parent_branch" \
