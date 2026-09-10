@@ -507,14 +507,18 @@ Capture the review diff unconditionally on both implementer paths — never into
 
 ```bash
 . "$SESSION/env.sh"
-integration_branch="cf/$CF_SLUG-integrated"
 if [ -n "${REPO_ROOT:-}" ]; then
+  integration_branch=$(jq -r '.integration_branch // empty' "$SESSION/integration-result.json" 2>/dev/null)
+  if [ -z "$integration_branch" ]; then
+    echo "Phase 4 fail-early: integration branch missing from integration-result.json"
+    exit 1
+  fi
   if ! git -C "$REPO_ROOT" rev-parse --verify "$BASE_HEAD" >/dev/null 2>&1; then
     echo "Phase 4 fail-early: fixed point missing: $BASE_HEAD"
     exit 1
   fi
   if ! git -C "$REPO_ROOT" rev-parse --verify "$integration_branch" >/dev/null 2>&1; then
-    echo "Phase 4 fail-early: integration branch missing: $integration_branch"
+    echo "Phase 4 fail-early: integration branch unresolvable: $integration_branch"
     exit 1
   fi
   git -C "$REPO_ROOT" diff "$BASE_HEAD" "$integration_branch" > "$SESSION/implement.diff"
@@ -528,7 +532,9 @@ else
 fi
 ```
 
-The diff spans from `$BASE_HEAD` (flow-start HEAD) to `$integration_branch`, so per-contract commits collapse into the review payload cleanly.
+Any `Phase 4 fail-early:` line halts Phase 4: surface that line verbatim to the human and dispatch nothing. An empty diff means nothing reviewable was produced; a missing or unresolvable ref means the flow's fixed point or integrated branch is gone.
+
+The integration branch name is read from `$SESSION/integration-result.json`, which the integration gate publishes — never re-derive it here. The diff spans from `$BASE_HEAD` (flow-start HEAD) to that branch, so per-contract commits collapse into the review payload cleanly.
 
 The reviewer Reads this file directly; the orchestrator never reads its body.
 

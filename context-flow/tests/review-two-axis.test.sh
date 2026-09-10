@@ -431,3 +431,10 @@ assert_ge1 "$(printf '%s\n' "$st" | grep -F 'report file' | grep -cF 'reply' || 
 
 # SmellBaselinePrecedence T5: every finding quotes the hunk
 assert_ge1 "$(printf '%s\n' "$st" | grep -cF 'quoting the hunk' || true)" "Standards findings quote the hunk"
+
+# FixedPointResolves T5: integration branch is read from integration-result.json, never re-derived
+p4=$(phase4)
+assert_ge1 "$(printf '%s\n' "$p4" | grep -cF 'Phase 4 fail-early: integration branch missing from integration-result.json' || true)" "exact integration-result.json fail-early line"
+assert_ge1 "$(printf '%s\n' "$p4" | grep -F 'jq -r' | grep -cF '.integration_branch' || true)" "Phase 4 reads .integration_branch with jq"
+assert_eq "0" "$(printf '%s\n' "$p4" | grep -cF 'cf/$CF_SLUG-integrated' || true)" "Phase 4 does not re-derive the integration branch name"
+assert_ge1 "$(printf '%s\n' "$p4" | grep -F 'Phase 4 fail-early:' | grep -F 'surface' | grep -cF 'halt' || true)" "every fail-early line is surfaced to the human and halts Phase 4"
