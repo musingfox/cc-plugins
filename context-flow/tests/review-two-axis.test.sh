@@ -176,3 +176,47 @@ fi
 
 # DiffNonEmpty T3
 assert_ge1 "$(phase4 | grep -cF 'implement.diff is empty' || true)" "Phase 4 names an empty implement.diff"
+
+phase4_revparse_before_agent() {
+  local f="$1"
+  local range rp ag
+  range=$(awk '/^## Phase 4: Review/{p=1} p{print} /^## Context Compression/{exit}' "$f")
+  rp=$(printf '%s\n' "$range" | grep -n -m1 -F 'rev-parse' | cut -d: -f1)
+  ag=$(printf '%s\n' "$range" | grep -n -m1 -F 'Agent(' | cut -d: -f1)
+  [ -n "$rp" ] && [ -n "$ag" ] && [ "$rp" -lt "$ag" ]
+}
+
+# FixedPointResolves T1
+assert_ge1 "$(phase4 | grep -cF 'rev-parse' || true)" "Phase 4 uses rev-parse"
+assert_ge1 "$(phase4 | grep -cF -- '--verify' || true)" "Phase 4 uses --verify"
+
+# FixedPointResolves T2
+if phase4_revparse_before_agent "$CFMD"; then
+  assert_eq "order" "order" "rev-parse precedes Agent("
+else
+  assert_eq "rev-parse<agent" "fail" "rev-parse precedes Agent("
+fi
+
+# FixedPointResolves T3
+NEG=$(mktemp -d)
+awk '{print} /^## Phase 4: Review$/{print "Agent("}' "$CFMD" > "$NEG/cf.md"
+if phase4_revparse_before_agent "$NEG/cf.md"; then
+  assert_eq "fail" "pass" "injected Agent( after Phase 4 heading fails ordering helper"
+else
+  assert_eq "fail" "fail" "injected Agent( after Phase 4 heading fails ordering helper"
+fi
+if phase4_revparse_before_agent "$CFMD"; then
+  assert_eq "pass" "pass" "unmodified cf.md still passes ordering helper"
+else
+  assert_eq "pass" "fail" "unmodified cf.md still passes ordering helper"
+fi
+rm -rf "$NEG"
+if [ ! -d "$NEG" ]; then
+  assert_eq "gone" "gone" "negative-control temp dir is removed"
+else
+  assert_eq "absent" "present" "negative-control temp dir is removed"
+fi
+
+# FixedPointResolves T4
+assert_ge1 "$(phase4 | grep -cF 'Phase 4 fail-early:' || true)" "Phase 4 fail-early prefix"
+assert_ge1 "$(phase4 | grep -cF 'integration branch missing' || true)" "Phase 4 names integration branch missing"

@@ -509,6 +509,14 @@ Capture the review diff unconditionally on both implementer paths — never into
 . "$SESSION/env.sh"
 integration_branch="cf/$CF_SLUG-integrated"
 if [ -n "${REPO_ROOT:-}" ]; then
+  if ! git -C "$REPO_ROOT" rev-parse --verify "$BASE_HEAD" >/dev/null 2>&1; then
+    echo "Phase 4 fail-early: fixed point missing: $BASE_HEAD"
+    exit 1
+  fi
+  if ! git -C "$REPO_ROOT" rev-parse --verify "$integration_branch" >/dev/null 2>&1; then
+    echo "Phase 4 fail-early: integration branch missing: $integration_branch"
+    exit 1
+  fi
   git -C "$REPO_ROOT" diff "$BASE_HEAD" "$integration_branch" > "$SESSION/implement.diff"
   if [ ! -s "$SESSION/implement.diff" ]; then
     echo "implement.diff is empty — nothing reviewable was produced. Stop; do not dispatch review."
