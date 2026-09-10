@@ -593,6 +593,7 @@ When describing the run, mention which implementer ran (`Implementation by OMP (
 
 Route on the **Spec verdict** only. A Standards documented-convention violation is shown beside it; it does not change routing.
 
+- **no spec available** → call `AskUserQuestion` (nothing to judge; do not send this back to implement).
 - **APPROVE, no critical advisories** → present changelog to human → **run post-PASS rebase** (see below). Done.
 - **APPROVE with advisories** → present changelog + advisories to human, then call `AskUserQuestion` with options: "Address all now (loop to implement)", "Address only critical advisories", "Ship as-is — accept advisories", "Other". On "Ship as-is" or after advisories addressed, **run post-PASS rebase**.
 - **REQUEST_CHANGES with contract failures** → re-run implement with the failure details as additional context (treat as `retry-different-approach`; increment `retries_used`). Do NOT rebase yet — the cf branch accumulates more commits.

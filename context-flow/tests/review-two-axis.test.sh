@@ -257,3 +257,13 @@ assert_ge1 "$(outdisc | grep -cF 'review-spec.md' || true)" "Output Discipline n
 # SideBySidePresent T4
 assert_ge1 "$(printf '%s\n' "$pr" | grep -cF 'review-standards.md' || true)" "Presenting names review-standards.md"
 assert_ge1 "$(printf '%s\n' "$pr" | grep -cF 'review-spec.md' || true)" "Presenting names review-spec.md"
+
+# NoSpecEscalation T1–T2
+nospec_line=$(handling | grep -F 'no spec available' | grep -F 'AskUserQuestion' || true)
+if [ -n "$nospec_line" ]; then
+  assert_eq "ge1" "ge1" "Handling sends no spec available to AskUserQuestion"
+else
+  assert_eq "present" "absent" "Handling sends no spec available to AskUserQuestion"
+fi
+assert_eq "0" "$(printf '%s\n' "$nospec_line" | grep -cF 're-run implement' || true)" "no-spec line does not re-run implement"
+assert_eq "0" "$(printf '%s\n' "$nospec_line" | grep -cF 'retries_used' || true)" "no-spec line does not increment retries_used"
