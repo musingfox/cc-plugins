@@ -224,6 +224,19 @@ Confirm the cause of a bug and leave one failing test on a branch — ported fro
 /plugin install diagnose
 ```
 
+### Deepen
+
+Survey a codebase for deepening opportunities — shallow modules, leaking seams, interfaces that are hard to test through — and hand the candidates to viz as a Mermaid report — ported from [mattpocock/skills](https://github.com/mattpocock/skills) (`improve-codebase-architecture`), MIT, Copyright (c) 2026 Matt Pocock:
+- **Scope rule**: follow the user's direction, else git-log hotspots, else widen; explorers scan for shallow modules, leaking seams, and interfaces that are hard to test through
+- **Explorers**: fan out over the scoped modules; each reports deepening candidates, not a rewrite
+- **Viz report**: candidates land as markdown plus Mermaid and are handed to viz to render
+- **Spiral hand-off**: a candidate worth narrowing further goes to `/spiral`; this skill ends at the report
+
+**Installation:**
+```bash
+/plugin install deepen
+```
+
 ## Plugin Development
 
 This repository serves as both a marketplace and a development workspace for custom Claude Code plugins.
@@ -240,6 +253,7 @@ cc-plugins/
 ├── agent-browser/      skills: agent-browser, playwright, web-test
 ├── apple-podcasts/     skills: apple-podcasts-fetch
 ├── context-flow/       commands: cf  · agents: research, plan, implement, review · scripts, tests
+├── deepen/             skills: survey · agents: explorer · scripts, docs, tests
 ├── diagnose/           skills: diagnose, diagnose-now · docs, scripts, tests
 ├── fizzy/              skills: fizzy
 ├── hook-guard/         skills: hook-guard

@@ -1,0 +1,21 @@
+{
+  "name": "deepen",
+  "description": "Survey a codebase for deepening opportunities — shallow modules, leaking seams, interfaces that are hard to test through — and hand the candidates to viz as a Mermaid report",
+  "version": "0.1.0",
+  "author": {
+    "name": "Nick Huang",
+    "email": "nick12703990@gmail.com"
+  },
+  "keywords": [
+    "architecture",
+    "deepen",
+    "survey",
+    "seam",
+    "refactor"
+  ],
+  "homepage": "https://github.com/musingfox/cc-plugins/tree/main/deepen",
+  "license": "MIT",
+  "dependencies": [
+    "viz"
+  ]
+}

@@ -77,6 +77,11 @@
       "name": "diagnose",
       "source": "./diagnose",
       "description": "Diagnose a confirmed cause of a bug and leave one failing test on a branch to read from, without applying the fix"
+    },
+    {
+      "name": "deepen",
+      "source": "./deepen",
+      "description": "Survey a codebase for deepening opportunities — shallow modules, leaking seams, interfaces that are hard to test through — and hand the candidates to viz as a Mermaid report"
     }
   ]
 }
