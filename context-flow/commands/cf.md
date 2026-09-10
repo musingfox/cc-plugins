@@ -595,7 +595,7 @@ Use changelog format from the Spec report — Added / Changed / Fixed sections d
 {then baseline smells — never reordered; if the axis reported none, show `No findings.`}
 
 ## Spec
-{bounded read of `$SESSION/review-spec.md` — `## Contract Status` (N/M passed) and `## Advisories` (critical/warning only — drop info unless relevant)}
+{bounded read of `$SESSION/review-spec.md` — `## Contract Verification` (count PASS vs total) and `## Advisories` (critical/warning only — drop info unless relevant)}
 ```
 
 When describing the run, mention which implementer ran (`Implementation by OMP ($PI_DESC)` or `Fallback: Claude implement agent`).
