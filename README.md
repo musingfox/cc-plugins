@@ -245,10 +245,15 @@ This repository serves as both a marketplace and a development workspace for cus
 
 Every plugin directory carries `.claude-plugin/plugin.json`; the rest is its components.
 
+Once per clone, run `git config core.hooksPath .githooks`. The hooks enforce Conventional
+Commit subjects and bump a plugin's patch version in the commit that changes it, so a
+single `git push` ships an update Claude Code will refresh.
+
 ```
 cc-plugins/
 ├── .claude-plugin/marketplace.json   # Marketplace configuration
 ├── .claude/skills/marketplace/       # Repo-internal: add/modify a plugin, version bump, sync
+├── .githooks/                        # commit-msg, pre-commit (version bump), post-commit, pre-push (guard)
 ├── adr/                skills: adr
 ├── agent-browser/      skills: agent-browser, playwright, web-test
 ├── apple-podcasts/     skills: apple-podcasts-fetch
