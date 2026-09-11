@@ -27,6 +27,7 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 export PI_RUNS_DIR="$TMP/runs"
+export PI_CWD="$TMP/work"; mkdir -p "$PI_CWD"
 REG="$PI_RUNS_DIR/agents"
 
 # Stub pi: emits a session line + a clean agent_end. On --session (resume) the reply

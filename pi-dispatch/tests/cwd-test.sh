@@ -3,7 +3,7 @@
 # Pure-local, NO pi, NO network: PI_BIN is a shim that records its cwd, the
 # brief it was handed, the head of its PATH, and any -e extension.
 #
-#   PI_CWD unset      -> the worker runs in the caller's directory, unfenced
+#   PI_CWD unset      -> a fresh dispatch is refused: exit 2, no RUNDIR created
 #   PI_CWD=<dir>      -> the worker runs in <dir>; routing records CWD=; shims/git
 #                        is first on PATH with PI_REAL_GIT; the fence extension
 #                        is passed via -e
@@ -62,11 +62,15 @@ launch() { # usage: launch <env assignments...> "$DISPATCH" args...   (runs from
 }
 field() { sed -n "s/^$2=//p" "$1/result.md"; }
 
-# --- Case 1: PI_CWD unset -> caller's directory, no fence ---
-RD="$(launch PI_BIN="$SHIM" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
-if [ "$(field "$RD" CWD)" = "$CALLER" ]; then ok "unset -> worker cwd is the caller's"; else bad "unset -> $(field "$RD" CWD)"; fi
-if grep -q '^CWD=$' "$RD/routing"; then ok "unset -> routing records an empty CWD"; else bad "unset -> routing: $(cat "$RD/routing" | tr '\n' ' ')"; fi
-if [ "$(field "$RD" PATH_HEAD)" != "$SHIMS" ] && [ -z "$(field "$RD" EXT)" ]; then ok "unset -> no shim, no extension"; else bad "unset -> fenced anyway"; fi
+# --- Case 1: PI_CWD unset -> a fresh dispatch is refused, nothing created ---
+before="$(ls "$OUT" | wc -l | tr -d ' ')"
+if (cd "$CALLER" && PI_BIN="$SHIM" "$DISPATCH" "$CALLER/brief.md" "$OUT" >/dev/null 2>"$TMP/err"); then
+  bad "unset -> should exit non-zero"
+else
+  rc=$?
+  if [ "$rc" = "2" ] && grep -q 'PI_CWD' "$TMP/err"; then ok "unset -> exit 2 naming PI_CWD"; else bad "unset -> rc=$rc err=$(cat "$TMP/err")"; fi
+fi
+if [ "$before" = "$(ls "$OUT" | wc -l | tr -d ' ')" ]; then ok "unset -> no RUNDIR created"; else bad "unset -> RUNDIR created"; fi
 
 # --- Case 2: PI_CWD absolute -> worker runs there, recorded, fenced ---
 RD="$(launch PI_BIN="$SHIM" PI_CWD="$WORK" "$DISPATCH" "$CALLER/brief.md" "$OUT")"

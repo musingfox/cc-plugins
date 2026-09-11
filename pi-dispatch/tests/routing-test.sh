@@ -54,6 +54,7 @@ echo '{"type":"agent_end","messages":[{"stopReason":"stop","content":[{"type":"t
 EOF
 chmod +x "$TMP/pi"
 export PI_BIN="$TMP/pi" PI_RUNS_DIR="$TMP/runs"
+export PI_CWD="$TMP/work"; mkdir -p "$PI_CWD"
 
 launch_and_wait() { # ARGS... -> echoes RUNDIR
   local out rundir
@@ -85,7 +86,7 @@ esac
 
 # --- routing is recorded ------------------------------------------------------
 got="$(cat "$R1/routing" 2>/dev/null | tr '\n' ' ')"
-[ "$got" = "PROVIDER=openai-codex MODEL=gpt-5.5 CWD= " ] \
+[ "$got" = "PROVIDER=openai-codex MODEL=gpt-5.5 CWD=$(cd "$PI_CWD" && pwd -P) " ] \
   && ok "routing recorded in RUNDIR" || bad "routing file" "$got"
 
 # --- resume inherits the prior run's routing; the env must NOT hijack it ------

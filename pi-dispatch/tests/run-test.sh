@@ -19,6 +19,7 @@ SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 export PI_RUNS_DIR="$TMP/runs"
+export PI_CWD="$TMP/work"; mkdir -p "$PI_CWD"
 export PI_POLL_INTERVAL_S=1
 
 mkdir -p "$TMP/bin"

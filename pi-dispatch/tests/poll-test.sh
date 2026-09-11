@@ -36,6 +36,7 @@ ok()  { PASS=$((PASS+1)); echo "ok   - $1"; }
 bad() { FAIL=$((FAIL+1)); echo "FAIL - $1"; }
 
 TMP="$(mktemp -d)"
+export PI_CWD="$TMP/work"; mkdir -p "$PI_CWD"
 trap 'rm -rf "$TMP"' EXIT
 
 # A guaranteed-dead pid: spawn a subshell, wait for it to be reaped, reuse its pid.

@@ -45,8 +45,9 @@
 #                BUILD brief prompt) without modifying this script.
 #
 # Worker directory:
-#   PI_CWD       optional; pi is launched inside it. Recorded with the routing and
-#                replayed on resume. Sets up the fence: shims/git on PATH (with
+#   PI_CWD       required for a fresh dispatch; pi is launched inside it. Recorded
+#                with the routing and replayed on resume (a resume needs no env).
+#                Sets up the fence: shims/git on PATH (with
 #                PI_REAL_GIT), extensions/worktree-fence.ts via -e, and on macOS
 #                a sandbox-exec profile (RUNDIR/sandbox.sb) that denies writes
 #                outside the worktree. PI_SANDBOX=0 skips the sandbox.
@@ -134,30 +135,35 @@ if [ -n "$PRIOR_RUNDIR" ]; then
     done
   fi
 fi
-if [ -n "$PI_CWD" ]; then
-  if [ ! -d "$PI_CWD" ]; then
-    echo "pi-dispatch: PI_CWD is not a directory: $PI_CWD" >&2
-    exit 2
-  fi
-  PI_CWD="$(abs "$PI_CWD")"
-  export PI_CWD
-  # The fence: shims/git first on the worker's PATH (it needs the real git's
-  # location, since it can no longer find it by scanning PATH) and the
-  # write/edit extension via -e below.
-  SHIMS="$(abs "$SCRIPT_DIR/../shims")"
-  PI_REAL_GIT="$(command -v git)"
-  export PI_REAL_GIT
-  PATH="$SHIMS:$PATH"
-  export PATH
+# Deny by default: an unset PI_CWD used to mean "wherever the caller stands",
+# which for every non-cf dispatch was the human's checkout. Running there on
+# purpose is spelled PI_CWD="$PWD" — that still arms the fence.
+if [ -z "$PI_CWD" ]; then
+  echo "pi-dispatch: PI_CWD is not set. A worker runs and is fenced inside PI_CWD; pass the worktree (PI_CWD=<dir>), or PI_CWD=\"\$PWD\" to run here deliberately." >&2
+  exit 2
 fi
+if [ ! -d "$PI_CWD" ]; then
+  echo "pi-dispatch: PI_CWD is not a directory: $PI_CWD" >&2
+  exit 2
+fi
+PI_CWD="$(abs "$PI_CWD")"
+export PI_CWD
+# The fence: shims/git first on the worker's PATH (it needs the real git's
+# location, since it can no longer find it by scanning PATH) and the
+# write/edit extension via -e below.
+SHIMS="$(abs "$SCRIPT_DIR/../shims")"
+PI_REAL_GIT="$(command -v git)"
+export PI_REAL_GIT
+PATH="$SHIMS:$PATH"
+export PATH
 
-# Filesystem sandbox (macOS, PI_CWD set, PI_SANDBOX not 0): the whole worker
+# Filesystem sandbox (macOS, PI_SANDBOX not 0): the whole worker
 # process tree may write only inside the worktree, the run dir, the per-user
 # temp and cache dirs, pi's own state, and the shared git dir a linked worktree
 # commits through. This is the fence the shim cannot be: it catches /usr/bin/git
 # by absolute path, a rewritten PATH, gh, libgit2, and plain shell writes.
 SANDBOX=()
-if [ -n "$PI_CWD" ] && [ "${PI_SANDBOX:-1}" != "0" ] && [ "$(uname -s)" = Darwin ] && command -v sandbox-exec >/dev/null 2>&1; then
+if [ "${PI_SANDBOX:-1}" != "0" ] && [ "$(uname -s)" = Darwin ] && command -v sandbox-exec >/dev/null 2>&1; then
   sb_paths=("$PI_CWD")
   common="$(git -C "$PI_CWD" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
   [ -n "$common" ] && sb_paths+=("$(abs "$common")")
@@ -280,11 +286,11 @@ fi
 # ~40%, at the price of the dispatch AGENTS.md and extension tools).
 # shellcheck disable=SC2206
 [ -n "${PI_EXTRA_ARGS:-}" ] && PI_ARGS+=(${PI_EXTRA_ARGS})
-[ -n "$PI_CWD" ] && PI_ARGS+=(-e "$SCRIPT_DIR/../extensions/worktree-fence.ts")
+PI_ARGS+=(-e "$SCRIPT_DIR/../extensions/worktree-fence.ts")
 PI_ARGS+=(--session-dir "$SESSION_DIR" @"$BRIEF_FILE" "$PROMPT")
 
 # Every path pi receives is absolute by now, so the cd only moves the worker.
-[ -n "$PI_CWD" ] && cd "$PI_CWD"
+cd "$PI_CWD"
 
 perl -MPOSIX -e '
   POSIX::setsid();
