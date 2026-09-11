@@ -12,10 +12,8 @@
 #   TaskStop                    stop NAME
 #   background-完成通知 glue     watch [INTERVAL]   (feed to the Monitor tool)
 #
-# This is the FALLBACK control plane. Inside a herdr pane (HERDR_ENV=1) drive
-# the same pi workers with `herdr agent` instead — it gives a live pane, a
-# native blocked state, and immediate death detection. These verbs are what
-# works everywhere else (cron, CI, the web and IDE clients).
+# This is the control plane; it works everywhere (cron, CI, the web and IDE
+# clients) because it needs nothing but the filesystem.
 #
 # Registry: the filesystem IS the registry — $PI_RUNS_DIR/agents/<NAME> is a
 # symlink to the run's RUNDIR. No database, no daemon. `send` on a finished

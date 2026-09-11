@@ -18,7 +18,7 @@ symlinks to the run's RUNDIR. Main (the orchestrator) loads this usage and
 embeds it verbatim into a builder brief when offloading; the builder operates
 the verbs as a pure operator.
 
-## Output contract — required in every brief, on either control plane
+## Output contract — required in every brief
 
 Never extract a verdict by parsing a transcript or a session jsonl. Name the
 artifact in the brief instead, and make the worker verify before claiming:
@@ -42,37 +42,13 @@ crash, not that the work is done — and a self-verified `DONE` is stronger than
 an unverified one: the round trip a caller would burn discovering a failed
 check happens inside the worker's own session instead.
 
-## Control plane — herdr by default, `pi-agent.sh` as the fallback
+## Control plane
 
-Two control planes drive the same pi workers. Decide once, at the start of a
-dispatch:
-
-```bash
-test "${HERDR_ENV:-}" = 1
-```
-
-**Inside herdr — use it.** This is the default, not a preference. **Load the
-`herdr` skill first** (or run
-`herdr --skill`): it does not auto-trigger on delegation intent, so main must
-request it explicitly before issuing any `herdr` command. Then:
-
-```bash
-herdr pane split --current --direction right --cwd <ABS_DIR> --no-focus
-herdr agent start NAME --kind pi --pane <PANE_ID>
-herdr agent prompt NAME <BRIEF> --wait --timeout <MS>
-```
-
-A worker that dies mid-turn fails the waiting call at once with
-`agent_not_running` (rc=1) instead of hanging to the timeout.
-`herdr worktree create --cwd <REPO> --branch <NAME>` replaces
-`pi-worktree.sh create` for isolation — but its `remove --force` deletes a live
-worktree without killing the worker or capturing the diff, so commit the work
-(or capture the diff) before removing.
-
-**Outside herdr** — cron, CI, the web and IDE clients, any Claude not launched
-from a herdr pane — use the verbs below. This is the fallback path, and the one
-cf's own scripts sit on (they call `pi-dispatch.sh` directly, and no CLI-less
-harness tool can reach them).
+`pi-agent.sh` is the control plane: cf's own scripts sit on the same
+primitives (they call `pi-dispatch.sh` directly). A dispatched worker is
+work handed off, not a pane to watch. Running another harness (grok, codex,
+omp) in a visible pane is a different activity with its own tooling and is not
+part of this workflow.
 
 ## Verbs
 
