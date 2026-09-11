@@ -1,7 +1,7 @@
 {
   "name": "deepen",
   "description": "Survey a codebase for deepening opportunities — shallow modules, leaking seams, interfaces that are hard to test through — and hand the candidates to viz as a Mermaid report",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": {
     "name": "Nick Huang",
     "email": "nick12703990@gmail.com"

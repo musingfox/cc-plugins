@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# Post-commit hook: re-stage manifests that pre-commit bumped during a
+# `git commit <pathspec>`.
+#
+# With a pathspec, git runs pre-commit against a temporary index and then
+# rewrites the real index from its pre-hook snapshot, so the bump reaches the
+# commit but the real index still holds the old version and the next plain
+# `git commit` would revert it. A manifest whose working copy already equals
+# HEAD has nothing of the user's in flight, so re-adding it is safe.
+#
+
+for plugin_json in */.claude-plugin/plugin.json; do
+  [ -f "$plugin_json" ] || continue
+  git diff --quiet HEAD -- "$plugin_json" && git add "$plugin_json"
+done
+
+exit 0

@@ -1,0 +1,68 @@
+#!/bin/sh
+#
+# Pre-commit hook: auto-bump patch version for plugins changed since the last push.
+#
+# Plugins are discovered dynamically by scanning for */.claude-plugin/plugin.json,
+# so new plugins are picked up automatically without editing this hook.
+#
+# The bump lands in the commit being made, so a single `git push` ships it. The
+# range compared is "everything not yet on any remote" plus the index, so a stack
+# of unpushed commits costs one bump per plugin, not one per commit, and --amend
+# or fixup! commits never bump twice.
+#
+# Skips the bump when:
+#   - plugin.json version already differs from the last pushed one (manual or earlier bump)
+#   - Only plugin.json changed (no content changes)
+#   - The plugin is new (no pushed version to bump from)
+#
+
+fail() {
+  echo "pre-commit: $1" >&2
+  exit 1
+}
+
+oldest=$(git rev-list HEAD --not --remotes 2>/dev/null | tail -1)
+if [ -z "$oldest" ]; then
+  base=$(git rev-parse -q --verify HEAD) || base=$(git hash-object -t tree /dev/null)
+else
+  base=$(git rev-parse -q --verify "${oldest}^") || base=$(git hash-object -t tree /dev/null)
+fi
+
+read_version() {
+  git show "$1" 2>/dev/null |
+    grep '"version"' | head -1 | sed 's/.*"version": *"\([^"]*\)".*/\1/'
+}
+
+for plugin_json in */.claude-plugin/plugin.json; do
+  [ -f "$plugin_json" ] || continue
+
+  plugin=${plugin_json%%/.claude-plugin/plugin.json}
+
+  # Content changes since the last push, including what is staged now, ignoring the manifest
+  changed=$(git diff --cached --name-only "$base" -- "$plugin/" | grep -v "^${plugin_json}$")
+  [ -n "$changed" ] || continue
+
+  current_version=$(read_version ":$plugin_json")
+  [ -n "$current_version" ] || continue
+
+  pushed_version=$(read_version "$base:$plugin_json")
+  [ -n "$pushed_version" ] || continue
+  [ "$pushed_version" != "$current_version" ] && continue
+
+  git diff --quiet -- "$plugin_json" ||
+    fail "${plugin_json} has unstaged edits; stage or stash them before committing"
+
+  major=$(echo "$current_version" | cut -d. -f1)
+  minor=$(echo "$current_version" | cut -d. -f2)
+  patch=$(echo "$current_version" | cut -d. -f3)
+  new_version="${major}.${minor}.$((patch + 1))"
+
+  tmp=$(mktemp)
+  sed "s/\"version\": \"${current_version}\"/\"version\": \"${new_version}\"/" "$plugin_json" > "$tmp" &&
+    mv "$tmp" "$plugin_json"
+
+  git add "$plugin_json"
+  echo "Auto-bumped ${plugin} version: ${current_version} -> ${new_version}"
+done
+
+exit 0

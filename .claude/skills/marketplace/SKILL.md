@@ -59,16 +59,18 @@ Edit the components, then check the same four artifacts. Specifically:
 - Component renamed, added, or deleted → update the README section and the structure
   tree row.
 - Behaviour or scope changed → update both descriptions (manifest + marketplace entry).
-- Version: `.githooks/pre-push` auto-bumps the **patch** once per push for any plugin
-  with content changes in the pushed range — a stack of commits costs one bump, not one
-  per commit. It skips a plugin whose version already changed in that range, so a manual
-  minor/major bump wins — edit the version and commit the manifest yourself.
+- Version: `.githooks/pre-commit` auto-bumps the **patch** for any plugin whose content
+  is in the commit and whose version still equals the last pushed one — a stack of
+  unpushed commits costs one bump, not one per commit, and a manual minor/major bump
+  wins: edit the version and commit the manifest yourself. The bump lands in the same
+  commit, so one `git push` ships it. The hook refuses to bump while the manifest has
+  unstaged edits.
 
-The bump is amended into the tip commit, so the first `git push` aborts with
-`Run 'git push' again`; the second succeeds. The hook refuses to bump when the index or
-the manifest is dirty, to avoid amending work in progress.
+`.githooks/pre-push` never bumps; it only refuses a push where plugin content changed
+without a version change. `.githooks/post-commit` re-stages the bumped manifest after a
+`git commit <pathspec>`.
 
-The hook only runs when the clone is wired up: `git config core.hooksPath .githooks`.
+The hooks only run when the clone is wired up: `git config core.hooksPath .githooks`.
 Verify this before trusting auto-bump.
 
 ## Removing a plugin
