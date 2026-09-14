@@ -5,8 +5,9 @@
 
 . "$CF_TESTS_DIR/lib/assert.sh"
 
-# Extract the function from cf-pi-run.sh and load it with stub env.
-eval "$(sed -n '/^derive_cause()/,/^}/p' "$CF_TESTS_DIR/../scripts/cf-pi-run.sh")"
+# Extract the function (and the JSONL resolver it calls) from cf-pi-run.sh and
+# load them with stub env.
+eval "$(sed -n '/^newest_jsonl()/,/^}/p;/^derive_cause()/,/^}/p' "$CF_TESTS_DIR/../scripts/cf-pi-run.sh")"
 
 SHARD_SESSION="$(mktemp -d)"
 PI_SESSION_DIR="$SHARD_SESSION/pi-sessions"; mkdir -p "$PI_SESSION_DIR"
@@ -34,5 +35,15 @@ assert_eq "scope violation — see undeclared_files below" \
 printf '{"type":"message","errorMessage":"usage_limit_reached"}\n' > "$PI_SESSION_DIR/a.jsonl"
 assert_contains "$(derive_cause FAIL stall)" "usage_limit_reached" \
   "T5: infra cause from JSONL errorMessage"
+
+# T6: after a resume the new run dir has no JSONL — the evidence is in the run
+# dir the resume replaced, so the previous one must stay in the search.
+mkdir -p "$SHARD_SESSION/new-run/sessions" "$SHARD_SESSION/old-run/sessions"
+printf '{"errorMessage":"stalled mid-resume"}\n' > "$SHARD_SESSION/old-run/sessions/a.jsonl"
+printf '%s\n' "$SHARD_SESSION/new-run" > "$SHARD_SESSION/pi-rundir"
+printf '%s\n' "$SHARD_SESSION/old-run" > "$SHARD_SESSION/pi-rundir-prev"
+rm -f "$PI_SESSION_DIR"/*.jsonl
+assert_contains "$(derive_cause FAIL stall)" "stalled mid-resume" \
+  "T6: cause falls back to the run dir the resume replaced"
 
 rm -rf "$SHARD_SESSION"

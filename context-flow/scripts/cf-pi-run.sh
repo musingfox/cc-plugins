@@ -13,14 +13,18 @@
 # Exit:    0 = PASS, 1 = FAIL, 2 = NEEDS_REPLAN
 #
 # Lifecycle (in order):
+#   0. clear run artifacts   last round's outcome/report/escalate/diff must not
+#                            be read as this round's (a re-launched shard reuses
+#                            the same session directory)
 #   1. cf-pi-worktree.sh     create worktree + branch (BEFORE brief, so brief's
 #                            Environment block can include WORK/CF_BRANCH/BASE_HEAD)
 #   2. cf-pi-brief.sh        assemble brief
 #   3. cf-pi-probe.sh        liveness probe
 #   4. cf-pi-dispatch.sh     background OMP
-#   5. poll loop             cf-pi-poll.sh once per ~30s, max 70 rounds
+#   5. poll loop             cf-pi-poll.sh once per ~30s, max 64 rounds at the default wall clock
 #   6. escalation detect     $ESCALATE_FILE present => NEEDS_REPLAN
-#   7. gate 1 report         head -20 contains ## Summary && ## Completed
+#   7. gate 1 report         head -20 contains ## Summary && ## Completed;
+#                            one report-only re-dispatch before failing
 #   8. survivors set         contracts this shard both declared and reported done
 #   9. gate 3 test execute   cf-pi-test.sh; one in-shard re-dispatch on fail
 #  10. actual ⊆ declared     files this shard's own commits touched (prerequisite
@@ -53,6 +57,30 @@ load_cf_flow_env "$FLOW_SESSION"
 
 START_TS=$(date +%s)
 
+# -------- 0. clear this round's artifacts -------------------------------
+# A re-launched shard (cf.md §3.5) reuses its session directory, and nothing
+# else truncates these. Left behind, last round's copies are read as this
+# round's: outcome.md makes cf-pi-watch.sh report the shard finished before it
+# started (with the stale status), escalate.md short-circuits step 6 into
+# NEEDS_REPLAN, and implement-report.md carries gate 1 on stale contract claims.
+# The worktree/branch is NOT touched -- committed work is the resume base.
+# Must stay out of dispatch_and_poll: the gate-3 and gate-1 re-briefs depend on
+# the worker rewriting these files, not on finding them emptied.
+# prereq-merged goes too (same rationale as prereq-refs below): it is rewritten
+# only when depends_on is non-empty, so a replan that drops depends_on would
+# otherwise leave last round's "these files are read-only context" block in the
+# brief, steering the worker off files this shard now owns.
+# pi-rundir goes too: only an in-run resume reads it (this round's first dispatch
+# is always fresh), while write_outcome/derive_cause read it on ANY failure --
+# including one before dispatch, which would otherwise report the previous
+# round's session JSONL and errorMessage as this round's cause.
+rm -f "$OUTCOME_FILE" "$REPORT_FILE" "$ESCALATE_FILE" "$DIFF_FILE" "$TEST_LOG" \
+      "$SHARD_SESSION/prereq-merged" \
+      "$SHARD_SESSION/pi-rundir" "$SHARD_SESSION/pi-rundir-prev" \
+      "$SHARD_SESSION/escalate-snippet.md" "$SHARD_SESSION/postmortem.log" \
+      "$SHARD_SESSION/gate3.out" "$SHARD_SESSION/gate3-retest.out" \
+      "$SHARD_SESSION/gate3-retry.out" 2>/dev/null || true
+
 # -------- helpers --------------------------------------------------------
 
 # Format elapsed seconds since START_TS.
@@ -66,6 +94,21 @@ elapsed_s() {
 say() {
   echo "[shard $SHARD_ID] $*"
   printf '%s %s\n' "$(date +%H:%M:%S)" "$*" > "$SHARD_SESSION/progress" 2>/dev/null || true
+}
+
+# Newest worker session JSONL for this round. A resume re-dispatch gets a fresh
+# run dir whose sessions/ stays empty (pi keeps writing into the prior one), so
+# the previous dir -- recorded by dispatch_and_poll before it is overwritten --
+# must stay in the search or a post-resume failure reports no evidence at all.
+newest_jsonl() {
+  local f d globs=""
+  for f in "$SHARD_SESSION/pi-rundir" "$SHARD_SESSION/pi-rundir-prev"; do
+    [ -f "$f" ] || continue
+    d="$(cat "$f" 2>/dev/null || true)"
+    [ -n "$d" ] && globs="$globs $d/sessions/*.jsonl"
+  done
+  # shellcheck disable=SC2086
+  ls -t $globs "$PI_SESSION_DIR"/*.jsonl 2>/dev/null | head -1 || true
 }
 
 # One-line human-readable failure cause for outcome.md, picked from the
@@ -84,8 +127,7 @@ derive_cause() {
       cause="scope violation — see undeclared_files below" ;;
     *)
       # infra failures (stall/timeout/rc-fail/error/...): worker-side error stream
-      local _rd=""; [ -f "$SHARD_SESSION/pi-rundir" ] && _rd="$(cat "$SHARD_SESSION/pi-rundir" 2>/dev/null || true)"
-      local _j; _j=$(ls -t "${_rd:+$_rd/sessions}"/*.jsonl "$PI_SESSION_DIR"/*.jsonl 2>/dev/null | head -1 || true)
+      local _j; _j=$(newest_jsonl)
       [ -n "$_j" ] && cause=$(grep -m1 -o '"errorMessage":"[^"]*"' "$_j" 2>/dev/null) ;;
   esac
   printf '%s' "$cause" | head -c 300
@@ -101,10 +143,7 @@ derive_cause() {
 write_outcome() {
   local status="$1" reason="$2" survived="$3" affected="$4" pm="$5" undecl="$6"
   local jsonl_path="-"
-  local _canon_rundir=""; [ -f "$SHARD_SESSION/pi-rundir" ] && _canon_rundir="$(cat "$SHARD_SESSION/pi-rundir" 2>/dev/null || true)"
-  local _jsonl_dir="${_canon_rundir:+$_canon_rundir/sessions}"
-  [ -z "$_jsonl_dir" ] && _jsonl_dir="$PI_SESSION_DIR"
-  local newest; newest=$(ls -t "$_jsonl_dir"/*.jsonl 2>/dev/null | head -1 || true)
+  local newest; newest=$(newest_jsonl)
   [ -n "$newest" ] && jsonl_path="$newest"
 
   local esc_path="-"
@@ -205,6 +244,19 @@ do_postmortem() {
   echo "$out"
 }
 
+# Step 0 removed the previous round's outcome, so from here on an abort with no
+# outcome.md leaves cf-pi-watch.sh waiting on a file that will never appear (its
+# all_done tests -s outcome.md) and main with nothing to route. Everything below
+# runs under set -e, and the worktree setup + env re-source can both die without
+# reaching a write_outcome, so guarantee an outcome on every exit path.
+on_exit() {
+  local rc=$?
+  [ -s "$OUTCOME_FILE" ] || \
+    write_outcome FAIL outcome-missing "" "(all): cf-pi-run aborted before any gate (rc=$rc)" "-" "-" 2>/dev/null || true
+  exit "$rc"
+}
+trap on_exit EXIT
+
 # -------- 1. worktree (MUST run before brief so BASE_HEAD/CF_BRANCH/WORK
 #               appear correctly in the brief's Environment block) -----
 
@@ -298,6 +350,11 @@ esac
 dispatch_and_poll() {
   local resume_file="${1:-}"
   say "dispatching pi${resume_file:+ (resume re-brief)}"
+  # Keep the outgoing run dir: on a resume the new one's sessions/ stays empty,
+  # so this is where a post-resume failure's evidence lives (newest_jsonl).
+  if [ -f "$SHARD_SESSION/pi-rundir" ]; then
+    cp "$SHARD_SESSION/pi-rundir" "$SHARD_SESSION/pi-rundir-prev" 2>/dev/null || true
+  fi
   local pi_pid
   pi_pid=$("$SCRIPTS/cf-pi-dispatch.sh" "$SHARD_SESSION" ${resume_file:+"$resume_file"})
   say "pi pid=$pi_pid"
@@ -371,30 +428,68 @@ dispatch_and_poll
 
 # -------- 6. escalation -------------------------------------------------
 
-if [ -s "$ESCALATE_FILE" ]; then
+# check_escalation [SURVIVORS]
+# Called after EVERY dispatch: a worker can escalate on a re-brief too, and an
+# escalation reported as FAIL would be re-launched as an infra failure -- which
+# deletes the blocker text at step 0 instead of routing it to Plan. Pass the
+# survivors known at the call site: cf.md feeds them to Plan as "preserve these
+# interfaces", so dropping them makes Plan re-plan contracts already committed
+# on the shard branch. Only the gate-3 site passes them -- there the survivor set
+# was established by an earlier, gate-1-valid report. Before gate 1 the only
+# report on disk is one written alongside the escalation, which the protocol
+# (pi-implementer-protocol.md §4) says to ignore, so those sites pass nothing.
+check_escalation() {
+  [ -s "$ESCALATE_FILE" ] || return 0
   # Bounded read for header inspection (don't pull content into outcome).
   head -80 "$ESCALATE_FILE" > "$SHARD_SESSION/escalate-snippet.md" 2>/dev/null || true
-  local_names=$(shard_contract_names | awk '{print $0 ": escalate"}')
-  write_outcome NEEDS_REPLAN escalate "" "$local_names" "-" "-"
+  local names; names=$(shard_contract_names | awk '{print $0 ": escalate"}')
+  write_outcome NEEDS_REPLAN escalate "${1:-}" "$names" "-" "-"
   say "NEEDS_REPLAN escalate"
   exit 2
-fi
+}
+
+check_escalation
 
 # -------- 7. gate 1: report file ---------------------------------------
 
-if [ ! -s "$REPORT_FILE" ]; then
-  pm=$(do_postmortem)
-  write_outcome FAIL report-malformed "" "(all): report missing/empty" "$pm" "-"
-  say "FAIL gate1 report missing"
-  exit 1
+report_ok() {
+  [ -s "$REPORT_FILE" ] || return 1
+  local head_lines; head_lines=$(head -20 "$REPORT_FILE")
+  echo "$head_lines" | grep -q '^## Summary' || return 1
+  echo "$head_lines" | grep -q '^## Completed' || return 1
+}
+
+if ! report_ok; then
+  # A missing report does not mean missing work: the commits can all be on the
+  # branch and the deterministic gates green, with only the write-up skipped.
+  # The report is still required -- commit messages carry no cf vocabulary by
+  # protocol, so it is the ONLY contract<->commit channel, and step 12 cannot
+  # tell an unimplemented contract from an unreported one. So ask for the
+  # report alone on the resumed session instead of burning a round re-running
+  # finished work.
+  say "gate 1 report missing/malformed — asking pi for the report only"
+  REPORT_REBRIEF="$SHARD_SESSION/report-re-brief.md"
+  # Self-contained on purpose: when the prior session cannot be resumed, this
+  # file IS the whole prompt a cold worker receives, so it must name the brief
+  # and the worktree rather than say "as in the brief".
+  {
+    printf '## Missing report\n'
+    printf 'Your implementation work is NOT in question here and must NOT be redone: `%s` is missing or does not open with the required schema.\n\n' "$REPORT_FILE"
+    printf 'Read `%s` (its `## Output Requirements` section holds the exact Report Schema, and `## Behavioral Contracts` names the contracts) and inspect what is already committed on this branch: `git -C %s log --stat %s..HEAD`.\n\n' "$BRIEF_FILE" "$WORK" "$BASE_HEAD"
+    printf 'Then write `%s` in that schema — it must start with `## Summary`, followed by `## Completed` with one bullet per contract that is actually implemented on the branch, each carrying its `_(contract: Name)_` suffix. Report only what the commits support; do not claim a contract you cannot point at. Then print DONE.\n' "$REPORT_FILE"
+  } > "$REPORT_REBRIEF"
+  # Also appended to the brief: cf-pi-dispatch.sh re-sends $BRIEF_FILE whenever
+  # pi-rundir is missing, and that is the one fallback where this file is not
+  # itself the prompt.
+  { printf '\n\n'; cat "$REPORT_REBRIEF"; } >> "$BRIEF_FILE"
+  dispatch_and_poll "$REPORT_REBRIEF"
+  check_escalation
 fi
 
-report_head=$(head -20 "$REPORT_FILE")
-if ! echo "$report_head" | grep -q '^## Summary' || \
-   ! echo "$report_head" | grep -q '^## Completed'; then
+if ! report_ok; then
   pm=$(do_postmortem)
-  write_outcome FAIL report-malformed "" "(all): report missing ## Summary or ## Completed in head -20" "$pm" "-"
-  say "FAIL gate1 malformed"
+  write_outcome FAIL report-malformed "" "(all): report missing, or missing ## Summary / ## Completed in head -20, after a report-only re-dispatch" "$pm" "-"
+  say "FAIL gate1 report missing/malformed"
   exit 1
 fi
 say "gate 1 ok"
@@ -467,6 +562,7 @@ if [ "$TEST_RC" -ne 0 ]; then
     # prompt -- OMP keeps its working context instead of a cold start.
     # dispatch_and_poll exits on failure paths; on DONE returns.
     dispatch_and_poll "$REBRIEF_FILE"
+    check_escalation "$survivors"
 
     set +e
     "$SCRIPTS/cf-pi-test.sh" "$SHARD_SESSION" $TEST_RUNNER > "$SHARD_SESSION/gate3-retry.out" 2>&1

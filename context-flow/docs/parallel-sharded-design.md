@@ -84,7 +84,7 @@ Never enters main: `contracts.json` bodies, worker reports, JSONL event streams,
 
 Every read main performs on a flow artifact is bounded: `Read(file, limit=N)`, `jq '.field'`, `head/tail -N`, `sed -n '/^## X/,/^## Y/p'`. Unbounded `cat`/`Read` on any artifact > 1KB is forbidden.
 
-Anti-growth: `dispatch-state.json` holds only the latest round (~1KB); history is appended to `dispatch-state-archive.jsonl`, never read by main during a flow. Gate-3 retest and in-shard resume re-brief happen inside `cf-pi-run.sh` — main never re-launches for a test failure, only for infrastructure FAIL.
+Anti-growth: `dispatch-state.json` holds only the latest round (~1KB); history is appended to `dispatch-state-archive.jsonl`, never read by main during a flow. Gate-3 retest, the gate-1 report-only re-brief, and in-shard resume re-briefs all happen inside `cf-pi-run.sh` — main never re-launches for a test failure or a missing report, only for infrastructure FAIL. A main-issued re-launch is self-cleaning: `cf-pi-run.sh` clears the previous round's outcome/report/escalate/diff before dispatching, so the retry cannot be read through last round's artifacts.
 
 ## 8. Observability
 

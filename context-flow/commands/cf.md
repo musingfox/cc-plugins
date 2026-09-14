@@ -404,7 +404,7 @@ Precedence within one round: **FAIL retries are resolved first, then NEEDS_REPLA
 
 #### Any FAIL
 
-A FAIL means OMP infrastructure failure (probe error, dispatch broken, stall after in-script retry, outcome missing/malformed). Re-launch `cf-pi-run.sh` for that shard with the same inputs — one message, one background `Bash` per failed shard if multiple:
+A FAIL means OMP infrastructure failure (probe error, dispatch broken, stall after in-script retry, report still missing after its own report-only re-dispatch). Re-launch `cf-pi-run.sh` for that shard with the same inputs — one message, one background `Bash` per failed shard if multiple. The re-launch clears the previous round's outcome/report/escalate/diff itself, so the shard's session directory needs no cleanup from you. Re-arm the progress monitor in a LATER message than the re-launch, not the same one: `cf-pi-watch.sh` evaluates "all done" on its first iteration, so a watch racing the re-launch could still catch the stale `outcome.md` before the script clears it.
 
 ```
 Bash(run_in_background: true, command:

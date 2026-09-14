@@ -75,20 +75,24 @@ BASE_BRANCH="main"
 BASE_HEAD="$BASE_HEAD"
 EOF
 
-  cat > "$SHARD/implement-report.md" <<'EOF'
-## Summary
-Did the work.
-
-## Completed
-- Implemented the thing _(contract: C2)_
-EOF
-
   for s in cf-pi-worktree.sh cf-pi-brief.sh cf-pi-stop.sh; do
     printf '#!/bin/bash\nexit 0\n' > "$STUBS/$s"
   done
   printf '#!/bin/bash\necho OK\n'            > "$STUBS/cf-pi-probe.sh"
   printf '#!/bin/bash\necho "pm"\n'          > "$STUBS/cf-pi-postmortem.sh"
-  printf '#!/bin/bash\necho 12345\n'         > "$STUBS/cf-pi-dispatch.sh"
+  # The worker writes the report during dispatch — cf-pi-run.sh clears the
+  # previous round's copy before dispatching, so it cannot be pre-seeded.
+  cat > "$STUBS/cf-pi-dispatch.sh" <<EOF
+#!/bin/bash
+cat > "$SHARD/implement-report.md" <<'REPORT'
+## Summary
+Did the work.
+
+## Completed
+- Implemented the thing _(contract: C2)_
+REPORT
+echo 12345
+EOF
   printf '#!/bin/bash\necho "STATUS=OK"\n'   > "$STUBS/cf-pi-poll.sh"
   printf '#!/bin/bash\necho "test_exit=0"\nexit 0\n' > "$STUBS/cf-pi-test.sh"
   printf '#!/bin/bash\nexit 0\n'             > "$STUBS/sleep"

@@ -7,6 +7,9 @@
 #   - transient  : test fails, retest passes  -> PASS, exactly 1 dispatch
 #   - persistent : test fails twice           -> re-dispatch once, retry fails
 #                                                -> NEEDS_REPLAN, 2 dispatches
+#   - escalates-on-fix : the worker escalates on the fix re-brief
+#                                                -> NEEDS_REPLAN escalate,
+#                                                   survivors preserved
 #
 # All sibling cf-pi-*.sh scripts (and `sleep`/`git`) are stubbed; the real
 # cf-pi-run.sh under scripts/ is the unit under test.
@@ -15,7 +18,7 @@
 
 REAL_SCRIPTS="$(cd "$CF_TESTS_DIR/../scripts" && pwd)"
 
-# build_fixture MODE  (MODE: transient | persistent)
+# build_fixture MODE  (MODE: transient | persistent | escalates-on-fix)
 # Sets: FLOW, SHARD, STUBS
 build_fixture() {
   local mode="$1"
@@ -45,22 +48,34 @@ BASE_BRANCH="main"
 BASE_HEAD="HEAD"
 EOF
 
-  # Report already in place: gate 1 must pass, C1 must register as survivor.
-  cat > "$SHARD/implement-report.md" <<'EOF'
-## Summary
-Did the work.
-
-## Completed
-- Implemented the thing _(contract: C1)_
-EOF
-
   # Lifecycle stubs: trivially succeed, count dispatches.
   for s in cf-pi-worktree.sh cf-pi-brief.sh cf-pi-stop.sh; do
     printf '#!/bin/bash\nexit 0\n' > "$STUBS/$s"
   done
   printf '#!/bin/bash\necho OK\n' > "$STUBS/cf-pi-probe.sh"
   printf '#!/bin/bash\necho "pm"\n' > "$STUBS/cf-pi-postmortem.sh"
-  printf '#!/bin/bash\necho 1 >> "%s/dispatch.count"\necho 12345\n' "$FLOW" > "$STUBS/cf-pi-dispatch.sh"
+  # Dispatch counts itself and writes the worker's report (cf-pi-run.sh clears
+  # the previous round's copy before dispatching, so it cannot be pre-seeded):
+  # gate 1 must pass and C1 register as survivor.
+  cat > "$STUBS/cf-pi-dispatch.sh" <<EOF
+#!/bin/bash
+echo 1 >> "$FLOW/dispatch.count"
+n=\$(wc -l < "$FLOW/dispatch.count")
+if [ "$mode" = escalates-on-fix ] && [ "\$n" -ge 2 ]; then
+  cat > "$SHARD/escalate.md" <<'ESC'
+## Blocker
+The failing test contradicts the contract.
+ESC
+fi
+cat > "$SHARD/implement-report.md" <<'REPORT'
+## Summary
+Did the work.
+
+## Completed
+- Implemented the thing _(contract: C1)_
+REPORT
+echo 12345
+EOF
   printf '#!/bin/bash\necho "STATUS=OK"\n' > "$STUBS/cf-pi-poll.sh"
 
   # Test stub: counts invocations; behavior per scenario.
@@ -120,4 +135,20 @@ assert_eq "2" "$(count_of "$FLOW/dispatch.count")" "persistent: exactly 2 dispat
 assert_eq "3" "$(count_of "$FLOW/test.count")" "persistent: test ran 3 times (first + retest + retry)"
 assert_contains "$(cat "$SHARD/implement-brief.md")" "Previous run feedback" \
   "persistent: failure feedback appended to brief for the re-dispatch"
+rm -rf "$FLOW"
+
+# ---- scenario 3: worker escalates on the fix re-brief -> survivors preserved ----
+# cf.md hands "## Survived contracts" to Plan as the interfaces it must preserve,
+# so an escalation discovered after step 8 must not blank the list — otherwise
+# Plan re-plans a contract already committed on the shard branch.
+
+build_fixture escalates-on-fix
+PATH="$STUBS:$PATH" bash "$REAL_SCRIPTS/cf-pi-run.sh" "$SHARD" "goal" "none" "true" \
+  > "$FLOW/run.log" 2>&1
+rc=$?
+assert_eq "2" "$rc" "escalates-on-fix: cf-pi-run exits 2 (NEEDS_REPLAN)"
+assert_contains "$(cat "$SHARD/outcome.md")" "escalate" \
+  "escalates-on-fix: outcome Reason is escalate, not test-fail-persistent"
+assert_contains "$(sed -n '/^## Survived contracts/,/^## Affected/p' "$SHARD/outcome.md")" "C1" \
+  "escalates-on-fix: the contract reported Completed stays in Survived contracts"
 rm -rf "$FLOW"
