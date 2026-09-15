@@ -52,6 +52,14 @@ _resolved="$(PI_RESOLVE_ROUTING_ONLY=1 "$SCRIPT_DIR/pi-dispatch.sh" 2>/dev/null)
 PROVIDER="$(printf '%s' "$_resolved" | sed -n 's/^PROVIDER=\([^ ]*\).*/\1/p')"
 MODEL="$(printf '%s' "$_resolved" | sed -n 's/.* MODEL=//p')"
 
+# Same routing rule as pi-dispatch.sh, or the probe would prove a provider the
+# dispatch will not use. A provider without a model cannot be routed at all
+# (pi resolves the model first), so report it here rather than probe pi's
+# default and call it OK.
+if [ -z "$MODEL" ] && [ -n "$PROVIDER" ]; then
+  echo "ERROR:PI_PROVIDER=$PROVIDER without PI_MODEL does not route"
+  exit 1
+fi
 PROBE_ARGS=(-p)
 if [ -n "$MODEL" ]; then
   PROBE_ARGS+=(--model "${PROVIDER:+$PROVIDER/}$MODEL")

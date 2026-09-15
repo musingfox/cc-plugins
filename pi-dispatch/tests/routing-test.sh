@@ -84,6 +84,38 @@ case "$got" in
   *) bad "--model in argv" "$got" ;;
 esac
 
+# --- a provider pinned WITHOUT a model is refused -----------------------------
+# Measured against pi 2026-09-15: `--provider X` alone does NOT route to X — pi
+# resolves the model first and the provider follows it, so the run lands on pi's
+# default while looking pinned. That is how a whole ticket ran on the wrong
+# provider. Nothing expresses "this provider, its own default model", so the
+# dispatch refuses rather than launching something it cannot honour.
+: > "$ARGVLOG"
+before="$(ls "$PI_RUNS_DIR/pi-dispatch" 2>/dev/null | wc -l | tr -d ' ')"
+err="$(PI_PROVIDER=cursor bash "$DISPATCH" "brief provider-only" 2>&1 >/dev/null)"; rc=$?
+[ "$rc" = "2" ] && ok "PROVIDER without MODEL exits 2" || bad "provider-only rc" "rc=$rc $err"
+case "$err" in
+  *"PI_PROVIDER=cursor is set without PI_MODEL"*) ok "the refusal names the variable and the cause" ;;
+  *) bad "provider-only message" "$err" ;;
+esac
+[ -z "$(cat "$ARGVLOG")" ] && ok "provider-only never reaches the binary" || bad "provider-only argv" "$(cat "$ARGVLOG")"
+after="$(ls "$PI_RUNS_DIR/pi-dispatch" 2>/dev/null | wc -l | tr -d ' ')"
+[ "$before" = "$after" ] && ok "provider-only leaves no run dir behind" || bad "run dir created" "$before -> $after"
+
+# --- the launch states the routing it resolved -------------------------------
+out="$(PI_PROVIDER=openai-codex PI_MODEL=gpt-5.5 bash "$DISPATCH" "brief routed")"
+got="$(printf '%s\n' "$out" | sed -n 's/^ROUTING=//p')"
+case "$got" in
+  "openai-codex/gpt-5.5 CWD="*) ok "launch echoes the resolved routing and cwd" ;;
+  *) bad "ROUTING line" "$got" ;;
+esac
+out="$(bash "$DISPATCH" "brief default")"
+got="$(printf '%s\n' "$out" | sed -n 's/^ROUTING=//p')"
+case "$got" in
+  "<pi-default>/<pi-default> CWD="*) ok "launch names pi's own default when nothing is pinned" ;;
+  *) bad "ROUTING line default" "$got" ;;
+esac
+
 # --- routing is recorded ------------------------------------------------------
 got="$(cat "$R1/routing" 2>/dev/null | tr '\n' ' ')"
 [ "$got" = "PROVIDER=openai-codex MODEL=gpt-5.5 CWD=$(cd "$PI_CWD" && pwd -P) " ] \

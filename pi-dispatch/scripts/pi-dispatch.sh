@@ -28,10 +28,13 @@
 #   OUTPUT=<absolute path to result file>     <- the handle the caller reads later
 #   PID=<background wrapper pid (== PGID)>     <- the perl setsid wrapper's pid
 #   RUNDIR=<per-run dir holding result/stderr/pid/pgid/rc/start>
+#   ROUTING=<provider>/<model> CWD=<dir>   what the run actually resolved to
 #
-# Routing (nothing set = pi's own settings.json defaultProvider/defaultModel decide):
+# Routing (nothing set = pi's own config.yml defaultProvider/defaultModel decide):
 #   PI_BIN       agent binary to invoke (default: pi)
-#   PI_PROVIDER  optional; when set, the model is passed as PROVIDER/MODEL
+#   PI_PROVIDER  optional; with PI_MODEL it is passed as --model PROVIDER/MODEL.
+#                Alone it is refused (exit 2): pi resolves the model first, so
+#                --provider on its own does not route.
 #   PI_MODEL     optional model (pi fuzzy-matches model names)
 #   PI_RESOLVE_ROUTING_ONLY=1     print resolved "PROVIDER=… MODEL=…" and exit
 #
@@ -183,6 +186,18 @@ if [ -n "$PRIOR_RUNDIR" ] && [ -f "$PRIOR_RUNDIR/routing" ]; then
   MODEL="$(sed -n 's/^MODEL=//p' "$PRIOR_RUNDIR/routing")"
 fi
 
+# Routing gate. Measured against pi 2026-09-15: `--provider X` on its own does
+# NOT route to X. pi resolves the MODEL first and the provider follows from it,
+# so a provider-only invocation lands on pi's default model and default provider
+# while looking like it was pinned — a whole ticket once ran on the wrong
+# provider that way. There is no flag that expresses "this provider, its own
+# default model", so refuse instead of pretending. Placed before the run dir
+# exists so an abort leaves nothing behind.
+if [ -z "$MODEL" ] && [ -n "$PROVIDER" ]; then
+  echo "pi-dispatch: PI_PROVIDER=$PROVIDER is set without PI_MODEL. pi resolves the model first and the provider follows it, so this would silently run on pi's default provider, not $PROVIDER. Set PI_MODEL too (routing is one --model $PROVIDER/<model> spec), or unset PI_PROVIDER to use pi's own default deliberately." >&2
+  exit 2
+fi
+
 PROMPT="${PI_PROMPT:-Read the brief above and complete it. Output only the result.}"
 
 RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
@@ -268,8 +283,9 @@ fi
 # readable text from agent_end on terminal OK and saves the raw stream as
 # pi.stream.jsonl.
 
-# Build the pi argv. The --model flag appears ONLY when set — without it, pi
-# resolves from its own settings.json.
+# Build the pi argv. With neither set, no routing flag appears at all and pi
+# resolves from its own config. A provider without a model is refused earlier,
+# before the run dir exists — see the routing gate above.
 PI_ARGS=(-p --mode json)
 if [ -n "$MODEL" ]; then
   PI_ARGS+=(--model "${PROVIDER:+$PROVIDER/}$MODEL")
@@ -315,6 +331,10 @@ printf '%s\n' "$WRAP_PID" > "$PGID_FILE"
 disown
 
 # Return the handle immediately — do NOT block on Pi.
+# ROUTING= states what the run actually resolved to. It is the only place the
+# caller sees the routing before a terminal poll, so a run on the wrong provider
+# is visible at launch instead of a ticket later.
+echo "ROUTING=${PROVIDER:-<pi-default>}/${MODEL:-<pi-default>} CWD=$PI_CWD"
 echo "OUTPUT=$OUTPUT_FILE"
 echo "PID=$WRAP_PID"
 echo "RUNDIR=$RUNDIR"

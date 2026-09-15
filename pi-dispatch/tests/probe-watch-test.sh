@@ -25,6 +25,42 @@ got="$(PI_BIN=sh bash "$PROBE" --bin-only)"; rc=$?
 got="$(PI_BIN=definitely-not-a-binary-xyz bash "$PROBE" --bin-only)"; rc=$?
 case "$got" in NO_BIN*) [ "$rc" -eq 1 ] && ok "probe --bin-only NO_BIN (rc=1)" || bad "probe NO_BIN rc" "rc=$rc";; *) bad "probe NO_BIN" "$got";; esac
 
+# --- probe: the full probe routes exactly as a dispatch would -----------------
+# A probe that proves a different provider than the dispatch will use is worse
+# than no probe, so the model/provider rule is shared, not re-invented here.
+unset PI_PROVIDER PI_MODEL PI_CONFIG_FILES
+PARGV="$TMP/probe-argv.log"
+PSTUB="$TMP/pi-probe-stub"
+cat > "$PSTUB" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$PARGV"
+EOF
+chmod +x "$PSTUB"
+
+: > "$PARGV"
+got="$(PI_BIN="$PSTUB" PI_PROVIDER=cursor bash "$PROBE" "$TMP/probe-p" 2>/dev/null)"; rc=$?
+case "$got" in
+  ERROR:*does\ not\ route*) [ "$rc" -eq 1 ] && ok "probe: provider without model is reported, not probed" || bad "probe provider-only rc" "rc=$rc" ;;
+  *) bad "probe provider-only" "$got" ;;
+esac
+[ -z "$(cat "$PARGV")" ] && ok "probe: provider-only never reaches the binary" || bad "probe provider-only argv" "$(cat "$PARGV")"
+
+: > "$PARGV"
+PI_BIN="$PSTUB" PI_PROVIDER=openai-codex PI_MODEL=gpt-5.5 bash "$PROBE" "$TMP/probe-pm" >/dev/null 2>&1
+got="$(cat "$PARGV")"
+case "$got" in
+  *"--model openai-codex/gpt-5.5"*) ok "probe: provider and model use --model provider/model" ;;
+  *) bad "probe provider+model" "$got" ;;
+esac
+
+: > "$PARGV"
+PI_BIN="$PSTUB" bash "$PROBE" "$TMP/probe-none" >/dev/null 2>&1
+got="$(cat "$PARGV")"
+case "$got" in
+  *--model*|*--provider*) bad "probe with nothing pinned must pass no routing flag" "$got" ;;
+  *) ok "probe: nothing pinned passes no routing flag" ;;
+esac
+
 # --- watch: fixture stream with tools, usage, text, and a PARTIAL trailing line ---
 D="$TMP/run-w1"; mkdir -p "$D"
 printf '%s\n' "$(( $(date +%s) - 42 ))" > "$D/pi-start.ts"

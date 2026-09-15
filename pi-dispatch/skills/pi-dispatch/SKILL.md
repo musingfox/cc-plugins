@@ -142,9 +142,16 @@ Routing is `PI_PROVIDER` + `PI_MODEL` in the environment, passed to pi as one
 PI_PROVIDER=openai-codex PI_MODEL=gpt-5.4-mini pi-agent.sh start NAME BRIEF
 ```
 
-Give none and pi resolves from its own settings — `$PI_CODING_AGENT_DIR/settings.json`
+Both or neither. `PI_PROVIDER` on its own is refused with exit 2: pi resolves
+the model first and the provider follows it, so `--provider X` alone lands on
+pi's default provider while looking pinned (measured 2026-09-15). Set `PI_MODEL`
+alone and pi matches the model pattern across providers.
+
+Give none and pi resolves from its own config — `$PI_CODING_AGENT_DIR/config.yml`
 when that variable is exported (a dedicated worker profile), else
-`~/.pi/agent/settings.json`. Check which one binds before assuming a model.
+`~/.pi/agent/config.yml`, reading `defaultProvider` and `defaultModel`. Check
+which one binds before assuming a model: the launch prints the routing it
+resolved as `ROUTING=<provider>/<model> CWD=<dir>`.
 
 Routing is recorded per run and replayed on resume, so `send` keeps the worker
 on the model it started with; when nothing was set, the first terminal poll
