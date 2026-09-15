@@ -663,11 +663,12 @@ Interpret the first token of `$REBASE_STATUS`:
 | `CONFLICT <files>` | Rebase aborted to keep state clean; cf branch is still at its original (pre-rebase) tip. | "Rebase conflicts in `<files>`. Branch left at original tip — resolve manually before ff." |
 | `TESTFAIL <sha> <log>` | The delivered tree fails its own suite. | "The rebased tree fails the suite — do NOT fast-forward. Failures in `<log>`." Do not print the ff guidance; route the failures back to implement as `retry-different-approach`. That loop returns here: implement adds commits without rebasing, so the base is already applied and this step re-verifies on the NOOP path. |
 | `TESTSTALLED <sha> <log>` | That suite outran its deadline. | "The suite did not finish on the rebased tree (see `<log>`) — delivery is unverified, do NOT fast-forward." Ask the human whether to raise `CF_TEST_DEADLINE_S` and re-run, or ship unverified. |
+| `OK-UNVERIFIED <sha>` / `NOOP-UNVERIFIED <sha>` | Same as `OK`/`NOOP`, but no `$TEST_RUNNER` was in scope, so nothing ran on the delivered tree. | "Rebased onto `$BASE_BRANCH`, but no test runner was resolved — the delivered tree is unverified." Still offer the ff, and say plainly that no suite backs it. |
 | `SKIP <reason>` | Non-git mode or missing base; nothing to rebase. | Skip rebase messaging entirely. |
 
-On `OK` / `NOOP` / `SKIP`, close with branch + ff guidance. On `TESTFAIL` or
-`TESTSTALLED` the tree is not deliverable: say so and stop, do not offer the
-fast-forward.
+On `OK` / `NOOP` / `SKIP` (and the `-UNVERIFIED` pair), close with branch + ff
+guidance. On `TESTFAIL` or `TESTSTALLED` the tree is not deliverable: say so and
+stop, do not offer the fast-forward.
 
 ```
 Phase 4 PASSED. Committed to branch `cf/$CF_SLUG` (<N> commits).

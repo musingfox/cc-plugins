@@ -12,7 +12,7 @@
 #   - base unmoved + suite green                -> NOOP <sha>
 #   - rebase clean + suite red                  -> TESTFAIL <sha> <log>
 #   - suite outruns its deadline                -> TESTSTALLED <sha> <log>
-#   - no TEST_RUNNER given                      -> OK/NOOP, suite never run
+#   - no TEST_RUNNER given                      -> OK-UNVERIFIED, suite never run
 
 . "$CF_TESTS_DIR/lib/assert.sh"
 
@@ -110,11 +110,13 @@ out="$(CF_TEST_DEADLINE_S=1 bash "$REBASE" "$SESSION" "sleep 30")"
 assert_contains "$out" "TESTSTALLED " "stalled: reports TESTSTALLED"
 rm -rf "$SESSION"
 
-# ---- no TEST_RUNNER: old behaviour, no suite run ----
+# ---- no TEST_RUNNER: delivered, but the word says nobody checked ----
+# A bare OK here would be read as "the suite passed on this tree", which is the
+# one thing nothing established.
 
 build_repo yes
 out="$(bash "$REBASE" "$SESSION")"
-assert_contains "$out" "OK " "no runner: still reports OK"
+assert_contains "$out" "OK-UNVERIFIED " "no runner: the status word says unverified"
 ran=no; [ -f "$SESSION/rebase-test.log" ] && ran=yes
 assert_eq "no" "$ran" "no runner: nothing was executed"
 rm -rf "$SESSION"

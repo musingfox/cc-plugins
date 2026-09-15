@@ -6,6 +6,8 @@
 # Stdout:  one-line status:
 #   OK <new-head-sha>            — rebase clean, and the delivered tree is green
 #   NOOP <head-sha>              — $BASE_BRANCH unchanged, delivered tree green
+#   OK-UNVERIFIED <sha>          — as OK/NOOP, but no TEST_RUNNER was given so
+#   NOOP-UNVERIFIED <sha>          nothing ran on the delivered tree
 #   SKIP <reason>                — non-git mode, missing base, etc.
 #   CONFLICT <files>             — rebase had conflicts; aborted to keep state clean
 #   TESTFAIL <head-sha> <log>    — the tree about to be handed over fails its suite
@@ -68,8 +70,11 @@ fi
 # and exits; on a green suite it reports $1 (OK or NOOP) with the head sha.
 verify_and_report() {
   local word="$1" head="$2" rc
+  # No runner: say so in the status word. Reporting a bare OK here would claim
+  # the delivered tree is green on zero evidence, and the human reads that word
+  # as the receipt before fast-forwarding.
   if [ -z "$TEST_RUNNER" ]; then
-    echo "$word $head"
+    echo "$word-UNVERIFIED $head"
     exit 0
   fi
   local log="$session/rebase-test.log"
