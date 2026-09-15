@@ -322,16 +322,7 @@ SHARD_IDS=$(jq -r '.groups | keys[]' "$SESSION/shards.json")
 
 ### 3.2 Fan-out
 
-**Quota pre-flight.** Before launching (and before each re-fan-out in §3.4), run once:
-
-```bash
-bash "$SCRIPTS/cf-pi-usage-check.sh" "$SESSION"   # reads PI_PROVIDER, PI_USAGE_CEILING (default 0.85) from env.sh
-```
-
-- `OK` (or any `OK skip-…`) → dispatch OMP as normal.
-- `SATURATED <provider> <pct>` → OMP's configured provider is near its quota ceiling; a fresh dispatch could die mid-build. Route **this round** through the Claude fallback (§3.6) instead, logging: `omp provider <provider> at <pct> quota — using Claude implement agent this round to avoid a half-finished dispatch.` This is automatic; do not prompt the human.
-
-The gate activates only when `$PI_PROVIDER` names a provider whose quota `omp usage` can read (e.g. `openai-codex`); set that in your own environment together with `$PI_MODEL` (see §Agents — provider alone does not route). With `$PI_PROVIDER` unset — or set to a blind-quota provider (xai/grok, ollama expose no usage API) — the check returns `OK skip-…` and dispatch is unguarded, but the reactive poll in `cf-pi-run.sh` still catches true exhaustion. The check is advisory and fail-open. Tune the trip point with `PI_USAGE_CEILING` (fraction, e.g. `0.9`).
+**No pre-dispatch quota gate.** There is none, deliberately: since dispatch moved from omp to pi there is no provider-side headroom signal to read (`pi auth check` reports readiness, not remaining balance, and is blind to package-provided providers). Exhaustion is caught reactively — `cf-pi-run.sh`'s poll classifies it as `QUOTA` (balance or plan, which only paying resets) or `QUOTA-WINDOW` (a rolling window that clears on its own in hours), and one worker hitting the wall aborts its whole batch rather than letting every sibling pay for the same wall. On that outcome, route the round through the Claude fallback (§3.6) or re-run later against a different `$PI_PROVIDER`/`$PI_MODEL`.
 
 **Wave rule.** A shard is READY when every id in its `depends_on` already has a PASS checkpoint (`jq -r '.checkpoints | keys[]' "$SESSION/dispatch-state.json"`); shards with `depends_on: []` are READY immediately. Launch ONLY the READY shards — a dependent shard dispatched early forks a base without its prerequisites' interfaces and `cf-pi-run.sh` refuses it (`FAIL prereq-missing`). Dependent shards launch as the next wave from §3.4 routing; `cf-pi-run.sh` merges their prerequisites' checkpoints into their worktree base automatically.
 
