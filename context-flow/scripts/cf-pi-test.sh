@@ -4,6 +4,13 @@
 # On fail: tail -30 plus up to 10 explicit FAIL/error marker lines.
 # Full log lives at $TEST_LOG — orchestrator reads it on demand.
 #
+# Also emits test_counts=, because an exit code alone cannot tell a green suite
+# from one that skipped everything and exited 0. The counts are quoted from
+# whatever summary line the runner printed, never computed here: a per-runner
+# parser would be wrong for the next runner. When no count-shaped line is
+# present the marker says `unparsed` rather than inventing a number, and the
+# caller surfaces that instead of reading silence as confirmation.
+#
 # Usage:   cf-pi-test.sh SESSION TEST_CMD [TEST_CMD_ARGS...]
 # Exit:    the test command's exit code, or 124 when it outran the deadline
 #
@@ -39,6 +46,14 @@ if [ "$TEST_EXIT" -eq 124 ]; then
 fi
 
 echo "test_exit=$TEST_EXIT"
+
+# Quote the runner's own summary lines rather than recomputing them: whichever
+# shape it prints ("24 passed, 0 failed", "10 passing" + "2 pending",
+# "tests: 24, failed: 0") is reported as written. The LAST few matching lines
+# win — runners print per-file lines before the summary.
+COUNTS="$(grep -iE '[0-9]+ (passed|passing|failed|failing|skipped|pending|todo|ignored)|(tests|failures|passed|failed|skipped)[:=] ?[0-9]+' \
+  "$TEST_LOG" 2>/dev/null | tail -3 | paste -sd'|' - | tr -s ' ' | cut -c1-240 || true)"
+echo "test_counts=${COUNTS:-unparsed}"
 
 if [ "$TEST_EXIT" -eq 0 ]; then
   tail -15 "$TEST_LOG"

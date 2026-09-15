@@ -62,6 +62,15 @@ assert_eq "0" "$(grep -cF 'merges them back here' "$CFMD" || true)" \
 assert_eq "0" "$(grep -cF 'written by the integration gate' "$CFMD" || true)" \
   "cf.md does not say written by the integration gate"
 
+# T6b — a stalled integration suite is documented and emitted
+assert_ge1 "$(grep -cF 'INT_STATUS=TEST_STALLED' "$CFMD" || true)" \
+  "cf.md documents INT_STATUS=TEST_STALLED"
+assert_ge1 "$(grep -cF 'never funnel it into partial-replan' "$CFMD" || true)" \
+  "cf.md: a stalled suite is never funnelled into partial-replan"
+assert_ge1 "$(grep -cF 'integration_test_stalled' \
+    "$(cd "$CF_TESTS_DIR/.." && pwd)/scripts/cf-pi-integrate.sh" || true)" \
+  "cf-pi-integrate.sh emits reason integration_test_stalled"
+
 # T7 — do not call the suite runner from this file; Phase 4 stays byte-identical
 if bash "$CF_TESTS_DIR/review-two-axis.test.sh"; then
   assert_eq "ok" "ok" "review-two-axis.test.sh still ok"
@@ -69,5 +78,5 @@ else
   assert_eq "ok" "fail" "review-two-axis.test.sh still ok"
 fi
 got=$(phase4 | shasum -a 256 | awk '{print $1}')
-assert_eq "aad2685fb706c406e46829765f6b41d7e6ae84bf179c0997e6cbd48145a2f434" "$got" \
+assert_eq "6df1f1f585553781365843acba0f4b9dff455525d4929287b14bef45e89987c2" "$got" \
   "Phase 4 section is byte-identical"

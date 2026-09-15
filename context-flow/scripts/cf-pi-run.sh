@@ -162,12 +162,18 @@ write_outcome() {
   local test_log_path="-"
   [ -s "$TEST_LOG" ] && test_log_path="$TEST_LOG"
 
+  # What the runner said it ran. `unparsed` means the gate could not find a
+  # count in the output, so a green exit code is the ONLY evidence here — say
+  # that rather than let silence read as a full suite.
+  local test_counts="${TEST_COUNTS:-not-run}"
+
   local cause; cause=$(derive_cause "$status" "$reason")
 
   {
     printf '## Status\n%s\n\n' "$status"
     printf '## Reason\n%s\n\n' "$reason"
     printf '## Cause\n%s\n\n' "${cause:--}"
+    printf '## Tests\n%s\n\n' "$test_counts"
     printf '## Run\n'
     printf -- '- shard: %s\n' "$SHARD_ID"
     printf -- '- elapsed: %s\n' "$(elapsed_s)"
@@ -527,6 +533,7 @@ set +e
 "$SCRIPTS/cf-pi-test.sh" "$SHARD_SESSION" $TEST_RUNNER > "$SHARD_SESSION/gate3.out" 2>&1
 TEST_RC=$?
 set -e
+TEST_COUNTS="$(sed -n 's/^test_counts=//p' "$SHARD_SESSION/gate3.out" | tail -1)"
 
 # A stalled runner outran its deadline. Re-briefing the builder cannot fix a
 # suite that never returns, so stop here instead of spending a dispatch on it.
@@ -549,6 +556,7 @@ if [ "$TEST_RC" -ne 0 ]; then
     "$SCRIPTS/cf-pi-test.sh" "$SHARD_SESSION" $TEST_RUNNER > "$SHARD_SESSION/gate3-retest.out" 2>&1
     RETEST_RC=$?
     set -e
+    TEST_COUNTS="$(sed -n 's/^test_counts=//p' "$SHARD_SESSION/gate3-retest.out" | tail -1)"
     if [ "$RETEST_RC" -eq 0 ]; then
       say "gate 3 retest passed — first failure was an environment transient"
       TEST_RC=0
@@ -582,6 +590,7 @@ if [ "$TEST_RC" -ne 0 ]; then
     "$SCRIPTS/cf-pi-test.sh" "$SHARD_SESSION" $TEST_RUNNER > "$SHARD_SESSION/gate3-retry.out" 2>&1
     TEST_RC=$?
     set -e
+    TEST_COUNTS="$(sed -n 's/^test_counts=//p' "$SHARD_SESSION/gate3-retry.out" | tail -1)"
 
     if [ "$TEST_RC" -ne 0 ]; then
       # Persistent failure => NEEDS_REPLAN, all this shard's contracts affected.
@@ -599,7 +608,11 @@ if [ "$TEST_RC" -ne 0 ]; then
     exit 1
   fi
 fi
-say "gate 3 ok"
+if [ "${TEST_COUNTS:-unparsed}" = unparsed ]; then
+  say "gate 3 ok — WARNING: no test counts in the output, the exit code is the only evidence"
+else
+  say "gate 3 ok ($TEST_COUNTS)"
+fi
 
 # -------- 10. actual ⊆ declared file scope -----------------------------
 # Mechanism lives in cf-pi-scope.sh so the Claude-fallback path (cf.md §3.6)

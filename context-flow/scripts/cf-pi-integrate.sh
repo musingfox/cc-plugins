@@ -8,7 +8,7 @@
 # Writes:  $INTEGRATION_RESULT (json), integration branch cf/<flow-slug>-integrated,
 #          linearized parent branch cf/<flow-slug> on PASS.
 # Exit:    0 PASS, 2 NEEDS_REPLAN (design §5: integration failure injects NEEDS_REPLAN), 3 merge conflict (structurally
-#          impossible but guarded), 4 misuse, 5 LINEARIZE_CONFLICT.
+#          impossible but guarded), 4 misuse, 5 LINEARIZE_CONFLICT, 6 TEST_STALLED.
 # Stdout:  short progress lines + final status word.
 #
 # Behavior:
@@ -244,10 +244,39 @@ echo "running integration tests: $test_runner"
 
 # Run tests. Capture output bounded.
 test_log="$flow_session/integration-test.log"
+# Bounded like the shard gate: the integration suite is project-supplied too, and
+# a run that stops for stdin or spins would hang the whole flow with nothing
+# downstream to cut it off.
 set +e
-( cd "$integration_work" && eval "$test_runner" ) > "$test_log" 2>&1
+( cd "$integration_work" && run_bounded "${CF_TEST_DEADLINE_S:-1800}" bash -c "$test_runner" ) \
+  > "$test_log" 2>&1
 test_exit=$?
 set -e
+
+if [ "$test_exit" -eq 124 ]; then
+  # Not a contract failure: nothing was attributed because nothing finished.
+  # Replanning contracts over a suite that never returned would be guesswork.
+  jq -n \
+    --arg ts "$(date +%s)" \
+    --arg branch "$integration_branch" \
+    --argjson shards "$(merged_shards_json)" \
+    --arg log "$test_log" \
+    --arg deadline "${CF_TEST_DEADLINE_S:-1800}" \
+    '{
+      schema_version: 1,
+      status: "TEST_STALLED",
+      timestamp: ($ts|tonumber),
+      integration_branch: $branch,
+      merged_shards: $shards,
+      reason: "integration_test_stalled",
+      deadline_s: ($deadline|tonumber),
+      failures: [],
+      affected_contracts: [],
+      test_log: $log
+    }' > "$INTEGRATION_RESULT"
+  echo "TEST_STALLED after ${CF_TEST_DEADLINE_S:-1800}s"
+  exit 6
+fi
 
 if [ "$test_exit" -ne 0 ]; then
   # Test failures. Extract up to TOP_K and attribute to contracts.

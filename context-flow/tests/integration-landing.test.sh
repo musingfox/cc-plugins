@@ -380,3 +380,21 @@ base=$(basename "$FLOW")
 diff_out=$(git -C "$REPO" diff "refs/heads/cf/${base}-integrated" "refs/heads/cf/${base}" || true)
 assert_eq "" "$diff_out" "R1 integrated vs parent empty"
 cleanup_flow "$REPO" "$FLOW" "$TMP"
+
+# --- T6: the integration suite is bounded like the shard gate ----------------
+# A project-supplied suite that stops for stdin or spins would otherwise hang the
+# whole flow. A stall is infrastructure, not a contract failure: attributing
+# contracts to a suite that never finished would be guesswork, so it gets its own
+# status and lands nothing.
+
+setup_fixture_1
+CF_TEST_DEADLINE_S=1 bash "$INTEGRATE" "$FLOW" "sleep 30" >/dev/null 2>&1
+rc=$?
+assert_eq "6" "$rc" "T6 a stalled integration suite exits 6"
+assert_json "$FLOW/integration-result.json" '.status' "TEST_STALLED" "T6 status TEST_STALLED"
+assert_json "$FLOW/integration-result.json" '.reason' "integration_test_stalled" "T6 reason"
+affected=$(jq -r '.affected_contracts | length' "$FLOW/integration-result.json")
+assert_eq "0" "$affected" "T6 no contracts blamed for a suite that never finished"
+got_log=$(parent_log "$FLOW/work" "$BASE_HEAD")
+assert_eq "" "$got_log" "T6 nothing was landed on the parent"
+cleanup_flow "$REPO" "$FLOW" "$TMP"

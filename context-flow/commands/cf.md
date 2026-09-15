@@ -377,7 +377,7 @@ for id in $SHARD_IDS; do
 done
 ```
 
-`outcome.md` carries `## Status`, `## Reason`, `## Cause` (one bounded line extracted from the artifact matching the failure), `## Run`, `## Survived contracts`, `## Affected contracts`, `## Artifacts` — all paths-only besides Cause; pull `## Survived contracts` / `## Affected contracts` only when routing needs them. If a shard's outcome.md is missing or empty (its background task crashed before writing it), treat that shard as `FAIL` with reason `outcome-missing`.
+`outcome.md` carries `## Status`, `## Reason`, `## Cause` (one bounded line extracted from the artifact matching the failure), `## Tests` (the runner's own count line, or `unparsed` when it printed none — an exit code alone cannot tell a green suite from one that skipped everything, so read this before believing a PASS), `## Run`, `## Survived contracts`, `## Affected contracts`, `## Artifacts` — all paths-only besides Cause; pull `## Survived contracts` / `## Affected contracts` only when routing needs them. If a shard's outcome.md is missing or empty (its background task crashed before writing it), treat that shard as `FAIL` with reason `outcome-missing`.
 
 **Failure transparency — mandatory.** For every non-PASS shard, before routing, read its `## Reason` + `## Cause` and tell the human in one sentence per shard WHY it failed (e.g. `B: NEEDS_REPLAN — test-fail-persistent: "AssertionError: expected 200, got 404"`). Never report a bare status. If Cause is `-`, read `tail -20` of the postmortem path from `## Artifacts` and summarize; name the postmortem path so the human can dig deeper.
 
@@ -428,6 +428,7 @@ INT_STATUS=$(jq -r '.status' "$SESSION/integration-result.json")
 
 - `INT_STATUS=PASS` → proceed to Phase 4. Phase 4 captures `$SESSION/implement.diff`.
 - `INT_STATUS=NEEDS_REPLAN` → integration gate auto-injects NEEDS_REPLAN for the affected contracts (`jq -r '.affected_contracts[]' "$SESSION/integration-result.json"`). Funnel into the partial-replan path below as if they came from shard outcomes.
+- `INT_STATUS=TEST_STALLED` → the integration suite outran `CF_TEST_DEADLINE_S` and was killed, so nothing was attributed and nothing was landed. This is infrastructure, not a contract failure: never funnel it into partial-replan. Show the human `.test_log` and `.deadline_s` and ask whether to raise the deadline and re-run the gate, or to investigate the hanging test.
 - `INT_STATUS=LINEARIZE_CONFLICT` → the commits could not be replayed onto `cf/$CF_SLUG` as linear history, or the parent worktree was refused before any rewrite; the passing tree remains on `.integration_branch` and the parent sits at `.parent_prior_tip`. Read `jq -r '.reason, .offending_shard, .offending_commit' "$SESSION/integration-result.json"` and escalate with the cause named — never proceed to Phase 4 on this status. Reasons:
   - `parent_missing` — `$SESSION/work` is absent or not a git worktree. Nothing was written; the gate can be rerun once the worktree exists on `cf/$CF_SLUG`.
   - `parent_wrong_branch` — `$SESSION/work` is checked out on a branch other than `cf/$CF_SLUG`. Nothing was written; rerun once it is back on `cf/$CF_SLUG`.
@@ -660,7 +661,7 @@ Interpret the first token of `$REBASE_STATUS`:
 | `OK <sha>` | Cf branch rebased onto latest `$BASE_BRANCH`, head is `<sha>`, suite green on that tree. | "Rebased onto `$BASE_BRANCH` and the suite passes there. Ready to fast-forward." |
 | `NOOP <sha>` | `$BASE_BRANCH` hasn't moved during the flow; cf branch already linear over it, suite green. | "Already linear over `$BASE_BRANCH`, suite green." |
 | `CONFLICT <files>` | Rebase aborted to keep state clean; cf branch is still at its original (pre-rebase) tip. | "Rebase conflicts in `<files>`. Branch left at original tip — resolve manually before ff." |
-| `TESTFAIL <sha> <log>` | The delivered tree fails its own suite. | "The rebased tree fails the suite — do NOT fast-forward. Failures in `<log>`." Do not print the ff guidance; route the failures back to implement as `retry-different-approach`. |
+| `TESTFAIL <sha> <log>` | The delivered tree fails its own suite. | "The rebased tree fails the suite — do NOT fast-forward. Failures in `<log>`." Do not print the ff guidance; route the failures back to implement as `retry-different-approach`. That loop returns here: implement adds commits without rebasing, so the base is already applied and this step re-verifies on the NOOP path. |
 | `TESTSTALLED <sha> <log>` | That suite outran its deadline. | "The suite did not finish on the rebased tree (see `<log>`) — delivery is unverified, do NOT fast-forward." Ask the human whether to raise `CF_TEST_DEADLINE_S` and re-run, or ship unverified. |
 | `SKIP <reason>` | Non-git mode or missing base; nothing to rebase. | Skip rebase messaging entirely. |
 
