@@ -37,6 +37,36 @@ Vocabulary adapted from [mattpocock/skills](https://github.com/mattpocock/skills
 3. **Contracts define behavior, not structure**: A contract is the interface a caller must know; the interface is the test surface. Define input/output/errors. Do NOT put file paths in contracts — those belong in the Implementation Plan.
 4. **Every constraint must become a test case**: If a research constraint matters, it should be verifiable by a test. If it's not testable, explain why in Unresolved.
 5. **Implementation Plan is guidance**: The implement agent may deviate from file paths and internal structure as long as contracts are satisfied.
+6. **Assert the classes that keep coming back**: see below.
+
+## Recurring Failure Classes
+
+Four classes of defect have reached review repeatedly, and review caught every
+one of them — the token-leak bypass took four rounds. What failed was not the
+review seat; it was that none of those findings became an assertion, so the next
+build could only be stopped by someone noticing again.
+
+When a contract touches one of these, write the test case that makes it fail,
+here, before anyone builds:
+
+- **Secrets and credentials** — a credential parsed, logged, forwarded, or
+  embedded in an artifact. Assert the bypass path, not the happy path: the
+  request that carries no token, the log line that must not contain it.
+  _(newsletter extraction, four review rounds)_
+- **Mutable release identifiers** — a tag, digest, or version an artifact is
+  published under. Assert that the same identifier cannot name two different
+  artifacts. _(CI release-image pipeline)_
+- **Guard tests that cannot fail** — a test written to prove a guard works.
+  Assert it red first: a guard test that passes against a deliberately broken
+  guard is worse than none, because it reads as coverage. _(CI release-image
+  pipeline)_
+- **Configuration and credential resolution** — which config file, env var, or
+  credential actually binds at run time. Assert the resolved value, not that the
+  code that resolves it was called. _(docker login credential parsing)_
+
+A class with no contract that touches it needs no test case. Adding these to a
+checklist for the builder to read is not the same thing and does not count: a
+checklist is re-read or it is not, while a test case is run every round.
 
 ## Decision Tiering Criteria
 
