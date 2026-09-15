@@ -31,7 +31,14 @@ CF_SLUG="${1:-$SESSION_BASENAME}"
 PI_PROVIDER="${PI_PROVIDER:-}"
 PI_MODEL="${PI_MODEL:-}"
 if [ -n "$PI_PROVIDER" ] || [ -n "$PI_MODEL" ]; then
-  PI_DESC="${PI_PROVIDER:-<pi-default-provider>}/${PI_MODEL:-<pi-default-model>}"
+  # A provider without a model is not a routing spec — pi resolves the model
+  # first — so name that here instead of printing a plausible-looking pair the
+  # dispatch will refuse.
+  if [ -n "$PI_PROVIDER" ] && [ -z "$PI_MODEL" ]; then
+    PI_DESC="$PI_PROVIDER/<unroutable: PI_MODEL unset>"
+  else
+    PI_DESC="${PI_PROVIDER:-<pi-default-provider>}/$PI_MODEL"
+  fi
 else
   PI_DESC="OMP default config"
 fi
