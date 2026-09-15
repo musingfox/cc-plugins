@@ -24,30 +24,9 @@ load_cf_pi_env "$SESSION"
 
 DEADLINE="${CF_TEST_DEADLINE_S:-1800}"
 
-# Bounded foreground run. The runner gets its own session+process group so the
-# deadline kills the whole tree, not just the top process. macOS ships no
-# timeout(1), so this follows the plugin's existing perl idiom.
 (
-  cd "$WORK" && perl -MPOSIX -e '
-    my $deadline = shift @ARGV;
-    my $pid = fork();
-    exit 127 unless defined $pid;
-    if ($pid == 0) { POSIX::setsid(); exec { $ARGV[0] } @ARGV; exit 127; }
-    my $waited = 0;
-    while (1) {
-      last if waitpid($pid, POSIX::WNOHANG()) == $pid;
-      if ($waited >= $deadline) {
-        kill("TERM", -$pid); sleep 2; kill("KILL", -$pid);
-        waitpid($pid, 0);
-        exit 124;
-      }
-      select(undef, undef, undef, 0.2);
-      $waited += 0.2;
-    }
-    my $st = $?;
-    exit($st & 127 ? 128 + ($st & 127) : $st >> 8);
-  ' "$DEADLINE" "$@"
-) < /dev/null > "$TEST_LOG" 2>&1
+  cd "$WORK" && run_bounded "$DEADLINE" "$@"
+) > "$TEST_LOG" 2>&1
 TEST_EXIT=$?
 
 # A stalled runner is not a red suite: re-dispatching the builder cannot fix a

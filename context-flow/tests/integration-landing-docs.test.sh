@@ -69,5 +69,5 @@ else
   assert_eq "ok" "fail" "review-two-axis.test.sh still ok"
 fi
 got=$(phase4 | shasum -a 256 | awk '{print $1}')
-assert_eq "7a0bf82316321bf00fa43ab164c0d09e7fd5d77c508a09839d2754101bcc6795" "$got" \
+assert_eq "aad2685fb706c406e46829765f6b41d7e6ae84bf179c0997e6cbd48145a2f434" "$got" \
   "Phase 4 section is byte-identical"

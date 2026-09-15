@@ -641,9 +641,15 @@ Use the `spec` skill for the entry format and lifecycle. If the spec plugin is n
 
 Run `cf-rebase.sh` to align the cf branch with the latest `$BASE_BRANCH`, then hand the branch to the human. Never auto-fast-forward `$BASE_BRANCH` — the human decides when to merge.
 
+Pass `TEST_RUNNER` so the full suite runs on the tree the human is about to
+fast-forward. Nothing else tests it: the shard gates and the integration gate
+both ran before this rebase, and the advisory-fix route arrives here with
+commits no gate has seen. The same diff over a moved base is a different tree,
+so a green integration says nothing about what actually ships.
+
 ```bash
 . "$SESSION/env.sh"
-REBASE_STATUS=$("$SCRIPTS/cf-rebase.sh" "$SESSION")
+REBASE_STATUS=$("$SCRIPTS/cf-rebase.sh" "$SESSION" "$TEST_RUNNER")
 echo "$REBASE_STATUS"
 ```
 
@@ -651,12 +657,16 @@ Interpret the first token of `$REBASE_STATUS`:
 
 | Prefix | Meaning | What to tell the human |
 |---|---|---|
-| `OK <sha>` | Cf branch rebased onto latest `$BASE_BRANCH`, head is `<sha>`. | "Rebased onto `$BASE_BRANCH`. Ready to fast-forward." |
-| `NOOP` | `$BASE_BRANCH` hasn't moved during the flow; cf branch already linear over it. | "Already linear over `$BASE_BRANCH`." |
+| `OK <sha>` | Cf branch rebased onto latest `$BASE_BRANCH`, head is `<sha>`, suite green on that tree. | "Rebased onto `$BASE_BRANCH` and the suite passes there. Ready to fast-forward." |
+| `NOOP <sha>` | `$BASE_BRANCH` hasn't moved during the flow; cf branch already linear over it, suite green. | "Already linear over `$BASE_BRANCH`, suite green." |
 | `CONFLICT <files>` | Rebase aborted to keep state clean; cf branch is still at its original (pre-rebase) tip. | "Rebase conflicts in `<files>`. Branch left at original tip — resolve manually before ff." |
+| `TESTFAIL <sha> <log>` | The delivered tree fails its own suite. | "The rebased tree fails the suite — do NOT fast-forward. Failures in `<log>`." Do not print the ff guidance; route the failures back to implement as `retry-different-approach`. |
+| `TESTSTALLED <sha> <log>` | That suite outran its deadline. | "The suite did not finish on the rebased tree (see `<log>`) — delivery is unverified, do NOT fast-forward." Ask the human whether to raise `CF_TEST_DEADLINE_S` and re-run, or ship unverified. |
 | `SKIP <reason>` | Non-git mode or missing base; nothing to rebase. | Skip rebase messaging entirely. |
 
-Always close with branch + ff guidance:
+On `OK` / `NOOP` / `SKIP`, close with branch + ff guidance. On `TESTFAIL` or
+`TESTSTALLED` the tree is not deliverable: say so and stop, do not offer the
+fast-forward.
 
 ```
 Phase 4 PASSED. Committed to branch `cf/$CF_SLUG` (<N> commits).

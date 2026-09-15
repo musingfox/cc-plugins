@@ -111,3 +111,35 @@ resolve_canon_dispatch() {
      "$root"/../../pi-dispatch/*/scripts/pi-dispatch.sh 2>/dev/null \
    | sort -V | tail -1 || true
 }
+
+# run_bounded DEADLINE_S CMD [ARGS...]
+#   Runs CMD in its own session + process group with /dev/null on stdin, and
+#   group-kills the whole tree if it outruns DEADLINE_S. Returns the command's
+#   exit code, or 124 on the deadline (timeout(1)'s convention; macOS ships no
+#   timeout(1), hence perl).
+#
+#   Every gate that runs project-supplied commands goes through this. A suite
+#   that stops to read stdin, or one that spins, otherwise hangs its caller with
+#   nothing downstream to bound it.
+run_bounded() {
+  local deadline="$1"; shift
+  perl -MPOSIX -e '
+    my $deadline = shift @ARGV;
+    my $pid = fork();
+    exit 127 unless defined $pid;
+    if ($pid == 0) { POSIX::setsid(); exec { $ARGV[0] } @ARGV; exit 127; }
+    my $waited = 0;
+    while (1) {
+      last if waitpid($pid, POSIX::WNOHANG()) == $pid;
+      if ($waited >= $deadline) {
+        kill("TERM", -$pid); sleep 2; kill("KILL", -$pid);
+        waitpid($pid, 0);
+        exit 124;
+      }
+      select(undef, undef, undef, 0.2);
+      $waited += 0.2;
+    }
+    my $st = $?;
+    exit($st & 127 ? 128 + ($st & 127) : $st >> 8);
+  ' "$deadline" "$@" < /dev/null
+}
