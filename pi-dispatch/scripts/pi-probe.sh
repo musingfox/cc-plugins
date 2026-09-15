@@ -16,10 +16,17 @@
 #   NO_BIN (<bin>)     agent binary not on PATH
 #   NO_JSONL           binary ran but produced no stdout AND no session jsonl
 #   ERROR:<excerpt>    session jsonl contains "errorMessage" (auth/quota/model)
+#   STALLED (<n>s)     the round trip outran the deadline and was killed
 # Exit code: 0 iff OK (gate-friendly).
 #
+# The probe bounds itself. It used to rely on the caller passing a Bash timeout,
+# a prose convention nothing enforced, so a wedged provider hung whoever called
+# it — for cf that meant a shard stuck behind the orchestrator's one-hour
+# Monitor with no sign anything was wrong.
+#
 # Env: PI_BIN (default pi), PI_PROVIDER/PI_MODEL (routing, resolved
-#      via pi-dispatch.sh's PI_RESOLVE_ROUTING_ONLY seam).
+#      via pi-dispatch.sh's PI_RESOLVE_ROUTING_ONLY seam),
+#      PI_PROBE_DEADLINE_S (default 60).
 #
 # Full-probe side effects in PROBE_DIR: probe-stdout.log, probe-stderr.log,
 # session *.jsonl — diagnostics for a failed probe.
@@ -66,10 +73,39 @@ if [ -n "$MODEL" ]; then
 fi
 
 # -p (print mode) is load-bearing: without it pi opens its interactive TUI on a
-# non-tty stdin and hangs until the caller's timeout kills it.
-"$BIN" "${PROBE_ARGS[@]}" \
+# non-tty stdin and hangs. The deadline covers the rest: a provider that accepts
+# the connection and then never answers.
+#
+# The child gets its own session+process group so the deadline kills the whole
+# tree. macOS ships no timeout(1), hence perl.
+DEADLINE="${PI_PROBE_DEADLINE_S:-60}"
+perl -MPOSIX -e '
+  my $deadline = shift @ARGV;
+  my $pid = fork();
+  exit 127 unless defined $pid;
+  if ($pid == 0) { POSIX::setsid(); exec { $ARGV[0] } @ARGV; exit 127; }
+  my $waited = 0;
+  while (1) {
+    last if waitpid($pid, POSIX::WNOHANG()) == $pid;
+    if ($waited >= $deadline) {
+      kill("TERM", -$pid); sleep 2; kill("KILL", -$pid);
+      waitpid($pid, 0);
+      exit 124;
+    }
+    select(undef, undef, undef, 0.2);
+    $waited += 0.2;
+  }
+  my $st = $?;
+  exit($st & 127 ? 128 + ($st & 127) : $st >> 8);
+' "$DEADLINE" "$BIN" "${PROBE_ARGS[@]}" \
   --session-dir "$PROBE_DIR" \
-  --no-tools "say ok" < /dev/null > "$PROBE_DIR/probe-stdout.log" 2> "$PROBE_DIR/probe-stderr.log" || true
+  --no-tools "say ok" < /dev/null > "$PROBE_DIR/probe-stdout.log" 2> "$PROBE_DIR/probe-stderr.log"
+PROBE_RC=$?
+
+if [ "$PROBE_RC" -eq 124 ]; then
+  echo "STALLED (${DEADLINE}s)"
+  exit 1
+fi
 
 JSONL="$(ls -t "$PROBE_DIR"/*.jsonl 2>/dev/null | head -1)"
 

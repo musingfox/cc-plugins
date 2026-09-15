@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Thin adapter: pre-flight liveness probe via the canonical pi-dispatch/pi-probe.sh.
-# cf owns NO agent-binary handling — binary name, model resolution, and invocation
-# flags are pi-dispatch's concern. Caller MUST invoke via the Bash tool with
-# `timeout: 30000` so a hung probe does not block the orchestrator.
+# cf owns NO agent-binary handling — binary name, model resolution, invocation
+# flags, and the round-trip deadline are pi-dispatch's concern. pi-probe.sh
+# bounds itself (PI_PROBE_DEADLINE_S, default 60s) and reports STALLED, so a
+# wedged provider can no longer hang the orchestrator.
 #
-# cf-facing interface (unchanged):
+# cf-facing interface:
 #   Usage:   cf-pi-probe.sh SESSION
-#   Stdout:  single status line: OK | NO_BIN (<bin>) | NO_JSONL | ERROR:<excerpt>
+#   Stdout:  single status line: OK | NO_BIN (<bin>) | NO_JSONL | STALLED (<n>s)
+#            | ERROR:<excerpt>
 # Side effects: probe-stdout.log / probe-stderr.log / session *.jsonl in $PI_PROBE_DIR.
 
 set -uo pipefail

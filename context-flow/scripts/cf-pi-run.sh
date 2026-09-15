@@ -123,6 +123,10 @@ derive_cause() {
     test-fail*|"test runner error")
       [ -s "$TEST_LOG" ] && \
         cause=$(grep -E 'FAILED|failed|Error|not ok|✗' "$TEST_LOG" 2>/dev/null | head -1) ;;
+    test-stalled)
+      # The suite never returned, so there is no failure line to quote — the last
+      # thing it printed is the only evidence of where it stopped.
+      [ -s "$TEST_LOG" ] && cause="last output before the deadline: $(tail -1 "$TEST_LOG" 2>/dev/null)" ;;
     undeclared_file_touched)
       cause="scope violation — see undeclared_files below" ;;
     *)
@@ -523,6 +527,16 @@ set +e
 "$SCRIPTS/cf-pi-test.sh" "$SHARD_SESSION" $TEST_RUNNER > "$SHARD_SESSION/gate3.out" 2>&1
 TEST_RC=$?
 set -e
+
+# A stalled runner outran its deadline. Re-briefing the builder cannot fix a
+# suite that never returns, so stop here instead of spending a dispatch on it.
+if grep -q '^test_stalled=' "$SHARD_SESSION/gate3.out"; then
+  stall_s=$(sed -n 's/^test_stalled=//p' "$SHARD_SESSION/gate3.out" | head -1)
+  pm=$(do_postmortem)
+  write_outcome FAIL test-stalled "" "(all): test runner outran its ${stall_s}s deadline" "$pm" "-"
+  say "FAIL test-stalled after ${stall_s}s"
+  exit 1
+fi
 
 if [ "$TEST_RC" -ne 0 ]; then
   # Distinguish "tests failed" from "test runner errored".
