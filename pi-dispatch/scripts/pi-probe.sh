@@ -77,9 +77,12 @@ fi
 # the connection and then never answers.
 #
 # The child gets its own session+process group so the deadline kills the whole
-# tree. macOS ships no timeout(1), hence perl.
+# tree, and the supervisor leaves the caller's group so a group kill of the
+# caller cannot strand the child with nobody enforcing the deadline. macOS ships
+# no timeout(1), hence perl.
 DEADLINE="${PI_PROBE_DEADLINE_S:-60}"
 perl -MPOSIX -e '
+  POSIX::setpgid(0, 0);
   my $deadline = shift @ARGV;
   my $pid = fork();
   exit 127 unless defined $pid;
