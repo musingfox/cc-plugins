@@ -121,9 +121,15 @@ resolve_canon_dispatch() {
 #   Every gate that runs project-supplied commands goes through this. A suite
 #   that stops to read stdin, or one that spins, otherwise hangs its caller with
 #   nothing downstream to bound it.
+#
+#   The supervisor leaves the caller's process group before forking. The child
+#   has its own session, so killing the caller's group would otherwise take the
+#   supervisor down and leave the suite running with nothing left to enforce the
+#   deadline. Detached, it still kills the tree at the deadline and exits.
 run_bounded() {
   local deadline="$1"; shift
   perl -MPOSIX -e '
+    POSIX::setpgid(0, 0);
     my $deadline = shift @ARGV;
     my $pid = fork();
     exit 127 unless defined $pid;
