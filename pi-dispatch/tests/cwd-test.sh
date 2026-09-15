@@ -27,6 +27,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DISPATCH="$SCRIPT_DIR/../scripts/pi-dispatch.sh"
 SHIMS="$(cd "$SCRIPT_DIR/../shims" && pwd -P)"
 
+# The developer's own shell exports these for real dispatches; inherited here they
+# would make the "default routing" cases run on a pinned model.
+unset PI_PROVIDER PI_MODEL PI_CONFIG_FILES
+
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 TMP="$(cd "$TMP" && pwd -P)"
@@ -132,6 +136,27 @@ EOF2
   RD2="$(launch PI_BIN="$TMP/pi-writer" PI_CWD="$WORK" PI_SANDBOX=0 PI_PROMPT="$OUTSIDE" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
   if [ ! -f "$RD2/sandbox.sb" ] && [ "$(field "$RD2" OUTSIDE)" = written ]; then ok "PI_SANDBOX=0 -> no sandbox"; else bad "PI_SANDBOX=0 -> $(grep OUTSIDE= "$RD2/result.md")"; fi
 fi
+
+# --- Case 5d: a terminal poll back-fills the model without dropping CWD= ---
+# Default routing records MODEL= empty, which is exactly when pi-poll.sh fills the
+# model in from the stream. That rewrite used to truncate the routing file to two
+# lines, so the NEXT resume found no CWD= and fell back to the session header.
+POLL="$SCRIPT_DIR/../scripts/pi-poll.sh"
+JSHIM="$TMP/pi-json-shim"
+cat > "$JSHIM" <<'EOF3'
+#!/usr/bin/env bash
+printf '{"type":"session","id":"sess-new","cwd":"%s"}\n' "$(pwd -P)"
+echo '{"type":"message_end","message":{"role":"assistant","usage":{"cost":{"total":0.01}}}}'
+echo '{"type":"agent_end","messages":[{"role":"assistant","stopReason":"stop","text":"done","provider":"openai-codex","model":"gpt-5.6-terra"}]}'
+EOF3
+chmod +x "$JSHIM"
+RD="$(launch PI_BIN="$JSHIM" PI_CWD="$WORK" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
+if grep -q "^CWD=$WORK$" "$RD/routing" && ! grep -q '^MODEL=.' "$RD/routing"; then ok "default routing -> MODEL empty, CWD recorded"; else bad "default routing -> $(tr '\n' ' ' < "$RD/routing")"; fi
+bash "$POLL" "$RD" >/dev/null 2>&1
+if grep -q '^MODEL=gpt-5.6-terra$' "$RD/routing"; then ok "terminal poll back-fills MODEL"; else bad "back-fill MODEL -> $(tr '\n' ' ' < "$RD/routing")"; fi
+if grep -q "^CWD=$WORK$" "$RD/routing"; then ok "terminal poll keeps CWD="; else bad "back-fill dropped CWD -> $(tr '\n' ' ' < "$RD/routing")"; fi
+RD2="$(launch PI_BIN="$SHIM" "$DISPATCH" "$CALLER/brief.md" "$OUT" "$RD" 2>"$TMP/err")"
+if [ "$(field "$RD2" CWD)" = "$WORK" ] && ! grep -q 'recorded no CWD' "$TMP/err"; then ok "resume after a terminal poll -> still the recorded worktree"; else bad "resume after poll -> $(field "$RD2" CWD) $(cat "$TMP/err")"; fi
 
 # --- Case 6: a relative PI_BIN survives the cd ---
 RD="$(launch PI_BIN="../pi-shim" PI_CWD="$WORK" "$DISPATCH" "$CALLER/brief.md" "$OUT")"

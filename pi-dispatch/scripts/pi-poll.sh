@@ -185,7 +185,16 @@ usage_tail() {
   case "$t" in *model=*)
     if [ -f "$RUNDIR/routing" ] && ! grep -q '^MODEL=.' "$RUNDIR/routing"; then
       local pm="${t#* model=}"; pm="${pm%% *}"
-      printf 'PROVIDER=%s\nMODEL=%s\n' "${pm%%/*}" "${pm#*/}" > "$RUNDIR/routing" 2>/dev/null || true
+      # Carry every other recorded key through. CWD= is load-bearing: a resume
+      # reads it to put the worker back in its worktree, and dropping it sends
+      # the resume down the session-header recovery path instead.
+      local keep
+      keep="$(grep -v '^PROVIDER=' "$RUNDIR/routing" 2>/dev/null | grep -v '^MODEL=' || true)"
+      { printf 'PROVIDER=%s\nMODEL=%s\n' "${pm%%/*}" "${pm#*/}"
+        [ -n "$keep" ] && printf '%s\n' "$keep"
+        true
+      } > "$RUNDIR/routing.tmp" 2>/dev/null &&
+        mv "$RUNDIR/routing.tmp" "$RUNDIR/routing" 2>/dev/null || true
     fi ;;
   esac
   printf '%s' "$t"
