@@ -345,6 +345,11 @@ case "$PROBE_STATUS" in
     say "FAIL probe $PROBE_STATUS"
     exit 1
     ;;
+  STALLED*)
+    write_outcome FAIL probe-stalled "" "(all): probe $PROBE_STATUS" "-" "-"
+    say "FAIL probe $PROBE_STATUS"
+    exit 1
+    ;;
   *)
     write_outcome FAIL probe-error "" "(all): probe unknown ($PROBE_STATUS)" "-" "-"
     say "FAIL probe unknown: $PROBE_STATUS"
@@ -537,13 +542,20 @@ TEST_COUNTS="$(sed -n 's/^test_counts=//p' "$SHARD_SESSION/gate3.out" | tail -1)
 
 # A stalled runner outran its deadline. Re-briefing the builder cannot fix a
 # suite that never returns, so stop here instead of spending a dispatch on it.
-if grep -q '^test_stalled=' "$SHARD_SESSION/gate3.out"; then
-  stall_s=$(sed -n 's/^test_stalled=//p' "$SHARD_SESSION/gate3.out" | head -1)
+# Every gate-3 run goes through this, not just the first: a stall on the retest
+# or the retry is the same condition, and letting it through routes a hung suite
+# into a re-dispatch or into NEEDS_REPLAN.
+fail_if_stalled() { # $1 = gate output file
+  grep -q '^test_stalled=' "$1" || return 0
+  local stall_s pm
+  stall_s=$(sed -n 's/^test_stalled=//p' "$1" | head -1)
   pm=$(do_postmortem)
   write_outcome FAIL test-stalled "" "(all): test runner outran its ${stall_s}s deadline" "$pm" "-"
   say "FAIL test-stalled after ${stall_s}s"
   exit 1
-fi
+}
+
+fail_if_stalled "$SHARD_SESSION/gate3.out"
 
 if [ "$TEST_RC" -ne 0 ]; then
   # Distinguish "tests failed" from "test runner errored".
@@ -557,6 +569,7 @@ if [ "$TEST_RC" -ne 0 ]; then
     RETEST_RC=$?
     set -e
     TEST_COUNTS="$(sed -n 's/^test_counts=//p' "$SHARD_SESSION/gate3-retest.out" | tail -1)"
+    fail_if_stalled "$SHARD_SESSION/gate3-retest.out"
     if [ "$RETEST_RC" -eq 0 ]; then
       say "gate 3 retest passed — first failure was an environment transient"
       TEST_RC=0
@@ -591,6 +604,7 @@ if [ "$TEST_RC" -ne 0 ]; then
     TEST_RC=$?
     set -e
     TEST_COUNTS="$(sed -n 's/^test_counts=//p' "$SHARD_SESSION/gate3-retry.out" | tail -1)"
+    fail_if_stalled "$SHARD_SESSION/gate3-retry.out"
 
     if [ "$TEST_RC" -ne 0 ]; then
       # Persistent failure => NEEDS_REPLAN, all this shard's contracts affected.

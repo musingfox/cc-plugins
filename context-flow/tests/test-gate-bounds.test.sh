@@ -9,7 +9,9 @@
 #     test_stalled=, and exits 124 with no test_exit= marker
 #   - the whole process tree dies with it, not just the top process
 #   - cf-pi-run.sh routes test_stalled as FAIL test-stalled without spending a
-#     re-dispatch on it
+#     re-dispatch on it, on EVERY gate-3 run: the first, the cheap retest, and
+#     the post-re-dispatch retry. A stall reaching the retry path would be
+#     reported as test-fail-persistent and cost a whole Plan round.
 
 . "$CF_TESTS_DIR/lib/assert.sh"
 
@@ -64,16 +66,21 @@ rm -rf "$S"
 
 # ---- cf-pi-run.sh routes a stall as FAIL test-stalled, with no re-dispatch ----
 
-FLOW="$(mktemp -d)"
-SHARD="$FLOW/shards/A"
-STUBS="$FLOW/stubs"
-mkdir -p "$SHARD" "$STUBS"
+# run_stall_flow GATE_BODY -> echoes the FLOW dir. GATE_BODY is the body of the
+# stubbed cf-pi-test.sh; it may read "$FLOW/test.count" to behave differently on
+# the first run, the retest, and the retry.
+run_stall_flow() {
+  local gate_body="$1" FLOW SHARD STUBS
+  FLOW="$(mktemp -d)"
+  SHARD="$FLOW/shards/A"
+  STUBS="$FLOW/stubs"
+  mkdir -p "$SHARD" "$STUBS"
 
-cat > "$FLOW/shards.json" <<'JSON'
+  cat > "$FLOW/shards.json" <<'JSON'
 {"groups": {"A": {"contracts": ["C1"], "files": ["src/x.ts"]}}}
 JSON
 
-cat > "$SHARD/env.sh" <<EOF
+  cat > "$SHARD/env.sh" <<EOF
 SESSION="$SHARD"
 SESSION_BASENAME="test-shard-A"
 PLUGIN_ROOT="$FLOW"
@@ -89,12 +96,13 @@ BASE_BRANCH="main"
 BASE_HEAD="HEAD"
 EOF
 
-for s in cf-pi-worktree.sh cf-pi-brief.sh cf-pi-stop.sh; do
-  printf '#!/bin/bash\nexit 0\n' > "$STUBS/$s"
-done
-printf '#!/bin/bash\necho OK\n' > "$STUBS/cf-pi-probe.sh"
-printf '#!/bin/bash\necho "pm"\n' > "$STUBS/cf-pi-postmortem.sh"
-cat > "$STUBS/cf-pi-dispatch.sh" <<EOF
+  local s
+  for s in cf-pi-worktree.sh cf-pi-brief.sh cf-pi-stop.sh cf-pi-scope.sh; do
+    printf '#!/bin/bash\nexit 0\n' > "$STUBS/$s"
+  done
+  printf '#!/bin/bash\necho OK\n' > "$STUBS/cf-pi-probe.sh"
+  printf '#!/bin/bash\necho "pm"\n' > "$STUBS/cf-pi-postmortem.sh"
+  cat > "$STUBS/cf-pi-dispatch.sh" <<EOF
 #!/bin/bash
 echo 1 >> "$FLOW/dispatch.count"
 cat > "$SHARD/implement-report.md" <<'REPORT'
@@ -106,22 +114,24 @@ Did the work.
 REPORT
 echo 12345
 EOF
-printf '#!/bin/bash\necho "STATUS=OK"\n' > "$STUBS/cf-pi-poll.sh"
-cat > "$STUBS/cf-pi-test.sh" <<EOF
+  printf '#!/bin/bash\necho "STATUS=OK"\n' > "$STUBS/cf-pi-poll.sh"
+  cat > "$STUBS/cf-pi-test.sh" <<EOF
 #!/bin/bash
-echo 1 >> "$FLOW/test.count"
-echo "test_stalled=1800"
-exit 124
+FLOW="$FLOW"
+echo 1 >> "\$FLOW/test.count"
+$gate_body
 EOF
-printf '#!/bin/bash\nexit 0\n' > "$STUBS/sleep"
-printf '#!/bin/bash\nexit 0\n' > "$STUBS/git"
-chmod +x "$STUBS"/*
+  printf '#!/bin/bash\nexit 0\n' > "$STUBS/sleep"
+  printf '#!/bin/bash\nexit 0\n' > "$STUBS/git"
+  chmod +x "$STUBS"/*
 
-PATH="$STUBS:$PATH" bash "$REAL_SCRIPTS/cf-pi-run.sh" "$SHARD" "goal" "none" "true" \
-  > "$FLOW/run.log" 2>&1
-rc=$?
-assert_eq "1" "$rc" "stall routing: cf-pi-run exits 1 (FAIL)"
-assert_contains "$(head -8 "$SHARD/outcome.md" | tr '\n' ' ')" "test-stalled" \
+  PATH="$STUBS:$PATH" bash "$REAL_SCRIPTS/cf-pi-run.sh" "$SHARD" "goal" "none" "true" \
+    > "$FLOW/run.log" 2>&1
+  printf '%s' "$FLOW"
+}
+
+FLOW="$(run_stall_flow 'echo "test_stalled=1800"; exit 124')"
+assert_contains "$(head -8 "$FLOW/shards/A/outcome.md" | tr '\n' ' ')" "test-stalled" \
   "stall routing: outcome Reason is test-stalled"
 assert_eq "1" "$(wc -l < "$FLOW/test.count" | tr -d ' ')" \
   "stall routing: the gate ran once, no retest"
@@ -129,3 +139,26 @@ assert_eq "1" "$(wc -l < "$FLOW/dispatch.count" | tr -d ' ')" \
   "stall routing: no re-dispatch spent on a suite that never returns"
 rm -rf "$FLOW"
 
+# ---- a stall on the retest is still a stall, not a reason to re-dispatch ----
+# The first run fails red, so the cheap retest runs; that one hangs. Without the
+# guard on the retest output, TEST_RC keeps the first run's code and the script
+# spends a full dispatch+poll on a suite that never returns.
+
+FLOW="$(run_stall_flow 'if [ -f "$FLOW/test.count" ] && [ "$(wc -l < "$FLOW/test.count")" -ge 2 ]; then echo "test_stalled=1800"; exit 124; fi; echo "test_exit=1"; exit 1')"
+assert_contains "$(head -8 "$FLOW/shards/A/outcome.md" | tr '\n' ' ')" "test-stalled" \
+  "retest stall: outcome Reason is test-stalled, not a red suite"
+assert_eq "1" "$(wc -l < "$FLOW/dispatch.count" | tr -d ' ')" \
+  "retest stall: no re-dispatch spent on a suite that never returns"
+rm -rf "$FLOW"
+
+# ---- a stall on the retry is a stall, not test-fail-persistent ----
+# Here the re-dispatch has already happened, so the run is genuinely at the
+# retry. Calling that NEEDS_REPLAN blames every contract in the shard and buys a
+# Plan round for a test that never finished.
+
+FLOW="$(run_stall_flow 'if [ -f "$FLOW/test.count" ] && [ "$(wc -l < "$FLOW/test.count")" -ge 3 ]; then echo "test_stalled=1800"; exit 124; fi; echo "test_exit=1"; exit 1')"
+head8="$(head -8 "$FLOW/shards/A/outcome.md" | tr '\n' ' ')"
+assert_contains "$head8" "test-stalled" "retry stall: outcome Reason is test-stalled"
+verdict=clean; case "$head8" in *test-fail-persistent*) verdict=misrouted ;; esac
+assert_eq "clean" "$verdict" "retry stall: never reported as a persistent test failure"
+rm -rf "$FLOW"
