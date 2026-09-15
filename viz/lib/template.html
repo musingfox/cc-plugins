@@ -5,129 +5,224 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DOC_NAME_PLACEHOLDER</title>
 
-    <!-- Resolve theme before first paint to avoid a flash of the wrong palette -->
-    <script>
-        (function () {
-            try {
-                var t = localStorage.getItem('viz-theme');
-                if (t !== 'light' && t !== 'dark') {
-                    t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                }
-                document.documentElement.setAttribute('data-theme', t);
-            } catch (e) {
-                document.documentElement.setAttribute('data-theme', 'light');
-            }
-        })();
-    </script>
-
     <!-- Code highlighting -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@latest/build/styles/atom-one-dark.min.css" id="hljs-theme">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@latest/build/styles/monokai.min.css" id="hljs-theme">
 
     <!-- KaTeX math -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.33/dist/katex.min.css">
 
-    <!-- AOS scroll animations -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css">
-
-    <!-- Fonts: Noto Sans TC + Fira Code -->
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-
     <style>
+        /* musingfox standalone token contract. */
+        :root {
+            --bg: #07080a;
+            --surface: #181818;
+            --surface-warm: #222222;
+
+            --fg: #e8e8e5;
+            --fg-2: #c4c5b5;
+            --muted: #75715e;
+            --meta: #49483e;
+
+            --border: #2e2e2e;
+            --border-soft: #1f1f1f;
+
+            --accent: #fd971f;
+            --accent-on: #07080a;
+            --accent-hover: #ffb85a;
+            --accent-active: #c97608;
+
+            --success: #98e024;
+            --warn: #e0d561;
+            --danger: #f4005f;
+
+            --font-display: "Fira Code", "jf Open Huninn", "PingFang TC", "Microsoft JhengHei", ui-monospace, monospace;
+            --font-body: "Fira Code", "jf Open Huninn", "PingFang TC", "Microsoft JhengHei", ui-monospace, monospace;
+            --font-mono: "Fira Code", "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+            --text-xs: 11px;
+            --text-sm: 13px;
+            --text-base: 16px;
+            --text-lg: 20px;
+            --text-xl: 28px;
+            --text-2xl: 36px;
+            --text-3xl: 48px;
+            --text-4xl: 64px;
+
+            --leading-body: 1.55;
+            --leading-tight: 1.15;
+            --tracking-display: -0.02em;
+
+            --space-1: 4px;
+            --space-2: 8px;
+            --space-3: 12px;
+            --space-4: 16px;
+            --space-5: 20px;
+            --space-6: 24px;
+            --space-8: 32px;
+            --space-12: 48px;
+            --section-y-desktop: 80px;
+            --section-y-tablet: 48px;
+            --section-y-phone: 32px;
+
+            --radius-sm: 4px;
+            --radius-md: 4px;
+            --radius-lg: 10px;
+            --radius-pill: 9999px;
+
+            --elev-flat: none;
+            --elev-ring: 0 0 0 1px var(--border);
+            --elev-raised: 0 4px 16px rgb(0 0 0 / 50%);
+
+            --focus-ring: 0 0 0 1px var(--bg), 0 0 0 3px var(--accent);
+
+            --motion-fast: 120ms;
+            --motion-base: 200ms;
+            --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+            --container-max: 1200px;
+            --container-gutter-desktop: 24px;
+            --container-gutter-tablet: 16px;
+            --container-gutter-phone: 12px;
+
+            /* Reading measure. The design system's 640px prose column assumes a
+               proportional face; the whole UI is monospace here, which is ~20%
+               wider per character, so the column is widened to keep a
+               comparable character count per line. */
+            --measure: 860px;
+        }
+
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
+        /* The canvas carries the 32px grid and the off-center ember vignette;
+           the body is only a reading column, so it stays transparent. */
+        html {
+            color-scheme: dark;
+            background:
+                radial-gradient(circle at 82% 4%, color-mix(in srgb, var(--accent), transparent 88%), transparent 34rem),
+                linear-gradient(var(--border-soft) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border-soft) 1px, transparent 1px),
+                var(--bg);
+            background-size: auto, 32px 32px, 32px 32px, auto;
+            background-attachment: fixed;
+        }
+
         body {
-            max-width: 860px;
-            margin: 48px auto;
-            padding: 0 24px;
-            font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            line-height: 1.62;
-            letter-spacing: 0.015em;
-            color: #26241f;
-            background: #f5f4ed;
+            max-width: calc(var(--measure) + 2 * var(--container-gutter-desktop));
+            margin: var(--space-12) auto;
+            padding: 0 var(--container-gutter-desktop);
+            font-family: var(--font-body);
+            font-size: var(--text-base);
+            line-height: 1.7;
+            color: var(--fg);
+            background: transparent;
             font-synthesis: none;
+            font-variant-ligatures: none;
             font-variant-numeric: tabular-nums lining-nums;
-            animation: pageLoad 0.5s ease-out;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
         }
 
-        @keyframes pageLoad {
-            from { opacity: 0; transform: translateY(12px); }
-            to   { opacity: 1; transform: translateY(0); }
+        ::selection { background: color-mix(in srgb, var(--accent), transparent 72%); color: var(--fg); }
+
+        button, input, summary { font: inherit; }
+        button, a, input, summary { -webkit-tap-highlight-color: transparent; }
+        a:focus-visible,
+        button:focus-visible,
+        input:focus-visible,
+        summary:focus-visible,
+        .mermaid-viewport:focus-visible {
+            outline: none;
+            box-shadow: var(--focus-ring);
         }
 
         /* -- Typography -- */
         h1, h2, h3, h4, h5, h6 {
-            margin-top: 1.6em;
-            margin-bottom: 0.6em;
+            font-family: var(--font-display);
+            margin-top: var(--space-8);
+            margin-bottom: var(--space-3);
             font-weight: 700;
-            letter-spacing: 0;
-            line-height: 1.25;
+            line-height: var(--leading-tight);
+            color: var(--fg);
         }
-        h1 { font-size: 1.85em; border-bottom: 1px solid #ddd8c9; padding-bottom: 0.35em; }
-        h2 { font-size: 1.4em; border-bottom: 1px solid #e8e4d8; padding-bottom: 0.25em; }
-        h3 { font-size: 1.15em; }
+        h1 {
+            font-size: var(--text-xl);
+            letter-spacing: var(--tracking-display);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: var(--space-3);
+        }
+        h2 { font-size: var(--text-lg); border-bottom: 1px solid var(--border-soft); padding-bottom: var(--space-2); }
+        h3 { font-size: var(--text-base); }
+        /* `›` is the system's universal forward marker — the section mark for
+           top-level sections, never applied to TOC copies of the same text. */
+        #content > h2::before { content: '\203A  '; color: var(--accent); }
 
-        p { margin: 0.75em 0; }
-        a { color: #1b365d; text-decoration: none; }
-        a:hover { text-decoration: underline; }
+        p { margin: var(--space-3) 0; }
+        a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; transition: border-color var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard); }
+        a:hover { border-bottom-color: var(--accent); }
+        a:active { opacity: .85; }
 
         /* -- Inline code -- */
         code {
-            background: #ebe8de;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: 'Fira Code', "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-            font-size: 0.875em;
-            font-variant-ligatures: none;
+            background: var(--surface-warm);
+            padding: 1px var(--space-1);
+            border: 1px solid var(--border-soft);
+            border-radius: var(--radius-sm);
+            font-family: var(--font-mono);
+            font-size: var(--text-sm);
+            color: var(--fg-2);
         }
 
-        /* -- Code blocks -- */
+        /* -- Code blocks: terminal panels, so square corners -- */
         .code-block {
-            margin: 1.25em 0;
-            border-radius: 8px;
+            margin: var(--space-5) 0;
+            border-radius: 0;
             overflow: hidden;
-            border: 1px solid #ddd8c9;
+            border: 1px solid var(--border);
+            transition: border-color var(--motion-fast) var(--ease-standard);
         }
+        .code-block:hover { border-color: var(--accent); }
         .code-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 6px 16px;
-            background: #21252b;
-            font-family: 'Fira Code', "SFMono-Regular", Consolas, monospace;
-            font-size: 0.75em;
-            color: #7f848e;
-            letter-spacing: 0.02em;
-            text-transform: lowercase;
-            border-bottom: 1px solid #181a1f;
+            padding: var(--space-1) var(--space-3);
+            background: var(--surface-warm);
+            font-family: var(--font-mono);
+            font-size: var(--text-xs);
+            color: var(--muted);
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
             user-select: none;
         }
         .code-header .copy-btn {
-            background: none;
-            border: 1px solid #3e4451;
-            border-radius: 4px;
-            color: #7f848e;
-            font-size: 11px;
-            padding: 2px 8px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--muted);
+            font-size: var(--text-xs);
+            padding: 1px var(--space-2);
             cursor: pointer;
             font-family: inherit;
-            transition: all 0.15s;
+            text-transform: lowercase;
+            transition: color var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard);
         }
-        .code-header .copy-btn:hover { color: #abb2bf; border-color: #5c6370; }
+        .code-header .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+        .code-header .copy-btn:active { opacity: .85; }
 
         pre {
-            background: #282c34;
-            padding: 16px;
+            background: var(--surface);
+            padding: var(--space-4);
             overflow-x: auto;
             margin: 0;
         }
 
         pre code {
             background: none;
+            border: none;
             padding: 0;
-            color: #abb2bf;
-            font-size: 0.8125em;
+            color: var(--fg-2);
+            font-size: var(--text-sm);
             line-height: 1.6;
             border-radius: 0;
         }
@@ -135,94 +230,102 @@
         /* Standalone pre (no code-block wrapper yet) */
         #content > pre,
         #content > details > pre {
-            border-radius: 8px;
-            border: 1px solid #ddd8c9;
-            margin: 1.25em 0;
-            padding: 16px;
+            border-radius: 0;
+            border: 1px solid var(--border);
+            margin: var(--space-5) 0;
+            padding: var(--space-4);
         }
 
         /* -- Tables -- */
         .table-wrap {
             overflow-x: auto;
-            margin: 1.25em 0;
-            border-radius: 8px;
-            border: 1px solid #ddd8c9;
+            margin: var(--space-5) 0;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+            background: var(--surface);
+            transition: border-color var(--motion-fast) var(--ease-standard);
         }
+        .table-wrap:hover { border-color: var(--accent); }
         table { border-collapse: collapse; width: 100%; margin: 0; }
-        th, td { padding: 10px 14px; text-align: left; font-size: 0.9em; }
+        th, td { padding: var(--space-2) var(--space-3); text-align: left; font-size: var(--text-sm); }
         th {
-            font-weight: 600;
-            border-bottom: 2px solid #d3cdbd;
-            background: #f0ede3;
+            font-weight: 700;
+            color: var(--fg-2);
+            background: var(--surface-warm);
+            border-bottom: 1px solid var(--border);
             position: sticky; top: 0; z-index: 1;
             white-space: nowrap;
         }
-        td { border-bottom: 1px solid #e8e4d8; }
-        td { font-variant-numeric: tabular-nums; }
+        td { border-bottom: 1px solid var(--border-soft); color: var(--fg-2); font-variant-numeric: tabular-nums; }
         tr:last-child td { border-bottom: none; }
-        tr:hover td { background: rgba(27, 54, 93, 0.04); }
+        tr:hover td { background: var(--surface-warm); }
 
         /* -- Blockquote -- */
         blockquote {
-            border-left: 3px solid #1b365d;
-            margin: 1.25em 0;
-            padding: 0.6em 1.2em;
-            background: #faf9f5;
-            color: #504e49;
-            border-radius: 0 6px 6px 0;
+            border-left: 2px solid var(--accent);
+            margin: var(--space-5) 0;
+            padding: var(--space-3) var(--space-5);
+            background: var(--surface);
+            color: var(--fg-2);
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
         }
         blockquote p:first-child { margin-top: 0; }
         blockquote p:last-child { margin-bottom: 0; }
 
         /* -- Lists -- */
-        ul, ol { padding-left: 1.5em; margin: 0.6em 0; }
-        li { margin: 0.35em 0; }
-        li > ul, li > ol { margin: 0.2em 0; }
+        ul, ol { padding-left: var(--space-6); margin: var(--space-2) 0; }
+        li { margin: var(--space-1) 0; }
+        li > ul, li > ol { margin: 0; }
+        li::marker { color: var(--muted); }
 
         /* -- Other elements -- */
-        hr { border: none; border-top: 1px solid #ddd8c9; margin: 2.5em 0; }
-        img { max-width: 100%; height: auto; border-radius: 6px; }
+        hr { border: none; border-top: 1px solid var(--border); margin: var(--space-8) 0; }
+        img { max-width: 100%; height: auto; border-radius: var(--radius-sm); }
 
         /* Checkbox styling */
         input[type="checkbox"] {
-            margin-right: 6px;
-            accent-color: #1b365d;
+            margin-right: var(--space-2);
+            accent-color: var(--accent);
         }
 
         /* -- Mermaid diagrams -- */
         .mermaid-shell {
             position: relative;
-            margin: 1.25em 0;
-            border: 1px solid #ddd8c9;
-            border-radius: 8px;
+            margin: var(--space-5) 0;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
             overflow: hidden;
-            background: #faf9f5;
+            background: var(--surface);
+            transition: border-color var(--motion-fast) var(--ease-standard);
         }
+        .mermaid-shell:hover { border-color: var(--accent); }
         .zoom-controls {
-            position: absolute; top: 8px; right: 8px;
-            display: flex; gap: 4px; z-index: 10;
-            opacity: 0; transition: opacity 0.2s;
+            position: absolute; top: var(--space-2); right: var(--space-2);
+            display: flex; gap: var(--space-1); z-index: 10;
+            opacity: 0; transition: opacity var(--motion-base) var(--ease-standard);
         }
-        .mermaid-shell:hover .zoom-controls { opacity: 1; }
+        .mermaid-shell:hover .zoom-controls,
+        .zoom-controls:focus-within { opacity: 1; }
         .zoom-controls button {
             width: 28px; height: 28px;
-            border: 1px solid #d3cdbd; border-radius: 6px;
-            background: rgba(255,255,255,0.92);
-            cursor: pointer; font-size: 13px;
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            background: var(--surface-warm);
+            cursor: pointer; font-size: var(--text-sm);
             display: flex; align-items: center; justify-content: center;
-            color: #555;
-            transition: all 0.15s;
+            color: var(--fg-2);
+            transition: color var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard);
         }
-        .zoom-controls button:hover { background: #f0f0f0; border-color: #aaa; }
+        .zoom-controls button:hover { color: var(--accent); border-color: var(--accent); }
+        .zoom-controls button:active { opacity: .85; }
         .mermaid-viewport {
             overflow: hidden; cursor: grab;
-            min-height: 100px; padding: 24px;
+            min-height: 100px; padding: var(--space-6);
         }
         .mermaid-viewport:active { cursor: grabbing; }
         .mermaid-viewport .mermaid {
             text-align: center;
             transform-origin: 0 0;
-            transition: transform 0.15s ease-out;
+            transition: transform var(--motion-fast) var(--ease-standard);
         }
         /* Fill the frame width so SVG and shell always scale together.
            `width: 100%` overrides mermaid's inline `max-width: <px>` cap;
@@ -236,242 +339,135 @@
         /* -- Mermaid edge styling --
            The marching-ants animation this class used to carry ran forever on
            every edge; on a 56-edge diagram it cost ~25% of frames in Gecko
-           (506 -> 639 frames per 4s, measured 3/3). Static dashes now; to bring
-           the motion back, add `animation: viz-flow 1.6s linear infinite` plus
-           an `@keyframes viz-flow { to { stroke-dashoffset: -20 } }`. */
+           (506 -> 639 frames per 4s, measured 3/3). Static dashes now, and the
+           design system bans decorative looping motion, so it stays static. */
         .mermaid svg .viz-flow { stroke-dasharray: 6 4 !important; }
         .mermaid svg .viz-flow-dashed { stroke-dasharray: 3 4 !important; }
 
         .katex-display {
             overflow-x: auto;
             overflow-y: hidden;
-            padding: 0.5em 0;
+            padding: var(--space-2) 0;
         }
 
         /* -- TOC navigation -- */
         body.has-toc { max-width: none; margin: 0; padding: 0; }
         .doc-layout {
             display: flex;
-            max-width: 860px; margin: 48px auto; padding: 0 24px;
+            max-width: calc(var(--measure) + 2 * var(--container-gutter-desktop));
+            margin: var(--space-12) auto; padding: 0 var(--container-gutter-desktop);
         }
         .toc {
-            display: none; position: sticky; top: 40px;
-            max-height: calc(100vh - 80px); overflow-y: auto;
-            font-size: 0.82em; padding-right: 1.25em;
-            border-right: 1px solid #e8e4d8;
+            display: none; position: sticky; top: var(--space-8);
+            max-height: calc(100vh - var(--space-12) * 2); overflow-y: auto;
+            font-size: var(--text-sm); padding-right: var(--space-5);
+            border-right: 1px solid var(--border);
         }
         .toc a {
-            display: block; padding: 4px 10px;
-            color: #888; text-decoration: none;
-            border-left: 2px solid transparent;
-            transition: all 0.15s; line-height: 1.4;
-            border-radius: 0 3px 3px 0;
+            display: block; padding: var(--space-1) var(--space-3);
+            color: var(--muted); text-decoration: none;
+            border-left: 2px solid transparent; border-bottom: none;
+            transition: color var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard);
+            line-height: 1.4;
         }
-        .toc a:hover { color: #444; background: #f0ede3; }
-        .toc a.active { color: #1b365d; border-left-color: #1b365d; font-weight: 500; }
-        .toc a.toc-h3 { padding-left: 22px; font-size: 0.92em; }
+        .toc a:hover { color: var(--fg); }
+        .toc a.active { color: var(--accent); border-left-color: var(--accent); }
+        .toc a.toc-h3 { padding-left: var(--space-6); color: var(--meta); }
+        .toc a.toc-h3:hover { color: var(--fg-2); }
+        /* The TOC is additive: it claims its own 220px rail so the prose column
+           keeps the same measure it has without a TOC. */
         @media (min-width: 1200px) {
-            .doc-layout { max-width: 1160px; gap: 3em; }
+            .doc-layout {
+                max-width: min(var(--container-max), calc(var(--measure) + 220px + var(--space-12) + 2 * var(--container-gutter-desktop)));
+                gap: var(--space-12);
+            }
             .toc { display: block; width: 220px; min-width: 220px; }
             .doc-layout #content { min-width: 0; flex: 1; }
         }
         .toc-mobile {
-            display: none; overflow-x: auto; padding: 8px 0;
-            margin-bottom: 1em; border-bottom: 1px solid #e8e4d8;
+            display: none; overflow-x: auto; padding: var(--space-2) 0;
+            margin-bottom: var(--space-4); border-bottom: 1px solid var(--border);
             -webkit-overflow-scrolling: touch;
             position: sticky; top: 0; z-index: 20;
-            background: rgba(245, 244, 237, 0.97);
+            background: var(--bg);
         }
         .toc-mobile a {
-            white-space: nowrap; padding: 4px 12px;
-            color: #888; text-decoration: none; font-size: 0.82em;
+            white-space: nowrap; padding: var(--space-1) var(--space-3);
+            color: var(--muted); text-decoration: none; font-size: var(--text-sm);
             border-bottom: 2px solid transparent;
         }
-        .toc-mobile a.active { color: #1b365d; border-bottom-color: #1b365d; }
+        .toc-mobile a.active { color: var(--accent); border-bottom-color: var(--accent); }
         @media (max-width: 1199px) {
             .toc-mobile.has-items { display: flex; }
         }
 
         /* -- Collapsible code blocks -- */
-        details.code-collapse { margin: 1.25em 0; }
+        details.code-collapse { margin: var(--space-5) 0; }
         details.code-collapse summary {
-            cursor: pointer; padding: 8px 16px;
-            background: #21252b; border-radius: 8px;
-            color: #7f848e; font-family: 'Fira Code', monospace;
-            font-size: 0.8em; list-style: none;
-            display: flex; align-items: center; gap: 6px;
-            border: 1px solid #ddd8c9;
+            cursor: pointer; padding: var(--space-2) var(--space-4);
+            background: var(--surface-warm); border-radius: 0;
+            color: var(--muted); font-family: var(--font-mono);
+            font-size: var(--text-xs); list-style: none;
+            letter-spacing: .12em; text-transform: uppercase;
+            display: flex; align-items: center; gap: var(--space-2);
+            border: 1px solid var(--border);
+            transition: color var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard);
         }
+        details.code-collapse summary:hover { color: var(--accent); border-color: var(--accent); }
         details.code-collapse summary::-webkit-details-marker { display: none; }
-        details.code-collapse summary::before { content: '\25b6'; font-size: 0.7em; transition: transform 0.2s; }
+        details.code-collapse summary::before { content: '\203A'; color: var(--accent); transition: transform var(--motion-base) var(--ease-standard); }
         details.code-collapse[open] summary::before { transform: rotate(90deg); }
-        details.code-collapse[open] summary { border-radius: 8px 8px 0 0; border-bottom: none; }
-        details.code-collapse pre { margin-top: 0 !important; border-radius: 0 0 8px 8px !important; }
-        details.code-collapse .code-block { margin-top: 0; border-radius: 0 0 8px 8px; }
+        details.code-collapse[open] summary { border-bottom: none; }
+        details.code-collapse pre { margin-top: 0 !important; border-radius: 0 !important; }
+        details.code-collapse .code-block { margin-top: 0; border-radius: 0; }
         details.code-collapse .code-block .code-header { display: none; }
+
+        /* -- Responsive: tablet keeps the measure, only the gutter tightens -- */
+        @media (max-width: 900px) {
+            body { padding: 0 var(--container-gutter-tablet); }
+            .doc-layout { padding: 0 var(--container-gutter-tablet); }
+        }
 
         /* -- Mobile responsive -- */
         @media (max-width: 600px) {
-            body { margin: 24px auto; padding: 0 16px; font-size: 15px; }
+            body { margin: var(--space-6) auto; padding: 0 var(--container-gutter-phone); font-size: 15px; }
             body.has-toc { padding: 0; }
-            .doc-layout { margin: 24px auto; padding: 0 16px; }
-            h1 { font-size: 1.5em; }
-            h2 { font-size: 1.2em; }
-            h3 { font-size: 1.05em; }
-            pre { padding: 12px; }
-            pre code { font-size: 0.8em; }
-            .code-header { padding: 5px 12px; font-size: 0.7em; }
-            th, td { padding: 8px 10px; font-size: 0.85em; }
-            .mermaid-viewport { padding: 12px; }
+            .doc-layout { margin: var(--space-6) auto; padding: 0 var(--container-gutter-phone); }
+            h1 { font-size: var(--text-lg); }
+            h2 { font-size: var(--text-base); }
+            h3 { font-size: 15px; }
+            pre { padding: var(--space-3); }
+            th, td { padding: var(--space-2); }
+            .mermaid-viewport { padding: var(--space-3); }
             .zoom-controls { opacity: 1; }
-            .zoom-controls button { width: 32px; height: 32px; font-size: 15px; }
-            details.code-collapse summary { padding: 8px 12px; }
-            blockquote { padding: 0.5em 1em; }
+            .zoom-controls button { width: 32px; height: 32px; }
+            details.code-collapse summary { padding: var(--space-2) var(--space-3); }
+            blockquote { padding: var(--space-2) var(--space-4); }
         }
 
-        /* -- Theme toggle button -- */
-        #viz-theme-toggle {
-            position: fixed; top: 16px; right: 16px; z-index: 1000;
-            width: 38px; height: 38px; border-radius: 10px;
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; font-size: 17px; line-height: 1;
-            background: rgba(245, 244, 237, 0.95); color: #26241f;
-            border: 1px solid #ddd8c9;
-            transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
-        }
-        #viz-theme-toggle:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
-        @media print { #viz-theme-toggle { display: none; } }
-
-        /* -- Dark mode: Noir cyberpunk (system-driven via head script, or manual toggle) -- */
-        :root[data-theme="dark"] {
-            --cyan: #00eaff; --magenta: #ff2d78;
-            --text: #c6d3e1; --dim: #6b7a8c;
-            --line: rgba(0,234,255,.14); --line-2: rgba(0,234,255,.32);
-            --glow-c: 0 0 10px rgba(0,234,255,.45);
-
-            & body { background: #08080c; color: var(--text); }
-            & body::before {
-                content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-                background:
-                    radial-gradient(1200px 600px at 50% -12%, rgba(0,234,255,.09), transparent 60%),
-                    radial-gradient(900px 520px at 100% 0%, rgba(255,45,120,.06), transparent 55%),
-                    radial-gradient(700px 700px at 0% 100%, rgba(0,234,255,.05), transparent 60%);
-            }
-            & ::selection { background: rgba(0,234,255,.30); color: #fff; }
-            & ::-webkit-scrollbar-track { background: #0a0a12; }
-            & ::-webkit-scrollbar-thumb { background: linear-gradient(#00eaff,#ff2d78); border-radius: 6px; border: 2px solid #0a0a12; }
-
-            & h1, & h2, & h3, & h4, & h5, & h6 { color: var(--cyan); text-shadow: 0 0 10px rgba(0,234,255,.4); }
-            & h1 { border-bottom: 1px solid var(--line-2); }
-            & h2 { border-bottom: 1px solid transparent; border-image: linear-gradient(90deg, var(--line-2), transparent) 1; }
-
-            & #content a { color: var(--cyan); position: relative; text-shadow: 0 0 6px rgba(0,234,255,.35); }
-            & #content a::after {
-                content: ''; position: absolute; left: 0; bottom: -2px; width: 100%; height: 1px;
-                background: linear-gradient(90deg, var(--cyan), var(--magenta));
-                transform: scaleX(0); transform-origin: left; transition: transform .25s ease;
-            }
-            & #content a:hover { color: #fff; text-decoration: none; }
-            & #content a:hover::after { transform: scaleX(1); }
-
-            & code { background: #10131e; color: var(--cyan); border: 1px solid var(--line); transition: box-shadow .15s, border-color .15s; }
-            & code:hover { box-shadow: 0 0 10px rgba(0,234,255,.22); border-color: var(--line-2); }
-
-            & .table-wrap, & .mermaid-shell, & .code-block {
-                border: 1px solid var(--line-2); border-radius: 10px; position: relative;
-                box-shadow: 0 0 0 1px rgba(0,234,255,.04), 0 10px 34px rgba(0,0,0,.5), 0 0 22px rgba(0,234,255,.06);
-                transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
-            }
-            & .table-wrap, & .mermaid-shell {
-                background: rgba(12,14,22,.88);
-            }
-            & .table-wrap:hover, & .mermaid-shell:hover, & .code-block:hover {
-                transform: translateY(-2px); border-color: rgba(0,234,255,.5);
-                box-shadow: 0 0 0 1px rgba(0,234,255,.08), 0 14px 40px rgba(0,0,0,.55), 0 0 30px rgba(0,234,255,.12);
-            }
-            & .table-wrap::before, & .mermaid-shell::before, & .code-block::before {
-                content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; z-index: 3;
-                background: linear-gradient(90deg, var(--cyan), var(--magenta)); opacity: .75;
-            }
-
-            & pre { background: #0a0d16; }
-            & .code-block { overflow: hidden; }
-            & .code-header {
-                background: rgba(12,16,24,.94); color: var(--cyan); border-bottom: 1px solid var(--line);
-                text-transform: uppercase; letter-spacing: .12em;
-            }
-            & .code-header .copy-btn { border: 1px solid var(--line-2); color: var(--cyan); }
-            & .code-header .copy-btn:hover { background: rgba(0,234,255,.12); color: #fff; box-shadow: var(--glow-c); border-color: var(--cyan); }
-            & #content > pre, & #content > details > pre { border-color: var(--line-2); }
-            & details.code-collapse summary { background: rgba(12,16,24,.82); color: var(--cyan); border: 1px solid var(--line-2); }
-
-            & .hljs { color: #9fb3c8; background: transparent; }
-            & .hljs-keyword, & .hljs-built_in, & .hljs-literal { color: var(--magenta); }
-            & .hljs-string, & .hljs-attr, & .hljs-symbol { color: var(--cyan); }
-            & .hljs-title, & .hljs-section, & .hljs-name, & .hljs-selector-tag { color: #5dd9ff; }
-            & .hljs-number, & .hljs-meta { color: #c792ea; }
-            & .hljs-type, & .hljs-params { color: #ffd479; }
-            & .hljs-comment, & .hljs-quote { color: #46566a; font-style: italic; }
-
-            & th { background: #0d1422; color: var(--cyan); text-transform: uppercase; letter-spacing: .09em; font-size: .78em; border-bottom: 1px solid var(--magenta); }
-            & td { border-bottom: 1px solid var(--line); }
-            & tr:hover td { background: rgba(0,234,255,.05); }
-
-            & blockquote {
-                border-left: 3px solid var(--magenta);
-                background: linear-gradient(90deg, rgba(255,45,120,.09), transparent 70%);
-                color: #aebccd; box-shadow: 0 0 18px rgba(255,45,120,.08);
-            }
-            & hr { border: none; height: 1px; background: linear-gradient(90deg, transparent, var(--cyan), var(--magenta), transparent); box-shadow: 0 0 8px rgba(0,234,255,.4); }
-
-            /* Glow lives on the shell, not on the SVG internals. Per-element
-               `filter: drop-shadow()` defeats GPU compositing: every scroll or
-               pan re-rasterizes every node and edge (measured: 51 -> 77 fps on
-               a 116-element diagram). One box-shadow is free. */
-            & .mermaid-shell {
-                background: rgba(10,13,22,.60);
-                box-shadow: inset 0 0 24px rgba(0,234,255,.10), 0 0 16px rgba(0,234,255,.12);
-            }
-            & .zoom-controls button {
-                background: rgba(10,13,22,.94); border: 1px solid var(--line-2); color: var(--cyan);
-            }
-            & .zoom-controls button:hover { background: rgba(0,234,255,.15); color: #fff; border-color: var(--cyan); box-shadow: var(--glow-c); }
-
-            & .toc { border-right: 1px solid var(--line); }
-            & .toc a { color: var(--dim); }
-            & .toc a:hover { color: var(--cyan); background: rgba(0,234,255,.06); }
-            & .toc a.active { color: var(--cyan); border-left-color: var(--cyan); background: rgba(0,234,255,.06); box-shadow: -2px 0 10px rgba(0,234,255,.4); text-shadow: 0 0 6px rgba(0,234,255,.5); }
-            & .toc-mobile { border-bottom: 1px solid var(--line); background: rgba(8,8,12,.92); }
-            & .toc-mobile a { color: var(--dim); }
-            & .toc-mobile a.active { color: var(--cyan); border-bottom-color: var(--cyan); text-shadow: var(--glow-c); }
-
-            & input[type="checkbox"] { accent-color: var(--cyan); }
-            & .katex-display { transition: filter .2s; }
-            & .katex-display:hover { filter: drop-shadow(0 0 6px rgba(0,234,255,.25)); }
-
-            & #viz-theme-toggle { background: rgba(12,14,22,.7); color: var(--cyan); border: 1px solid var(--line-2); }
-            & #viz-theme-toggle:hover { box-shadow: 0 0 14px rgba(0,234,255,.4); }
-        }
         @media (prefers-reduced-motion: reduce) {
-            :root[data-theme="dark"] * { transition: none !important; }
-            :root[data-theme="dark"] .table-wrap:hover,
-            :root[data-theme="dark"] .code-block:hover,
-            :root[data-theme="dark"] .mermaid-shell:hover { transform: none; }
+            *, *::before, *::after {
+                scroll-behavior: auto !important;
+                transition-duration: .01ms !important;
+                animation-duration: .01ms !important;
+            }
         }
 
-        /* -- Print / PDF: force a light, ink-friendly, paginated layout -- */
+        /* -- Print / PDF: ink-friendly, paginated. The screen theme is dark-only,
+              so paper gets no background at all rather than a light theme. -- */
         @media print {
             @page { size: A4; margin: 18mm 16mm; }
+            html { background: none !important; }
             body {
                 max-width: none !important; margin: 0 !important; padding: 0 !important;
-                background: #fff !important; color: #1a1a1a !important;
+                background: none !important; color: #111 !important;
                 font-size: 11pt; line-height: 1.5;
             }
-            body::before { display: none !important; }
-            #viz-theme-toggle { display: none !important; }
-
-            /* AOS leaves elements at opacity:0 until scrolled — reveal everything */
-            [data-aos] { opacity: 1 !important; transform: none !important; }
+            h1, h2, h3, h4, h5, h6, p, li, td, th, blockquote, code, pre code, .hljs {
+                color: #111 !important; background: none !important;
+            }
+            #content > h2::before { color: #111 !important; }
+            a { color: #111 !important; border-bottom: none !important; }
 
             /* TOC navigation is useless on paper */
             .toc, .toc-mobile { display: none !important; }
@@ -488,12 +484,9 @@
             h1, h2, h3, h4 { break-after: avoid; page-break-after: avoid; }
             p, li, blockquote { widows: 3; orphans: 3; }
 
-            /* Light code for paper (the screen theme is dark) */
-            pre { background: #f6f8fa !important; border: 1px solid #d0d7de; }
-            pre code, .hljs { color: #24292e !important; background: transparent !important; }
-            .code-header { background: #eaeef2 !important; color: #57606a !important; }
-            a { color: #0b3d91 !important; text-shadow: none !important; }
-            a::after { display: none !important; }
+            pre, .code-block, .table-wrap, .mermaid-shell, th, td { border-color: #999 !important; }
+            .code-header { background: none !important; color: #555 !important; }
+            .zoom-controls { display: none !important; }
         }
     </style>
 </head>
@@ -534,9 +527,6 @@
 
     <!-- KaTeX math -->
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.33/dist/katex.min.js"></script>
-
-    <!-- AOS scroll animations -->
-    <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
 
     <script>
         function base64DecodeUTF8(base64) {
@@ -611,7 +601,7 @@
                         var header = document.createElement('div');
                         header.className = 'code-header';
                         var langSpan = document.createElement('span');
-                        langSpan.textContent = lang;
+                        langSpan.textContent = '[ ' + lang + ' ]';
                         header.appendChild(langSpan);
                         var copyBtn = document.createElement('button');
                         copyBtn.className = 'copy-btn';
@@ -619,7 +609,7 @@
                         copyBtn.addEventListener('click', function() {
                             var text = code ? code.textContent : pre.textContent;
                             navigator.clipboard.writeText(text).then(function() {
-                                copyBtn.textContent = 'copied!';
+                                copyBtn.textContent = 'copied';
                                 setTimeout(function() { copyBtn.textContent = 'copy'; }, 1500);
                             });
                         });
@@ -638,7 +628,7 @@
                         { action: 'zoom-in', title: 'Zoom in', label: '+' },
                         { action: 'zoom-out', title: 'Zoom out', label: '\u2212' },
                         { action: 'zoom-reset', title: 'Reset', label: '1:1' },
-                        { action: 'expand', title: 'Open in new tab', label: '\u26F6' }
+                        { action: 'expand', title: 'Open in new tab', label: '\u2197' }
                     ];
                     actions.forEach(function(item) {
                         var btn = document.createElement('button');
@@ -697,7 +687,7 @@
                         var m = code.className.match(/language-(\w+)/);
                         if (m) lang = m[1];
                     }
-                    summary.textContent = lang ? lang + ' \u2014 ' + lines + ' lines' : lines + ' lines';
+                    summary.textContent = lang ? '[ ' + lang + ' ] \u00B7 ' + lines + ' lines' : lines + ' lines';
                     details.appendChild(summary);
                     target.parentNode.insertBefore(details, target);
                     details.appendChild(target);
@@ -745,38 +735,30 @@
                     headings.forEach(function(h) { observer.observe(h); });
                 }
 
-                // 11. Add AOS scroll animations
-                document.querySelectorAll('h1, h2, h3, .table-wrap, blockquote, .mermaid-shell, .katex-display, details.code-collapse').forEach(function(el) {
-                    el.setAttribute('data-aos', 'fade-up');
-                });
-                document.querySelectorAll('#content pre, #content .code-block').forEach(function(el) {
-                    if (!el.closest('.mermaid-shell') && !el.closest('details')) {
-                        el.setAttribute('data-aos', 'fade-up');
-                    }
-                });
-
-                // 12. Initialize Mermaid (visibility-aware lazy rendering, theme-aware)
-                function mermaidThemeConfig() {
-                    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
-                    if (!dark) return { startOnLoad: false, theme: 'default', securityLevel: 'strict' };
+                // 11. Initialize Mermaid (visibility-aware lazy rendering).
+                //     Diagram colors are the musingfox tokens; `printing` swaps to
+                //     an ink-friendly palette because the screen theme is dark-only.
+                function mermaidThemeConfig(printing) {
+                    if (printing) return { startOnLoad: false, theme: 'neutral', securityLevel: 'strict' };
                     return {
                         startOnLoad: false, theme: 'base', securityLevel: 'strict',
                         themeVariables: {
-                            darkMode: true, background: 'transparent', fontFamily: 'Fira Code, monospace',
-                            primaryColor: '#0d1422', primaryBorderColor: '#00eaff', primaryTextColor: '#c6d3e1',
-                            secondaryColor: '#1a0e1e', secondaryBorderColor: '#ff2d78',
-                            tertiaryColor: '#0c0e16', tertiaryBorderColor: '#00eaff',
-                            lineColor: '#00eaff', nodeBorder: '#00eaff',
-                            clusterBkg: 'rgba(12,14,22,.5)', clusterBorder: '#ff2d78',
-                            edgeLabelBackground: '#0a0d16', titleColor: '#00eaff'
+                            darkMode: true, background: 'transparent',
+                            fontFamily: 'Fira Code, jf Open Huninn, PingFang TC, ui-monospace, monospace',
+                            primaryColor: '#222222', primaryBorderColor: '#fd971f', primaryTextColor: '#e8e8e5',
+                            secondaryColor: '#181818', secondaryBorderColor: '#75715e',
+                            tertiaryColor: '#181818', tertiaryBorderColor: '#2e2e2e',
+                            lineColor: '#75715e', nodeBorder: '#fd971f',
+                            clusterBkg: '#181818', clusterBorder: '#2e2e2e',
+                            edgeLabelBackground: '#222222', titleColor: '#fd971f'
                         }
                     };
                 }
                 var mermaidNodes = document.querySelectorAll('.mermaid');
-                // Theme the last render was QUEUED with — not "a render finished".
-                // Tying the re-theme to completion loses the toggle when the user
-                // clicks before the first render resolves.
-                var mermaidQueuedTheme = null;
+                // The palette the last render was QUEUED with — not "a render
+                // finished". Tying the re-theme to completion loses a print
+                // request issued before the first render resolves.
+                var mermaidQueuedPrinting = null;
                 function tagMermaidEdges() {
                     document.querySelectorAll('.mermaid svg').forEach(function(svg) {
                         // Flowchart: paths inside any g whose class contains "edge"
@@ -795,19 +777,19 @@
                         });
                     });
                 }
-                // Renders are serialized: a theme toggle fired while the first
-                // render is still in flight would otherwise let the stale (old
-                // theme) run finish last and overwrite the new one.
+                // Renders are serialized: a print re-theme fired while the first
+                // render is still in flight would otherwise let the stale (screen
+                // palette) run finish last and overwrite the new one.
                 var mermaidQueue = Promise.resolve();
-                function renderMermaid() {
+                function renderMermaid(printing) {
                     if (mermaidNodes.length === 0) return;
-                    mermaidQueuedTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+                    mermaidQueuedPrinting = !!printing;
                     mermaidQueue = mermaidQueue
                         .catch(function() {})
                         // mermaid loads as a deferred ES module — wait for it before rendering
                         .then(function() { return window.__mermaidReady; })
                         .then(function() {
-                            mermaid.initialize(mermaidThemeConfig());
+                            mermaid.initialize(mermaidThemeConfig(printing));
                             // Reset each node so a re-render (e.g. theme toggle) re-runs cleanly
                             mermaidNodes.forEach(function(n) {
                                 n.removeAttribute('data-processed');
@@ -829,13 +811,12 @@
                     });
                 }
 
-                // 13. Mermaid zoom/pan controls
+                // 12. Mermaid zoom/pan controls
                 function openDiagramTab(svgEl) {
                     var page = document.implementation.createHTMLDocument('Diagram');
-                    // Match the page's own theme, not the system preference: the SVG
-                    // was rendered with this page's mermaid palette, so a dark diagram
-                    // on a system-light background is unreadable.
-                    var bg = document.documentElement.getAttribute('data-theme') === 'dark' ? '#0a0d16' : '#fff';
+                    // The SVG carries this page's mermaid palette, so the standalone
+                    // tab has to sit on the same binding canvas to stay readable.
+                    var bg = '#07080a';
                     page.body.setAttribute('style', 'margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:' + bg);
                     var style = page.createElement('style');
                     style.textContent = 'svg{max-width:95vw;max-height:95vh}';
@@ -924,44 +905,14 @@
                     }, { passive: true });
                 });
 
-                // 14. Initialize AOS scroll animations
-                AOS.init({ duration: 500, once: true, offset: 40 });
-
-                // 15. Theme toggle — light (Kami) / dark (Noir), persisted; follows
-                //     system until the user makes an explicit choice.
-                (function setupThemeToggle() {
-                    var btn = document.createElement('button');
-                    btn.id = 'viz-theme-toggle';
-                    document.body.appendChild(btn);
-                    function applyTheme(theme, persist) {
-                        document.documentElement.setAttribute('data-theme', theme);
-                        if (persist) { try { localStorage.setItem('viz-theme', theme); } catch (e) {} }
-                        btn.textContent = theme === 'dark' ? '☀' : '☽';
-                        btn.title = theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
-                        if (mermaidQueuedTheme && mermaidQueuedTheme !== theme) renderMermaid();
-                    }
-                    var current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-                    applyTheme(current, false);
-                    btn.addEventListener('click', function() {
-                        var now = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-                        applyTheme(now === 'dark' ? 'light' : 'dark', true);
-                    });
-                    // Follow OS changes only while the user hasn't chosen explicitly
-                    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
-                        try { if (localStorage.getItem('viz-theme')) return; } catch (_) {}
-                        applyTheme(e.matches ? 'dark' : 'light', false);
-                    });
-                    // Print in the light Kami theme (ink-friendly), then restore.
-                    var prePrintTheme = null;
-                    window.addEventListener('beforeprint', function() {
-                        prePrintTheme = document.documentElement.getAttribute('data-theme');
-                        if (prePrintTheme !== 'light') applyTheme('light', false);
-                    });
-                    window.addEventListener('afterprint', function() {
-                        if (prePrintTheme && prePrintTheme !== 'light') applyTheme(prePrintTheme, false);
-                        prePrintTheme = null;
-                    });
-                })();
+                // 13. Print in an ink-friendly diagram palette, then restore.
+                //     The page itself is dark-only; only mermaid needs the swap.
+                window.addEventListener('beforeprint', function() {
+                    if (mermaidQueuedPrinting === false) renderMermaid(true);
+                });
+                window.addEventListener('afterprint', function() {
+                    if (mermaidQueuedPrinting === true) renderMermaid(false);
+                });
 
             } catch (error) {
                 document.getElementById('content').textContent = 'Error: ' + error.message;

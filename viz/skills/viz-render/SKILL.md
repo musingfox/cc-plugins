@@ -13,8 +13,8 @@ description: >-
 # Viz Render Skill
 
 Render markdown documents, Mermaid diagrams, or plan files as formatted HTML
-with syntax highlighting, math formulas, Mermaid, scroll animations, and dark
-mode. One skill, one script, three input shapes.
+with syntax highlighting, math formulas, and Mermaid, in the dark-only
+Musingfox design system. One skill, one script, three input shapes.
 
 ## When to Use
 
