@@ -469,3 +469,28 @@ bash "$INTEGRATE" "$FLOW" 'echo "build complete"' >/dev/null 2>&1
 counts=$(jq -r '.test_counts' "$FLOW/integration-result.json")
 assert_eq "unparsed" "$counts" "T10 a silent runner is recorded as unparsed, not blank"
 cleanup_flow "$REPO" "$FLOW" "$TMP"
+
+# --- T11: the runner survives into a gate that was passed nothing ------------
+# Every orchestrator command is a fresh shell, so a TEST_RUNNER held only in the
+# orchestrator's context reaches this gate as an empty string. Recorded in
+# env.sh it survives; recorded nowhere, the gate refuses rather than running
+# `bash -c ""` and calling the instant exit 0 a green suite.
+
+setup_fixture_1
+printf 'TEST_RUNNER=%s\n' "'echo \"Tests: 7 passed\"'" >> "$FLOW/env.sh"
+bash "$INTEGRATE" "$FLOW" "" >/dev/null 2>&1
+rc=$?
+assert_eq "0" "$rc" "T11 exit 0 using the recorded runner"
+assert_json "$FLOW/integration-result.json" '.status' "PASS" "T11 status PASS"
+counts=$(jq -r '.test_counts' "$FLOW/integration-result.json")
+assert_contains "$counts" "7 passed" "T11 the recorded runner is the one that ran"
+cleanup_flow "$REPO" "$FLOW" "$TMP"
+
+setup_fixture_1
+prior=$(git -C "$FLOW/work" rev-parse HEAD)
+bash "$INTEGRATE" "$FLOW" "" >/dev/null 2>&1
+rc=$?
+assert_eq "4" "$rc" "T11 no runner anywhere is refused, not treated as green"
+after=$(git -C "$FLOW/work" rev-parse HEAD)
+assert_eq "$prior" "$after" "T11 nothing was landed"
+cleanup_flow "$REPO" "$FLOW" "$TMP"

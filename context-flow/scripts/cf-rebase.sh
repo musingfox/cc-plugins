@@ -6,8 +6,9 @@
 # Stdout:  one-line status:
 #   OK <new-head-sha>            — rebase clean, and the delivered tree is green
 #   NOOP <head-sha>              — $BASE_BRANCH unchanged, delivered tree green
-#   OK-UNVERIFIED <sha>          — as OK/NOOP, but no TEST_RUNNER was given so
-#   NOOP-UNVERIFIED <sha>          nothing ran on the delivered tree
+#   OK-UNVERIFIED <sha>          — as OK/NOOP, but no runner was given as $2 nor
+#   NOOP-UNVERIFIED <sha>          recorded as TEST_RUNNER in the session env.sh,
+#                                  so nothing ran on the delivered tree
 #   SKIP <reason>                — non-git mode, missing base, etc.
 #   CONFLICT <files>             — rebase had conflicts; aborted to keep state clean
 #   TESTFAIL <head-sha> <log>    — the tree about to be handed over fails its suite
@@ -35,8 +36,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/cf-pi-env.sh"
 
 session="$1"
-TEST_RUNNER="${2:-}"
+# Captured before load_cf_pi_env, which sources env.sh and would otherwise
+# overwrite an explicitly passed runner with the recorded one.
+TEST_RUNNER_ARG="${2:-}"
 load_cf_pi_env "$session"
+# The argument wins; env.sh is the fallback. Phase 4 runs in a shell that never
+# saw the orchestrator's own variables, so relying on the caller to interpolate
+# TEST_RUNNER is how the delivery check silently becomes a no-op.
+TEST_RUNNER="${TEST_RUNNER_ARG:-${TEST_RUNNER:-}}"
 
 if [ -z "${REPO_ROOT:-}" ]; then
   echo "SKIP non-git-mode"

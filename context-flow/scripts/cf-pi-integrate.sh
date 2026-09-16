@@ -29,11 +29,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=cf-pi-env.sh
 . "$SCRIPT_DIR/cf-pi-env.sh"
 
-if [ $# -ne 2 ] || [ -z "$2" ]; then
-  # An empty runner is not "no tests to run": `bash -c ""` exits 0 instantly and
-  # this gate would linearize onto the parent and write PASS having run nothing.
-  # It is the green that authorizes delivery, so it refuses instead.
-  echo "Usage: cf-pi-integrate.sh FLOW_SESSION TEST_RUNNER (TEST_RUNNER must be non-empty)" >&2
+if [ $# -ne 2 ]; then
+  echo "Usage: cf-pi-integrate.sh FLOW_SESSION TEST_RUNNER" >&2
   exit 4
 fi
 
@@ -42,7 +39,7 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 4
 fi
 
-flow_session="$1"; test_runner="$2"
+flow_session="$1"; test_runner_arg="$2"
 load_cf_flow_env "$flow_session"
 
 if [ ! -f "$flow_session/env.sh" ]; then
@@ -55,6 +52,19 @@ set -a
 # shellcheck disable=SC1090,SC1091
 . "$flow_session/env.sh"
 set +a
+
+# The argument wins; env.sh is the fallback. Each orchestrator command runs in a
+# fresh shell that never saw the orchestrator's own TEST_RUNNER, so a gate that
+# depends on the caller interpolating it can silently receive nothing.
+#
+# And an empty runner is not "no tests to run": `bash -c ""` exits 0 instantly
+# and this gate would linearize onto the parent and write PASS having run
+# nothing at all. It is the green that authorizes delivery, so it refuses.
+test_runner="${test_runner_arg:-${TEST_RUNNER:-}}"
+if [ -z "$test_runner" ]; then
+  echo "cf-pi-integrate.sh: no test runner — pass one as \$2 or record TEST_RUNNER in $flow_session/env.sh" >&2
+  exit 4
+fi
 
 if [ -z "${REPO_ROOT:-}" ]; then
   echo "cf-pi-integrate.sh: REPO_ROOT not set in flow env" >&2

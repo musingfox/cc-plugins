@@ -136,3 +136,24 @@ build_repo yes
 out="$(bash "$REBASE" "$SESSION" 'test -n "$REPO_ROOT"')"
 assert_contains "$out" "OK " "env: the delivery runner sees REPO_ROOT"
 rm -rf "$SESSION"
+
+# ---- the delivery check falls back to the runner recorded in env.sh ----
+# Phase 4 runs in a shell that never saw the orchestrator's variables. If the
+# gate depended on the caller interpolating TEST_RUNNER, the delivered tree
+# would go unverified while the status line blamed a missing plan entry.
+
+build_repo yes
+printf 'TEST_RUNNER=%s\n' "'test -f moved.txt'" >> "$SESSION/env.sh"
+out="$(bash "$REBASE" "$SESSION")"
+assert_contains "$out" "OK " "recorded runner: the delivery tree is actually verified"
+ran=no; [ -f "$SESSION/rebase-test.log" ] && ran=yes
+assert_eq "yes" "$ran" "recorded runner: the suite really ran"
+rm -rf "$SESSION"
+
+# ---- an explicitly passed runner still wins over the recorded one ----
+
+build_repo yes
+printf 'TEST_RUNNER=%s\n' "'false'" >> "$SESSION/env.sh"
+out="$(bash "$REBASE" "$SESSION" "true")"
+assert_contains "$out" "OK " "argument wins over the recorded runner"
+rm -rf "$SESSION"

@@ -315,7 +315,16 @@ SHARD_IDS=$(jq -r '.groups | keys[]' "$SESSION/shards.json")
 - `TEST_RUNNER` — full-suite command, from `$SESSION/plan.md` Implementation Plan §Test
   Runners, or one-shot `AskUserQuestion` with language default. Used at the integration
   gate and again at the Phase 4 delivery check (§Rebase) — never at a shard gate.
-  Keep it in scope until Phase 4 closes.
+  **Record it once, immediately, into the session env so the later gates cannot lose it**
+  (every command you run is a fresh shell; a variable you hold in context does not
+  survive into one, and a gate that receives nothing either refuses or silently reports
+  the tree as unverified):
+
+  ```bash
+  printf 'TEST_RUNNER=%s\n' "$(printf '%q' '<resolved full-suite command>')" >> "$SESSION/env.sh"
+  ```
+
+  Both gates take it as an argument first and fall back to this recorded value.
 - `SHARD_TEST_RUNNER` — hermetic subset for per-shard gates, from the same §Test Runners.
   Must not need live services / shared ports / external daemons (parallel shards each run
   it in their own worktree — a shared resource makes every first run collide and fail).
