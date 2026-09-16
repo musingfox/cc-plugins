@@ -120,3 +120,12 @@ assert_contains "$out" "OK-UNVERIFIED " "no runner: the status word says unverif
 ran=no; [ -f "$SESSION/rebase-test.log" ] && ran=yes
 assert_eq "no" "$ran" "no runner: nothing was executed"
 rm -rf "$SESSION"
+
+# ---- the delivery suite sees the session env too ----
+# Same shape as the integration gate: the runner is a string handed to a child
+# shell, so `npm test --prefix $REPO_ROOT` has to expand to something.
+
+build_repo yes
+out="$(bash "$REBASE" "$SESSION" 'test -n "$REPO_ROOT"')"
+assert_contains "$out" "OK " "env: the delivery runner sees REPO_ROOT"
+rm -rf "$SESSION"

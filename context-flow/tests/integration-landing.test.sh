@@ -398,3 +398,35 @@ assert_eq "0" "$affected" "T6 no contracts blamed for a suite that never finishe
 got_log=$(parent_log "$FLOW/work" "$BASE_HEAD")
 assert_eq "" "$got_log" "T6 nothing was landed on the parent"
 cleanup_flow "$REPO" "$FLOW" "$TMP"
+
+# --- T7: an empty runner is refused, never mistaken for a green suite --------
+# `bash -c ""` exits 0 instantly. This gate's green is what authorizes landing
+# on the parent and Phase 4, so an empty runner reaching it would linearize and
+# write PASS having run nothing at all.
+
+setup_fixture_1
+prior=$(git -C "$FLOW/work" rev-parse HEAD)
+bash "$INTEGRATE" "$FLOW" "" >/dev/null 2>&1
+rc=$?
+assert_eq "4" "$rc" "T7 an empty test runner is refused"
+after=$(git -C "$FLOW/work" rev-parse HEAD)
+assert_eq "$prior" "$after" "T7 nothing was landed on the parent"
+if [ -f "$FLOW/integration-result.json" ]; then
+  _assert_fail "T7 no result JSON is written for a refused run"
+else
+  _assert_pass
+fi
+cleanup_flow "$REPO" "$FLOW" "$TMP"
+
+# --- T8: the runner expands the flow env, not an empty child environment -----
+# A plan-resolved runner like `npm test --prefix $REPO_ROOT` is ordinary. The
+# gate hands the string to a child shell, so anything env.sh defines has to be
+# exported or the runner silently loses the argument.
+
+setup_fixture_1
+bash "$INTEGRATE" "$FLOW" 'test -n "$REPO_ROOT" && test -n "$SESSION"' >/dev/null 2>&1
+rc=$?
+assert_eq "0" "$rc" "T8 exit 0"
+assert_json "$FLOW/integration-result.json" '.status' "PASS" \
+  "T8 a runner referencing the flow env sees it"
+cleanup_flow "$REPO" "$FLOW" "$TMP"

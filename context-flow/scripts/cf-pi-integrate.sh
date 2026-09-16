@@ -29,8 +29,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=cf-pi-env.sh
 . "$SCRIPT_DIR/cf-pi-env.sh"
 
-if [ $# -ne 2 ]; then
-  echo "Usage: cf-pi-integrate.sh FLOW_SESSION TEST_RUNNER" >&2
+if [ $# -ne 2 ] || [ -z "$2" ]; then
+  # An empty runner is not "no tests to run": `bash -c ""` exits 0 instantly and
+  # this gate would linearize onto the parent and write PASS having run nothing.
+  # It is the green that authorizes delivery, so it refuses instead.
+  echo "Usage: cf-pi-integrate.sh FLOW_SESSION TEST_RUNNER (TEST_RUNNER must be non-empty)" >&2
   exit 4
 fi
 
@@ -46,8 +49,12 @@ if [ ! -f "$flow_session/env.sh" ]; then
   echo "cf-pi-integrate.sh: flow env.sh not found at $flow_session/env.sh" >&2
   exit 4
 fi
+# Exported for the same reason load_cf_pi_env exports: the integration runner
+# runs in a child shell and expands its variables there.
+set -a
 # shellcheck disable=SC1090,SC1091
 . "$flow_session/env.sh"
+set +a
 
 if [ -z "${REPO_ROOT:-}" ]; then
   echo "cf-pi-integrate.sh: REPO_ROOT not set in flow env" >&2

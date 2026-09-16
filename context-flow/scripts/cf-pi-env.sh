@@ -44,6 +44,11 @@ load_cf_pi_env() {
     echo "load_cf_pi_env: missing or invalid session ($session)" >&2
     return 1
   fi
+  # Exported, not just set. A plan-resolved test runner is a string the gates
+  # hand to a child shell, so a runner like `npm test --prefix $REPO_ROOT`
+  # expands against the child's environment; a sourced-but-unexported variable
+  # is invisible there and the runner silently loses the argument.
+  set -a
   # shellcheck disable=SC1090,SC1091
   . "$session/env.sh"
 
@@ -61,6 +66,7 @@ load_cf_pi_env() {
   PI_PID_FILE="$session/pi.pid"
   PI_START_FILE="$session/pi-start.ts"
   TEST_LOG="$session/test-output.log"
+  set +a
 
   mkdir -p "$PI_SESSION_DIR"
 
@@ -73,6 +79,7 @@ load_cf_flow_env() {
     echo "load_cf_flow_env: missing or invalid flow session ($flow_session)" >&2
     return 1
   fi
+  set -a
   FLOW_SESSION="$flow_session"
   SHARDS_DIR="$flow_session/shards"
   CONTRACTS_FILE="$flow_session/contracts.json"
@@ -81,6 +88,7 @@ load_cf_flow_env() {
   DISPATCH_ARCHIVE_FILE="$flow_session/dispatch-state-archive.jsonl"
   INTEGRATION_RESULT="$flow_session/integration-result.json"
   PLAN_ATTACHMENTS_DIR="$flow_session/plan-attachments"
+  set +a
   return 0
 }
 
