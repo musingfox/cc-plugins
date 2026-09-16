@@ -417,7 +417,7 @@ Per-shard, per-round FAIL retry budget = 1 (design §6).
 INT_STATUS=$(jq -r '.status' "$SESSION/integration-result.json")
 ```
 
-- `INT_STATUS=PASS` → proceed to Phase 4. Phase 4 captures `$SESSION/implement.diff`.
+- `INT_STATUS=PASS` → read `jq -r '.test_counts' "$SESSION/integration-result.json"` before believing it: an exit code cannot tell a green suite from one that skipped everything and exited 0, and this is the green that authorizes delivery. `unparsed` means the runner printed no count line — say so to the human in one line rather than passing over it. Then proceed to Phase 4, which captures `$SESSION/implement.diff`.
 - `INT_STATUS=NEEDS_REPLAN` → integration gate auto-injects NEEDS_REPLAN for the affected contracts (`jq -r '.affected_contracts[]' "$SESSION/integration-result.json"`). Funnel into the partial-replan path below as if they came from shard outcomes.
 - `INT_STATUS=TEST_STALLED` → the integration suite outran `CF_TEST_DEADLINE_S` and was killed, so nothing was attributed and nothing was landed. This is infrastructure, not a contract failure: never funnel it into partial-replan. Show the human `.test_log` and `.deadline_s` and ask whether to raise the deadline and re-run the gate, or to investigate the hanging test.
 - `INT_STATUS=LINEARIZE_CONFLICT` → the commits could not be replayed onto `cf/$CF_SLUG` as linear history, or the parent worktree was refused before any rewrite; the passing tree remains on `.integration_branch` and the parent sits at `.parent_prior_tip`. Read `jq -r '.reason, .offending_shard, .offending_commit' "$SESSION/integration-result.json"` and escalate with the cause named — never proceed to Phase 4 on this status. Reasons:

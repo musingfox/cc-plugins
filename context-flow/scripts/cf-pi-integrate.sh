@@ -289,6 +289,9 @@ if [ -f "$CF_BOUNDED_STALL_MARK" ]; then
   exit 6
 fi
 
+test_counts="$(test_counts_of "$test_log")"
+echo "integration test_counts=$test_counts"
+
 if [ "$test_exit" -ne 0 ]; then
   # Test failures. Extract up to TOP_K and attribute to contracts.
   echo "integration tests FAIL (exit=$test_exit); attributing to contracts"
@@ -402,7 +405,9 @@ jq -n \
   --arg prior "$parent_prior_tip" \
   --arg tip "$parent_tip" \
   --arg pbranch "$parent_branch" \
-  '{schema_version: 1, status: "PASS", timestamp: ($ts|tonumber), integration_branch: $branch, merged_shards: $shards, failures: [], parent_prior_tip: $prior, parent_tip: $tip, parent_branch: $pbranch}' \
+  --arg counts "$test_counts" \
+  --arg log "$test_log" \
+  '{schema_version: 1, status: "PASS", timestamp: ($ts|tonumber), integration_branch: $branch, merged_shards: $shards, failures: [], parent_prior_tip: $prior, parent_tip: $tip, parent_branch: $pbranch, test_counts: $counts, test_log: $log}' \
   > "$INTEGRATION_RESULT"
 echo "PASS"
 exit 0

@@ -49,13 +49,7 @@ fi
 
 echo "test_exit=$TEST_EXIT"
 
-# Quote the runner's own summary lines rather than recomputing them: whichever
-# shape it prints ("24 passed, 0 failed", "10 passing" + "2 pending",
-# "tests: 24, failed: 0") is reported as written. The LAST few matching lines
-# win — runners print per-file lines before the summary.
-COUNTS="$(grep -iE '[0-9]+ (passed|passing|failed|failing|skipped|pending|todo|ignored)|(tests|failures|passed|failed|skipped)[:=] ?[0-9]+' \
-  "$TEST_LOG" 2>/dev/null | tail -3 | paste -sd'|' - | tr -s ' ' | cut -c1-240 || true)"
-echo "test_counts=${COUNTS:-unparsed}"
+echo "test_counts=$(test_counts_of "$TEST_LOG")"
 
 if [ "$TEST_EXIT" -eq 0 ]; then
   tail -15 "$TEST_LOG"

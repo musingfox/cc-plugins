@@ -451,3 +451,21 @@ else
   _assert_pass
 fi
 cleanup_flow "$REPO" "$FLOW" "$TMP"
+
+# --- T10: the integration gate reports what the suite ran --------------------
+# This gate's green is what authorizes landing and Phase 4, so "exit 0" alone is
+# the weakest possible evidence. The counts are quoted from the runner, and a
+# runner that prints none says so rather than leaving the field blank.
+
+setup_fixture_1
+bash "$INTEGRATE" "$FLOW" 'echo "Tests: 24 passed, 0 failed"' >/dev/null 2>&1
+assert_json "$FLOW/integration-result.json" '.status' "PASS" "T10 status PASS"
+counts=$(jq -r '.test_counts' "$FLOW/integration-result.json")
+assert_contains "$counts" "24 passed" "T10 the runner's own counts reach the result"
+cleanup_flow "$REPO" "$FLOW" "$TMP"
+
+setup_fixture_1
+bash "$INTEGRATE" "$FLOW" 'echo "build complete"' >/dev/null 2>&1
+counts=$(jq -r '.test_counts' "$FLOW/integration-result.json")
+assert_eq "unparsed" "$counts" "T10 a silent runner is recorded as unparsed, not blank"
+cleanup_flow "$REPO" "$FLOW" "$TMP"
