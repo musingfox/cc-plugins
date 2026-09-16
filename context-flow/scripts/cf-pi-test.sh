@@ -31,6 +31,7 @@ load_cf_pi_env "$SESSION"
 
 DEADLINE="${CF_TEST_DEADLINE_S:-1800}"
 
+export CF_BOUNDED_STALL_MARK="$SESSION/test-stalled.mark"
 (
   cd "$WORK" && run_bounded "$DEADLINE" "$@"
 ) > "$TEST_LOG" 2>&1
@@ -39,7 +40,8 @@ TEST_EXIT=$?
 # A stalled runner is not a red suite: re-dispatching the builder cannot fix a
 # suite that never returns. Say so with its own marker and no test_exit, so the
 # caller routes it as infrastructure rather than as a contract failure.
-if [ "$TEST_EXIT" -eq 124 ]; then
+if [ -f "$CF_BOUNDED_STALL_MARK" ]; then
+  rm -f "$CF_BOUNDED_STALL_MARK"
   echo "test_stalled=$DEADLINE"
   tail -30 "$TEST_LOG"
   exit 124

@@ -110,6 +110,13 @@ out="$(CF_TEST_DEADLINE_S=1 bash "$REBASE" "$SESSION" "sleep 30")"
 assert_contains "$out" "TESTSTALLED " "stalled: reports TESTSTALLED"
 rm -rf "$SESSION"
 
+# ---- a suite that exits 124 by itself is red, not stalled ----
+
+build_repo yes
+out="$(bash "$REBASE" "$SESSION" "exit 124")"
+assert_contains "$out" "TESTFAIL " "self-124: a runner's own timeout is a red suite"
+rm -rf "$SESSION"
+
 # ---- no TEST_RUNNER: delivered, but the word says nobody checked ----
 # A bare OK here would be read as "the suite passed on this tree", which is the
 # one thing nothing established.

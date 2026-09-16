@@ -7,6 +7,8 @@
 #   - a command that reads stdin gets EOF instead of blocking
 #   - a command that outruns CF_TEST_DEADLINE_S is killed, reported as
 #     test_stalled=, and exits 124 with no test_exit= marker
+#   - a command that exits 124 BY ITSELF (a suite wrapping itself in timeout(1))
+#     is a red suite, not a stall: the deadline is reported out of band
 #   - the whole process tree dies with it, not just the top process
 #   - cf-pi-run.sh routes test_stalled as FAIL test-stalled without spending a
 #     re-dispatch on it, on EVERY gate-3 run: the first, the cheap retest, and
@@ -51,6 +53,19 @@ assert_eq "prompt" "$verdict" \
   "deadline: killed near the deadline, not after the command's own run (${elapsed}s)"
 marker=absent; case "$out" in *test_exit=*) marker=present ;; esac
 assert_eq "absent" "$marker" "deadline: a stall is not a red suite, so no test_exit= marker"
+rm -rf "$S"
+
+# ---- a runner's own 124 is a red suite, not a stall ----
+# `timeout 600 npm test` is an ordinary runner. Routing its timeout as
+# infrastructure would skip the retest and the re-brief a red suite is owed.
+
+S="$(new_session)"
+out="$(bash "$TESTSH" "$S" bash -c 'exit 124' 2>&1)"
+rc=$?
+assert_eq "124" "$rc" "self-124: the runner's own exit code is passed through"
+assert_contains "$out" "test_exit=124" "self-124: reported as a red suite"
+marker=absent; case "$out" in *test_stalled=*) marker=present ;; esac
+assert_eq "absent" "$marker" "self-124: not reported as a stall"
 rm -rf "$S"
 
 # ---- the deadline kills the whole process tree, not just the top process ----

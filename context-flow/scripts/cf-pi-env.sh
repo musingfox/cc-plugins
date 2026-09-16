@@ -126,6 +126,13 @@ resolve_canon_dispatch() {
 #   exit code, or 124 on the deadline (timeout(1)'s convention; macOS ships no
 #   timeout(1), hence perl).
 #
+#   124 alone does not identify a deadline kill: `timeout 600 npm test` is an
+#   ordinary thing to write as a test runner, and its own timeout exits 124 too.
+#   Routing that as infrastructure would skip the retest and the re-brief a red
+#   suite is owed. So the deadline is reported out of band: set
+#   CF_BOUNDED_STALL_MARK to a path and the supervisor creates that file if, and
+#   only if, it killed the tree itself.
+#
 #   Every gate that runs project-supplied commands goes through this. A suite
 #   that stops to read stdin, or one that spins, otherwise hangs its caller with
 #   nothing downstream to bound it.
@@ -136,8 +143,11 @@ resolve_canon_dispatch() {
 #   deadline. Detached, it still kills the tree at the deadline and exits.
 run_bounded() {
   local deadline="$1"; shift
-  perl -MPOSIX -e '
+  local mark="${CF_BOUNDED_STALL_MARK:-}"
+  [ -n "$mark" ] && rm -f "$mark"
+  CF_BOUNDED_STALL_MARK="$mark" perl -MPOSIX -e '
     POSIX::setpgid(0, 0);
+    my $mark = $ENV{CF_BOUNDED_STALL_MARK};
     my $deadline = shift @ARGV;
     my $pid = fork();
     exit 127 unless defined $pid;
@@ -148,6 +158,7 @@ run_bounded() {
       if ($waited >= $deadline) {
         kill("TERM", -$pid); sleep 2; kill("KILL", -$pid);
         waitpid($pid, 0);
+        if ($mark) { open(my $m, ">", $mark) and print $m "$deadline\n"; }
         exit 124;
       }
       select(undef, undef, undef, 0.2);

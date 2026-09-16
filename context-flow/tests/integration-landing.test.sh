@@ -430,3 +430,24 @@ assert_eq "0" "$rc" "T8 exit 0"
 assert_json "$FLOW/integration-result.json" '.status' "PASS" \
   "T8 a runner referencing the flow env sees it"
 cleanup_flow "$REPO" "$FLOW" "$TMP"
+
+# --- T9: a runner's own 124 is a red suite, not a stalled one ----------------
+# `timeout 600 npm test` exits 124 when its own timeout fires. That is a test
+# failure with contracts to attribute, not the infrastructure verdict that lands
+# nothing and blames nobody. (This fixture carries no contracts.json, so the
+# attribution step itself errors out afterwards — what is pinned here is which
+# branch the exit code routed into.)
+
+setup_fixture_1
+out=$(bash "$INTEGRATE" "$FLOW" "exit 124" 2>&1)
+rc=$?
+routed=stall; case "$rc" in 6) routed=stall ;; *) routed=failure ;; esac
+assert_eq "failure" "$routed" "T9 a runner's own 124 is not routed as a stall"
+assert_contains "$out" "attributing to contracts" \
+  "T9 it takes the contract-attribution path, like any red suite"
+if [ -f "$FLOW/integration-result.json" ]; then
+  assert_eq "TEST_STALLED" "not-TEST_STALLED" "T9 no TEST_STALLED verdict"
+else
+  _assert_pass
+fi
+cleanup_flow "$REPO" "$FLOW" "$TMP"

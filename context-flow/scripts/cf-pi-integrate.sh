@@ -254,13 +254,17 @@ test_log="$flow_session/integration-test.log"
 # Bounded like the shard gate: the integration suite is project-supplied too, and
 # a run that stops for stdin or spins would hang the whole flow with nothing
 # downstream to cut it off.
+export CF_BOUNDED_STALL_MARK="$flow_session/integration-stalled.mark"
 set +e
 ( cd "$integration_work" && run_bounded "${CF_TEST_DEADLINE_S:-1800}" bash -c "$test_runner" ) \
   > "$test_log" 2>&1
 test_exit=$?
 set -e
 
-if [ "$test_exit" -eq 124 ]; then
+# The mark, not rc 124: a runner that wraps itself in timeout(1) exits 124 on
+# its own and is a red suite, which belongs in the contract-attribution path.
+if [ -f "$CF_BOUNDED_STALL_MARK" ]; then
+  rm -f "$CF_BOUNDED_STALL_MARK"
   # Not a contract failure: nothing was attributed because nothing finished.
   # Replanning contracts over a suite that never returned would be guesswork.
   jq -n \

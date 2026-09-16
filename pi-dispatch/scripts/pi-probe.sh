@@ -81,8 +81,11 @@ fi
 # caller cannot strand the child with nobody enforcing the deadline. macOS ships
 # no timeout(1), hence perl.
 DEADLINE="${PI_PROBE_DEADLINE_S:-60}"
-perl -MPOSIX -e '
+STALL_MARK="$PROBE_DIR/probe-stalled.mark"
+rm -f "$STALL_MARK"
+PI_PROBE_STALL_MARK="$STALL_MARK" perl -MPOSIX -e '
   POSIX::setpgid(0, 0);
+  my $mark = $ENV{PI_PROBE_STALL_MARK};
   my $deadline = shift @ARGV;
   my $pid = fork();
   exit 127 unless defined $pid;
@@ -93,6 +96,7 @@ perl -MPOSIX -e '
     if ($waited >= $deadline) {
       kill("TERM", -$pid); sleep 2; kill("KILL", -$pid);
       waitpid($pid, 0);
+      if ($mark) { open(my $m, ">", $mark) and print $m "$deadline\n"; }
       exit 124;
     }
     select(undef, undef, undef, 0.2);
@@ -105,7 +109,9 @@ perl -MPOSIX -e '
   --no-tools "say ok" < /dev/null > "$PROBE_DIR/probe-stdout.log" 2> "$PROBE_DIR/probe-stderr.log"
 PROBE_RC=$?
 
-if [ "$PROBE_RC" -eq 124 ]; then
+# The mark, not the exit code: 124 is also what a bounded pi would return on its
+# own, and a probe that answered is not a stalled one.
+if [ -f "$STALL_MARK" ]; then
   echo "STALLED (${DEADLINE}s)"
   exit 1
 fi

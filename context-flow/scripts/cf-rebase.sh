@@ -78,15 +78,21 @@ verify_and_report() {
     exit 0
   fi
   local log="$session/rebase-test.log"
+  export CF_BOUNDED_STALL_MARK="$session/rebase-stalled.mark"
   set +e
   ( cd "$WORK" && run_bounded "${CF_TEST_DEADLINE_S:-1800}" bash -c "$TEST_RUNNER" ) > "$log" 2>&1
   rc=$?
   set -e
-  case "$rc" in
-    0)   echo "$word $head" ;;
-    124) echo "TESTSTALLED $head $log" ;;
-    *)   echo "TESTFAIL $head $log" ;;
-  esac
+  # The mark, not rc 124: a suite that wraps itself in timeout(1) exits 124 on
+  # its own and is a red suite, not a stalled one.
+  if [ -f "$CF_BOUNDED_STALL_MARK" ]; then
+    rm -f "$CF_BOUNDED_STALL_MARK"
+    echo "TESTSTALLED $head $log"
+  elif [ "$rc" -eq 0 ]; then
+    echo "$word $head"
+  else
+    echo "TESTFAIL $head $log"
+  fi
   exit 0
 }
 
