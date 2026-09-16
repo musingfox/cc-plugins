@@ -313,8 +313,9 @@ SHARD_IDS=$(jq -r '.groups | keys[]' "$SESSION/shards.json")
 - `GOAL_ONELINE` — derived from `$SESSION/goal.md` (one sentence).
 - `CONSTRAINTS` — `sed -n '/^## Constraints/,/^## Key Files/p' "$SESSION/research.md"`, boiled to short lines.
 - `TEST_RUNNER` — full-suite command, from `$SESSION/plan.md` Implementation Plan §Test
-  Runners, or one-shot `AskUserQuestion` with language default. Used ONLY at the
-  integration gate.
+  Runners, or one-shot `AskUserQuestion` with language default. Used at the integration
+  gate and again at the Phase 4 delivery check (§Rebase) — never at a shard gate.
+  Keep it in scope until Phase 4 closes.
 - `SHARD_TEST_RUNNER` — hermetic subset for per-shard gates, from the same §Test Runners.
   Must not need live services / shared ports / external daemons (parallel shards each run
   it in their own worktree — a shared resource makes every first run collide and fail).
@@ -395,7 +396,9 @@ Precedence within one round: **FAIL retries are resolved first, then NEEDS_REPLA
 
 #### Any FAIL
 
-A FAIL means OMP infrastructure failure (probe error, dispatch broken, stall after in-script retry, report still missing after its own report-only re-dispatch). Re-launch `cf-pi-run.sh` for that shard with the same inputs — one message, one background `Bash` per failed shard if multiple. The re-launch clears the previous round's outcome/report/escalate/diff itself, so the shard's session directory needs no cleanup from you. Re-arm the progress monitor in a LATER message than the re-launch, not the same one: `cf-pi-watch.sh` evaluates "all done" on its first iteration, so a watch racing the re-launch could still catch the stale `outcome.md` before the script clears it.
+**Two reasons are exempt from the re-launch: `test-stalled` and `probe-stalled`.** Both mean something never returned within its deadline — the shard already burned `CF_TEST_DEADLINE_S` (or `PI_PROBE_DEADLINE_S`) once, and re-launching with the same inputs buys exactly the same wait a second time. Same argument as `INT_STATUS=TEST_STALLED` below: this is infrastructure, not a contract failure. Show the human the reason line and `$SESSION/shards/<id>/outcome.md`, and ask whether to raise the deadline and re-run that shard or to investigate what hangs. Do not count these against the retry budget.
+
+Otherwise a FAIL means OMP infrastructure failure (probe error, dispatch broken, stall after in-script retry, report still missing after its own report-only re-dispatch). Re-launch `cf-pi-run.sh` for that shard with the same inputs — one message, one background `Bash` per failed shard if multiple. The re-launch clears the previous round's outcome/report/escalate/diff itself, so the shard's session directory needs no cleanup from you. Re-arm the progress monitor in a LATER message than the re-launch, not the same one: `cf-pi-watch.sh` evaluates "all done" on its first iteration, so a watch racing the re-launch could still catch the stale `outcome.md` before the script clears it.
 
 ```
 Bash(run_in_background: true, command:
