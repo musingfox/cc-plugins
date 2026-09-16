@@ -95,12 +95,27 @@ before="$(ls "$PI_RUNS_DIR/pi-dispatch" 2>/dev/null | wc -l | tr -d ' ')"
 err="$(PI_PROVIDER=cursor bash "$DISPATCH" "brief provider-only" 2>&1 >/dev/null)"; rc=$?
 [ "$rc" = "2" ] && ok "PROVIDER without MODEL exits 2" || bad "provider-only rc" "rc=$rc $err"
 case "$err" in
-  *"PI_PROVIDER=cursor is set without PI_MODEL"*) ok "the refusal names the variable and the cause" ;;
+  *"provider cursor is pinned without a model (from PI_PROVIDER)"*) ok "the refusal names the cause and where the value came from" ;;
   *) bad "provider-only message" "$err" ;;
 esac
 [ -z "$(cat "$ARGVLOG")" ] && ok "provider-only never reaches the binary" || bad "provider-only argv" "$(cat "$ARGVLOG")"
 after="$(ls "$PI_RUNS_DIR/pi-dispatch" 2>/dev/null | wc -l | tr -d ' ')"
 [ "$before" = "$after" ] && ok "provider-only leaves no run dir behind" || bad "run dir created" "$before -> $after"
+
+# A resume inherits the prior run's routing, and runs launched before this gate
+# existed could record a provider with no model. Blaming PI_PROVIDER there sends
+# the reader to a variable they never set, so the message names the file.
+LEGACY="$PI_RUNS_DIR/pi-dispatch/legacy-run"
+mkdir -p "$LEGACY"
+printf 'PROVIDER=cursor\nMODEL=\nCWD=%s\n' "$PWD" > "$LEGACY/routing"
+printf 'x\n' > "$LEGACY/session-id"
+err="$(bash "$DISPATCH" "brief resume" "$PI_RUNS_DIR/pi-dispatch" "$LEGACY" 2>&1 >/dev/null)"; rc=$?
+[ "$rc" = "2" ] && ok "an inherited provider-only routing is refused too" || bad "legacy resume rc" "rc=$rc $err"
+case "$err" in
+  *"legacy-run/routing)"*) ok "the refusal points at the routing file, not the environment" ;;
+  *) bad "legacy resume message" "$err" ;;
+esac
+rm -rf "$LEGACY"
 
 # --- the launch states the routing it resolved -------------------------------
 out="$(PI_PROVIDER=openai-codex PI_MODEL=gpt-5.5 bash "$DISPATCH" "brief routed")"

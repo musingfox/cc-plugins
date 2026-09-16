@@ -181,9 +181,11 @@ fi
 # A resume inherits the prior run's routing. The recorded routing beats the env
 # (a shell that says grok must not hijack a session started on codex). Without
 # this a follow-up turn silently changes model mid-session.
+ROUTING_SOURCE="PI_PROVIDER"
 if [ -n "$PRIOR_RUNDIR" ] && [ -f "$PRIOR_RUNDIR/routing" ]; then
   PROVIDER="$(sed -n 's/^PROVIDER=//p' "$PRIOR_RUNDIR/routing")"
   MODEL="$(sed -n 's/^MODEL=//p' "$PRIOR_RUNDIR/routing")"
+  ROUTING_SOURCE="$PRIOR_RUNDIR/routing"
 fi
 
 # Routing gate. Measured against pi 2026-09-15: `--provider X` on its own does
@@ -193,8 +195,13 @@ fi
 # provider that way. There is no flag that expresses "this provider, its own
 # default model", so refuse instead of pretending. Placed before the run dir
 # exists so an abort leaves nothing behind.
+#
+# The message names where the value came from. A resume inherits the prior run's
+# routing, and runs launched before this gate existed were allowed to record a
+# provider with no model — blaming PI_PROVIDER there would send the reader to an
+# environment variable they never set.
 if [ -z "$MODEL" ] && [ -n "$PROVIDER" ]; then
-  echo "pi-dispatch: PI_PROVIDER=$PROVIDER is set without PI_MODEL. pi resolves the model first and the provider follows it, so this would silently run on pi's default provider, not $PROVIDER. Set PI_MODEL too (routing is one --model $PROVIDER/<model> spec), or unset PI_PROVIDER to use pi's own default deliberately." >&2
+  echo "pi-dispatch: provider $PROVIDER is pinned without a model (from $ROUTING_SOURCE). pi resolves the model first and the provider follows it, so this would silently run on pi's default provider, not $PROVIDER. Routing is one --model $PROVIDER/<model> spec: supply the model too, or drop the provider to use pi's own default deliberately." >&2
   exit 2
 fi
 
