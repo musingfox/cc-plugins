@@ -337,6 +337,14 @@ describe('card', () => {
     expect(nodesOf(tree, 'Markdown').length).toBe(0)
   })
 
+  test('a card missing from the unfinished list still draws below the empty notice', async ($, on) => {
+    world(on, { search: 'No matches found.', read: CARD })
+    await issue($, 'done-card')
+    const tree = await $.ui.render(PANE)
+    expect(stringsIn(tree)).toContain('No unfinished cards in pm/cc-plugins.')
+    expect(nodesOf(tree, 'Markdown').length).toBe(1)
+  })
+
   test('a card without title, or priority, falls back to its name and a dash', async ($, on) => {
     world(on, { read: '---\nstatus: todo\n---\nbody\n' })
     await issue($, 'k')

@@ -9,19 +9,23 @@ import type { CardHeader } from './card.ts'
 
 const PANE = { id: 'obw-issue', title: 'obw issue', focus: true, closeOnEscape: true }
 
-type Card = CardHeader & { name: string; body: string }
+// The card region under the list has its own state, so a card's outcome never replaces the list's message.
+type CardRegion =
+  | { kind: 'loading'; name: string }
+  | { kind: 'error'; message: string }
+  | { kind: 'shown'; name: string; header: CardHeader; body: string }
+
 type View = {
-  phase: 'loading' | 'message' | 'list'
-  message?: string
-  project?: string
-  vault?: string
-  cards?: string[]
-  selected?: string
-  card?: Card | null
-  cardLoading?: boolean
+  message: string | null
+  scope: { vault: string; project: string } | null
+  cards: string[]
+  selected: string | null
+  card: CardRegion | null
 }
 
-let view: View = { phase: 'loading' }
+const LOADING: View = { message: 'Reading the vault…', scope: null, cards: [], selected: null, card: null }
+
+let view: View = LOADING
 
 async function runObsidian($: any, argv: string[]): Promise<Run> {
   try {
@@ -37,28 +41,24 @@ function invalidate($: any) {
 }
 
 function showMessage($: any, message: string) {
-  view = { phase: 'message', message }
+  view = { ...LOADING, message }
+  invalidate($)
+}
+
+function showCard($: any, name: string, card: CardRegion) {
+  view = { ...view, selected: name, card }
   invalidate($)
 }
 
 async function show($: any, name: string) {
-  if (!view.vault || !view.project) return
-  view = { ...view, selected: name, card: null, cardLoading: true }
-  invalidate($)
-  const built = cardArgv(view.vault, view.project, name)
-  if (!('argv' in built)) {
-    view = { ...view, cardLoading: false, card: null, message: `"${name}" is not a card name.` }
-    invalidate($)
-    return
-  }
+  const { scope } = view
+  if (!scope) return
+  const built = cardArgv(scope.vault, scope.project, name)
+  if (!('argv' in built)) return showCard($, name, { kind: 'error', message: `"${name}" is not a card name.` })
+  showCard($, name, { kind: 'loading', name })
   const output = readOutput(await runObsidian($, built.argv))
-  if (output.kind === 'error') {
-    view = { ...view, cardLoading: false, card: null, message: output.message }
-  } else {
-    const card = { name, ...headerOf(output.frontmatter), body: output.body }
-    view = { ...view, cardLoading: false, message: undefined, card }
-  }
-  invalidate($)
+  if (output.kind === 'error') return showCard($, name, { kind: 'error', message: output.message })
+  showCard($, name, { kind: 'shown', name, header: headerOf(output.frontmatter), body: output.body })
 }
 
 type Config = { vault: string; project: string; path: string } | { error: string }
@@ -116,12 +116,11 @@ async function openIssue($: any, card: string) {
   const result = searchOutput(await runObsidian($, list.argv), config.project)
   if (result.kind === 'error') return showMessage($, result.message)
   view = {
-    phase: 'list',
-    vault: config.vault,
-    project: config.project,
+    message: result.kind === 'empty' ? `No unfinished cards in pm/${config.project}.` : null,
+    scope: { vault: config.vault, project: config.project },
     cards: result.kind === 'cards' ? result.cards : [],
-    selected: card || undefined,
-    message: result.kind === 'empty' ? `No unfinished cards in pm/${config.project}.` : undefined,
+    selected: card || null,
+    card: null,
   }
   invalidate($)
   if (card) await show($, card)
@@ -132,11 +131,7 @@ async function drawPane($: any, e: any) {
   const safe = (text: string) => bounded(text).text
   const dim = (text: string) => Text({ dimColor: true, children: [safe(text)] })
   const children: any[] = []
-  if (view.phase === 'loading') {
-    children.push(dim(view.message ?? 'Reading the vault…'))
-    return Box({ flexDirection: 'column', children })
-  }
-  if (view.cards?.length) {
+  if (view.cards.length) {
     children.push(
       Select({
         key: 'cards',
@@ -149,11 +144,13 @@ async function drawPane($: any, e: any) {
     )
   }
   if (view.message) children.push(dim(view.message))
-  if (view.cardLoading && view.selected) children.push(dim(`Reading ${view.selected}…`))
-  if (view.card) {
-    const { name, title, status, priority } = view.card
-    const body = bounded(view.card.body)
-    children.push(Text({ bold: true, children: [safe(title ?? name)] }))
+  const card = view.card
+  if (card?.kind === 'loading') children.push(dim(`Reading ${card.name}…`))
+  if (card?.kind === 'error') children.push(dim(card.message))
+  if (card?.kind === 'shown') {
+    const { title, status, priority } = card.header
+    const body = bounded(card.body)
+    children.push(Text({ bold: true, children: [safe(title ?? card.name)] }))
     children.push(dim(`status: ${status ?? '—'} · priority: ${priority ?? '—'}`))
     if (body.clippedFrom !== null) children.push(dim(`Clipped: showing ${body.text.length} of ${body.clippedFrom} characters.`))
     children.push(Markdown({ text: body.text }))
@@ -178,7 +175,7 @@ export function register(on: On) {
 
   on('command.run', { command: 'issue' }, async ($, e) => {
     const card = (e.args ?? '').trim()
-    view = { phase: 'loading', message: 'Reading the vault…' }
+    view = LOADING
     try {
       await $.ui.open(PANE)
     } catch {
