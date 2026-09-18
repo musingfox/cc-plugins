@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { renderTarget, vizInstallPath, vizManifestPath } from '../hooks/viz.ts'
+import { renderOutcome, renderTarget, vizInstallPath, vizManifestPath } from '../hooks/viz.ts'
 
 test('reads the manifest under an absolute CLAUDE_CONFIG_DIR', () => {
   expect(vizManifestPath('/cfg', '/home/u')).toBe('/cfg/plugins/installed_plugins.json')
@@ -125,5 +125,52 @@ test('cuts a long name to its first 64 characters', () => {
   expect(renderTarget('x'.repeat(300))).toEqual({
     file: '/tmp/viz/obw/' + 'x'.repeat(64) + '.md',
     name: 'obw-' + 'x'.repeat(64),
+  })
+})
+
+const exited = (exitCode: number, stdout: string, stderr = '') => ({ kind: 'exited' as const, exitCode, stdout, stderr })
+
+test('reads an opened path from a single path line', () => {
+  expect(renderOutcome(exited(0, '/tmp/viz/work/obw-a-260919120000.html\n'))).toEqual({
+    kind: 'opened',
+    path: '/tmp/viz/work/obw-a-260919120000.html',
+    url: null,
+  })
+})
+
+test('reads the SSH URL after the path line', () => {
+  expect(renderOutcome(exited(0, '/tmp/viz/work/obw-a.html\nURL: http://100.64.0.1:18090/work/obw-a.html\n'))).toEqual({
+    kind: 'opened',
+    path: '/tmp/viz/work/obw-a.html',
+    url: 'http://100.64.0.1:18090/work/obw-a.html',
+  })
+})
+
+test('shows stderr when render.sh fails', () => {
+  expect(renderOutcome(exited(1, '', 'Error: File not found: /tmp/viz/obw/a.md\n'))).toEqual({
+    kind: 'error',
+    message: 'Error: File not found: /tmp/viz/obw/a.md',
+  })
+})
+
+test('names the exit code when a failure prints nothing', () => {
+  expect(renderOutcome(exited(127, '', ''))).toEqual({
+    kind: 'error',
+    message: 'viz render.sh exited 127 with no output.',
+  })
+})
+
+test('reports a success that prints no path', () => {
+  expect(renderOutcome(exited(0, ''))).toEqual({ kind: 'error', message: 'viz render.sh printed no output path.' })
+})
+
+test('shows a success that prints something other than a path as printed', () => {
+  expect(renderOutcome(exited(0, 'garbage\n'))).toEqual({ kind: 'error', message: 'garbage' })
+})
+
+test('reports a render.sh that did not start or finish', () => {
+  expect(renderOutcome({ kind: 'rejected' })).toEqual({
+    kind: 'error',
+    message: 'viz did not render: render.sh could not start, or it did not finish within 15 s.',
   })
 })
