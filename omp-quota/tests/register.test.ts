@@ -215,3 +215,41 @@ describe('/quota', () => {
     expect(await $.command.run({ command: 'quota' })).toEqual({ text: 'omp quota: the pane could not open' })
   })
 })
+
+describe('/quota refresh', () => {
+  test("drops omp's cache, then refetches, both against the user's omp home", async ($, on) => {
+    const w = world(on)
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    expect(await $.command.run({ command: 'quota', args: 'refresh' })).toEqual({ text: 'omp quota refreshed' })
+    const [invalidate, fetch] = w.runs.slice(-2)
+    expect(invalidate.argv).toEqual(['omp', 'usage', 'invalidate'])
+    expect(fetch.argv).toEqual(['omp', 'usage', '--json'])
+    expect(invalidate.init.env.PI_CODING_AGENT_DIR).toBe('/home/u/.omp/agent')
+    expect(fetch.init.env.PI_CODING_AGENT_DIR).toBe('/home/u/.omp/agent')
+    expect(w.opened).toEqual([])
+  })
+
+  test('a failed refetch answers the reason and marks the status line stale', async ($, on) => {
+    const w = world(on)
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    w.omp({ exitCode: 0, stdout: '{"reports":[]}' })
+    expect(await $.command.run({ command: 'quota', args: 'refresh' })).toEqual({
+      text: 'omp quota refresh failed: omp reported no providers',
+    })
+    expect(last(w.statuses)).toEndWith(' (stale)')
+  })
+
+  test('a failed invalidate still refetches and says the cache was kept', async ($, on) => {
+    const w = world(on)
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    w.invalidateAnswers({ exitCode: 2 })
+    const before = w.jsonRuns()
+    expect(await $.command.run({ command: 'quota', args: 'refresh' })).toEqual({
+      text: 'omp quota refreshed (cache not invalidated)',
+    })
+    expect(w.jsonRuns()).toBe(before + 1)
+  })
+})

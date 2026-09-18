@@ -5,6 +5,7 @@ import { readUsage, worsenedProviders } from './usage.ts'
 import type { OmpOutcome, UsageReading } from './usage.ts'
 
 const FETCH_ARGV = ['omp', 'usage', '--json']
+const INVALIDATE_ARGV = ['omp', 'usage', 'invalidate']
 const OMP_TIMEOUT_MS = 10_000
 const POLL_MS = 300_000
 const PANE_ID = 'omp-quota'
@@ -47,6 +48,19 @@ async function fetchAndPublish($: any) {
   await publish($, await fetchUsage($))
 }
 
+async function refresh($: any) {
+  const home = await $.env.get('HOME')
+  if (!home) {
+    await publish($, { ok: false, reason: 'HOME is unset' })
+    return { text: 'omp quota refresh failed: HOME is unset' }
+  }
+  const invalidated = await runOmp($, home, INVALIDATE_ARGV)
+  const reading = readUsage(await runOmp($, home, FETCH_ARGV))
+  await publish($, reading)
+  const note = invalidated.kind === 'exited' && invalidated.exitCode === 0 ? '' : ' (cache not invalidated)'
+  return { text: reading.ok ? `omp quota refreshed${note}` : `omp quota refresh failed: ${reading.reason}${note}` }
+}
+
 async function openPane($: any) {
   try {
     await $.ui.open({ id: PANE_ID, title: 'omp quota', focus: true, closeOnEscape: true })
@@ -81,6 +95,7 @@ export function register(on: On) {
   on('command.run', { command: 'quota' }, async ($, e) => {
     const args = (e.args ?? '').trim()
     if (args === '') return openPane($)
+    if (args === 'refresh') return refresh($)
     return { text: 'usage: /quota [refresh]' }
   })
 }

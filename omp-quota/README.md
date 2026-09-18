@@ -70,6 +70,11 @@ you are in another window shows on the status line when you return.
 - `/quota` opens the pane (`omp-quota`), focused and closed with Escape; it prints nothing
   in the transcript. Only this command opens the pane — a poll or a worsening never does.
   If the pane is refused, one line says so.
+- `/quota refresh` runs `omp usage invalidate`, then fetches, both against the same omp
+  home, and answers one line: `omp quota refreshed` or
+  `omp quota refresh failed: <reason>` (the status line then goes stale). When the
+  invalidate fails, the fetch still runs and the answer ends in `(cache not invalidated)`.
+  It does not open the pane and needs no model turn.
 - `/quota <anything else>` answers `usage: /quota [refresh]` and runs nothing.
 
 ## The pane
