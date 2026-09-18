@@ -1,25 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { PANE } from './fixtures/pane.ts'
+import { PANE, issue, nodesOf, stringsIn } from './fixtures/pane.ts'
 import { CARD, SEARCH_ARGV, SESSION, world } from './fixtures/world.ts'
-
-// Every string drawn: Text children, Markdown text, Select option values and labels.
-function stringsIn(node: any): string[] {
-  if (typeof node === 'string') return node === '' ? [] : [node]
-  if (!node || typeof node !== 'object') return []
-  const options = (node.props?.options ?? []).flatMap((option: any) => [option.value, option.label])
-  return [...(node.children ?? []), ...(node.props?.children ?? []), node.props?.text, ...options].flatMap(stringsIn)
-}
-
-function nodesOf(node: any, type: string): any[] {
-  if (!node || typeof node !== 'object') return []
-  const kids = [...(node.children ?? []), ...(node.props?.children ?? [])]
-  return [...(node.type === type ? [node] : []), ...kids.flatMap((kid) => nodesOf(kid, type))]
-}
-
-async function issue($: any, args: string) {
-  await $.session.start(SESSION)
-  return $.command.run({ command: 'issue', args })
-}
 
 async function paneStrings($: any) {
   return stringsIn(await $.ui.render(PANE))
