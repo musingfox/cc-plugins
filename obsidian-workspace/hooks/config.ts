@@ -1,9 +1,10 @@
-import { unquote } from './yaml-scalar.ts'
+// A quoted value keeps any `#` inside its quotes and drops a comment after them.
+const QUOTED = /^(["'])(.*)\1\s*(#.*)?$/
 
 function valueOf(raw: string) {
   const trimmed = raw.trim()
-  const quoted = unquote(trimmed)
-  const value = quoted !== trimmed ? quoted : trimmed.replace(/(^|\s+)#.*$/, '')
+  const quoted = QUOTED.exec(trimmed)
+  const value = quoted ? quoted[2] : trimmed.replace(/(^|\s+)#.*$/, '')
   return value || undefined
 }
 
