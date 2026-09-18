@@ -94,3 +94,15 @@ export function readUsage(outcome: OmpOutcome): UsageReading {
   }
   return { ok: true, usage: { providers: [...grouped].map(([provider, limits]) => providerOf(provider, limits)) } }
 }
+
+export type Worsened = { provider: string; status: 'warning' | 'exhausted' }
+
+export function worsenedProviders(previous: Usage | null, current: Usage): Worsened[] {
+  if (!previous) return []
+  const before = new Map(previous.providers.map((p) => [p.provider, p.status]))
+  return current.providers.flatMap((p) =>
+    before.get(p.provider) === 'ok' && (p.status === 'warning' || p.status === 'exhausted')
+      ? [{ provider: p.provider, status: p.status }]
+      : [],
+  )
+}

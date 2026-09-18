@@ -1,11 +1,30 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { readUsage, remainingShareOf } from '../hooks/usage.ts'
-import { SNAPSHOT_STDOUT } from './fixtures/snapshot.ts'
+import { readUsage, remainingShareOf, worsenedProviders } from '../hooks/usage.ts'
+import { SNAPSHOT, SNAPSHOT_STDOUT } from './fixtures/snapshot.ts'
 
 function usageOf(stdout: string) {
   const reading = readUsage({ kind: 'exited', exitCode: 0, stdout })
   if (!reading.ok) throw new Error(reading.reason)
   return reading.usage
+}
+
+function fixtureWith(statuses: Record<string, string | undefined>) {
+  const copy = JSON.parse(SNAPSHOT_STDOUT)
+  for (const report of copy.reports)
+    for (const limit of report.limits)
+      if (limit.id in statuses) {
+        if (statuses[limit.id] === undefined) delete limit.status
+        else limit.status = statuses[limit.id]
+      }
+  return usageOf(JSON.stringify(copy))
+}
+
+function providerLimitIds(provider: string) {
+  return SNAPSHOT.reports.find((r) => r.provider === provider)!.limits.map((l) => l.id)
+}
+
+function allOf(provider: string, status: string | undefined) {
+  return Object.fromEntries(providerLimitIds(provider).map((id) => [id, status]))
 }
 
 function reportsWith(limits: object[][], provider = 'p') {
@@ -110,5 +129,52 @@ describe('readUsage', () => {
     const provider = usageOf(reportsWith([[{ id: 'a', status: 'bogus' }]])).providers[0]!
     expect(provider.limits[0]!.status).toBe(null)
     expect(provider.status).toBe(null)
+  })
+})
+
+describe('worsenedProviders', () => {
+  const fixture = usageOf(SNAPSHOT_STDOUT)
+
+  test('the first good fetch has nothing to compare with', () => {
+    expect(worsenedProviders(null, fixture)).toEqual([])
+  })
+
+  test('a provider going from ok to warning is reported', () => {
+    const previous = fixtureWith({ 'openai-codex:secondary': 'ok' })
+    expect(worsenedProviders(previous, fixture)).toEqual([{ provider: 'openai-codex', status: 'warning' }])
+  })
+
+  test('an unchanged fetch reports nothing', () => {
+    expect(worsenedProviders(fixture, fixture)).toEqual([])
+  })
+
+  test('warning to exhausted is not reported', () => {
+    const previous = fixture
+    const current = fixtureWith({ 'openai-codex:secondary': 'exhausted' })
+    expect(worsenedProviders(previous, current)).toEqual([])
+  })
+
+  test('a provider with no previous status is not reported', () => {
+    const previous = fixtureWith(allOf('openai-codex', undefined))
+    expect(worsenedProviders(previous, fixture)).toEqual([])
+  })
+
+  test('a provider losing its status is not reported', () => {
+    const current = fixtureWith(allOf('anthropic', undefined))
+    expect(worsenedProviders(fixture, current)).toEqual([])
+  })
+
+  test('a provider that first appears is not reported', () => {
+    const previous = { providers: fixture.providers.filter((p) => p.provider !== 'cursor') }
+    expect(worsenedProviders(previous, fixture)).toEqual([])
+  })
+
+  test('several worsened providers are reported in current order', () => {
+    const previous = fixtureWith({ 'openai-codex:secondary': 'ok' })
+    const current = fixtureWith({ 'anthropic:5h': 'exhausted' })
+    expect(worsenedProviders(previous, current)).toEqual([
+      { provider: 'openai-codex', status: 'warning' },
+      { provider: 'anthropic', status: 'exhausted' },
+    ])
   })
 })

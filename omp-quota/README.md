@@ -18,6 +18,10 @@ Built and tested against Claude Code 2.1.276.
 - **Status** of a provider: the worst status among its limits (`exhausted` > `warning` >
   `ok`); limits without one are ignored, and a provider with none has no status. Reports
   with the same provider name merge into one provider.
+- **Worsened provider**: one whose status was `ok` in the previous good fetch and is
+  `warning` or `exhausted` now. The first good fetch has no previous; `warning` →
+  `exhausted`, a provider without a status on either side, and a newly appearing provider
+  do not count.
 - **Failed fetch**: omp did not answer (could not start, or still running after 10 s),
   exited non-zero, printed something that is not a JSON report list, or reported no
   providers — the last is how omp answers when it reads the wrong home, so it never wipes
