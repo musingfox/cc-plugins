@@ -6,15 +6,17 @@ import { searchOutput, readOutput, OBSIDIAN_TIMEOUT_MS } from './cli-output.ts'
 import type { Run } from './cli-output.ts'
 import { headerOf } from './card.ts'
 import type { CardHeader } from './card.ts'
-import { vizManifestPath, vizInstallPath } from './viz.ts'
+import { vizManifestPath, vizInstallPath, renderTarget } from './viz.ts'
 
 const PANE = { id: 'obw-issue', title: 'obw issue', focus: true, closeOnEscape: true }
+
+type Browser = { kind: 'rendering' } | { kind: 'error'; message: string }
 
 // The card region under the list has its own state, so a card's outcome never replaces the list's message.
 type CardRegion =
   | { kind: 'loading'; name: string }
   | { kind: 'error'; message: string }
-  | { kind: 'shown'; name: string; header: CardHeader; body: string; viz: string | null }
+  | { kind: 'shown'; name: string; header: CardHeader; body: string; viz: string | null; browser: Browser | null }
 
 type View = {
   message: string | null
@@ -77,7 +79,34 @@ async function show($: any, name: string) {
   const output = readOutput(await runObsidian($, built.argv))
   if (output.kind === 'error') return showCard($, request, name, { kind: 'error', message: output.message })
   const viz = await findViz($)
-  showCard($, request, name, { kind: 'shown', name, header: headerOf(output.frontmatter), body: output.body, viz })
+  showCard($, request, name, { kind: 'shown', name, header: headerOf(output.frontmatter), body: output.body, viz, browser: null })
+}
+
+// A press result writes only under the card read it was pressed on: a newer read, even of the same card, drops it.
+function showBrowser($: any, request: number, browser: Browser) {
+  const card = view.card
+  if (request !== requests || card?.kind !== 'shown') return
+  view = { ...view, card: { ...card, browser } }
+  invalidate($)
+}
+
+async function openInBrowser($: any) {
+  const card = view.card
+  if (card?.kind !== 'shown' || !card.viz) return
+  const request = requests
+  const { file } = renderTarget(card.name)
+  showBrowser($, request, { kind: 'rendering' })
+  try {
+    await $.fs.write(file, card.body)
+  } catch (error) {
+    return showBrowser($, request, { kind: 'error', message: `Could not write ${file}: ${reasonOf(error)}` })
+  }
+}
+
+function browserLines(browser: Browser | null): string[] {
+  if (browser?.kind === 'rendering') return ['Rendering in the browser…']
+  if (browser?.kind === 'error') return [browser.message]
+  return []
 }
 
 type Config = { vault: string; project: string; path: string } | { error: string }
@@ -173,7 +202,18 @@ async function drawPane($: any, e: any) {
     children.push(Text({ bold: true, children: [safe(title ?? card.name)] }))
     children.push(dim(`status: ${status ?? '—'} · priority: ${priority ?? '—'}`))
     // Only the terminal can run render.sh: `process` is CLI only.
-    if (card.viz && e.surface === 'terminal') children.push(Button({ key: 'open-in-browser', label: 'Open in browser', onPress: () => {} }))
+    if (card.viz && e.surface === 'terminal') {
+      children.push(
+        Button({
+          key: 'open-in-browser',
+          label: 'Open in browser',
+          onPress: () => {
+            void openInBrowser($).catch(() => {})
+          },
+        }),
+      )
+      for (const line of browserLines(card.browser)) children.push(dim(line))
+    }
     if (body.clippedFrom !== null) children.push(dim(`Clipped: showing ${body.text.length} of ${body.clippedFrom} characters.`))
     children.push(Markdown({ text: body.text }))
   }

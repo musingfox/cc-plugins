@@ -149,3 +149,53 @@ describe('the button surface', () => {
     expect(nodesOf(await $.ui.render(PANE), 'Button').length).toBe(1)
   })
 })
+
+// The kit presses only a Button a render has drawn; the press's async work finishes on settle.
+async function press($: any, w: any) {
+  await $.ui.render(PANE)
+  const pressed = await $.ui.press(PRESS)
+  await w.clock.settle()
+  return pressed
+}
+
+describe('pressing Open in browser', () => {
+  test('the whole card body is written to the temp file', async ($, on) => {
+    const w = vizWorld(on)
+    await issue($, 'mod-obw-issue-pane')
+    await press($, w)
+    expect(w.writes).toEqual([
+      { path: '/tmp/viz/obw/mod-obw-issue-pane.md', text: '# mod-obw-issue-pane\n\n## Acceptance Criteria\n- [ ] one\n' },
+    ])
+  })
+
+  test('a long body is written unclipped while the pane draws it clipped', async ($, on) => {
+    const w = vizWorld(on, { read: '---\ntitle: t\n---\n' + 'x'.repeat(11000) })
+    await issue($, 'k')
+    await press($, w)
+    expect(w.writes[0].text.length).toBe(11000)
+    expect(nodesOf(await $.ui.render(PANE), 'Markdown')[0].props.text.length).toBe(10000)
+  })
+
+  test('a card name that is not a plain slug is written as card.md', async ($, on) => {
+    const w = vizWorld(on)
+    await issue($, 'my card')
+    await press($, w)
+    expect(w.writes[0].path).toBe('/tmp/viz/obw/card.md')
+  })
+
+  test('a refused write is shown and runs nothing', async ($, on) => {
+    const w = vizWorld(on, { write: { deny: 'EACCES' } })
+    await issue($, 'mod-obw-issue-pane')
+    expect(await press($, w)).toEqual({ element: 'open-in-browser' })
+    expect(w.runs.length).toBe(2)
+    const strings = stringsIn(await $.ui.render(PANE))
+    expect(strings.filter((text) => text.startsWith('Could not write /tmp/viz/obw/mod-obw-issue-pane.md')).length).toBe(1)
+  })
+
+  test('a shown card without a press writes nothing', async ($, on) => {
+    const w = vizWorld(on)
+    await issue($, 'mod-obw-issue-pane')
+    await $.ui.render(PANE)
+    expect(w.writes).toEqual([])
+  })
+})
