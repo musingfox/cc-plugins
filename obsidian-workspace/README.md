@@ -1,6 +1,6 @@
 # Obsidian Workspace
 
-Project-scoped Obsidian vault productivity for Claude Code — quick capture, long-form notes, and project management. The plugin is **skills-only**: it owns folder layout + file templates + PM conventions; all vault I/O runs the Obsidian CLI directly in the main context, deferring to the official `obsidian:obsidian-cli` skill for syntax. Each skill file is kept small so it doesn't burn your context budget.
+Project-scoped Obsidian vault productivity for Claude Code — quick capture, long-form notes, and project management. Skills own folder layout + file templates + PM conventions, while the `/issue` Claude Mod opens unfinished task cards in a pane; vault I/O runs through the Obsidian CLI, deferring to the official `obsidian:obsidian-cli` skill for syntax. Each skill file is kept small so it doesn't burn your context budget.
 
 Plugin identifier: `obw` (skills invoked as `/obw:<name>` or via natural language).
 
@@ -18,6 +18,24 @@ Plugin identifier: `obw` (skills invoked as `/obw:<name>` or via natural languag
 - **Daily notes** use Obsidian's **Daily Notes** core plugin (folder / filename / template). Quick capture calls `daily:append`.
 - **Templates** (`task`, `doc`, `adr`) live in your vault's Obsidian Templates folder. On `/obw:init` the plugin copies starter files from `templates/` only if the same name doesn't already exist — it never overwrites your edits.
 - **Dashboards** are **Obsidian Bases** (`.base` files — core in Obsidian 1.9+) generated from plugin-internal templates via shell substitution, so contents never enter Claude's context.
+
+## Issue Pane
+
+Run `/issue` to list unfinished cards for the configured project, then select one to read its title, status, priority, and markdown body in the same pane. `/issue <card>` opens that card directly. The pane reports missing configuration, unavailable CLI output, and missing cards in place without adding vault content to the conversation.
+
+Enable Claude Mods globally before using the pane:
+
+```bash
+export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1
+```
+
+Test the plugin with:
+
+```bash
+claude plugin test obsidian-workspace
+```
+
+Built and tested against Claude Code 2.1.276.
 
 ## Prerequisites
 

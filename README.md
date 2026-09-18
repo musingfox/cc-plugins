@@ -171,7 +171,8 @@ Interact with [Fizzy](https://fizzy.do) via the Fizzy CLI for project management
 
 ### Obsidian Workspace
 
-Personal Obsidian vault productivity — capture, notes, and project management through the Obsidian CLI (skills-only, runs directly in the main context):
+Personal Obsidian vault productivity — capture, notes, and project management through the Obsidian CLI:
+- **Issue Pane** (`/issue`): Claude Mod pane for selecting unfinished task cards and reading their details
 - **Jot** (`/obw:jot`): Quick capture (timestamped journal bullet) or long-form note — triages by input shape; filename strategies (title / slug / timestamp-title), `--folder` overrides per-call
 - **Project Management** (`/obw:pm`): Task/doc/ADR lifecycle, Bases dashboards, wikilink cross-references; split a spec into blocking tickets
 - **Interactive Init** (`/obw:init`): Guided setup of `.obsidian.yaml` — vault binding, note/pm sections
@@ -275,7 +276,7 @@ cc-plugins/
 ├── diagnose/           skills: diagnose, diagnose-now · docs, scripts, tests
 ├── fizzy/              skills: fizzy
 ├── hook-guard/         skills: hook-guard
-├── obsidian-workspace/ skills: init, jot, pm · templates, tests
+├── obsidian-workspace/ skills: init, jot, pm · templates, tests · hooks: register (Claude Mod)
 ├── omp-quota/          hooks: register (Claude Mod) · tests
 ├── omt/                skills: contract-validation · agents, commands, contracts, lib
 ├── pi-dispatch/        skills: pi-dispatch · agents: builder, reviewer · scripts, shims, extensions, tests
