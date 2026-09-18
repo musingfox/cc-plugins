@@ -23,6 +23,10 @@ Quota is fetched once at session start and then every 5 minutes. A failed fetch 
 poll running; there is no other retry. When a reload re-fires session start, the previous
 poll is cancelled first, so the cadence never doubles.
 
+Nothing waits on omp. Session start (which Claude Code awaits before the first prompt)
+starts the fetch without awaiting it, and the module hooks no tool-call or prompt event,
+so no tool call or prompt is ever held up by a slow omp.
+
 ## How quota is read
 
 - **Remaining share** of a limit: omp's `remainingFraction` when it is a number, else

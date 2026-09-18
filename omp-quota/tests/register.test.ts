@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { FIXTURE, SESSION, world } from './fixtures/world.ts'
+import { FIXTURE, NOW, SESSION, world } from './fixtures/world.ts'
 
 const SUCCESS =
   'omp quota: openai-codex 6% · ollama-cloud — · google-antigravity 100% · xai-oauth 100% · cursor 0% · anthropic 86%'
@@ -121,5 +121,16 @@ describe('poll schedule', () => {
     await w.clock.settle()
     await w.clock.advance(300000)
     expect(w.jsonRuns()).toBe(2)
+  })
+})
+
+describe('fetch never blocks', () => {
+  test('session start returns while omp is still running', async ($, on) => {
+    const w = world(on)
+    w.omp('hang')
+    expect(await $.session.start(SESSION)).toEqual({ cwd: '/work' })
+    expect(await w.clock.now()).toBe(NOW)
+    expect(w.statuses).toEqual(['omp quota: fetching'])
+    await w.clock.advance(60000)
   })
 })
