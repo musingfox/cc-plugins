@@ -19,7 +19,7 @@ The card's d.ts line references are 2.1.273's. Everything below was checked agai
 
 `/issue` is a Claude Mod in obsidian-workspace's (plugin `obw`) module slot, which is free because obw has no hooks today. Every read of vault content goes through the `obsidian` CLI via `$.process.run`; only the project's own `.obsidian.yaml`, which is not in the vault, is read with `$.fs`. The card is drawn in a pane opened by the command and never enters the conversation.
 
-`/issue` trusts nothing the CLI prints until it matches a known success shape, and draws nothing until it fits the element's bounds. Every other outcome — a closed app, an unknown vault, a missing card, an empty project, an oversized or malformed body — becomes a message in the pane, and the hook never throws. The mod makes one CLI call per view, launches nothing, and scopes every query to the project's own folder.
+`/issue` trusts nothing the CLI prints until it matches a known success shape, and draws nothing until it fits the element's bounds. Every other outcome — a closed app, an unknown vault, a missing card, an empty project, an oversized or malformed body — becomes a message in the pane, and the hook never throws. The mod makes one CLI call per view and scopes every query to the project's own folder. The only other process it starts is the viz plugin's `render.sh`, and only when the user presses the card's Open in browser Button.
 
 ## Concrete enough to build on
 
@@ -59,6 +59,8 @@ Defaults taken on two-way doors, none visible outside the mod:
 - `claude plugin test` is green on tests that cover every output shape above with the CLI call stubbed (the test kit has no process access).
 - Whether `$.fs` expands `~` is tested live and recorded. Nothing depends on the answer: the mod's only `$.fs` paths are absolute, built from `$.session.cwd()`.
 - One real session with `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` shows the list, a card, and the closed-app message correctly.
+- A shown card has an Open in browser Button in the terminal when viz is installed, and none when viz is absent or on another surface. A press writes the card body to `/tmp/viz/obw/`, runs viz's `render.sh` on it with a 15 s timeout, and the pane shows where the card was rendered or why it was not.
+- In one real session with `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`, pressing Open in browser on a card with a Mermaid block opens the rendered page in the browser.
 
 ## Left open
 
@@ -66,6 +68,8 @@ Defaults taken on two-way doors, none visible outside the mod:
 - **The exact text and layout of each error message** — settled while building.
 - **Mobile** — whether a column of `Button`s replaces the `Select` there. Outside the card's scope.
 - **The pm skill's own list query** (`obsidian-workspace/skills/pm/SKILL.md:62,105`) is unscoped and matches substrings too. Latent — no project name is a substring of another — and outside this card; flagged, not fixed.
+- **Sandboxing of the press.** Whether the Bash sandbox or a permission prompt applies to a mod's `$.fs.write` to `/tmp/viz/obw/` and its `$.process.run` of `bash`, and whether `onPress` side effects run live as in the test kit, is untested live.
+- **SSH holding the run.** Under SSH, `render.sh` starts a background server that inherits stdin, which may hold the run until the 15 s timeout; the pane then shows the timeout message. Untested live.
 
 ## What would overturn this
 

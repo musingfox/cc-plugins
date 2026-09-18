@@ -62,3 +62,8 @@ n="$(awk '/^## Issue Pane/,/^## Prerequisites/' obsidian-workspace/README.md | g
 [ "$n" -ge 1 ] || fail "obw README Issue Pane must mention viz"
 n="$(awk '/^## Issue Pane/,/^## Prerequisites/' obsidian-workspace/README.md | grep -c 'macOS' || true)"
 [ "$n" -ge 1 ] || fail "obw README Issue Pane must mention macOS"
+
+n="$(grep -c 'launches nothing' docs/milestones/obw-issue-pane.md || true)"
+[ "$n" -eq 0 ] || fail "obw issue pane milestone launches nothing count is $n, want 0"
+n="$(awk '/^## Acceptance criteria/,/^## Left open/' docs/milestones/obw-issue-pane.md | grep -c 'Open in browser' || true)"
+[ "$n" -ge 1 ] || fail "obw issue pane milestone acceptance criteria must mention Open in browser"
