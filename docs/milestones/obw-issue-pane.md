@@ -17,7 +17,7 @@ The card's d.ts line references are 2.1.273's. Everything below was checked agai
 
 ## What is committed
 
-`/issue` is a Claude Mod in obsidian-workspace's (plugin `obw`) module slot, which is free because obw has no hooks today. Every read of vault content goes through the `obsidian` CLI via `$.process.run`; only the project's own `.obsidian.yaml`, which is not in the vault, is read with `$.fs`. The card is drawn in a pane opened by the command and never enters the conversation.
+`/issue` is a Claude Mod in obsidian-workspace's (plugin `obw`) module slot, which is free because obw has no hooks today. Every read of vault content goes through the `obsidian` CLI via `$.process.run`; `$.fs` reads only the project's own `.obsidian.yaml`, which is not in the vault, and viz's `installed_plugins.json` under `$CLAUDE_CONFIG_DIR` or `$HOME/.claude`, and writes only the card body to `/tmp/viz/obw/<slug>.md` for render.sh. The card is drawn in a pane opened by the command and never enters the conversation.
 
 `/issue` trusts nothing the CLI prints until it matches a known success shape, and draws nothing until it fits the element's bounds. Every other outcome — a closed app, an unknown vault, a missing card, an empty project, an oversized or malformed body — becomes a message in the pane, and the hook never throws. The mod makes one CLI call per view and scopes every query to the project's own folder. The only other process it starts is the viz plugin's `render.sh`, and only when the user presses the card's Open in browser Button.
 
@@ -57,7 +57,7 @@ Defaults taken on two-way doors, none visible outside the mod:
 - All vault content comes from the `obsidian` CLI; none of it enters the conversation.
 - Obsidian closed, an unknown vault, a missing card, an empty or `/`-containing argument, output of no known shape, and a body over 10000 characters each draw a message in the pane; the hook never throws and the pane never falls back to the engine's default drawing.
 - `claude plugin test` is green on tests that cover every output shape above with the CLI call stubbed (the test kit has no process access).
-- Whether `$.fs` expands `~` is tested live and recorded. Nothing depends on the answer: the mod's only `$.fs` paths are absolute, built from `$.session.cwd()`.
+- Whether `$.fs` expands `~` is tested live and recorded. Nothing depends on the answer: every `$.fs` path the mod uses is absolute, built from `$.session.cwd()`, from an absolute `$CLAUDE_CONFIG_DIR` or `$HOME`, or under the fixed `/tmp/viz/obw/`.
 - One real session with `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` shows the list, a card, and the closed-app message correctly.
 - A shown card has an Open in browser Button in the terminal when viz is installed, and none when viz is absent or on another surface. A press writes the card body to `/tmp/viz/obw/`, runs viz's `render.sh` on it with a 15 s timeout, and the pane shows where the card was rendered or why it was not.
 - In one real session with `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`, pressing Open in browser on a card with a Mermaid block opens the rendered page in the browser.
