@@ -91,6 +91,11 @@ the same name repeats inside a provider, each row gets a tag in brackets: the pa
 limit id that differ within the group (antigravity's shared pools read `[anthropic]` and
 `[openai]`).
 
+The open pane redraws after every settled fetch, failed ones included, so it always shows
+the latest data the module holds. It is drawn from `Box` and `Text` only, with the props
+`flexDirection`, `bold`, `dimColor`, and `wrap`; any other prop would make Claude Code
+fall back to drawing its own pane.
+
 ## Enabling
 
 Claude Mods are off unless Claude Code starts with the global switch:

@@ -1,4 +1,5 @@
 import type { On } from 'claude-code'
+import { paneModelOf } from './pane-rows.ts'
 import type { QuotaView } from './pane-rows.ts'
 import { statusLineOf } from './status-line.ts'
 import { readUsage, worsenedProviders } from './usage.ts'
@@ -42,6 +43,7 @@ async function publish($: any, reading: UsageReading) {
     view = { ...view, failure: reading.reason }
   }
   $.ui.status(statusLineOf(view))
+  $.ui.invalidate('ui.render')
 }
 
 async function fetchAndPublish($: any) {
@@ -68,6 +70,26 @@ async function openPane($: any) {
   } catch {
     return { text: 'omp quota: the pane could not open' }
   }
+}
+
+async function renderPane($: any, e: any) {
+  const { Box, Text } = await $.ui.resolve(e)
+  const model = paneModelOf(view, await $.clock.now())
+  const lines = []
+  if (model.notice) lines.push(Text({ dimColor: true, children: [model.notice] }))
+  for (const section of model.providers) {
+    lines.push(Text({ bold: true, children: [section.heading] }))
+    if (section.empty) lines.push(Text({ dimColor: true, children: ['  ', section.empty] }))
+    for (const row of section.rows) {
+      lines.push(
+        Text({
+          wrap: 'truncate-end',
+          children: ['  ', row.name, '  ', row.share, '  ', row.status, '  resets ', row.resets],
+        }),
+      )
+    }
+  }
+  return Box({ flexDirection: 'column', children: lines })
 }
 
 export function register(on: On) {
@@ -97,5 +119,10 @@ export function register(on: On) {
     if (args === '') return openPane($)
     if (args === 'refresh') return refresh($)
     return { text: 'usage: /quota [refresh]' }
+  })
+
+  on('ui.render', { component: 'Pane' }, async ($, e, next) => {
+    if (e.requestId !== PANE_ID) return next(e)
+    return renderPane($, e)
   })
 }

@@ -1,8 +1,15 @@
 import { describe, expect, test } from 'claude-code/testing'
+import { PANE } from './fixtures/pane.ts'
 import { FIXTURE, NOW, SESSION, fixtureWith, world } from './fixtures/world.ts'
 
 const SUCCESS =
   'omp quota: openai-codex 6% · ollama-cloud — · google-antigravity 100% · xai-oauth 100% · cursor 0% · anthropic 86%'
+
+function stringsIn(node: any): string[] {
+  if (typeof node === 'string') return [node]
+  if (!node || typeof node !== 'object') return []
+  return [...(node.children ?? []), ...(node.props?.children ?? [])].flatMap(stringsIn)
+}
 
 function last(list: string[]) {
   return list[list.length - 1]
@@ -251,5 +258,52 @@ describe('/quota refresh', () => {
       text: 'omp quota refreshed (cache not invalidated)',
     })
     expect(w.jsonRuns()).toBe(before + 1)
+  })
+})
+
+describe('quota pane', () => {
+  test('draws every provider section and row from the latest data', async ($, on) => {
+    const w = world(on)
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    const strings = stringsIn(await $.ui.render(PANE))
+    expect(strings).toContain('openai-codex 6%')
+    expect(strings).toContain('Claude & GPT (shared) · Weekly [anthropic]')
+    expect(strings).toContain('1d 11h')
+    expect(strings).toContain('no limits reported')
+  })
+
+  test('says it is fetching while omp has not answered', async ($, on) => {
+    const w = world(on)
+    w.omp('hang')
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    expect(stringsIn(await $.ui.render(PANE))).toContain('Fetching omp usage')
+    await w.clock.advance(60000)
+  })
+
+  test('names the failure when no fetch has succeeded', async ($, on) => {
+    const w = world(on)
+    w.omp({ deny: 'timed out' })
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    expect(stringsIn(await $.ui.render(PANE))).toContain('Unavailable: omp did not answer')
+  })
+
+  test("leaves another plugin's pane to the hook beneath", async ($, on) => {
+    world(on)
+    on('ui.render', { component: 'Pane' }, () => ({ type: 'Text', children: ['beneath'] }))
+    await $.session.start(SESSION)
+    expect(await $.ui.render({ ...PANE, requestId: 'other' })).toEqual({ type: 'Text', children: ['beneath'] })
+  })
+
+  test('asks for a redraw after every settled fetch, failed ones included', async ($, on) => {
+    const w = world(on)
+    w.omp(FIXTURE, { exitCode: 1 })
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    expect(w.invalidates).toBe(1)
+    await w.clock.advance(300000)
+    expect(w.invalidates).toBe(2)
   })
 })
