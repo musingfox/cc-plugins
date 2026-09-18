@@ -293,3 +293,32 @@ describe('the press outcome', () => {
     )
   })
 })
+
+describe('a press result after a newer read', () => {
+  test('a render that settles after the same card is read again is dropped', async ($, on) => {
+    const w = vizWorld(on, { render: 'defer' })
+    await issue($, 'a')
+    await press($, w)
+    await $.command.run({ command: 'issue', args: 'a' })
+    await w.clock.settle()
+    w.release(2, '/tmp/viz/work/obw-a-1.html\n')
+    await w.clock.settle()
+    const tree = await $.ui.render(PANE)
+    expect(stringsIn(tree).filter((text) => OUTCOME.test(text))).toEqual([])
+    expect(nodesOf(tree, 'Markdown').length).toBe(1)
+  })
+
+  test('a render that settles after another card is read is dropped', async ($, on) => {
+    const w = vizWorld(on, { render: 'defer', search: '["pm/cc-plugins/tasks/a.md","pm/cc-plugins/tasks/b.md"]' })
+    await issue($, 'a')
+    await press($, w)
+    await $.command.run({ command: 'issue', args: 'b' })
+    await w.clock.settle()
+    w.release(2, '/tmp/viz/work/obw-a-1.html\n')
+    await w.clock.settle()
+    const tree = await $.ui.render(PANE)
+    expect(stringsIn(tree).filter((text) => OUTCOME.test(text))).toEqual([])
+    expect(nodesOf(tree, 'Select')[0].props.value).toBe('b')
+    expect(nodesOf(tree, 'Markdown').length).toBe(1)
+  })
+})
