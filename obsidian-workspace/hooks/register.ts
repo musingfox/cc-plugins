@@ -23,9 +23,9 @@ async function show($: any, name: string) {
   else { const header = headerOf(output.frontmatter); view = { ...view, cardLoading: false, message: undefined, card: { name, ...header, body: output.body } } }
   invalidate($)
 }
-async function resolveConfig($: any): Promise<{ vault: string; project: string } | { error: string }> {
+async function resolveConfig($: any): Promise<{ vault: string; project: string; path: string } | { error: string }> {
   const cwd = await $.session.cwd(); let dir = cwd
-  while (true) { const path = `${dir}/.obsidian.yaml`; let exists = false; try { exists = await $.fs.exists(path) } catch {} if (exists) { let text: string; try { text = await $.fs.read(path) } catch { return { error: `Could not read ${path}.` } }; const { vault, project } = configOf(text); if (!vault && !project) return { error: `${path} has no vault or pm.project.` }; if (!vault) return { error: `${path} has no vault.` }; if (!project) return { error: `${path} has no pm.project.` }; return { vault, project } } if (dir === '/') break; dir = dir.slice(0, dir.lastIndexOf('/')) || '/' }
+  while (true) { const path = `${dir}/.obsidian.yaml`; let exists = false; try { exists = await $.fs.exists({ path }) } catch {} if (exists) { let text: string; try { text = await $.fs.read({ path }) } catch { return { error: `Could not read ${path}.` } }; const { vault, project } = configOf(text); if (!vault && !project) return { error: `${path} has no vault or pm.project.` }; if (!vault) return { error: `${path} has no vault.` }; if (!project) return { error: `${path} has no pm.project.` }; return { vault, project, path } } if (dir === '/') break; dir = dir.slice(0, dir.lastIndexOf('/')) || '/' }
   return { error: `No .obsidian.yaml in ${cwd} or any directory above it.` }
 }
 
@@ -38,7 +38,7 @@ export function register(on: On) {
     const config = await resolveConfig($)
     if ('error' in config) { view = { phase: 'message', message: config.error }; invalidate($); return {} }
     const list = listArgv(config.vault, config.project)
-    if (!('argv' in list)) { view = { phase: 'message', message: `${config.project ? 'pm.project "' + config.project + '" cannot name a folder under pm/.' : 'Invalid configuration.'}` }; invalidate($); return {} }
+    if (!('argv' in list)) { view = { phase: 'message', message: `${config.path}: pm.project "${config.project}" cannot name a folder under pm/.` }; invalidate($); return {} }
     const result = searchOutput(await runObsidian($, list.argv), config.project)
     if (result.kind === 'error') { view = { phase: 'message', message: result.message }; invalidate($); return {} }
     view = { phase: 'list', vault: config.vault, project: config.project, cards: result.kind === 'cards' ? result.cards : [], selected: card || undefined, message: result.kind === 'empty' ? `No unfinished cards in pm/${config.project}.` : undefined }
