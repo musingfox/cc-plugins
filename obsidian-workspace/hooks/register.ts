@@ -6,6 +6,7 @@ import { searchOutput, readOutput, OBSIDIAN_TIMEOUT_MS } from './cli-output.ts'
 import type { Run } from './cli-output.ts'
 import { headerOf } from './card.ts'
 import type { CardHeader } from './card.ts'
+import { vizManifestPath, vizInstallPath } from './viz.ts'
 
 const PANE = { id: 'obw-issue', title: 'obw issue', focus: true, closeOnEscape: true }
 
@@ -13,7 +14,7 @@ const PANE = { id: 'obw-issue', title: 'obw issue', focus: true, closeOnEscape: 
 type CardRegion =
   | { kind: 'loading'; name: string }
   | { kind: 'error'; message: string }
-  | { kind: 'shown'; name: string; header: CardHeader; body: string }
+  | { kind: 'shown'; name: string; header: CardHeader; body: string; viz: string | null }
 
 type View = {
   message: string | null
@@ -54,6 +55,16 @@ function showCard($: any, request: number, name: string, card: CardRegion) {
   invalidate($)
 }
 
+// Any fault while looking for viz only leaves viz unfound; the card still draws.
+async function findViz($: any): Promise<string | null> {
+  try {
+    const path = vizManifestPath(await $.env.get('CLAUDE_CONFIG_DIR'), await $.env.get('HOME'))
+    return path ? vizInstallPath(await $.fs.read(path)) : null
+  } catch {
+    return null
+  }
+}
+
 async function show($: any, name: string) {
   const { scope } = view
   if (!scope) return
@@ -65,7 +76,8 @@ async function show($: any, name: string) {
   showCard($, request, name, { kind: 'loading', name })
   const output = readOutput(await runObsidian($, built.argv))
   if (output.kind === 'error') return showCard($, request, name, { kind: 'error', message: output.message })
-  showCard($, request, name, { kind: 'shown', name, header: headerOf(output.frontmatter), body: output.body })
+  const viz = await findViz($)
+  showCard($, request, name, { kind: 'shown', name, header: headerOf(output.frontmatter), body: output.body, viz })
 }
 
 type Config = { vault: string; project: string; path: string } | { error: string }
