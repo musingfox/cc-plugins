@@ -199,3 +199,39 @@ describe('pressing Open in browser', () => {
     expect(w.writes).toEqual([])
   })
 })
+
+describe('running viz', () => {
+  test('a press runs the installed render.sh on the temp file', async ($, on) => {
+    const w = vizWorld(on)
+    await issue($, 'mod-obw-issue-pane')
+    await press($, w)
+    expect(w.runs[2].argv).toEqual([
+      'bash',
+      '/Users/u/.claude/plugins/cache/m/viz/1.1.4/lib/render.sh',
+      '/tmp/viz/obw/mod-obw-issue-pane.md',
+      'obw-mod-obw-issue-pane',
+    ])
+    expect(w.runs[2].init).toEqual({ timeoutMs: 15000 })
+  })
+
+  test('the install found through CLAUDE_CONFIG_DIR is the one run', async ($, on) => {
+    const w = world(on, {
+      env: { CLAUDE_CONFIG_DIR: '/cfg', HOME: '/Users/u' },
+      files: {
+        [CONFIG_PATH]: CONFIG,
+        '/cfg/plugins/installed_plugins.json': manifest('/cfg/plugins/cache/m/viz/1.1.4'),
+        [HOME_MANIFEST]: manifest('/Users/u/.claude/plugins/cache/m/viz/1.1.3'),
+      },
+    })
+    await issue($, 'mod-obw-issue-pane')
+    await press($, w)
+    expect(w.runs[2].argv[1]).toBe('/cfg/plugins/cache/m/viz/1.1.4/lib/render.sh')
+  })
+
+  test('drawing the pane runs nothing', async ($, on) => {
+    const w = vizWorld(on)
+    await issue($, 'mod-obw-issue-pane')
+    for (let i = 0; i < 3; i += 1) await $.ui.render(PANE)
+    expect(w.runs.length).toBe(2)
+  })
+})

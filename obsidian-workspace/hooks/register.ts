@@ -6,11 +6,11 @@ import { searchOutput, readOutput, OBSIDIAN_TIMEOUT_MS } from './cli-output.ts'
 import type { Run } from './cli-output.ts'
 import { headerOf } from './card.ts'
 import type { CardHeader } from './card.ts'
-import { vizManifestPath, vizInstallPath, renderTarget } from './viz.ts'
+import { vizManifestPath, vizInstallPath, renderTarget, renderOutcome, RENDER_TIMEOUT_MS } from './viz.ts'
 
 const PANE = { id: 'obw-issue', title: 'obw issue', focus: true, closeOnEscape: true }
 
-type Browser = { kind: 'rendering' } | { kind: 'error'; message: string }
+type Browser = { kind: 'rendering' } | ReturnType<typeof renderOutcome>
 
 // The card region under the list has its own state, so a card's outcome never replaces the list's message.
 type CardRegion =
@@ -32,9 +32,9 @@ let view: View = LOADING
 // A CLI call can settle after a newer /issue or card read started; only the latest request writes the view.
 let requests = 0
 
-async function runObsidian($: any, argv: string[]): Promise<Run> {
+async function runProcess($: any, argv: string[], timeoutMs = OBSIDIAN_TIMEOUT_MS): Promise<Run> {
   try {
-    const result = await $.process.run(argv, { timeoutMs: OBSIDIAN_TIMEOUT_MS })
+    const result = await $.process.run(argv, { timeoutMs })
     return { kind: 'exited', exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr }
   } catch {
     return { kind: 'rejected' }
@@ -76,7 +76,7 @@ async function show($: any, name: string) {
     return showCard($, request, name, { kind: 'error', message: `"${name}" is not a card name.` })
   }
   showCard($, request, name, { kind: 'loading', name })
-  const output = readOutput(await runObsidian($, built.argv))
+  const output = readOutput(await runProcess($, built.argv))
   if (output.kind === 'error') return showCard($, request, name, { kind: 'error', message: output.message })
   const viz = await findViz($)
   showCard($, request, name, { kind: 'shown', name, header: headerOf(output.frontmatter), body: output.body, viz, browser: null })
@@ -94,13 +94,15 @@ async function openInBrowser($: any) {
   const card = view.card
   if (card?.kind !== 'shown' || !card.viz) return
   const request = requests
-  const { file } = renderTarget(card.name)
+  const { file, name } = renderTarget(card.name)
   showBrowser($, request, { kind: 'rendering' })
   try {
     await $.fs.write(file, card.body)
   } catch (error) {
     return showBrowser($, request, { kind: 'error', message: `Could not write ${file}: ${reasonOf(error)}` })
   }
+  const run = await runProcess($, ['bash', `${card.viz}/lib/render.sh`, file, name], RENDER_TIMEOUT_MS)
+  showBrowser($, request, renderOutcome(run))
 }
 
 function browserLines(browser: Browser | null): string[] {
@@ -161,7 +163,7 @@ async function openIssue($: any, request: number, card: string) {
   if (!('argv' in list)) {
     return showMessage($, request, `${config.path}: pm.project "${config.project}" cannot name a folder under pm/.`)
   }
-  const result = searchOutput(await runObsidian($, list.argv), config.project)
+  const result = searchOutput(await runProcess($, list.argv), config.project)
   if (request !== requests) return
   if (result.kind === 'error') return showMessage($, request, result.message)
   view = {
