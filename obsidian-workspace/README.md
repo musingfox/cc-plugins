@@ -23,6 +23,8 @@ Plugin identifier: `obw` (skills invoked as `/obw:<name>` or via natural languag
 
 Run `/issue` to list unfinished cards for the configured project, then select one to read its title, status, priority, and markdown body in the same pane. `/issue <card>` opens that card directly. The pane reports missing configuration, unavailable CLI output, and missing cards in place without adding vault content to the conversation.
 
+A shown card has an **Open in browser** Button that renders the card body, Mermaid included, through the [viz](../viz) plugin's `render.sh`. The Button appears only when viz is installed, found through `installed_plugins.json` under `$CLAUDE_CONFIG_DIR` or `~/.claude`, and only in the terminal. Opening the browser uses macOS `open`; over SSH the pane shows the page's URL instead. The pane reports where the card was rendered, or why it was not.
+
 Enable Claude Mods globally before using the pane:
 
 ```bash

@@ -55,3 +55,10 @@ n="$(grep -cF '├── obsidian-workspace/ skills: init, jot, pm · templates,
 [ "$n" -eq 1 ] || fail "root README obw tree line count is $n, want 1"
 n="$(grep -cF 'Built and tested against Claude Code 2.1.276.' obsidian-workspace/README.md || true)"
 [ "$n" -eq 1 ] || fail "obw README Claude Code version line count is $n, want 1"
+
+n="$(awk '/^## Issue Pane/,/^## Prerequisites/' obsidian-workspace/README.md | grep -c 'Open in browser' || true)"
+[ "$n" -ge 1 ] || fail "obw README Issue Pane must mention Open in browser"
+n="$(awk '/^## Issue Pane/,/^## Prerequisites/' obsidian-workspace/README.md | grep -c 'viz' || true)"
+[ "$n" -ge 1 ] || fail "obw README Issue Pane must mention viz"
+n="$(awk '/^## Issue Pane/,/^## Prerequisites/' obsidian-workspace/README.md | grep -c 'macOS' || true)"
+[ "$n" -ge 1 ] || fail "obw README Issue Pane must mention macOS"
