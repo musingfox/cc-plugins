@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 import { PANE } from './fixtures/pane.ts'
-import { SESSION, world } from './fixtures/world.ts'
+import { CARD, SEARCH_ARGV, SESSION, world } from './fixtures/world.ts'
 
 // Every string drawn: Text children, Markdown text, Select option values and labels.
 function stringsIn(node: any): string[] {
@@ -8,6 +8,12 @@ function stringsIn(node: any): string[] {
   if (!node || typeof node !== 'object') return []
   const options = (node.props?.options ?? []).flatMap((option: any) => [option.value, option.label])
   return [...(node.children ?? []), ...(node.props?.children ?? []), node.props?.text, ...options].flatMap(stringsIn)
+}
+
+function nodesOf(node: any, type: string): any[] {
+  if (!node || typeof node !== 'object') return []
+  const kids = [...(node.children ?? []), ...(node.props?.children ?? [])]
+  return [...(node.type === type ? [node] : []), ...kids.flatMap((kid) => nodesOf(kid, type))]
 }
 
 async function issue($: any, args: string) {
@@ -176,5 +182,218 @@ describe('bad card argument', () => {
     world(on, { files: {} })
     await issue($, 'a/b')
     expect(await paneStrings($)).toContain('"a/b" is not a card name.')
+  })
+
+  test('spaces around a card name are trimmed and the name is read', async ($, on) => {
+    const w = world(on, { search: '["pm/cc-plugins/tasks/ok-card.md"]' })
+    await issue($, '  ok-card ')
+    expect(w.runs[1].argv[3]).toBe('path=pm/cc-plugins/tasks/ok-card.md')
+  })
+})
+
+describe('list', () => {
+  test('unfinished cards are one scoped search drawn as a Select', async ($, on) => {
+    const w = world(on, { search: '["pm/cc-plugins/tasks/a.md","pm/cc-plugins/tasks/b.md"]' })
+    await issue($, '')
+    const tree = await $.ui.render(PANE)
+    expect(w.runs.length).toBe(1)
+    expect(w.runs[0].argv).toEqual(SEARCH_ARGV)
+    expect(w.runs[0].init.timeoutMs).toBe(10000)
+    const selects = nodesOf(tree, 'Select')
+    expect(selects.length).toBe(1)
+    expect(selects[0].props.options).toEqual([
+      { value: 'a', label: 'a' },
+      { value: 'b', label: 'b' },
+    ])
+    expect(selects[0].props.value).toBe(undefined)
+    expect(w.invalidates >= 1).toBe(true)
+  })
+
+  test('drawing the pane again runs nothing', async ($, on) => {
+    const w = world(on, { search: '["pm/cc-plugins/tasks/a.md","pm/cc-plugins/tasks/b.md"]' })
+    await issue($, '')
+    await $.ui.render(PANE)
+    await $.ui.render(PANE)
+    await $.ui.render(PANE)
+    expect(w.runs.length).toBe(1)
+  })
+
+  test('no unfinished cards is said in text, with no Select', async ($, on) => {
+    world(on, { search: 'No matches found.\n' })
+    await issue($, '')
+    const tree = await $.ui.render(PANE)
+    expect(nodesOf(tree, 'Select').length).toBe(0)
+    expect(stringsIn(tree)).toContain('No unfinished cards in pm/cc-plugins.')
+  })
+
+  test('an unknown vault is shown as the CLI printed it', async ($, on) => {
+    world(on, { search: 'Vault not found.\n' })
+    await issue($, '')
+    const tree = await $.ui.render(PANE)
+    expect(nodesOf(tree, 'Select').length).toBe(0)
+    expect(stringsIn(tree)).toContain('Vault not found.')
+  })
+
+  test('output of no known shape is shown as printed', async ($, on) => {
+    world(on, { search: 'garbage' })
+    await issue($, '')
+    const tree = await $.ui.render(PANE)
+    expect(nodesOf(tree, 'Select').length).toBe(0)
+    expect(stringsIn(tree)).toContain('garbage')
+  })
+
+  test('a CLI that did not run is said so', async ($, on) => {
+    world(on, { search: { deny: 'spawn failed' } })
+    await issue($, '')
+    expect(await paneStrings($)).toContain(
+      'The obsidian CLI did not run: it is not on PATH, or it did not answer within 10 s.',
+    )
+  })
+
+  test('duplicate and archived paths leave one option each', async ($, on) => {
+    world(on, {
+      search: '["pm/cc-plugins/tasks/a.md","pm/cc-plugins/tasks/a.md","pm/cc-plugins/tasks/archive/c.md"]',
+    })
+    await issue($, '')
+    const tree = await $.ui.render(PANE)
+    expect(tree.type).not.toBe('engine')
+    expect(nodesOf(tree, 'Select')[0].props.options).toEqual([{ value: 'a', label: 'a' }])
+  })
+
+  test('the pane reads "Reading the vault…" while the search runs', async ($, on) => {
+    const w = world(on, { search: 'hang' })
+    await $.session.start(SESSION)
+    const done = $.command.run({ command: 'issue', args: '' })
+    await w.clock.settle()
+    const loading = await $.ui.render(PANE)
+    expect(w.runs.length).toBe(1)
+    expect(stringsIn(loading)).toEqual(['Reading the vault…'])
+    await w.clock.advance(60000)
+    await done
+    expect(nodesOf(await $.ui.render(PANE), 'Select').length).toBe(1)
+  })
+})
+
+describe('card', () => {
+  test('/issue <card> draws the header and body below the preselected list', async ($, on) => {
+    const w = world(on, {
+      search: '["pm/cc-plugins/tasks/mod-obw-issue-pane.md","pm/cc-plugins/tasks/other.md"]',
+      read: CARD,
+    })
+    await issue($, 'mod-obw-issue-pane')
+    const tree = await $.ui.render(PANE)
+    expect(w.runs.map((run: any) => run.argv)).toEqual([
+      SEARCH_ARGV,
+      ['obsidian', 'vault=obsidian', 'read', 'path=pm/cc-plugins/tasks/mod-obw-issue-pane.md'],
+    ])
+    const select = nodesOf(tree, 'Select')[0]
+    expect(select.props.value).toBe('mod-obw-issue-pane')
+    const strings = stringsIn(tree)
+    expect(strings).toContain('Claude Mod：面板顯示 obw 的 task 與 issue')
+    expect(strings).toContain('status: todo · priority: medium')
+    const markdowns = nodesOf(tree, 'Markdown')
+    expect(markdowns.length).toBe(1)
+    expect(markdowns[0].props.text).toBe('# mod-obw-issue-pane\n\n## Acceptance Criteria\n- [ ] one\n')
+    const flat = JSON.stringify(tree)
+    expect(flat.indexOf('"type":"Select"') < flat.indexOf('"type":"Markdown"')).toBe(true)
+  })
+
+  test('a missing card is a message under the list, with no body', async ($, on) => {
+    world(on, { read: 'Error: File "pm/cc-plugins/tasks/nope.md" not found.\n' })
+    await issue($, 'nope')
+    const tree = await $.ui.render(PANE)
+    expect(nodesOf(tree, 'Select').length).toBe(1)
+    expect(stringsIn(tree)).toContain('Error: File "pm/cc-plugins/tasks/nope.md" not found.')
+    expect(nodesOf(tree, 'Markdown').length).toBe(0)
+  })
+
+  test('a card outside the list is still preselected without breaking the pane', async ($, on) => {
+    world(on, {
+      search: '["pm/cc-plugins/tasks/a.md","pm/cc-plugins/tasks/b.md"]',
+      read: 'Error: File "pm/cc-plugins/tasks/zzz.md" not found.\n',
+    })
+    await issue($, 'zzz')
+    const tree = await $.ui.render(PANE)
+    expect(tree.type).not.toBe('engine')
+    expect(nodesOf(tree, 'Select')[0].props.value).toBe('zzz')
+  })
+
+  test('an unknown vault on read is a message, with no body', async ($, on) => {
+    world(on, { read: 'Vault not found.' })
+    await issue($, 'k')
+    const tree = await $.ui.render(PANE)
+    expect(nodesOf(tree, 'Markdown').length).toBe(0)
+    expect(stringsIn(tree)).toContain('Vault not found.')
+  })
+
+  test('a closed app on the search is the only message, and nothing is read', async ($, on) => {
+    const closed = 'The CLI is unable to find Obsidian. Please make sure Obsidian is running and try again.'
+    const w = world(on, { search: { exitCode: 1, stdout: '', stderr: `${closed}\n` } })
+    await issue($, 'k')
+    const tree = await $.ui.render(PANE)
+    expect(w.runs.length).toBe(1)
+    expect(stringsIn(tree)).toContain(closed)
+    expect(nodesOf(tree, 'Select').length).toBe(0)
+    expect(nodesOf(tree, 'Markdown').length).toBe(0)
+  })
+
+  test('a card without title, or priority, falls back to its name and a dash', async ($, on) => {
+    world(on, { read: '---\nstatus: todo\n---\nbody\n' })
+    await issue($, 'k')
+    const tree = await $.ui.render(PANE)
+    const title = nodesOf(tree, 'Text').filter((node: any) => node.props?.bold)
+    expect(stringsIn(title[0])).toEqual(['k'])
+    expect(stringsIn(tree)).toContain('status: todo · priority: —')
+  })
+
+  test('the card region reads "Reading <card>…" while the read runs', async ($, on) => {
+    const w = world(on, { search: '["pm/cc-plugins/tasks/mod-obw-issue-pane.md"]', read: 'hang' })
+    await $.session.start(SESSION)
+    const done = $.command.run({ command: 'issue', args: 'mod-obw-issue-pane' })
+    await w.clock.settle()
+    const loading = await $.ui.render(PANE)
+    expect(w.runs.length).toBe(2)
+    expect(nodesOf(loading, 'Select').length).toBe(1)
+    expect(stringsIn(loading)).toContain('Reading mod-obw-issue-pane…')
+    await w.clock.advance(60000)
+    await done
+  })
+})
+
+describe('bounded drawing', () => {
+  const ESC = String.fromCharCode(27)
+  const CR = String.fromCharCode(13)
+  const DRAWABLE = /^[^\x00-\x08\x0b-\x1f\x7f-\x9f]*$/
+
+  test('a body over 10000 characters is clipped with a notice', async ($, on) => {
+    world(on, { read: `---\ntitle: t\n---\n${'x'.repeat(11000)}` })
+    await issue($, 'k')
+    const tree = await $.ui.render(PANE)
+    expect(tree.type).not.toBe('engine')
+    expect(nodesOf(tree, 'Markdown')[0].props.text.length).toBe(10000)
+    expect(stringsIn(tree)).toContain('Clipped: showing 10000 of 11000 characters.')
+  })
+
+  test('a body of exactly 10000 characters has no notice', async ($, on) => {
+    world(on, { read: `---\ntitle: t\n---\n${'x'.repeat(10000)}` })
+    await issue($, 'k')
+    expect((await paneStrings($)).some((s) => s.includes('Clipped:'))).toBe(false)
+  })
+
+  test('an escape in a CLI message is stripped', async ($, on) => {
+    world(on, { read: `Error: ${ESC}[31mboom` })
+    await issue($, 'k')
+    const strings = await paneStrings($)
+    expect(strings).toContain('Error: [31mboom')
+    expect(strings.some((s) => s.includes(ESC))).toBe(false)
+  })
+})
+
+describe('other panes', () => {
+  test('a pane that is not obw issue draws as it would without obw', async ($, on) => {
+    world(on)
+    on('ui.render', { component: 'Pane' }, () => ({ type: 'Text', children: ['beneath'] }))
+    await $.session.start(SESSION)
+    expect(await $.ui.render({ ...PANE, requestId: 'other' })).toEqual({ type: 'Text', children: ['beneath'] })
   })
 })
