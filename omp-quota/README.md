@@ -10,6 +10,12 @@ Shows every omp provider's remaining quota inside a Claude Code session, as one 
 
 Built and tested against Claude Code 2.1.276.
 
+## How quota is read
+
+- **Remaining share** of a limit: omp's `remainingFraction` when it is a number, else
+  `1 − usedFraction`, else none; clamped to 0–100%. A provider's share is the lowest of its
+  limits' shares. Shown as a rounded percentage, or `—` when none is computable.
+
 ## Enabling
 
 Claude Mods are off unless Claude Code starts with the global switch:
