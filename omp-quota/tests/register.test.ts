@@ -394,6 +394,28 @@ describe('quota band', () => {
     expect(lines[0].props.dimColor).toBe(true)
   })
 
+  test('colors each share by how much is left, leaving a missing share plain', async ($, on) => {
+    const w = world(on, { store: { band: true } })
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    const tree: any = await $.ui.render(BAND)
+    const lines = tree.props?.children ?? tree.children
+    const colored = (line: any) =>
+      (line.props?.children ?? line.children)
+        .filter((span: any) => span?.props?.color)
+        .map((span: any) => [stringsIn(span).join(''), span.props.color])
+    expect(colored(lines[0])).toEqual([
+      ['6%', '#e5484d'],
+      ['6%', '#e5484d'],
+    ])
+    expect(colored(lines[1])).toEqual([])
+    expect(colored(lines[5])).toEqual([
+      ['86%', '#46a758'],
+      ['86%', '#46a758'],
+    ])
+    expect(lines.map((line: any) => line.props.wrap)).toEqual(Array(6).fill('truncate-end'))
+  })
+
   test('a lowest limit without a status shows a dash in its place', async ($, on) => {
     const w = world(on, { store: { band: true } })
     w.omp(fixtureWith({ 'openai-codex:secondary': undefined }))

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { quotaModelOf } from '../hooks/quota-model.ts'
+import { quotaModelOf, shareColorOf } from '../hooks/quota-model.ts'
 import { readUsage } from '../hooks/usage.ts'
 import type { LimitQuota } from '../hooks/usage.ts'
 import { SNAPSHOT_STDOUT } from './fixtures/snapshot.ts'
@@ -14,7 +14,7 @@ function fixtureUsage() {
 
 function sectionOf(provider: string) {
   const model = quotaModelOf({ usage: fixtureUsage(), failure: null, lastGoodAt: NOW }, NOW)
-  return model.providers.find((p) => p.heading.startsWith(`${provider} `))!
+  return model.providers.find((p) => p.provider === provider)!
 }
 
 function limit(id: string, over: Partial<LimitQuota> = {}): LimitQuota {
@@ -29,10 +29,10 @@ function rowsOf(limits: LimitQuota[]) {
 describe('quotaModelOf', () => {
   test('lists each codex limit with share, status, and time to reset', () => {
     const codex = sectionOf('openai-codex')
-    expect(codex.heading).toBe('openai-codex 6%')
+    expect([codex.provider, codex.share, codex.shareColor]).toEqual(['openai-codex', '6%', '#e5484d'])
     expect(codex.rows).toEqual([
-      { name: '5 hours', share: '100%', status: 'ok', resets: '4h 59m' },
-      { name: '7 days', share: '6%', status: 'warning', resets: '1d 11h' },
+      { name: '5 hours', share: '100%', shareColor: '#46a758', status: 'ok', resets: '4h 59m' },
+      { name: '7 days', share: '6%', shareColor: '#e5484d', status: 'warning', resets: '1d 11h' },
     ])
   })
 
@@ -56,16 +56,17 @@ describe('quotaModelOf', () => {
     expect(cursor.rows[1]!.status).toBe('exhausted')
   })
 
-  test('anthropic heading and reset times', () => {
+  test('anthropic share and reset times', () => {
     const anthropic = sectionOf('anthropic')
-    expect(anthropic.heading).toBe('anthropic 86%')
+    expect(anthropic.share).toBe('86%')
     expect(anthropic.rows[0]!.resets).toBe('1h 44m')
     expect(anthropic.rows[1]!.resets).toBe('5d 15h')
   })
 
   test('a provider with no limits says so', () => {
     expect(sectionOf('ollama-cloud')).toEqual({
-      heading: 'ollama-cloud —',
+      provider: 'ollama-cloud',
+      share: '—',
       rows: [],
       empty: 'no limits reported',
       lowest: null,
@@ -113,5 +114,32 @@ describe('quotaModelOf', () => {
   test('tags keep every id segment that differs within the repeat group', () => {
     const rows = rowsOf([limit('p:x:1'), limit('p:y:1'), limit('p:y:2')])
     expect(rows.map((r) => r.name)).toEqual(['L · W [x:1]', 'L · W [y:1]', 'L · W [y:2]'])
+  })
+})
+
+describe('shareColorOf', () => {
+  const RED = '#e5484d'
+  const ORANGE = '#f5a524'
+  const GREEN = '#46a758'
+
+  test('0 to 30% left is red', () => {
+    expect([0, 0.3].map(shareColorOf)).toEqual([RED, RED])
+  })
+
+  test('31 to 60% left is orange', () => {
+    expect([0.31, 0.6].map(shareColorOf)).toEqual([ORANGE, ORANGE])
+  })
+
+  test('61 to 100% left is green', () => {
+    expect([0.61, 1].map(shareColorOf)).toEqual([GREEN, GREEN])
+  })
+
+  test('no share has no color', () => {
+    expect(shareColorOf(null)).toBeUndefined()
+  })
+
+  test('the color follows the rounded percentage shown', () => {
+    expect(shareColorOf(0.305)).toBe(ORANGE)
+    expect(shareColorOf(0.604)).toBe(ORANGE)
   })
 })

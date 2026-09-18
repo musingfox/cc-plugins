@@ -94,12 +94,16 @@ async function toggleBand($: any) {
 async function renderBand($: any, e: any) {
   const { Box, Text } = await $.ui.resolve(e)
   const model = quotaModelOf(view, await $.clock.now())
+  const share = (text: string, color: string | undefined) => (color ? Text({ color, children: [text] }) : text)
   const lines = []
   if (model.notice) lines.push(Text({ dimColor: true, wrap: 'truncate-end', children: [model.notice] }))
   for (const section of model.providers) {
     const limit = section.lowest
-    const summary = limit ? [limit.name, ' ', limit.share, ' ', limit.status, '  resets ', limit.resets] : [section.empty]
-    lines.push(Text({ wrap: 'truncate-end', children: [section.heading, '  ', ...summary] }))
+    const summary = limit
+      ? [limit.name, ' ', share(limit.share, limit.shareColor), ' ', limit.status, '  resets ', limit.resets]
+      : [section.empty]
+    const provider = [section.provider, ' ', share(section.share, section.shareColor), '  ']
+    lines.push(Text({ wrap: 'truncate-end', children: [...provider, ...summary] }))
   }
   return Box({ flexDirection: 'column', children: lines })
 }

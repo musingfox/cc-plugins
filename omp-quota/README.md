@@ -93,7 +93,9 @@ order: `<provider> <share>`, then the provider's lowest limit as
 `openai-codex 6%  7 days 6% warning  resets 1d 11h`. The lowest limit is the first one with
 the least share left, or the first limit when none has a share. Status reads `—` when omp
 gives none; time to reset reads `Xd Yh`, `Xh Ym`, or `Ym`, `now` when due, and `—` when
-omp gives none. A provider without limits shows `no limits reported`.
+omp gives none. A provider without limits shows `no limits reported`. Each share is colored
+by the percentage shown: red for 0–30%, orange for 31–60%, green for 61–100%; `—` stays
+uncolored. The status line stays plain text.
 
 A limit's name is its label, plus `· <window>` when the window label differs. When the same
 name repeats inside a provider, each gets a tag in brackets: the parts of the limit id that
@@ -103,7 +105,7 @@ Every line is cut at the band's width with an ellipsis rather than wrapped. The 
 to a survey while one holds it, and redraws after every settled fetch, failed ones
 included, so it always shows the latest data the module holds. Collapse it with
 ctrl+x ctrl+a (or its `[-]` mark) without turning it off. It is drawn from `Box` and `Text`
-only, with the props `flexDirection`, `dimColor`, and `wrap`.
+only, with the props `flexDirection`, `color`, `dimColor`, and `wrap`.
 
 ## Enabling
 

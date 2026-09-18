@@ -2,9 +2,16 @@ import type { LimitQuota, Usage } from './usage.ts'
 
 export type QuotaView = { usage: Usage | null; failure: string | null; lastGoodAt: number | null }
 
-export type LimitRow = { name: string; share: string; status: string; resets: string }
+export type LimitRow = { name: string; share: string; shareColor?: string; status: string; resets: string }
 
-export type ProviderSection = { heading: string; rows: LimitRow[]; empty: string | null; lowest: LimitRow | null }
+export type ProviderSection = {
+  provider: string
+  share: string
+  shareColor?: string
+  rows: LimitRow[]
+  empty: string | null
+  lowest: LimitRow | null
+}
 
 export type QuotaModel = { notice: string | null; providers: ProviderSection[] }
 
@@ -12,8 +19,18 @@ const MINUTE = 60_000
 const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
 
+const RED = '#e5484d'
+const ORANGE = '#f5a524'
+const GREEN = '#46a758'
+
 export function percentOf(share: number | null): string {
   return share === null ? '—' : `${Math.round(share * 100)}%`
+}
+
+export function shareColorOf(share: number | null): string | undefined {
+  if (share === null) return undefined
+  const percent = Math.round(share * 100)
+  return percent <= 30 ? RED : percent <= 60 ? ORANGE : GREEN
 }
 
 function durationOf(ms: number): string {
@@ -74,11 +91,14 @@ function sectionsOf(usage: Usage, nowMs: number): ProviderSection[] {
     const rows = provider.limits.map((limit, i) => ({
       name: names[i]!,
       share: percentOf(limit.share),
+      shareColor: shareColorOf(limit.share),
       status: limit.status ?? '—',
       resets: resetsOf(limit.resetsAt, nowMs),
     }))
     return {
-      heading: `${provider.provider} ${percentOf(provider.share)}`,
+      provider: provider.provider,
+      share: percentOf(provider.share),
+      shareColor: shareColorOf(provider.share),
       rows,
       empty: provider.limits.length ? null : 'no limits reported',
       lowest: rows[lowestIndexOf(provider.limits)] ?? null,
