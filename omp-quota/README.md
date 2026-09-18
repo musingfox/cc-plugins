@@ -43,6 +43,9 @@ so no tool call or prompt is ever held up by a slow omp.
   exited non-zero, printed something that is not a JSON report list, or reported no
   providers — the last is how omp answers when it reads the wrong home, so it never wipes
   the display. omp's error output is never shown.
+- **Account data**: only provider names, limit ids and labels, shares, statuses, and reset
+  times are kept. omp's `metadata` (email, account id, endpoint) and each limit's `scope`
+  never reach the status line, a toast, the transcript, or the pane.
 
 ## The status line
 

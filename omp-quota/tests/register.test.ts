@@ -307,3 +307,42 @@ describe('quota pane', () => {
     expect(w.invalidates).toBe(2)
   })
 })
+
+describe('account data', () => {
+  // Built here, never in snapshot.ts: the fixture's own guard would flag it.
+  function planted(statuses: Record<string, string | undefined> = {}) {
+    const copy = JSON.parse(fixtureWith(statuses).stdout)
+    for (const report of copy.reports) {
+      report.metadata = { email: 'planted@example.test', accountId: 'acct-planted', endpoint: 'https://planted.example' }
+      for (const limit of report.limits) limit.scope.projectId = 'proj-planted'
+    }
+    return { exitCode: 0, stdout: JSON.stringify(copy), stderr: '' }
+  }
+
+  test("omp's account data never reaches the status line, a toast, the transcript, or the pane", async ($, on) => {
+    const w = world(on)
+    w.omp(planted({ 'openai-codex:secondary': 'ok' }), planted())
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    const answer = await $.command.run({ command: 'quota', args: 'refresh' })
+    const pane = stringsIn(await $.ui.render(PANE))
+    expect(w.toasts).toHaveLength(1)
+    const shown = [...w.statuses, ...w.toasts, answer.text, ...pane]
+    expect(shown.filter((text) => text.includes('planted'))).toEqual([])
+  })
+
+  test("omp's error output never reaches the status line, the transcript, or the pane", async ($, on) => {
+    const w = world(on)
+    const failing = { exitCode: 1, stdout: '', stderr: 'Bearer sk-planted' }
+    w.omp(planted(), failing)
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    await w.clock.advance(300000)
+    const answer = await $.command.run({ command: 'quota', args: 'refresh' })
+    const pane = stringsIn(await $.ui.render(PANE))
+    const shown = [...w.statuses, ...w.toasts, answer.text, ...pane]
+    expect(shown.filter((text) => text.includes('sk-planted'))).toEqual([])
+    expect(last(w.statuses)).toEndWith(' (stale)')
+    expect(answer).toEqual({ text: 'omp quota refresh failed: omp exited 1' })
+  })
+})
