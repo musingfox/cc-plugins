@@ -7,3 +7,4 @@ test('retains absent header fields', () => expect(headerOf('status: todo')).toEq
 test('ignores nested title', () => expect(headerOf('  title: nested').title).toBe(undefined))
 test('keeps hashes in a title', () => expect(headerOf('title: Fix #12 now')).toEqual({ title: 'Fix #12 now' }))
 test('omits empty title', () => expect(headerOf('title:').title).toBe(undefined))
+test('keeps a title holding a carriage return', () => expect(headerOf(`title: "a${String.fromCharCode(13)}b"`).title).toBe(`a${String.fromCharCode(13)}b`))

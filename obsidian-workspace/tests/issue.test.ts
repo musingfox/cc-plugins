@@ -388,6 +388,16 @@ describe('bounded drawing', () => {
     expect((await paneStrings($)).some((s) => s.includes('Clipped:'))).toBe(false)
   })
 
+  test('carriage returns and escapes are stripped from title and body', async ($, on) => {
+    world(on, { read: `---\ntitle: "a${CR}b"\n---\nline1${CR}\nline2 ${ESC}[31mred${ESC}[0m\n` })
+    await issue($, 'k')
+    const tree = await $.ui.render(PANE)
+    for (const text of stringsIn(tree)) expect(DRAWABLE.test(text)).toBe(true)
+    expect(nodesOf(tree, 'Markdown')[0].props.text.includes('line1\nline2 [31mred[0m')).toBe(true)
+    const title = nodesOf(tree, 'Text').filter((node: any) => node.props?.bold)
+    expect(stringsIn(title[0])).toEqual(['ab'])
+  })
+
   test('an escape in a CLI message is stripped', async ($, on) => {
     world(on, { read: `Error: ${ESC}[31mboom` })
     await issue($, 'k')
