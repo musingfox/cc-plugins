@@ -241,7 +241,7 @@ Survey a codebase for deepening opportunities — shallow modules, leaking seams
 
 Every omp provider's remaining quota inside the session, as a Claude Mod (needs `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`, which enables every installed plugin's modules):
 - **Status line**: each provider's lowest remaining share, marked `(stale)` when the latest fetch failed
-- **`/quota`**: a pane listing every limit with its share, status, and time to reset
+- **`/quota`**: toggles a compact table above the prompt with each provider's share and its lowest limit
 - **`/quota refresh`**: runs `omp usage invalidate`, then fetches fresh quota without a model turn
 - **Toast**: one in-session toast when a provider's status worsens from `ok`
 

@@ -26,7 +26,7 @@ type Hook = (...args: any[]) => unknown
 export type WorldOptions = {
   env?: Record<string, string>
   commandRegister?: Hook
-  uiOpen?: Hook
+  store?: Record<string, unknown> | 'refuse'
 }
 
 // A stub world beneath the plugin: every $ call it makes is answered and recorded here.
@@ -36,13 +36,17 @@ export function world(on: any, options: WorldOptions = {}) {
   const runs: any[] = []
   const statuses: string[] = []
   const toasts: string[] = []
-  const opened: any[] = []
   const registered: any[] = []
   const state = { invalidates: 0, omp: [FIXTURE] as OmpAnswer[], invalidate: { exitCode: 0 } as OmpAnswer }
 
   on('session.start', ($: any, e: any) => ({ cwd: e.cwd }))
   const clock = mock.clock(on, { now: NOW })
   mock.env(on, options.env ?? { HOME: '/home/u' })
+  if (options.store === 'refuse') {
+    for (const call of ['store.get', 'store.set']) on(call, () => ({ deny: 'store unavailable' }))
+  } else {
+    mock.store(on, options.store ?? {})
+  }
   on(
     'command.register',
     options.commandRegister ??
@@ -69,14 +73,6 @@ export function world(on: any, options: WorldOptions = {}) {
     toasts.push(e.text)
     return { value: undefined }
   })
-  on(
-    'ui.open',
-    options.uiOpen ??
-      (($: any, e: any) => {
-        opened.push(e)
-        return { value: undefined }
-      }),
-  )
   on('ui.invalidate', () => {
     state.invalidates += 1
     return { value: undefined }
@@ -87,7 +83,6 @@ export function world(on: any, options: WorldOptions = {}) {
     runs,
     statuses,
     toasts,
-    opened,
     registered,
     jsonRuns: () => runs.filter((r) => r.argv[2] === '--json').length,
     get invalidates() {

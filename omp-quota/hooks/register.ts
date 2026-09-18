@@ -1,6 +1,6 @@
 import type { On } from 'claude-code'
-import { paneModelOf } from './pane-rows.ts'
-import type { QuotaView } from './pane-rows.ts'
+import { quotaModelOf } from './quota-model.ts'
+import type { QuotaView } from './quota-model.ts'
 import { statusLineOf } from './status-line.ts'
 import { readUsage, worsenedProviders } from './usage.ts'
 import type { OmpOutcome, UsageReading } from './usage.ts'
@@ -9,9 +9,10 @@ const FETCH_ARGV = ['omp', 'usage', '--json']
 const INVALIDATE_ARGV = ['omp', 'usage', 'invalidate']
 const OMP_TIMEOUT_MS = 10_000
 const POLL_MS = 300_000
-const PANE_ID = 'omp-quota'
+const BAND_KEY = 'band'
 
 let view: QuotaView = { usage: null, failure: null, lastGoodAt: null }
+let bandOn = false
 let poll: { cancel(): void } | null = null
 let fetchesStarted = 0
 let lastPublished = 0
@@ -71,31 +72,34 @@ async function refresh($: any) {
   return { text: reading.ok ? `omp quota refreshed${note}` : `omp quota refresh failed: ${reading.reason}${note}` }
 }
 
-async function openPane($: any) {
+async function readBand($: any) {
   try {
-    await $.ui.open({ id: PANE_ID, title: 'omp quota', focus: true, closeOnEscape: true })
-    return {}
+    bandOn = (await $.store.get(BAND_KEY)) === true
   } catch {
-    return { text: 'omp quota: the pane could not open' }
+    bandOn = false
   }
 }
 
-async function renderPane($: any, e: any) {
+async function toggleBand($: any) {
+  bandOn = !bandOn
+  try {
+    await $.store.set(BAND_KEY, bandOn)
+  } catch {
+    // The band still toggles for this session; only the next one will not remember it.
+  }
+  $.ui.invalidate('ui.render')
+  return {}
+}
+
+async function renderBand($: any, e: any) {
   const { Box, Text } = await $.ui.resolve(e)
-  const model = paneModelOf(view, await $.clock.now())
+  const model = quotaModelOf(view, await $.clock.now())
   const lines = []
-  if (model.notice) lines.push(Text({ dimColor: true, children: [model.notice] }))
+  if (model.notice) lines.push(Text({ dimColor: true, wrap: 'truncate-end', children: [model.notice] }))
   for (const section of model.providers) {
-    lines.push(Text({ bold: true, children: [section.heading] }))
-    if (section.empty) lines.push(Text({ dimColor: true, children: ['  ', section.empty] }))
-    for (const row of section.rows) {
-      lines.push(
-        Text({
-          wrap: 'truncate-end',
-          children: ['  ', row.name, '  ', row.share, '  ', row.status, '  resets ', row.resets],
-        }),
-      )
-    }
+    const limit = section.lowest
+    const summary = limit ? [limit.name, ' ', limit.share, ' ', limit.status, '  resets ', limit.resets] : [section.empty]
+    lines.push(Text({ wrap: 'truncate-end', children: [section.heading, '  ', ...summary] }))
   }
   return Box({ flexDirection: 'column', children: lines })
 }
@@ -113,6 +117,7 @@ export function register(on: On) {
     } catch {
       // A refused /quota leaves the status line and the poll working.
     }
+    await readBand($)
     void fetchAndPublish($).catch(() => {})
     // A reload re-fires session.start on this instance; a second timer would double the cadence.
     poll?.cancel()
@@ -124,13 +129,13 @@ export function register(on: On) {
 
   on('command.run', { command: 'quota' }, async ($, e) => {
     const args = (e.args ?? '').trim()
-    if (args === '') return openPane($)
+    if (args === '') return toggleBand($)
     if (args === 'refresh') return refresh($)
     return { text: 'usage: /quota [refresh]' }
   })
 
-  on('ui.render', { component: 'Pane' }, async ($, e, next) => {
-    if (e.requestId !== PANE_ID) return next(e)
-    return renderPane($, e)
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (!bandOn || e.props.hasSurvey) return next(e)
+    return renderBand($, e)
   })
 }

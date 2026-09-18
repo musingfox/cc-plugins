@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { PANE } from './fixtures/pane.ts'
+import { BAND } from './fixtures/band.ts'
 import { FIXTURE, NOW, SESSION, fixtureWith, world } from './fixtures/world.ts'
 
 const SUCCESS =
@@ -14,6 +14,25 @@ function stringsIn(node: any): string[] {
 function last(list: string[]) {
   return list[list.length - 1]
 }
+
+const BENEATH = { type: 'Text', children: ['beneath'] }
+
+function beneath(on: any) {
+  on('ui.render', { component: 'AbovePrompt' }, () => BENEATH)
+}
+
+function linesOf(tree: any): string[] {
+  return (tree.props?.children ?? tree.children).map((line: any) => stringsIn(line).join(''))
+}
+
+const BAND_LINES = [
+  'openai-codex 6%  7 days 6% warning  resets 1d 11h',
+  'ollama-cloud —  no limits reported',
+  'google-antigravity 100%  Gemini · Weekly 100% ok  resets 6d 23h',
+  'xai-oauth 100%  SuperGrok Weekly Credits · Weekly 100% ok  resets 6d 5h',
+  'cursor 0%  Cursor Models · Monthly 0% exhausted  resets 11h 25m',
+  'anthropic 86%  Claude 5 Hour · 5 Hour 86% ok  resets 1h 44m',
+]
 
 test('session start passes through to the engine', async ($, on) => {
   world(on)
@@ -228,8 +247,6 @@ describe('overlapping fetches', () => {
 })
 
 describe('/quota', () => {
-  const PANE = { id: 'omp-quota', title: 'omp quota', focus: true, closeOnEscape: true }
-
   test('session start registers the command', async ($, on) => {
     const w = world(on)
     await $.session.start(SESSION)
@@ -238,38 +255,57 @@ describe('/quota', () => {
     ])
   })
 
-  test('only the command opens the pane, never a poll or a worsening', async ($, on) => {
+  test('toggles the band on, then off, answering nothing and asking for a redraw each time', async ($, on) => {
     const w = world(on)
+    beneath(on)
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    const before = w.invalidates
+    expect(await $.command.run({ command: 'quota' })).toEqual({})
+    expect(w.invalidates).toBe(before + 1)
+    expect(linesOf(await $.ui.render(BAND))).toEqual(BAND_LINES)
+    expect(await $.command.run({ command: 'quota' })).toEqual({})
+    expect(w.invalidates).toBe(before + 2)
+    expect(await $.ui.render(BAND)).toEqual(BENEATH)
+  })
+
+  test('only the command shows the band, never a poll or a worsening', async ($, on) => {
+    const w = world(on)
+    beneath(on)
     w.omp(fixtureWith({ 'openai-codex:secondary': 'ok' }), FIXTURE)
     await $.session.start(SESSION)
     await w.clock.settle()
     await w.clock.advance(600000)
     expect(w.toasts).toHaveLength(1)
-    expect(w.opened).toEqual([])
-    expect(await $.command.run({ command: 'quota' })).toEqual({})
-    expect(w.opened).toEqual([PANE])
+    expect(await $.ui.render(BAND)).toEqual(BENEATH)
   })
 
   test('other arguments answer the usage line and run nothing', async ($, on) => {
     const w = world(on)
+    beneath(on)
     await $.session.start(SESSION)
     await w.clock.settle()
     const runs = w.runs.length
     expect(await $.command.run({ command: 'quota', args: 'junk' })).toEqual({ text: 'usage: /quota [refresh]' })
-    expect(w.opened).toEqual([])
+    expect(await $.ui.render(BAND)).toEqual(BENEATH)
     expect(w.runs).toHaveLength(runs)
   })
 
-  test('a refused pane answers one transcript line', async ($, on) => {
-    const w = world(on, { uiOpen: () => ({ deny: 'no' }) })
-    await $.session.start(SESSION)
-    expect(await $.command.run({ command: 'quota' })).toEqual({ text: 'omp quota: the pane could not open' })
+  test('a store that refuses still toggles the band', async ($, on) => {
+    const w = world(on, { store: 'refuse' })
+    beneath(on)
+    expect(await $.session.start(SESSION)).toEqual({ cwd: '/work' })
+    await w.clock.settle()
+    expect(await $.ui.render(BAND)).toEqual(BENEATH)
+    expect(await $.command.run({ command: 'quota' })).toEqual({})
+    expect(linesOf(await $.ui.render(BAND))).toEqual(BAND_LINES)
   })
 })
 
 describe('/quota refresh', () => {
   test("drops omp's cache, then refetches, both against the user's omp home", async ($, on) => {
     const w = world(on)
+    beneath(on)
     await $.session.start(SESSION)
     await w.clock.settle()
     expect(await $.command.run({ command: 'quota', args: 'refresh' })).toEqual({ text: 'omp quota refreshed' })
@@ -278,7 +314,7 @@ describe('/quota refresh', () => {
     expect(fetch.argv).toEqual(['omp', 'usage', '--json'])
     expect(invalidate.init.env.PI_CODING_AGENT_DIR).toBe('/home/u/.omp/agent')
     expect(fetch.init.env.PI_CODING_AGENT_DIR).toBe('/home/u/.omp/agent')
-    expect(w.opened).toEqual([])
+    expect(await $.ui.render(BAND)).toEqual(BENEATH)
   })
 
   test('a failed refetch answers the reason and marks the status line stale', async ($, on) => {
@@ -305,40 +341,82 @@ describe('/quota refresh', () => {
   })
 })
 
-describe('quota pane', () => {
-  test('draws every provider section and row from the latest data', async ($, on) => {
-    const w = world(on)
+describe('quota band', () => {
+  test('a band left on in an earlier session draws from the start', async ($, on) => {
+    const w = world(on, { store: { band: true } })
+    beneath(on)
     await $.session.start(SESSION)
     await w.clock.settle()
-    const strings = stringsIn(await $.ui.render(PANE))
-    expect(strings).toContain('openai-codex 6%')
-    expect(strings).toContain('Claude & GPT (shared) · Weekly [anthropic]')
-    expect(strings).toContain('1d 11h')
-    expect(strings).toContain('no limits reported')
+    expect(linesOf(await $.ui.render(BAND))).toEqual(BAND_LINES)
+  })
+
+  test('a toggle is remembered by the next session start', async ($, on) => {
+    const w = world(on)
+    beneath(on)
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    await $.command.run({ command: 'quota' })
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    expect(linesOf(await $.ui.render(BAND))).toEqual(BAND_LINES)
+    await $.command.run({ command: 'quota' })
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    expect(await $.ui.render(BAND)).toEqual(BENEATH)
+  })
+
+  test('a store that refuses at session start leaves the band off', async ($, on) => {
+    const w = world(on, { store: 'refuse' })
+    beneath(on)
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    expect(await $.ui.render(BAND)).toEqual(BENEATH)
+  })
+
+  test('yields to a survey holding the band', async ($, on) => {
+    const w = world(on, { store: { band: true } })
+    beneath(on)
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    expect(await $.ui.render({ ...BAND, props: { ...BAND.props, hasSurvey: true } })).toEqual(BENEATH)
+  })
+
+  test('draws one truncating line per provider in omp order, under a dim stale notice', async ($, on) => {
+    const w = world(on, { store: { band: true } })
+    w.omp(FIXTURE, { exitCode: 1 })
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    await $.command.run({ command: 'quota', args: 'refresh' })
+    const tree: any = await $.ui.render(BAND)
+    expect(linesOf(tree)).toEqual(['Stale: omp exited 1; showing data from 0m ago', ...BAND_LINES])
+    const lines = tree.props?.children ?? tree.children
+    expect(lines.map((line: any) => line.props.wrap)).toEqual(Array(7).fill('truncate-end'))
+    expect(lines[0].props.dimColor).toBe(true)
+  })
+
+  test('a lowest limit without a status shows a dash in its place', async ($, on) => {
+    const w = world(on, { store: { band: true } })
+    w.omp(fixtureWith({ 'openai-codex:secondary': undefined }))
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    expect(linesOf(await $.ui.render(BAND))[0]).toBe('openai-codex 6%  7 days 6% —  resets 1d 11h')
   })
 
   test('says it is fetching while omp has not answered', async ($, on) => {
-    const w = world(on)
+    const w = world(on, { store: { band: true } })
     w.omp('hang')
     await $.session.start(SESSION)
     await w.clock.settle()
-    expect(stringsIn(await $.ui.render(PANE))).toContain('Fetching omp usage')
+    expect(linesOf(await $.ui.render(BAND))).toEqual(['Fetching omp usage'])
     await w.clock.advance(60000)
   })
 
   test('names the failure when no fetch has succeeded', async ($, on) => {
-    const w = world(on)
+    const w = world(on, { store: { band: true } })
     w.omp({ deny: 'timed out' })
     await $.session.start(SESSION)
     await w.clock.settle()
-    expect(stringsIn(await $.ui.render(PANE))).toContain('Unavailable: omp did not answer')
-  })
-
-  test("leaves another plugin's pane to the hook beneath", async ($, on) => {
-    world(on)
-    on('ui.render', { component: 'Pane' }, () => ({ type: 'Text', children: ['beneath'] }))
-    await $.session.start(SESSION)
-    expect(await $.ui.render({ ...PANE, requestId: 'other' })).toEqual({ type: 'Text', children: ['beneath'] })
+    expect(linesOf(await $.ui.render(BAND))).toEqual(['Unavailable: omp did not answer'])
   })
 
   test('asks for a redraw after every settled fetch, failed ones included', async ($, on) => {
@@ -363,28 +441,30 @@ describe('account data', () => {
     return { exitCode: 0, stdout: JSON.stringify(copy), stderr: '' }
   }
 
-  test("omp's account data never reaches the status line, a toast, the transcript, or the pane", async ($, on) => {
-    const w = world(on)
+  test("omp's account data never reaches the status line, a toast, the transcript, or the band", async ($, on) => {
+    const w = world(on, { store: { band: true } })
     w.omp(planted({ 'openai-codex:secondary': 'ok' }), planted())
     await $.session.start(SESSION)
     await w.clock.settle()
     const answer = await $.command.run({ command: 'quota', args: 'refresh' })
-    const pane = stringsIn(await $.ui.render(PANE))
+    const band = stringsIn(await $.ui.render(BAND))
     expect(w.toasts).toHaveLength(1)
-    const shown = [...w.statuses, ...w.toasts, answer.text, ...pane]
+    expect(band).not.toEqual([])
+    const shown = [...w.statuses, ...w.toasts, answer.text, ...band]
     expect(shown.filter((text) => text.includes('planted'))).toEqual([])
   })
 
-  test("omp's error output never reaches the status line, the transcript, or the pane", async ($, on) => {
-    const w = world(on)
+  test("omp's error output never reaches the status line, the transcript, or the band", async ($, on) => {
+    const w = world(on, { store: { band: true } })
     const failing = { exitCode: 1, stdout: '', stderr: 'Bearer sk-planted' }
     w.omp(planted(), failing)
     await $.session.start(SESSION)
     await w.clock.settle()
     await w.clock.advance(300000)
     const answer = await $.command.run({ command: 'quota', args: 'refresh' })
-    const pane = stringsIn(await $.ui.render(PANE))
-    const shown = [...w.statuses, ...w.toasts, answer.text, ...pane]
+    const band = stringsIn(await $.ui.render(BAND))
+    expect(band).not.toEqual([])
+    const shown = [...w.statuses, ...w.toasts, answer.text, ...band]
     expect(shown.filter((text) => text.includes('sk-planted'))).toEqual([])
     expect(last(w.statuses)).toEndWith(' (stale)')
     expect(answer).toEqual({ text: 'omp quota refresh failed: omp exited 1' })

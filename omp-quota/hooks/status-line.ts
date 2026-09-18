@@ -1,5 +1,5 @@
-import { percentOf } from './pane-rows.ts'
-import type { QuotaView } from './pane-rows.ts'
+import { percentOf } from './quota-model.ts'
+import type { QuotaView } from './quota-model.ts'
 
 export function statusLineOf(view: QuotaView): string {
   if (!view.usage) return view.failure ? `omp quota: unavailable (${view.failure})` : 'omp quota: fetching'

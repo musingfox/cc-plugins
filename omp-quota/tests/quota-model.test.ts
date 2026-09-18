@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { paneModelOf } from '../hooks/pane-rows.ts'
+import { quotaModelOf } from '../hooks/quota-model.ts'
 import { readUsage } from '../hooks/usage.ts'
 import type { LimitQuota } from '../hooks/usage.ts'
 import { SNAPSHOT_STDOUT } from './fixtures/snapshot.ts'
@@ -13,7 +13,7 @@ function fixtureUsage() {
 }
 
 function sectionOf(provider: string) {
-  const model = paneModelOf({ usage: fixtureUsage(), failure: null, lastGoodAt: NOW }, NOW)
+  const model = quotaModelOf({ usage: fixtureUsage(), failure: null, lastGoodAt: NOW }, NOW)
   return model.providers.find((p) => p.heading.startsWith(`${provider} `))!
 }
 
@@ -23,10 +23,10 @@ function limit(id: string, over: Partial<LimitQuota> = {}): LimitQuota {
 
 function rowsOf(limits: LimitQuota[]) {
   const usage = { providers: [{ provider: 'p', limits, share: null, status: null }] }
-  return paneModelOf({ usage, failure: null, lastGoodAt: NOW }, NOW).providers[0]!.rows
+  return quotaModelOf({ usage, failure: null, lastGoodAt: NOW }, NOW).providers[0]!.rows
 }
 
-describe('paneModelOf', () => {
+describe('quotaModelOf', () => {
   test('lists each codex limit with share, status, and time to reset', () => {
     const codex = sectionOf('openai-codex')
     expect(codex.heading).toBe('openai-codex 6%')
@@ -64,27 +64,44 @@ describe('paneModelOf', () => {
   })
 
   test('a provider with no limits says so', () => {
-    expect(sectionOf('ollama-cloud')).toEqual({ heading: 'ollama-cloud —', rows: [], empty: 'no limits reported' })
+    expect(sectionOf('ollama-cloud')).toEqual({
+      heading: 'ollama-cloud —',
+      rows: [],
+      empty: 'no limits reported',
+      lowest: null,
+    })
   })
 
-  test('before any fetch settles the pane says it is fetching', () => {
-    expect(paneModelOf({ usage: null, failure: null, lastGoodAt: null }, NOW)).toEqual({
+  test('before any fetch settles the model says it is fetching', () => {
+    expect(quotaModelOf({ usage: null, failure: null, lastGoodAt: null }, NOW)).toEqual({
       notice: 'Fetching omp usage',
       providers: [],
     })
   })
 
-  test('with no good fetch yet the pane names the failure', () => {
-    expect(paneModelOf({ usage: null, failure: 'omp exited 1', lastGoodAt: null }, NOW)).toEqual({
+  test('with no good fetch yet the model names the failure', () => {
+    expect(quotaModelOf({ usage: null, failure: 'omp exited 1', lastGoodAt: null }, NOW)).toEqual({
       notice: 'Unavailable: omp exited 1',
       providers: [],
     })
   })
 
   test('a failure after good data keeps the data and says how old it is', () => {
-    const model = paneModelOf({ usage: fixtureUsage(), failure: 'omp did not answer', lastGoodAt: NOW - 720000 }, NOW)
+    const model = quotaModelOf({ usage: fixtureUsage(), failure: 'omp did not answer', lastGoodAt: NOW - 720000 }, NOW)
     expect(model.notice).toBe('Stale: omp did not answer; showing data from 12m ago')
     expect(model.providers).toHaveLength(6)
+  })
+
+  test('the lowest limit is the first with the least share, skipping limits without one', () => {
+    expect(sectionOf('openai-codex').lowest!.name).toBe('7 days')
+    expect(sectionOf('cursor').lowest!.name).toBe('Cursor Models · Monthly')
+    expect(sectionOf('google-antigravity').lowest!.name).toBe('Gemini · Weekly')
+  })
+
+  test('with no share anywhere the lowest limit is the first', () => {
+    const limits = [limit('a', { label: 'A' }), limit('b', { label: 'B' })]
+    const usage = { providers: [{ provider: 'p', limits, share: null, status: null }] }
+    expect(quotaModelOf({ usage, failure: null, lastGoodAt: NOW }, NOW).providers[0]!.lowest!.name).toBe('A · W')
   })
 
   test('a due reset reads now and a missing one reads a dash', () => {

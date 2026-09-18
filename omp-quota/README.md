@@ -4,7 +4,7 @@ Shows every omp provider's remaining quota inside a Claude Code session, as one 
 (a function-hooks module, `hooks/register.ts`).
 
 - **Status line**: one line under the prompt with each provider's lowest remaining share.
-- **`/quota`**: opens a pane listing every limit of every provider.
+- **`/quota`**: toggles a compact table above the prompt, one line per provider.
 - **`/quota refresh`**: drops omp's cache and fetches fresh quota, without a model turn.
 - **Toast**: one in-session toast when a provider's status worsens from `ok`.
 
@@ -45,7 +45,7 @@ so no tool call or prompt is ever held up by a slow omp.
   the display. omp's error output is never shown.
 - **Account data**: only provider names, limit ids and labels, shares, statuses, and reset
   times are kept. omp's `metadata` (email, account id, endpoint) and each limit's `scope`
-  never reach the status line, a toast, the transcript, or the pane.
+  never reach the status line, a toast, the transcript, or the band.
 
 ## The status line
 
@@ -70,34 +70,40 @@ you are in another window shows on the status line when you return.
 
 ## Commands
 
-- `/quota` opens the pane (`omp-quota`), focused and closed with Escape; it prints nothing
-  in the transcript. Only this command opens the pane — a poll or a worsening never does.
-  If the pane is refused, one line says so.
+- `/quota` toggles the band above the prompt on or off and prints nothing in the
+  transcript. Only this command changes the band — a poll or a worsening never does. The
+  choice is kept in the plugin's store (key `band`) and read at session start, so the band
+  stays as you left it; with nothing stored, or a store that fails, it starts off. A store
+  that fails on the toggle still flips the band for this session.
 - `/quota refresh` runs `omp usage invalidate`, then fetches, both against the same omp
   home, and answers one line: `omp quota refreshed` or
   `omp quota refresh failed: <reason>` (the status line then goes stale). When the
   invalidate fails, the fetch still runs and the answer ends in `(cache not invalidated)`.
-  It does not open the pane and needs no model turn.
+  It does not change the band and needs no model turn.
 - `/quota <anything else>` answers `usage: /quota [refresh]` and runs nothing.
 
-## The pane
+## The band
 
-A notice line while fetching (`Fetching omp usage`), when no fetch has succeeded
+The band is the strip directly above the prompt input. While `/quota` has it on, it shows
+a dim notice line while fetching (`Fetching omp usage`), when no fetch has succeeded
 (`Unavailable: <reason>`), or when the latest fetch failed
-(`Stale: <reason>; showing data from <age> ago`). Then one section per provider, headed
-`<provider> <share>`, with one row per limit: name, share, status (`—` when omp gives
-none), and time to reset (`Xd Yh`, `Xh Ym`, or `Ym`; `now` when due; `—` when omp gives
-none). A provider without limits shows `no limits reported`.
+(`Stale: <reason>; showing data from <age> ago`). Then one line per provider, in omp's
+order: `<provider> <share>`, then the provider's lowest limit as
+`<name> <share> <status>  resets <time>`, for example
+`openai-codex 6%  7 days 6% warning  resets 1d 11h`. The lowest limit is the first one with
+the least share left, or the first limit when none has a share. Status reads `—` when omp
+gives none; time to reset reads `Xd Yh`, `Xh Ym`, or `Ym`, `now` when due, and `—` when
+omp gives none. A provider without limits shows `no limits reported`.
 
-A row's name is the limit label, plus `· <window>` when the window label differs. When
-the same name repeats inside a provider, each row gets a tag in brackets: the parts of the
-limit id that differ within the group (antigravity's shared pools read `[anthropic]` and
-`[openai]`).
+A limit's name is its label, plus `· <window>` when the window label differs. When the same
+name repeats inside a provider, each gets a tag in brackets: the parts of the limit id that
+differ within the group (antigravity's shared pools read `[anthropic]` and `[openai]`).
 
-The open pane redraws after every settled fetch, failed ones included, so it always shows
-the latest data the module holds. It is drawn from `Box` and `Text` only, with the props
-`flexDirection`, `bold`, `dimColor`, and `wrap`; any other prop would make Claude Code
-fall back to drawing its own pane.
+Every line is cut at the band's width with an ellipsis rather than wrapped. The band yields
+to a survey while one holds it, and redraws after every settled fetch, failed ones
+included, so it always shows the latest data the module holds. Collapse it with
+ctrl+x ctrl+a (or its `[-]` mark) without turning it off. It is drawn from `Box` and `Text`
+only, with the props `flexDirection`, `dimColor`, and `wrap`.
 
 ## Enabling
 

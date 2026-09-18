@@ -2,11 +2,11 @@ import type { LimitQuota, Usage } from './usage.ts'
 
 export type QuotaView = { usage: Usage | null; failure: string | null; lastGoodAt: number | null }
 
-export type PaneRow = { name: string; share: string; status: string; resets: string }
+export type LimitRow = { name: string; share: string; status: string; resets: string }
 
-export type PaneSection = { heading: string; rows: PaneRow[]; empty: string | null }
+export type ProviderSection = { heading: string; rows: LimitRow[]; empty: string | null; lowest: LimitRow | null }
 
-export type PaneModel = { notice: string | null; providers: PaneSection[] }
+export type QuotaModel = { notice: string | null; providers: ProviderSection[] }
 
 const MINUTE = 60_000
 const HOUR = 60 * MINUTE
@@ -59,23 +59,34 @@ function rowNamesOf(limits: LimitQuota[]): string[] {
   return names
 }
 
-function sectionsOf(usage: Usage, nowMs: number): PaneSection[] {
+function lowestIndexOf(limits: LimitQuota[]): number {
+  let lowest = 0
+  limits.forEach((limit, i) => {
+    const least = limits[lowest]!.share
+    if (limit.share !== null && (least === null || limit.share < least)) lowest = i
+  })
+  return lowest
+}
+
+function sectionsOf(usage: Usage, nowMs: number): ProviderSection[] {
   return usage.providers.map((provider) => {
     const names = rowNamesOf(provider.limits)
+    const rows = provider.limits.map((limit, i) => ({
+      name: names[i]!,
+      share: percentOf(limit.share),
+      status: limit.status ?? '—',
+      resets: resetsOf(limit.resetsAt, nowMs),
+    }))
     return {
       heading: `${provider.provider} ${percentOf(provider.share)}`,
-      rows: provider.limits.map((limit, i) => ({
-        name: names[i]!,
-        share: percentOf(limit.share),
-        status: limit.status ?? '—',
-        resets: resetsOf(limit.resetsAt, nowMs),
-      })),
+      rows,
       empty: provider.limits.length ? null : 'no limits reported',
+      lowest: rows[lowestIndexOf(provider.limits)] ?? null,
     }
   })
 }
 
-export function paneModelOf(view: QuotaView, nowMs: number): PaneModel {
+export function quotaModelOf(view: QuotaView, nowMs: number): QuotaModel {
   if (!view.usage) {
     return { notice: view.failure ? `Unavailable: ${view.failure}` : 'Fetching omp usage', providers: [] }
   }
