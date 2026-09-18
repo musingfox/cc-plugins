@@ -1,0 +1,4 @@
+{
+  "description": "obw /issue: shows a pm task card in a pane, read through the Obsidian CLI",
+  "modules": ["./register.ts"]
+}
