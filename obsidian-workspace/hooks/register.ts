@@ -16,7 +16,7 @@ type Browser = { kind: 'rendering' } | ReturnType<typeof renderOutcome>
 type CardRegion =
   | { kind: 'loading'; name: string }
   | { kind: 'error'; message: string }
-  | { kind: 'shown'; name: string; header: CardHeader; body: string; viz: string | null; browser: Browser | null }
+  | { kind: 'shown'; name: string; header: CardHeader; body: string; vizRoot: string | null; browser: Browser | null }
 
 type View = {
   message: string | null
@@ -78,8 +78,8 @@ async function show($: any, name: string) {
   showCard($, request, name, { kind: 'loading', name })
   const output = readOutput(await runProcess($, built.argv))
   if (output.kind === 'error') return showCard($, request, name, { kind: 'error', message: output.message })
-  const viz = await findViz($)
-  showCard($, request, name, { kind: 'shown', name, header: headerOf(output.frontmatter), body: output.body, viz, browser: null })
+  const vizRoot = await findViz($)
+  showCard($, request, name, { kind: 'shown', name, header: headerOf(output.frontmatter), body: output.body, vizRoot, browser: null })
 }
 
 // A press result writes only under the card read it was pressed on: a newer read, even of the same card, drops it.
@@ -92,7 +92,7 @@ function showBrowser($: any, request: number, browser: Browser) {
 
 async function openInBrowser($: any) {
   const card = view.card
-  if (card?.kind !== 'shown' || !card.viz) return
+  if (card?.kind !== 'shown' || !card.vizRoot) return
   const request = requests
   const { file, name } = renderTarget(card.name)
   showBrowser($, request, { kind: 'rendering' })
@@ -101,7 +101,7 @@ async function openInBrowser($: any) {
   } catch (error) {
     return showBrowser($, request, { kind: 'error', message: `Could not write ${file}: ${reasonOf(error)}` })
   }
-  const run = await runProcess($, ['bash', `${card.viz}/lib/render.sh`, file, name], RENDER_TIMEOUT_MS)
+  const run = await runProcess($, ['bash', `${card.vizRoot}/lib/render.sh`, file, name], RENDER_TIMEOUT_MS)
   showBrowser($, request, renderOutcome(run))
 }
 
@@ -206,7 +206,7 @@ async function drawPane($: any, e: any) {
     children.push(Text({ bold: true, children: [safe(title ?? card.name)] }))
     children.push(dim(`status: ${status ?? '—'} · priority: ${priority ?? '—'}`))
     // Only the terminal can run render.sh: `process` is CLI only.
-    if (card.viz && e.surface === 'terminal') {
+    if (card.vizRoot && e.surface === 'terminal') {
       children.push(
         Button({
           key: 'open-in-browser',
