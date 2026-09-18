@@ -147,7 +147,7 @@ async function openIssue($: any, request: number, card: string) {
 }
 
 async function drawPane($: any, e: any) {
-  const { Box, Text, Select, Markdown } = await $.ui.resolve(e)
+  const { Box, Text, Select, Markdown, Button } = await $.ui.resolve(e)
   const safe = (text: string) => bounded(text).text
   const dim = (text: string) => Text({ dimColor: true, children: [safe(text)] })
   const children: any[] = []
@@ -172,6 +172,7 @@ async function drawPane($: any, e: any) {
     const body = bounded(card.body)
     children.push(Text({ bold: true, children: [safe(title ?? card.name)] }))
     children.push(dim(`status: ${status ?? '—'} · priority: ${priority ?? '—'}`))
+    if (card.viz) children.push(Button({ key: 'open-in-browser', label: 'Open in browser', onPress: () => {} }))
     if (body.clippedFrom !== null) children.push(dim(`Clipped: showing ${body.text.length} of ${body.clippedFrom} characters.`))
     children.push(Markdown({ text: body.text }))
   }
