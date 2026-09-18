@@ -46,6 +46,17 @@ describe('status line', () => {
     expect(w.statuses[0]).toBe('omp quota: fetching')
   })
 
+  test('a second session start keeps the held figures while omp is still running', async ($, on) => {
+    const w = world(on)
+    w.omp(FIXTURE, 'hang')
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    const before = w.statuses.length
+    await $.session.start(SESSION)
+    expect(w.statuses.slice(before)).toEqual([SUCCESS])
+    await w.clock.advance(60000)
+  })
+
   test("shows each provider's lowest remaining share once omp answers", async ($, on) => {
     const w = world(on)
     await $.session.start(SESSION)

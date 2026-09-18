@@ -94,7 +94,7 @@ async function renderPane($: any, e: any) {
 
 export function register(on: On) {
   on('session.start', async ($, e, next) => {
-    $.ui.status('omp quota: fetching')
+    $.ui.status(statusLineOf(view))
     try {
       await $.command.register({
         name: 'quota',
