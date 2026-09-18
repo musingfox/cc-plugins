@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { vizInstallPath, vizManifestPath } from '../hooks/viz.ts'
+import { renderTarget, vizInstallPath, vizManifestPath } from '../hooks/viz.ts'
 
 test('reads the manifest under an absolute CLAUDE_CONFIG_DIR', () => {
   expect(vizManifestPath('/cfg', '/home/u')).toBe('/cfg/plugins/installed_plugins.json')
@@ -96,4 +96,34 @@ test('finds nothing in a JSON null', () => {
 
 test('finds nothing when plugins is a list', () => {
   expect(vizInstallPath('{"plugins":[]}')).toBe(null)
+})
+
+test('names the file and page after a kebab card', () => {
+  expect(renderTarget('mod-obw-issue-pane')).toEqual({
+    file: '/tmp/viz/obw/mod-obw-issue-pane.md',
+    name: 'obw-mod-obw-issue-pane',
+  })
+})
+
+test('keeps dots and underscores in the card name', () => {
+  expect(renderTarget('v1.2_x')).toEqual({ file: '/tmp/viz/obw/v1.2_x.md', name: 'obw-v1.2_x' })
+})
+
+test('falls back to card for a name with markup', () => {
+  expect(renderTarget('a<b')).toEqual({ file: '/tmp/viz/obw/card.md', name: 'obw-card' })
+})
+
+test('falls back to card for a name with a space', () => {
+  expect(renderTarget('my card')).toEqual({ file: '/tmp/viz/obw/card.md', name: 'obw-card' })
+})
+
+test('falls back to card for a non-ASCII name', () => {
+  expect(renderTarget('面板')).toEqual({ file: '/tmp/viz/obw/card.md', name: 'obw-card' })
+})
+
+test('cuts a long name to its first 64 characters', () => {
+  expect(renderTarget('x'.repeat(300))).toEqual({
+    file: '/tmp/viz/obw/' + 'x'.repeat(64) + '.md',
+    name: 'obw-' + 'x'.repeat(64),
+  })
 })

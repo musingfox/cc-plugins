@@ -31,3 +31,11 @@ export function vizInstallPath(text: string): string | null {
   const { installPath } = entry
   return typeof installPath === 'string' && installPath.startsWith('/') ? installPath : null
 }
+
+// The name lands unescaped in viz's HTML <title> and in a file name, so only a plain, capped slug passes.
+const SLUG = /^[A-Za-z0-9._-]+$/
+
+export function renderTarget(card: string): { file: string; name: string } {
+  const slug = SLUG.test(card) ? card.slice(0, 64) : 'card'
+  return { file: `/tmp/viz/obw/${slug}.md`, name: `obw-${slug}` }
+}
