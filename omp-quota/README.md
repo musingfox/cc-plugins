@@ -29,3 +29,9 @@ CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin test omp-quota
 
 The test kit is hermetic: no filesystem, network, or process; every `$` call a test makes
 is answered by a stub beneath the plugin.
+
+`tests/fixtures/snapshot.ts` is a redacted copy of a live `omp usage --json` taken on
+2026-09-18. To refresh it, capture a new snapshot, remove every `metadata` object, every
+`scope.projectId` and `scope.accountId`, and `resetCredits`, then paste it in. The first
+test in `tests/snapshot.test.ts` fails while any account key or any string holding `@`
+remains.
