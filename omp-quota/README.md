@@ -10,6 +10,15 @@ Shows every omp provider's remaining quota inside a Claude Code session, as one 
 
 Built and tested against Claude Code 2.1.276.
 
+## How omp is run
+
+Each fetch runs `omp usage --json` with `PI_CODING_AGENT_DIR` set to `$HOME/.omp/agent`
+and a 10 s limit. The override matters: Claude Code may pass down a
+`PI_CODING_AGENT_DIR` of its own (pi-dispatch sets one), and omp reading that home answers
+with exit 0 and no providers. `omp` is found on Claude Code's `PATH` (it usually lives in
+`~/.bun/bin`). With `HOME` unset, omp is not run and the status line reads
+`omp quota: unavailable (HOME is unset)`.
+
 ## How quota is read
 
 - **Remaining share** of a limit: omp's `remainingFraction` when it is a number, else
