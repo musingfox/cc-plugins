@@ -237,6 +237,19 @@ Survey a codebase for deepening opportunities — shallow modules, leaking seams
 /plugin install deepen
 ```
 
+### omp-quota
+
+Every omp provider's remaining quota inside the session, as a Claude Mod (needs `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`, which enables every installed plugin's modules):
+- **Status line**: each provider's lowest remaining share, marked `(stale)` when the latest fetch failed
+- **`/quota`**: a pane listing every limit with its share, status, and time to reset
+- **`/quota refresh`**: runs `omp usage invalidate`, then fetches fresh quota without a model turn
+- **Toast**: one in-session toast when a provider's status worsens from `ok`
+
+**Installation:**
+```bash
+/plugin install omp-quota
+```
+
 ## Plugin Development
 
 This repository serves as both a marketplace and a development workspace for custom Claude Code plugins.
@@ -263,6 +276,7 @@ cc-plugins/
 ├── fizzy/              skills: fizzy
 ├── hook-guard/         skills: hook-guard
 ├── obsidian-workspace/ skills: init, jot, pm · templates, tests
+├── omp-quota/          hooks: register (Claude Mod) · tests
 ├── omt/                skills: contract-validation · agents, commands, contracts, lib
 ├── pi-dispatch/        skills: pi-dispatch · agents: builder, reviewer · scripts, shims, extensions, tests
 ├── spec/               skills: spec, glossary · scripts: spec.sh · tests

@@ -82,6 +82,11 @@
       "name": "deepen",
       "source": "./deepen",
       "description": "Survey a codebase for deepening opportunities — shallow modules, leaking seams, interfaces that are hard to test through — and hand the candidates to viz as a Mermaid report"
+    },
+    {
+      "name": "omp-quota",
+      "source": "./omp-quota",
+      "description": "[Experimental] Every omp provider's remaining quota in-session — a status line, a /quota pane, /quota refresh, and a toast when a provider worsens from ok (Claude Mod; needs CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1)"
     }
   ]
 }

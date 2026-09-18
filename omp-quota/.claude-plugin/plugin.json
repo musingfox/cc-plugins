@@ -1,0 +1,19 @@
+{
+  "name": "omp-quota",
+  "version": "0.1.0",
+  "description": "[Experimental] Every omp provider's remaining quota in-session — a status line, a /quota pane, /quota refresh, and a toast when a provider worsens from ok (Claude Mod; needs CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1)",
+  "author": {
+    "name": "Nick Huang",
+    "email": "nick12703990@gmail.com"
+  },
+  "repository": "https://github.com/musingfox/cc-plugins",
+  "homepage": "https://github.com/musingfox/cc-plugins/tree/main/omp-quota",
+  "keywords": [
+    "omp",
+    "quota",
+    "usage",
+    "status-line",
+    "claude-mod"
+  ],
+  "license": "MIT"
+}

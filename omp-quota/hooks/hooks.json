@@ -1,0 +1,4 @@
+{
+  "description": "Shows omp provider quota: status line, /quota pane, /quota refresh, and a toast when a provider worsens",
+  "modules": ["./register.ts"]
+}
