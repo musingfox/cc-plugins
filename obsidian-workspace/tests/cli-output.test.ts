@@ -1,3 +1,27 @@
 import { expect, test } from 'claude-code/testing'
 import { searchOutput, readOutput } from '../hooks/cli-output.ts'
-test('classifies cli output positively', () => { expect(searchOutput({kind:'exited',exitCode:0,stdout:'["pm/p/tasks/a.md"]',stderr:''}, 'p')).toEqual({kind:'cards',cards:['a']}); expect(readOutput({kind:'exited',exitCode:0,stdout:'---\n---\nbody',stderr:''})).toEqual({kind:'card',frontmatter:'',body:'body'}) })
+const run = (stdout: string, exitCode = 0, stderr = '') => ({ kind: 'exited' as const, exitCode, stdout, stderr })
+const closed = 'The CLI is unable to find Obsidian. Please make sure Obsidian is running and try again.\n'
+test('recognizes card search JSON', () => expect(searchOutput(run('["pm/p/tasks/a.md","pm/p/tasks/b.md"]\n'), 'p')).toEqual({ kind: 'cards', cards: ['a', 'b'] }))
+test('recognizes no matches without newline', () => expect(searchOutput(run('No matches found.'), 'p')).toEqual({ kind: 'empty' }))
+test('recognizes no matches with newline', () => expect(searchOutput(run('No matches found.\n'), 'p')).toEqual({ kind: 'empty' }))
+test('recognizes empty search JSON', () => expect(searchOutput(run('[]'), 'p')).toEqual({ kind: 'empty' }))
+test('filters invalid search paths', () => expect(searchOutput(run('["pm/p/tasks/a.md","pm/p/tasks/a.md","pm/p/tasks/archive/c.md","pm/q/tasks/d.md","pm/p/tasks/.md","pm/p/tasks/x.txt"]'), 'p')).toEqual({ kind: 'cards', cards: ['a'] }))
+test('treats only invalid search paths as empty', () => expect(searchOutput(run('["pm/p/tasks/archive/c.md"]'), 'p')).toEqual({ kind: 'empty' }))
+test('passes vault errors through', () => expect(searchOutput(run('Vault not found.\n'), 'p')).toEqual({ kind: 'error', message: 'Vault not found.' }))
+test('passes search errors through', () => expect(searchOutput(run('Error: Command "search" not found. Run help\n'), 'p')).toEqual({ kind: 'error', message: 'Error: Command "search" not found. Run help' }))
+test('rejects numeric JSON', () => expect(searchOutput(run('[1,2]'), 'p')).toEqual({ kind: 'error', message: '[1,2]' }))
+test('rejects object JSON', () => expect(searchOutput(run('{"a":1}'), 'p')).toEqual({ kind: 'error', message: '{"a":1}' }))
+test('uses stderr for failed search', () => expect(searchOutput(run('', 1, closed), 'p')).toEqual({ kind: 'error', message: closed.trim() }))
+test('rejects successful shaped output on failed search', () => expect(searchOutput(run('["pm/p/tasks/a.md"]', 1), 'p')).toEqual({ kind: 'error', message: '["pm/p/tasks/a.md"]' }))
+test('reports empty search output', () => expect(searchOutput(run(''), 'p')).toEqual({ kind: 'error', message: 'obsidian exited 0 with no output.' }))
+test('reports rejected search', () => expect(searchOutput({ kind: 'rejected' }, 'p')).toEqual({ kind: 'error', message: 'The obsidian CLI did not run: it is not on PATH, or it did not answer within 10 s.' }))
+const CARD = '---\ntitle: "Claude Mod：面板顯示 obw 的 task 與 issue"\nstatus: todo\npriority: medium\ndue:\ntags:\n  - claude-mods\ncreated: 2026-09-18\n---\n# mod-obw-issue-pane\n\n## Acceptance Criteria\n- [ ] one\n'
+test('recognizes closed card frontmatter', () => expect(readOutput(run(CARD))).toEqual({ kind: 'card', frontmatter: 'title: "Claude Mod：面板顯示 obw 的 task 與 issue"\nstatus: todo\npriority: medium\ndue:\ntags:\n  - claude-mods\ncreated: 2026-09-18', body: '# mod-obw-issue-pane\n\n## Acceptance Criteria\n- [ ] one\n' }))
+test('recognizes empty frontmatter', () => expect(readOutput(run('---\n---\nbody'))).toEqual({ kind: 'card', frontmatter: '', body: 'body' }))
+test('reports missing card output', () => expect(readOutput(run('Error: File "pm/p/tasks/x.md" not found.\n'))).toEqual({ kind: 'error', message: 'Error: File "pm/p/tasks/x.md" not found.' }))
+test('reports vault read output', () => expect(readOutput(run('Vault not found.'))).toEqual({ kind: 'error', message: 'Vault not found.' }))
+test('rejects unclosed frontmatter', () => expect(readOutput(run('---\ntitle: x\n'))).toEqual({ kind: 'error', message: '---\ntitle: x' }))
+test('rejects a body without frontmatter', () => expect(readOutput(run('# no frontmatter\n'))).toEqual({ kind: 'error', message: '# no frontmatter' }))
+test('rejects CRLF frontmatter', () => expect(readOutput(run('---\r\ntitle: x\r\n---\r\n')).kind).toBe('error'))
+test('uses stderr and rejection for failed reads', () => { expect(readOutput(run('', 1, closed))).toEqual({ kind: 'error', message: closed.trim() }); expect(readOutput({ kind: 'rejected' })).toEqual({ kind: 'error', message: 'The obsidian CLI did not run: it is not on PATH, or it did not answer within 10 s.' }) })

@@ -9,5 +9,5 @@ export function searchOutput(run: Run, project: string): { kind: 'cards'; cards:
 }
 export function readOutput(run: Run): { kind: 'card'; frontmatter: string; body: string } | { kind: 'error'; message: string } {
   if (run.kind !== 'exited' || run.exitCode !== 0) return { kind: 'error', message: error(run) }; if (!run.stdout.startsWith('---\n')) return { kind: 'error', message: error(run) }
-  const at = run.stdout.indexOf('---\n', 4); if (at < 0) return { kind: 'error', message: error(run) }; return { kind: 'card', frontmatter: run.stdout.slice(4, at), body: run.stdout.slice(at + 4) }
+  const at = run.stdout.indexOf('---\n', 4); if (at < 0) return { kind: 'error', message: error(run) }; return { kind: 'card', frontmatter: run.stdout.slice(4, at === 4 ? at : at - 1), body: run.stdout.slice(at + 4) }
 }
