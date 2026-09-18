@@ -1,0 +1,1 @@
+export const PANE = { component: 'Pane', surface: 'terminal', requestId: 'obw-issue', viewport: { columns: 160, rows: 40 }, props: { title: 'obw issue', isFocused: true, bodyColumns: 80, placement: 'inline', scroll: { offset: 0, bodyRows: 30 }, view: {} } } as const
