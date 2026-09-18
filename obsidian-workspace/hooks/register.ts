@@ -172,7 +172,8 @@ async function drawPane($: any, e: any) {
     const body = bounded(card.body)
     children.push(Text({ bold: true, children: [safe(title ?? card.name)] }))
     children.push(dim(`status: ${status ?? '—'} · priority: ${priority ?? '—'}`))
-    if (card.viz) children.push(Button({ key: 'open-in-browser', label: 'Open in browser', onPress: () => {} }))
+    // Only the terminal can run render.sh: `process` is CLI only.
+    if (card.viz && e.surface === 'terminal') children.push(Button({ key: 'open-in-browser', label: 'Open in browser', onPress: () => {} }))
     if (body.clippedFrom !== null) children.push(dim(`Clipped: showing ${body.text.length} of ${body.clippedFrom} characters.`))
     children.push(Markdown({ text: body.text }))
   }

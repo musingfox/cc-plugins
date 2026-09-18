@@ -133,3 +133,19 @@ describe('the Open in browser button', () => {
     expect(nodesOf(await $.ui.render(PANE), 'Button').length).toBe(0)
   })
 })
+
+describe('the button surface', () => {
+  test('the desktop draws the card without the button', async ($, on) => {
+    vizWorld(on)
+    await issue($, 'mod-obw-issue-pane')
+    const tree = await $.ui.render({ ...PANE, surface: 'desktop' })
+    expect(nodesOf(tree, 'Button').length).toBe(0)
+    expect(nodesOf(tree, 'Markdown').length).toBe(1)
+  })
+
+  test('the terminal draws the button', async ($, on) => {
+    vizWorld(on)
+    await issue($, 'mod-obw-issue-pane')
+    expect(nodesOf(await $.ui.render(PANE), 'Button').length).toBe(1)
+  })
+})
