@@ -175,3 +175,43 @@ describe('worsening toast', () => {
     expect(w.toasts).toEqual(['omp quota: openai-codex now warning, anthropic now exhausted'])
   })
 })
+
+describe('/quota', () => {
+  const PANE = { id: 'omp-quota', title: 'omp quota', focus: true, closeOnEscape: true }
+
+  test('session start registers the command', async ($, on) => {
+    const w = world(on)
+    await $.session.start(SESSION)
+    expect(w.registered).toEqual([
+      { name: 'quota', description: 'Show omp provider quota', argumentHint: '[refresh]', immediate: true },
+    ])
+  })
+
+  test('only the command opens the pane, never a poll or a worsening', async ($, on) => {
+    const w = world(on)
+    w.omp(fixtureWith({ 'openai-codex:secondary': 'ok' }), FIXTURE)
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    await w.clock.advance(600000)
+    expect(w.toasts).toHaveLength(1)
+    expect(w.opened).toEqual([])
+    expect(await $.command.run({ command: 'quota' })).toEqual({})
+    expect(w.opened).toEqual([PANE])
+  })
+
+  test('other arguments answer the usage line and run nothing', async ($, on) => {
+    const w = world(on)
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    const runs = w.runs.length
+    expect(await $.command.run({ command: 'quota', args: 'junk' })).toEqual({ text: 'usage: /quota [refresh]' })
+    expect(w.opened).toEqual([])
+    expect(w.runs).toHaveLength(runs)
+  })
+
+  test('a refused pane answers one transcript line', async ($, on) => {
+    const w = world(on, { uiOpen: () => ({ deny: 'no' }) })
+    await $.session.start(SESSION)
+    expect(await $.command.run({ command: 'quota' })).toEqual({ text: 'omp quota: the pane could not open' })
+  })
+})

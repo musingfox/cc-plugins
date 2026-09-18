@@ -7,6 +7,7 @@ import type { OmpOutcome, UsageReading } from './usage.ts'
 const FETCH_ARGV = ['omp', 'usage', '--json']
 const OMP_TIMEOUT_MS = 10_000
 const POLL_MS = 300_000
+const PANE_ID = 'omp-quota'
 
 let view: QuotaView = { usage: null, failure: null, lastGoodAt: null }
 let poll: { cancel(): void } | null = null
@@ -46,6 +47,15 @@ async function fetchAndPublish($: any) {
   await publish($, await fetchUsage($))
 }
 
+async function openPane($: any) {
+  try {
+    await $.ui.open({ id: PANE_ID, title: 'omp quota', focus: true, closeOnEscape: true })
+    return {}
+  } catch {
+    return { text: 'omp quota: the pane could not open' }
+  }
+}
+
 export function register(on: On) {
   on('session.start', async ($, e, next) => {
     $.ui.status('omp quota: fetching')
@@ -66,5 +76,11 @@ export function register(on: On) {
       void fetchAndPublish($).catch(() => {})
     })
     return next(e)
+  })
+
+  on('command.run', { command: 'quota' }, async ($, e) => {
+    const args = (e.args ?? '').trim()
+    if (args === '') return openPane($)
+    return { text: 'usage: /quota [refresh]' }
   })
 }

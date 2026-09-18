@@ -65,6 +65,13 @@ When a good fetch finds providers that worsened since the previous good fetch (s
 do not reset the comparison. There is no OS notification; a worsening that happens while
 you are in another window shows on the status line when you return.
 
+## Commands
+
+- `/quota` opens the pane (`omp-quota`), focused and closed with Escape; it prints nothing
+  in the transcript. Only this command opens the pane — a poll or a worsening never does.
+  If the pane is refused, one line says so.
+- `/quota <anything else>` answers `usage: /quota [refresh]` and runs nothing.
+
 ## The pane
 
 A notice line while fetching (`Fetching omp usage`), when no fetch has succeeded
