@@ -108,7 +108,9 @@ async function openInBrowser($: any) {
 function browserLines(browser: Browser | null): string[] {
   if (browser?.kind === 'rendering') return ['Rendering in the browser…']
   if (browser?.kind === 'error') return [browser.message]
-  return []
+  if (browser?.kind !== 'opened') return []
+  // Over SSH render.sh opens nothing and prints a URL instead.
+  return browser.url ? [`Rendered: ${browser.path}`, `URL: ${browser.url}`] : [`Opened in the browser: ${browser.path}`]
 }
 
 type Config = { vault: string; project: string; path: string } | { error: string }

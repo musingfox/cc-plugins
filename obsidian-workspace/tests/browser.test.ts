@@ -235,3 +235,61 @@ describe('running viz', () => {
     expect(w.runs.length).toBe(2)
   })
 })
+
+const OUTCOME = /^(Rendering|Opened|Rendered)/
+
+describe('the press outcome', () => {
+  test('before a press no outcome is drawn', async ($, on) => {
+    vizWorld(on)
+    await issue($, 'mod-obw-issue-pane')
+    expect(stringsIn(await $.ui.render(PANE)).filter((text) => OUTCOME.test(text))).toEqual([])
+  })
+
+  test('a running render shows that it is rendering and keeps the button', async ($, on) => {
+    const w = vizWorld(on, { render: 'defer' })
+    await issue($, 'mod-obw-issue-pane')
+    await press($, w)
+    const tree = await $.ui.render(PANE)
+    expect(stringsIn(tree)).toContain('Rendering in the browser…')
+    expect(nodesOf(tree, 'Button').length).toBe(1)
+  })
+
+  test('a finished render shows the opened page', async ($, on) => {
+    const w = vizWorld(on, { render: 'defer' })
+    await issue($, 'mod-obw-issue-pane')
+    await press($, w)
+    w.release(2, '/tmp/viz/work/obw-mod-obw-issue-pane-260919120000.html\n')
+    await w.clock.settle()
+    const strings = stringsIn(await $.ui.render(PANE))
+    expect(strings).toContain('Opened in the browser: /tmp/viz/work/obw-mod-obw-issue-pane-260919120000.html')
+    expect(strings).not.toContain('Rendering in the browser…')
+  })
+
+  test('a render over SSH shows the path and the URL, not an opened page', async ($, on) => {
+    const w = vizWorld(on, { render: '/tmp/viz/work/x.html\nURL: http://100.64.0.1:18090/work/x.html\n' })
+    await issue($, 'mod-obw-issue-pane')
+    await press($, w)
+    const strings = stringsIn(await $.ui.render(PANE))
+    expect(strings).toContain('Rendered: /tmp/viz/work/x.html')
+    expect(strings).toContain('URL: http://100.64.0.1:18090/work/x.html')
+    expect(strings.filter((text) => text.startsWith('Opened in the browser'))).toEqual([])
+  })
+
+  test('a failed render shows its error under the card', async ($, on) => {
+    const w = vizWorld(on, { render: { exitCode: 1, stderr: 'Error: File not found: /tmp/viz/obw/mod-obw-issue-pane.md\n' } })
+    await issue($, 'mod-obw-issue-pane')
+    await press($, w)
+    const tree = await $.ui.render(PANE)
+    expect(stringsIn(tree)).toContain('Error: File not found: /tmp/viz/obw/mod-obw-issue-pane.md')
+    expect(nodesOf(tree, 'Markdown').length).toBe(1)
+  })
+
+  test('a render that cannot start is shown and the press still resolves', async ($, on) => {
+    const w = vizWorld(on, { render: { deny: 'spawn failed' } })
+    await issue($, 'mod-obw-issue-pane')
+    expect(await press($, w)).toEqual({ element: 'open-in-browser' })
+    expect(stringsIn(await $.ui.render(PANE))).toContain(
+      'viz did not render: render.sh could not start, or it did not finish within 15 s.',
+    )
+  })
+})
