@@ -16,6 +16,15 @@ export const SEARCH_ARGV = [
 
 const LIST = '["pm/cc-plugins/tasks/a.md"]'
 
+export const CONFIG = 'vault: obsidian\npm:\n  project: cc-plugins\n'
+
+const RENDERED = '/tmp/viz/work/obw-mod-obw-issue-pane-260919120000.html\n'
+
+// An installed_plugins.json with one user-scope viz install at `root`.
+export function manifest(root: string) {
+  return JSON.stringify({ version: 2, plugins: { 'viz@m': [{ scope: 'user', installPath: root, version: '1.1.4' }] } })
+}
+
 // A string is stdout with exit 0; 'hang' answers the default after 60 s on the mock clock;
 // 'defer' stays open until the test calls `release` with that run's index in `runs`.
 export type CliAnswer = string | { exitCode: number; stdout?: string; stderr?: string } | { deny: string } | 'hang' | 'defer'
@@ -28,24 +37,34 @@ export type WorldOptions = {
   read?: CliAnswer
   register?: { deny: string }
   open?: { deny: string }
+  env?: Record<string, string>
+  write?: { deny: string }
+  render?: CliAnswer
 }
 
 // A stub world beneath the plugin: every $ call it makes is answered and recorded here.
-// `obsidian … search` and `obsidian … read` runs are answered by `search` and `read`.
+// `obsidian … search` and `obsidian … read` runs are answered by `search` and `read`, any other run by `render`.
+// `$.env.get` is answered only when `env` is given; without it the call rejects.
 export function world(on: any, options: WorldOptions = {}) {
   const runs: any[] = []
   const existsCalls: string[] = []
   const readCalls: string[] = []
   const opened: any[] = []
   const registered: any[] = []
+  const writes: { path: string; text: string }[] = []
   const state = { invalidates: 0 }
   const deferred = new Map<number, (stdout: string) => void>()
-  const files = options.files ?? { '/work/.obsidian.yaml': 'vault: obsidian\npm:\n  project: cc-plugins\n' }
-  const answers: Record<string, CliAnswer> = { search: options.search ?? LIST, read: options.read ?? CARD }
-  const defaults: Record<string, string> = { search: LIST, read: CARD }
+  const files = options.files ?? { '/work/.obsidian.yaml': CONFIG }
+  const answers: Record<string, CliAnswer> = {
+    search: options.search ?? LIST,
+    read: options.read ?? CARD,
+    render: options.render ?? RENDERED,
+  }
+  const defaults: Record<string, string> = { search: LIST, read: CARD, render: RENDERED }
 
   on('session.start', ($: any, e: any) => ({ cwd: e.cwd }))
   const clock = mock.clock(on)
+  if (options.env) mock.env(on, options.env)
   on('session.cwd', () => ({ value: options.cwd ?? '/work' }))
   on('fs.exists', ($: any, e: any) => {
     existsCalls.push(e.path)
@@ -57,6 +76,10 @@ export function world(on: any, options: WorldOptions = {}) {
     if (file === undefined) return { deny: 'ENOENT' }
     if (typeof file !== 'string') return file
     return { value: file }
+  })
+  on('fs.write', ($: any, e: any) => {
+    writes.push({ path: e.path, text: e.text })
+    return options.write ?? { value: undefined }
   })
   on('command.register', ($: any, e: any) => {
     registered.push(e)
@@ -72,7 +95,7 @@ export function world(on: any, options: WorldOptions = {}) {
   })
   on('process.run', async ($: any, e: any) => {
     runs.push(e)
-    const verb = e.argv[2]
+    const verb = e.argv[0] === 'obsidian' ? e.argv[2] : 'render'
     const answer = answers[verb]
     if (answer === undefined) return { deny: `no answer for ${verb}` }
     if (answer === 'defer') {
@@ -95,6 +118,7 @@ export function world(on: any, options: WorldOptions = {}) {
     readCalls,
     opened,
     registered,
+    writes,
     release(run: number, stdout: string) {
       deferred.get(run)!(stdout)
     },
