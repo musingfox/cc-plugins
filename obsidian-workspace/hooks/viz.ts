@@ -4,3 +4,30 @@ export function vizManifestPath(configDir: string | undefined, home: string | un
   if (home?.startsWith('/')) return `${home}/.claude/plugins/installed_plugins.json`
   return null
 }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function parsed(text: string): unknown {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
+// Two viz installs from different marketplaces give null rather than an arbitrary pick.
+export function vizInstallPath(text: string): string | null {
+  const manifest = parsed(text)
+  if (!isRecord(manifest) || !isRecord(manifest.plugins)) return null
+  const plugins = manifest.plugins
+  const keys = Object.keys(plugins).filter((key) => key.startsWith('viz@'))
+  if (keys.length !== 1) return null
+  const entries = plugins[keys[0]]
+  if (!Array.isArray(entries) || entries.length === 0) return null
+  const entry = entries.find((item) => isRecord(item) && item.scope === 'user') ?? entries[0]
+  if (!isRecord(entry)) return null
+  const { installPath } = entry
+  return typeof installPath === 'string' && installPath.startsWith('/') ? installPath : null
+}
