@@ -322,3 +322,30 @@ describe('a press result after a newer read', () => {
     expect(nodesOf(tree, 'Markdown').length).toBe(1)
   })
 })
+
+describe('bounded press outcome', () => {
+  test('a long path holding a carriage return is drawn clean and clipped', async ($, on) => {
+    const w = vizWorld(on, { render: '/tmp/viz/work/' + 'p'.repeat(11000) + '\r.html\n' })
+    await issue($, 'mod-obw-issue-pane')
+    await press($, w)
+    const strings = stringsIn(await $.ui.render(PANE))
+    for (const text of strings) expect(text).toMatch(/^[^\x00-\x08\x0b-\x1f\x7f-\x9f]*$/)
+    expect(strings.find((text) => text.startsWith('Opened in the browser: '))!.length).toBe(10000)
+  })
+
+  test('a long error is clipped', async ($, on) => {
+    const w = vizWorld(on, { render: { exitCode: 1, stderr: 'e'.repeat(11000) } })
+    await issue($, 'mod-obw-issue-pane')
+    await press($, w)
+    expect(stringsIn(await $.ui.render(PANE)).find((text) => text.startsWith('eee'))!.length).toBe(10000)
+  })
+
+  test('an error holding control characters is drawn without them', async ($, on) => {
+    const w = vizWorld(on, { render: { exitCode: 1, stderr: 'bad\r\x1b[31mred' } })
+    await issue($, 'mod-obw-issue-pane')
+    await press($, w)
+    const strings = stringsIn(await $.ui.render(PANE))
+    expect(strings).toContain('bad[31mred')
+    expect(strings.filter((text) => text.includes('\r') || text.includes('\x1b'))).toEqual([])
+  })
+})
