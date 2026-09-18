@@ -61,37 +61,53 @@ async function show($: any, name: string) {
   invalidate($)
 }
 
-async function resolveConfig($: any): Promise<{ vault: string; project: string; path: string } | { error: string }> {
-  const cwd = await $.session.cwd()
-  let dir = cwd
-  while (true) {
-    const path = `${dir}/.obsidian.yaml`
-    let exists = false
-    try {
-      exists = await $.fs.exists({ path })
-    } catch {}
-    if (exists) {
-      let text: string
-      try {
-        text = await $.fs.read({ path })
-      } catch {
-        return { error: `Could not read ${path}.` }
-      }
-      const { vault, project } = configOf(text)
-      if (!vault && !project) return { error: `${path} has no vault or pm.project.` }
-      if (!vault) return { error: `${path} has no vault.` }
-      if (!project) return { error: `${path} has no pm.project.` }
-      return { vault, project, path }
-    }
-    if (dir === '/') break
-    dir = dir.slice(0, dir.lastIndexOf('/')) || '/'
+type Config = { vault: string; project: string; path: string } | { error: string }
+
+function configPathIn(dir: string) {
+  return dir === '/' ? '/.obsidian.yaml' : `${dir}/.obsidian.yaml`
+}
+
+function parentOf(dir: string) {
+  const slash = dir.lastIndexOf('/')
+  return slash > 0 ? dir.slice(0, slash) : '/'
+}
+
+async function readConfig($: any, path: string): Promise<Config> {
+  let text: string
+  try {
+    text = await $.fs.read(path)
+  } catch {
+    return { error: `Could not read ${path}.` }
   }
-  return { error: `No .obsidian.yaml in ${cwd} or any directory above it.` }
+  const { vault, project } = configOf(text)
+  if (!vault && !project) return { error: `${path} has no vault or pm.project.` }
+  if (!vault) return { error: `${path} has no vault.` }
+  if (!project) return { error: `${path} has no pm.project.` }
+  return { vault, project, path }
+}
+
+// `fs.exists` never rejects on the host, so a rejection here is a fault to show, not an absent file.
+async function resolveConfig($: any): Promise<Config> {
+  const cwd = await $.session.cwd()
+  for (let dir = cwd; ; dir = parentOf(dir)) {
+    const path = configPathIn(dir)
+    if (await $.fs.exists(path)) return readConfig($, path)
+    if (dir === '/') return { error: `No .obsidian.yaml in ${cwd} or any directory above it.` }
+  }
+}
+
+function reasonOf(error: unknown) {
+  return error instanceof Error ? error.message : String(error)
 }
 
 async function openIssue($: any, card: string) {
   if (card && isBadCardName(card)) return showMessage($, `"${card}" is not a card name.`)
-  const config = await resolveConfig($)
+  let config: Config
+  try {
+    config = await resolveConfig($)
+  } catch (error) {
+    return showMessage($, `Could not look for .obsidian.yaml: ${reasonOf(error)}`)
+  }
   if ('error' in config) return showMessage($, config.error)
   const list = listArgv(config.vault, config.project)
   if (!('argv' in list)) {
