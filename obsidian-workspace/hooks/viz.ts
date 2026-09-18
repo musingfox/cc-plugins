@@ -44,6 +44,10 @@ export function renderTarget(card: string): { file: string; name: string } {
   return { file: `/tmp/viz/obw/${slug}.md`, name: `obw-${slug}` }
 }
 
+export function renderArgv(vizRoot: string, target: { file: string; name: string }): string[] {
+  return ['bash', `${vizRoot}/lib/render.sh`, target.file, target.name]
+}
+
 const NOT_RUN = `viz did not render: render.sh could not start, or it did not finish within ${RENDER_TIMEOUT_MS / 1000} s.`
 
 // Only a first line that is an absolute path counts as success; anything else is shown as printed.

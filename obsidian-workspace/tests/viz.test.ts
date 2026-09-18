@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { renderOutcome, renderTarget, vizInstallPath, vizManifestPath } from '../hooks/viz.ts'
+import { renderArgv, renderOutcome, renderTarget, vizInstallPath, vizManifestPath } from '../hooks/viz.ts'
 
 test('reads the manifest under an absolute CLAUDE_CONFIG_DIR', () => {
   expect(vizManifestPath('/cfg', '/home/u')).toBe('/cfg/plugins/installed_plugins.json')
@@ -126,6 +126,15 @@ test('cuts a long name to its first 64 characters', () => {
     file: '/tmp/viz/obw/' + 'x'.repeat(64) + '.md',
     name: 'obw-' + 'x'.repeat(64),
   })
+})
+
+test('runs render.sh from the viz root on the target file and page name', () => {
+  expect(renderArgv('/p/viz/1.1.4', { file: '/tmp/viz/obw/a.md', name: 'obw-a' })).toEqual([
+    'bash',
+    '/p/viz/1.1.4/lib/render.sh',
+    '/tmp/viz/obw/a.md',
+    'obw-a',
+  ])
 })
 
 const exited = (exitCode: number, stdout: string, stderr = '') => ({ kind: 'exited' as const, exitCode, stdout, stderr })

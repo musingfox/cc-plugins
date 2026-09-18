@@ -6,7 +6,7 @@ import { searchOutput, readOutput, OBSIDIAN_TIMEOUT_MS } from './cli-output.ts'
 import type { Run } from './cli-output.ts'
 import { headerOf } from './card.ts'
 import type { CardHeader } from './card.ts'
-import { vizManifestPath, vizInstallPath, renderTarget, renderOutcome, RENDER_TIMEOUT_MS } from './viz.ts'
+import { vizManifestPath, vizInstallPath, renderTarget, renderArgv, renderOutcome, RENDER_TIMEOUT_MS } from './viz.ts'
 
 const PANE = { id: 'obw-issue', title: 'obw issue', focus: true, closeOnEscape: true }
 
@@ -94,14 +94,14 @@ async function openInBrowser($: any) {
   const card = view.card
   if (card?.kind !== 'shown' || !card.vizRoot) return
   const request = requests
-  const { file, name } = renderTarget(card.name)
+  const target = renderTarget(card.name)
   showBrowser($, request, { kind: 'rendering' })
   try {
-    await $.fs.write(file, card.body)
+    await $.fs.write(target.file, card.body)
   } catch (error) {
-    return showBrowser($, request, { kind: 'error', message: `Could not write ${file}: ${reasonOf(error)}` })
+    return showBrowser($, request, { kind: 'error', message: `Could not write ${target.file}: ${reasonOf(error)}` })
   }
-  const run = await runProcess($, ['bash', `${card.vizRoot}/lib/render.sh`, file, name], RENDER_TIMEOUT_MS)
+  const run = await runProcess($, renderArgv(card.vizRoot, target), RENDER_TIMEOUT_MS)
   showBrowser($, request, renderOutcome(run))
 }
 
