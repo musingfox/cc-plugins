@@ -13,6 +13,8 @@ const PANE_ID = 'omp-quota'
 
 let view: QuotaView = { usage: null, failure: null, lastGoodAt: null }
 let poll: { cancel(): void } | null = null
+let fetchesStarted = 0
+let lastPublished = 0
 
 async function runOmp($: any, home: string, argv: string[]): Promise<OmpOutcome> {
   try {
@@ -34,10 +36,14 @@ async function fetchUsage($: any): Promise<UsageReading> {
   return readUsage(await runOmp($, home, FETCH_ARGV))
 }
 
-async function publish($: any, reading: UsageReading) {
+// A fetch that started before one already published would put older data back on screen.
+async function publish($: any, seq: number, reading: UsageReading) {
+  const now = await $.clock.now()
+  if (seq < lastPublished) return
+  lastPublished = seq
   if (reading.ok) {
     const worsened = worsenedProviders(view.usage, reading.usage)
-    view = { usage: reading.usage, failure: null, lastGoodAt: await $.clock.now() }
+    view = { usage: reading.usage, failure: null, lastGoodAt: now }
     if (worsened.length) $.ui.toast(`omp quota: ${worsened.map((w) => `${w.provider} now ${w.status}`).join(', ')}`)
   } else {
     view = { ...view, failure: reading.reason }
@@ -47,18 +53,20 @@ async function publish($: any, reading: UsageReading) {
 }
 
 async function fetchAndPublish($: any) {
-  await publish($, await fetchUsage($))
+  const seq = ++fetchesStarted
+  await publish($, seq, await fetchUsage($))
 }
 
 async function refresh($: any) {
   const home = await $.env.get('HOME')
   if (!home) {
-    await publish($, { ok: false, reason: 'HOME is unset' })
+    await publish($, ++fetchesStarted, { ok: false, reason: 'HOME is unset' })
     return { text: 'omp quota refresh failed: HOME is unset' }
   }
   const invalidated = await runOmp($, home, INVALIDATE_ARGV)
+  const seq = ++fetchesStarted
   const reading = readUsage(await runOmp($, home, FETCH_ARGV))
-  await publish($, reading)
+  await publish($, seq, reading)
   const note = invalidated.kind === 'exited' && invalidated.exitCode === 0 ? '' : ' (cache not invalidated)'
   return { text: reading.ok ? `omp quota refreshed${note}` : `omp quota refresh failed: ${reading.reason}${note}` }
 }

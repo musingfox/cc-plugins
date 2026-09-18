@@ -194,6 +194,39 @@ describe('worsening toast', () => {
   })
 })
 
+describe('overlapping fetches', () => {
+  function codexAt(remainingFraction: number) {
+    const copy = JSON.parse(FIXTURE.stdout)
+    copy.reports[0].limits[1].amount.remainingFraction = remainingFraction
+    return { exitCode: 0, stdout: JSON.stringify(copy), stderr: '' }
+  }
+
+  test('a poll that settles after a refresh leaves the refreshed figures alone', async ($, on) => {
+    const w = world(on)
+    w.omp(FIXTURE, 'hang', codexAt(0.5))
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    await w.clock.advance(300000)
+    expect(await $.command.run({ command: 'quota', args: 'refresh' })).toEqual({ text: 'omp quota refreshed' })
+    const refreshed = SUCCESS.replace('openai-codex 6%', 'openai-codex 50%')
+    expect(last(w.statuses)).toBe(refreshed)
+    const before = { statuses: w.statuses.length, invalidates: w.invalidates }
+    await w.clock.advance(60000)
+    expect(w.statuses.slice(before.statuses)).toEqual([])
+    expect(w.invalidates).toBe(before.invalidates)
+  })
+
+  test('two fetches settling together raise one toast for the same worsening', async ($, on) => {
+    const w = world(on)
+    w.omp(fixtureWith({ 'openai-codex:secondary': 'ok' }), FIXTURE)
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    await Promise.all([$.session.start(SESSION), $.session.start(SESSION)])
+    await w.clock.settle()
+    expect(w.toasts).toEqual(['omp quota: openai-codex now warning'])
+  })
+})
+
 describe('/quota', () => {
   const PANE = { id: 'omp-quota', title: 'omp quota', focus: true, closeOnEscape: true }
 
