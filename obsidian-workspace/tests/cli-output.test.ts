@@ -25,3 +25,6 @@ test('rejects unclosed frontmatter', () => expect(readOutput(run('---\ntitle: x\
 test('rejects a body without frontmatter', () => expect(readOutput(run('# no frontmatter\n'))).toEqual({ kind: 'error', message: '# no frontmatter' }))
 test('rejects CRLF frontmatter', () => expect(readOutput(run('---\r\ntitle: x\r\n---\r\n')).kind).toBe('error'))
 test('uses stderr and rejection for failed reads', () => { expect(readOutput(run('', 1, closed))).toEqual({ kind: 'error', message: closed.trim() }); expect(readOutput({ kind: 'rejected' })).toEqual({ kind: 'error', message: 'The obsidian CLI did not run: it is not on PATH, or it did not answer within 10 s.' }) })
+test('closes frontmatter only at a line that is exactly ---', () => expect(readOutput(run('---\ntitle: x---\n---\nbody'))).toEqual({ kind: 'card', frontmatter: 'title: x---', body: 'body' }))
+test('does not close frontmatter at a longer dash line', () => expect(readOutput(run('---\na: 1\n----\n---\nbody'))).toEqual({ kind: 'card', frontmatter: 'a: 1\n----', body: 'body' }))
+test('closes frontmatter at a final --- with no newline', () => expect(readOutput(run('---\ntitle: x\n---'))).toEqual({ kind: 'card', frontmatter: 'title: x', body: '' }))

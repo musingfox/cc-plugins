@@ -41,9 +41,10 @@ export function searchOutput(
 
 function noteOf(stdout: string): { frontmatter: string; body: string } | null {
   if (!stdout.startsWith('---\n')) return null
-  const at = stdout.indexOf('---\n', 4)
-  if (at < 0) return null
-  return { frontmatter: stdout.slice(4, at === 4 ? at : at - 1), body: stdout.slice(at + 4) }
+  const lines = stdout.split('\n')
+  const close = lines.indexOf('---', 1)
+  if (close < 0) return null
+  return { frontmatter: lines.slice(1, close).join('\n'), body: lines.slice(close + 1).join('\n') }
 }
 
 export function readOutput(run: Run): { kind: 'card'; frontmatter: string; body: string } | { kind: 'error'; message: string } {
