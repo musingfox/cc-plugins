@@ -368,6 +368,78 @@ describe('card', () => {
   })
 })
 
+describe('overlapping requests', () => {
+  const cardTitled = (title: string) => `---\ntitle: ${title}\n---\nbody of ${title}\n`
+
+  test('a card read that settles after a newer card read leaves the newer card drawn', async ($, on) => {
+    const w = world(on, { search: '["pm/cc-plugins/tasks/a.md","pm/cc-plugins/tasks/b.md"]', read: 'defer' })
+    await $.session.start(SESSION)
+    const first = $.command.run({ command: 'issue', args: 'a' })
+    await w.clock.settle()
+    const second = $.command.run({ command: 'issue', args: 'b' })
+    await w.clock.settle()
+    expect(w.runs.map((run: any) => run.argv[3])).toEqual([
+      SEARCH_ARGV[3],
+      'path=pm/cc-plugins/tasks/a.md',
+      SEARCH_ARGV[3],
+      'path=pm/cc-plugins/tasks/b.md',
+    ])
+    w.release(3, cardTitled('Card B'))
+    await w.clock.settle()
+    w.release(1, cardTitled('Card A'))
+    await Promise.all([first, second])
+    await w.clock.settle()
+    const tree = await $.ui.render(PANE)
+    expect(nodesOf(tree, 'Select')[0].props.value).toBe('b')
+    const strings = stringsIn(tree)
+    expect(strings).toContain('Card B')
+    expect(strings).not.toContain('Card A')
+    expect(nodesOf(tree, 'Markdown')[0].props.text).toBe('body of Card B\n')
+  })
+
+  test('a search that settles after a newer /issue leaves the newer list drawn and reads nothing', async ($, on) => {
+    const w = world(on, { search: 'defer' })
+    await $.session.start(SESSION)
+    const first = $.command.run({ command: 'issue', args: 'a' })
+    await w.clock.settle()
+    const second = $.command.run({ command: 'issue', args: '' })
+    await w.clock.settle()
+    expect(w.runs.length).toBe(2)
+    w.release(1, '["pm/cc-plugins/tasks/b.md"]')
+    await second
+    w.release(0, '["pm/cc-plugins/tasks/a.md"]')
+    await first
+    await w.clock.settle()
+    const tree = await $.ui.render(PANE)
+    expect(nodesOf(tree, 'Select')[0].props.options).toEqual([{ value: 'b', label: 'b' }])
+    expect(nodesOf(tree, 'Select')[0].props.value).toBe(undefined)
+    expect(stringsIn(tree)).toEqual(['b', 'b'])
+    expect(w.runs.length).toBe(2)
+  })
+
+  test('a card read started by an earlier /issue does not land in a newer one', async ($, on) => {
+    const w = world(on, { search: 'defer', read: 'defer' })
+    await $.session.start(SESSION)
+    const first = $.command.run({ command: 'issue', args: 'a' })
+    await w.clock.settle()
+    w.release(0, '["pm/cc-plugins/tasks/a.md"]')
+    await w.clock.settle()
+    expect(w.runs[1].argv[3]).toBe('path=pm/cc-plugins/tasks/a.md')
+    const second = $.command.run({ command: 'issue', args: '' })
+    await w.clock.settle()
+    w.release(2, '["pm/cc-plugins/tasks/b.md"]')
+    await second
+    w.release(1, cardTitled('Card A'))
+    await first
+    await w.clock.settle()
+    const tree = await $.ui.render(PANE)
+    expect(nodesOf(tree, 'Select')[0].props.options).toEqual([{ value: 'b', label: 'b' }])
+    expect(nodesOf(tree, 'Select')[0].props.value).toBe(undefined)
+    expect(stringsIn(tree)).toEqual(['b', 'b'])
+    expect(nodesOf(tree, 'Markdown').length).toBe(0)
+  })
+})
+
 describe('bounded drawing', () => {
   const ESC = String.fromCharCode(27)
   const CR = String.fromCharCode(13)

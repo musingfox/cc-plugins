@@ -26,6 +26,8 @@ type View = {
 const LOADING: View = { message: 'Reading the vault…', scope: null, cards: [], selected: null, card: null }
 
 let view: View = LOADING
+// A CLI call can settle after a newer /issue or card read started; only the latest request writes the view.
+let requests = 0
 
 async function runObsidian($: any, argv: string[]): Promise<Run> {
   try {
@@ -40,12 +42,14 @@ function invalidate($: any) {
   $.ui.invalidate('ui.render')
 }
 
-function showMessage($: any, message: string) {
+function showMessage($: any, request: number, message: string) {
+  if (request !== requests) return
   view = { ...LOADING, message }
   invalidate($)
 }
 
-function showCard($: any, name: string, card: CardRegion) {
+function showCard($: any, request: number, name: string, card: CardRegion) {
+  if (request !== requests) return
   view = { ...view, selected: name, card }
   invalidate($)
 }
@@ -53,12 +57,15 @@ function showCard($: any, name: string, card: CardRegion) {
 async function show($: any, name: string) {
   const { scope } = view
   if (!scope) return
+  const request = ++requests
   const built = cardArgv(scope.vault, scope.project, name)
-  if (!('argv' in built)) return showCard($, name, { kind: 'error', message: `"${name}" is not a card name.` })
-  showCard($, name, { kind: 'loading', name })
+  if (!('argv' in built)) {
+    return showCard($, request, name, { kind: 'error', message: `"${name}" is not a card name.` })
+  }
+  showCard($, request, name, { kind: 'loading', name })
   const output = readOutput(await runObsidian($, built.argv))
-  if (output.kind === 'error') return showCard($, name, { kind: 'error', message: output.message })
-  showCard($, name, { kind: 'shown', name, header: headerOf(output.frontmatter), body: output.body })
+  if (output.kind === 'error') return showCard($, request, name, { kind: 'error', message: output.message })
+  showCard($, request, name, { kind: 'shown', name, header: headerOf(output.frontmatter), body: output.body })
 }
 
 type Config = { vault: string; project: string; path: string } | { error: string }
@@ -100,21 +107,22 @@ function reasonOf(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
 
-async function openIssue($: any, card: string) {
-  if (card && isBadCardName(card)) return showMessage($, `"${card}" is not a card name.`)
+async function openIssue($: any, request: number, card: string) {
+  if (card && isBadCardName(card)) return showMessage($, request, `"${card}" is not a card name.`)
   let config: Config
   try {
     config = await resolveConfig($)
   } catch (error) {
-    return showMessage($, `Could not look for .obsidian.yaml: ${reasonOf(error)}`)
+    return showMessage($, request, `Could not look for .obsidian.yaml: ${reasonOf(error)}`)
   }
-  if ('error' in config) return showMessage($, config.error)
+  if ('error' in config) return showMessage($, request, config.error)
   const list = listArgv(config.vault, config.project)
   if (!('argv' in list)) {
-    return showMessage($, `${config.path}: pm.project "${config.project}" cannot name a folder under pm/.`)
+    return showMessage($, request, `${config.path}: pm.project "${config.project}" cannot name a folder under pm/.`)
   }
   const result = searchOutput(await runObsidian($, list.argv), config.project)
-  if (result.kind === 'error') return showMessage($, result.message)
+  if (request !== requests) return
+  if (result.kind === 'error') return showMessage($, request, result.message)
   view = {
     message: result.kind === 'empty' ? `No unfinished cards in pm/${config.project}.` : null,
     scope: { vault: config.vault, project: config.project },
@@ -175,13 +183,14 @@ export function register(on: On) {
 
   on('command.run', { command: 'issue' }, async ($, e) => {
     const card = (e.args ?? '').trim()
+    const request = ++requests
     view = LOADING
     try {
       await $.ui.open(PANE)
     } catch {
       return { text: 'obw: the /issue pane could not open.' }
     }
-    await openIssue($, card)
+    await openIssue($, request, card)
     // Card text never goes into the result: the model would read it.
     return {}
   })

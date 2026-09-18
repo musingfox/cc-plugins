@@ -16,8 +16,9 @@ export const SEARCH_ARGV = [
 
 const LIST = '["pm/cc-plugins/tasks/a.md"]'
 
-// A string is stdout with exit 0; 'hang' answers the default after 60 s on the mock clock.
-export type CliAnswer = string | { exitCode: number; stdout?: string; stderr?: string } | { deny: string } | 'hang'
+// A string is stdout with exit 0; 'hang' answers the default after 60 s on the mock clock;
+// 'defer' stays open until the test calls `release` with that run's index in `runs`.
+export type CliAnswer = string | { exitCode: number; stdout?: string; stderr?: string } | { deny: string } | 'hang' | 'defer'
 
 export type WorldOptions = {
   cwd?: string
@@ -38,6 +39,7 @@ export function world(on: any, options: WorldOptions = {}) {
   const opened: any[] = []
   const registered: any[] = []
   const state = { invalidates: 0 }
+  const deferred = new Map<number, (stdout: string) => void>()
   const files = options.files ?? { '/work/.obsidian.yaml': 'vault: obsidian\npm:\n  project: cc-plugins\n' }
   const answers: Record<string, CliAnswer> = { search: options.search ?? LIST, read: options.read ?? CARD }
   const defaults: Record<string, string> = { search: LIST, read: CARD }
@@ -73,6 +75,10 @@ export function world(on: any, options: WorldOptions = {}) {
     const verb = e.argv[2]
     const answer = answers[verb]
     if (answer === undefined) return { deny: `no answer for ${verb}` }
+    if (answer === 'defer') {
+      const stdout = await new Promise<string>((resolve) => deferred.set(runs.length - 1, resolve))
+      return { value: { exitCode: 0, stdout, stderr: '' } }
+    }
     if (answer === 'hang') {
       await clock.sleep(60000)
       return { value: { exitCode: 0, stdout: defaults[verb], stderr: '' } }
@@ -89,6 +95,9 @@ export function world(on: any, options: WorldOptions = {}) {
     readCalls,
     opened,
     registered,
+    release(run: number, stdout: string) {
+      deferred.get(run)!(stdout)
+    },
     get invalidates() {
       return state.invalidates
     },
