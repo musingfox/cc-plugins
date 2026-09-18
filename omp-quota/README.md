@@ -40,6 +40,19 @@ poll is cancelled first, so the cadence never doubles.
   providers — the last is how omp answers when it reads the wrong home, so it never wipes
   the display. omp's error output is never shown.
 
+## The status line
+
+Exactly one of:
+
+- `omp quota: fetching` — no fetch has settled yet.
+- `omp quota: openai-codex 6% · ollama-cloud — · …` — each provider's lowest remaining
+  share, in omp's order, with omp's provider names.
+- the same followed by ` (stale)` — the latest fetch failed; the figures are from the last
+  good one. The next good fetch clears the mark.
+- `omp quota: unavailable (<reason>)` — no fetch has succeeded yet.
+
+A refused `/quota` registration does not affect it.
+
 ## The pane
 
 A notice line while fetching (`Fetching omp usage`), when no fetch has succeeded

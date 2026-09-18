@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { SESSION, world } from './fixtures/world.ts'
+import { FIXTURE, SESSION, world } from './fixtures/world.ts'
+
+const SUCCESS =
+  'omp quota: openai-codex 6% · ollama-cloud — · google-antigravity 100% · xai-oauth 100% · cursor 0% · anthropic 86%'
+
+function last(list: string[]) {
+  return list[list.length - 1]
+}
 
 test('session start passes through to the engine', async ($, on) => {
   world(on)
@@ -21,7 +28,65 @@ describe('omp invocation', () => {
     await $.session.start(SESSION)
     await w.clock.settle()
     expect(w.runs).toEqual([])
-    expect(w.statuses[w.statuses.length - 1]).toBe('omp quota: unavailable (HOME is unset)')
+    expect(last(w.statuses)).toBe('omp quota: unavailable (HOME is unset)')
+  })
+})
+
+describe('status line', () => {
+  test('reads fetching until the first fetch settles', async ($, on) => {
+    const w = world(on)
+    await $.session.start(SESSION)
+    expect(w.statuses[0]).toBe('omp quota: fetching')
+  })
+
+  test("shows each provider's lowest remaining share once omp answers", async ($, on) => {
+    const w = world(on)
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    expect(last(w.statuses)).toBe(SUCCESS)
+  })
+
+  test('an empty report list keeps the last figures and marks them stale', async ($, on) => {
+    const w = world(on)
+    w.omp(FIXTURE, { exitCode: 0, stdout: '{"reports":[]}' })
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    await w.clock.advance(300000)
+    expect(last(w.statuses)).toBe(`${SUCCESS} (stale)`)
+  })
+
+  test('a non-zero exit keeps the last figures and marks them stale', async ($, on) => {
+    const w = world(on)
+    w.omp(FIXTURE, { exitCode: 1, stdout: '', stderr: 'boom' })
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    await w.clock.advance(300000)
+    expect(last(w.statuses)).toBe(`${SUCCESS} (stale)`)
+  })
+
+  test('a good fetch after a failed one clears the stale mark', async ($, on) => {
+    const w = world(on)
+    w.omp(FIXTURE, { exitCode: 1, stdout: '', stderr: 'boom' }, FIXTURE)
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    await w.clock.advance(300000)
+    await w.clock.advance(300000)
+    expect(last(w.statuses)).toBe(SUCCESS)
+  })
+
+  test('with no good fetch yet the line names the failure', async ($, on) => {
+    const w = world(on)
+    w.omp({ deny: 'timed out' })
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    expect(last(w.statuses)).toBe('omp quota: unavailable (omp did not answer)')
+  })
+
+  test('a refused /quota registration does not stop the status line', async ($, on) => {
+    const w = world(on, { commandRegister: () => ({ deny: 'taken' }) })
+    expect(await $.session.start(SESSION)).toEqual({ cwd: '/work' })
+    await w.clock.settle()
+    expect(last(w.statuses)).toBe(SUCCESS)
   })
 })
 
