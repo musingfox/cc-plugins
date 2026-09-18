@@ -4,6 +4,9 @@ import type { OmpOutcome, UsageReading } from './usage.ts'
 
 const FETCH_ARGV = ['omp', 'usage', '--json']
 const OMP_TIMEOUT_MS = 10_000
+const POLL_MS = 300_000
+
+let poll: { cancel(): void } | null = null
 
 async function runOmp($: any, home: string, argv: string[]): Promise<OmpOutcome> {
   try {
@@ -33,6 +36,11 @@ async function fetchAndPublish($: any) {
 export function register(on: On) {
   on('session.start', async ($, e, next) => {
     void fetchAndPublish($).catch(() => {})
+    // A reload re-fires session.start on this instance; a second timer would double the cadence.
+    poll?.cancel()
+    poll = $.clock.every(POLL_MS, () => {
+      void fetchAndPublish($).catch(() => {})
+    })
     return next(e)
   })
 }

@@ -24,3 +24,37 @@ describe('omp invocation', () => {
     expect(w.statuses[w.statuses.length - 1]).toBe('omp quota: unavailable (HOME is unset)')
   })
 })
+
+describe('poll schedule', () => {
+  test('fetches at session start, then every 5 minutes', async ($, on) => {
+    const w = world(on)
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    expect(w.jsonRuns()).toBe(1)
+    await w.clock.advance(299999)
+    expect(w.jsonRuns()).toBe(1)
+    await w.clock.advance(1)
+    expect(w.jsonRuns()).toBe(2)
+    await w.clock.advance(300000)
+    expect(w.jsonRuns()).toBe(3)
+  })
+
+  test('a second session start replaces the poll instead of doubling it', async ($, on) => {
+    const w = world(on)
+    await $.session.start(SESSION)
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    expect(w.jsonRuns()).toBe(2)
+    await w.clock.advance(300000)
+    expect(w.jsonRuns()).toBe(3)
+  })
+
+  test('a failed fetch leaves the poll running', async ($, on) => {
+    const w = world(on)
+    w.omp({ deny: 'timed out' })
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    await w.clock.advance(300000)
+    expect(w.jsonRuns()).toBe(2)
+  })
+})

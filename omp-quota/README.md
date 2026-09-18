@@ -19,6 +19,10 @@ with exit 0 and no providers. `omp` is found on Claude Code's `PATH` (it usually
 `~/.bun/bin`). With `HOME` unset, omp is not run and the status line reads
 `omp quota: unavailable (HOME is unset)`.
 
+Quota is fetched once at session start and then every 5 minutes. A failed fetch leaves the
+poll running; there is no other retry. When a reload re-fires session start, the previous
+poll is cancelled first, so the cadence never doubles.
+
 ## How quota is read
 
 - **Remaining share** of a limit: omp's `remainingFraction` when it is a number, else
