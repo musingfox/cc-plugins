@@ -27,6 +27,20 @@ Built and tested against Claude Code 2.1.276.
   providers — the last is how omp answers when it reads the wrong home, so it never wipes
   the display. omp's error output is never shown.
 
+## The pane
+
+A notice line while fetching (`Fetching omp usage`), when no fetch has succeeded
+(`Unavailable: <reason>`), or when the latest fetch failed
+(`Stale: <reason>; showing data from <age> ago`). Then one section per provider, headed
+`<provider> <share>`, with one row per limit: name, share, status (`—` when omp gives
+none), and time to reset (`Xd Yh`, `Xh Ym`, or `Ym`; `now` when due; `—` when omp gives
+none). A provider without limits shows `no limits reported`.
+
+A row's name is the limit label, plus `· <window>` when the window label differs. When
+the same name repeats inside a provider, each row gets a tag in brackets: the parts of the
+limit id that differ within the group (antigravity's shared pools read `[anthropic]` and
+`[openai]`).
+
 ## Enabling
 
 Claude Mods are off unless Claude Code starts with the global switch:
