@@ -15,6 +15,13 @@ Built and tested against Claude Code 2.1.276.
 - **Remaining share** of a limit: omp's `remainingFraction` when it is a number, else
   `1 − usedFraction`, else none; clamped to 0–100%. A provider's share is the lowest of its
   limits' shares. Shown as a rounded percentage, or `—` when none is computable.
+- **Status** of a provider: the worst status among its limits (`exhausted` > `warning` >
+  `ok`); limits without one are ignored, and a provider with none has no status. Reports
+  with the same provider name merge into one provider.
+- **Failed fetch**: omp did not answer (could not start, or still running after 10 s),
+  exited non-zero, printed something that is not a JSON report list, or reported no
+  providers — the last is how omp answers when it reads the wrong home, so it never wipes
+  the display. omp's error output is never shown.
 
 ## Enabling
 
