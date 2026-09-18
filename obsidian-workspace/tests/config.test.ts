@@ -14,3 +14,5 @@ test('closes the pm block at a vault line', () => expect(configOf('pm:\nvault: v
 test('keeps a hash inside a quoted value', () => expect(configOf('vault: "a # b"\n')).toEqual({ vault: 'a # b', project: undefined }))
 test('unwraps a double quoted value before its comment', () => expect(configOf('vault: "v"  # c\n')).toEqual({ vault: 'v', project: undefined }))
 test('unwraps a single quoted value before its comment', () => expect(configOf("vault: 'my vault' # c\n")).toEqual({ vault: 'my vault', project: undefined }))
+test('opens the pm block at a pm line with a comment after it', () => expect(configOf('vault: v\npm:  # PM settings\n  project: p\n')).toEqual({ vault: 'v', project: 'p' }))
+test('keeps the pm block closed at a pm line with an inline value and a comment', () => expect(configOf('vault: v\npm: x # c\n  project: p\n')).toEqual({ vault: 'v', project: undefined }))

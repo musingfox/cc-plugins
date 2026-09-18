@@ -16,7 +16,7 @@ export function configOf(text: string): { vault?: string; project?: string } {
     const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw
     if (/^\s*(#|$)/.test(line)) continue
     if (/^\S/.test(line)) {
-      inPm = /^pm:\s*$/.test(line)
+      inPm = /^pm:(\s+#.*)?\s*$/.test(line)
       if (/^vault:/.test(line)) vault = valueOf(line.slice('vault:'.length))
     } else if (inPm && /^\s+project:/.test(line)) {
       project = valueOf(line.replace(/^\s+project:/, ''))
