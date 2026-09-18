@@ -7,6 +7,18 @@ export const SESSION = { surface: 'terminal', isInteractive: true, cwd: '/work' 
 
 export const FIXTURE = { exitCode: 0, stdout: SNAPSHOT_STDOUT, stderr: '' }
 
+// The fixture answer with some limits' status replaced (undefined removes the key).
+export function fixtureWith(statuses: Record<string, string | undefined>) {
+  const copy = JSON.parse(SNAPSHOT_STDOUT)
+  for (const report of copy.reports)
+    for (const limit of report.limits)
+      if (limit.id in statuses) {
+        if (statuses[limit.id] === undefined) delete limit.status
+        else limit.status = statuses[limit.id]
+      }
+  return { exitCode: 0, stdout: JSON.stringify(copy), stderr: '' }
+}
+
 export type OmpAnswer = { exitCode: number; stdout?: string; stderr?: string } | { deny: string } | 'hang'
 
 type Hook = (...args: any[]) => unknown

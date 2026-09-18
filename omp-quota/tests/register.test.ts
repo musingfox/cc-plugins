@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { FIXTURE, NOW, SESSION, world } from './fixtures/world.ts'
+import { FIXTURE, NOW, SESSION, fixtureWith, world } from './fixtures/world.ts'
 
 const SUCCESS =
   'omp quota: openai-codex 6% · ollama-cloud — · google-antigravity 100% · xai-oauth 100% · cursor 0% · anthropic 86%'
@@ -132,5 +132,46 @@ describe('fetch never blocks', () => {
     expect(await w.clock.now()).toBe(NOW)
     expect(w.statuses).toEqual(['omp quota: fetching'])
     await w.clock.advance(60000)
+  })
+})
+
+describe('worsening toast', () => {
+  const CODEX_OK = fixtureWith({ 'openai-codex:secondary': 'ok' })
+
+  test('the first good fetch raises no toast even with providers already bad', async ($, on) => {
+    const w = world(on)
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    expect(w.toasts).toEqual([])
+  })
+
+  test('a provider going from ok to warning raises one toast, and only once', async ($, on) => {
+    const w = world(on)
+    w.omp(CODEX_OK, FIXTURE)
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    await w.clock.advance(300000)
+    expect(w.toasts).toEqual(['omp quota: openai-codex now warning'])
+    await w.clock.advance(300000)
+    expect(w.toasts).toHaveLength(1)
+  })
+
+  test('a failed fetch in between does not reset the comparison', async ($, on) => {
+    const w = world(on)
+    w.omp(CODEX_OK, { exitCode: 1 }, FIXTURE)
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    await w.clock.advance(300000)
+    await w.clock.advance(300000)
+    expect(w.toasts).toEqual(['omp quota: openai-codex now warning'])
+  })
+
+  test('several providers worsening at once share one toast', async ($, on) => {
+    const w = world(on)
+    w.omp(CODEX_OK, fixtureWith({ 'anthropic:5h': 'exhausted' }))
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    await w.clock.advance(300000)
+    expect(w.toasts).toEqual(['omp quota: openai-codex now warning, anthropic now exhausted'])
   })
 })

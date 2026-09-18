@@ -1,7 +1,7 @@
 import type { On } from 'claude-code'
 import type { QuotaView } from './pane-rows.ts'
 import { statusLineOf } from './status-line.ts'
-import { readUsage } from './usage.ts'
+import { readUsage, worsenedProviders } from './usage.ts'
 import type { OmpOutcome, UsageReading } from './usage.ts'
 
 const FETCH_ARGV = ['omp', 'usage', '--json']
@@ -32,9 +32,13 @@ async function fetchUsage($: any): Promise<UsageReading> {
 }
 
 async function publish($: any, reading: UsageReading) {
-  view = reading.ok
-    ? { usage: reading.usage, failure: null, lastGoodAt: await $.clock.now() }
-    : { ...view, failure: reading.reason }
+  if (reading.ok) {
+    const worsened = worsenedProviders(view.usage, reading.usage)
+    view = { usage: reading.usage, failure: null, lastGoodAt: await $.clock.now() }
+    if (worsened.length) $.ui.toast(`omp quota: ${worsened.map((w) => `${w.provider} now ${w.status}`).join(', ')}`)
+  } else {
+    view = { ...view, failure: reading.reason }
+  }
   $.ui.status(statusLineOf(view))
 }
 

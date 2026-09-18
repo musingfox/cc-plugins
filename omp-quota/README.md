@@ -57,6 +57,14 @@ Exactly one of:
 
 A refused `/quota` registration does not affect it.
 
+## The toast
+
+When a good fetch finds providers that worsened since the previous good fetch (see
+*Worsened provider* above), one in-session toast names them all:
+`omp quota: openai-codex now warning, anthropic now exhausted`. Failed fetches in between
+do not reset the comparison. There is no OS notification; a worsening that happens while
+you are in another window shows on the status line when you return.
+
 ## The pane
 
 A notice line while fetching (`Fetching omp usage`), when no fetch has succeeded
