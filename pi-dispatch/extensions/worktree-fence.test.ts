@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, realpathSync } from "node:fs";
+import { afterAll, describe, expect, test } from "bun:test";
+import { mkdtempSync, mkdirSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import fence, { canon, checkToolCall, inside } from "./worktree-fence";
@@ -69,5 +69,65 @@ describe("the pi seam", () => {
     expect("terminate" in verdict).toBe(false);
     expect(await handlers.tool_call({ toolName: "write", input: { path: join(WORK, "x") } }, {})).toBeUndefined();
     delete process.env.PI_CWD;
+  });
+});
+
+describe("declared writable files", () => {
+  // D sits outside WORK. TMP_D is spelled /tmp/... so the /private/tmp seam is covered.
+  const D = join(ROOT, "declared");
+  mkdirSync(D, { recursive: true });
+  const TMP_D = mkdtempSync("/tmp/fence-declared-");
+  afterAll(() => rmSync(TMP_D, { recursive: true, force: true }));
+  const REPORT = join(D, "report.md");
+  const set = new Set([canon(REPORT)]);
+
+  test("the declared file passes for write and edit", () => {
+    expect(checkToolCall("write", { path: REPORT }, CW, set)).toBeUndefined();
+    expect(checkToolCall("edit", { path: REPORT }, CW, set)).toBeUndefined();
+  });
+  test("a sibling of the declared file stays blocked", () => {
+    expect(checkToolCall("write", { path: join(D, "sibling.md") }, CW, set)?.block).toBe(true);
+  });
+  test("an entry and a tool path in different spellings of the same file match", () => {
+    const entry = join(TMP_D, "report.md");
+    const toolPath = join(realpathSync(TMP_D), "report.md");
+    expect(checkToolCall("write", { path: toolPath }, CW, new Set([canon(entry)]))).toBeUndefined();
+  });
+  test("a declared directory does not open the files under it", () => {
+    expect(checkToolCall("write", { path: REPORT }, CW, new Set([canon(D)]))?.block).toBe(true);
+  });
+  test("without an allowed set the declared file is blocked", () => {
+    expect(checkToolCall("write", { path: REPORT }, CW)?.block).toBe(true);
+  });
+  test("a declared file under the OS temp dir passes; its sibling does not", () => {
+    const T = mkdtempSync(join(tmpdir(), "fence-tmpdecl-"));
+    const s = new Set([canon(join(T, "report.md"))]);
+    expect(checkToolCall("write", { path: join(T, "report.md") }, CW, s)).toBeUndefined();
+    expect(checkToolCall("write", { path: join(T, "sibling.md") }, CW, s)?.block).toBe(true);
+    rmSync(T, { recursive: true, force: true });
+  });
+
+  const fakePi = () => {
+    const handlers: Record<string, Function> = {};
+    return { pi: { on: (name: string, fn: Function) => { handlers[name] = fn; } } as any, handlers };
+  };
+  test("the pi seam reads PI_WRITABLE_FILES at load", async () => {
+    process.env.PI_CWD = WORK;
+    process.env.PI_WRITABLE_FILES = REPORT;
+    const { pi, handlers } = fakePi();
+    fence(pi);
+    expect(await handlers.tool_call({ toolName: "write", input: { path: REPORT } }, {})).toBeUndefined();
+    expect((await handlers.tool_call({ toolName: "write", input: { path: join(D, "sibling.md") } }, {})).block).toBe(true);
+    delete process.env.PI_CWD;
+    delete process.env.PI_WRITABLE_FILES;
+  });
+  test("a list of only separators declares nothing", async () => {
+    process.env.PI_CWD = WORK;
+    process.env.PI_WRITABLE_FILES = ":";
+    const { pi, handlers } = fakePi();
+    fence(pi);
+    expect((await handlers.tool_call({ toolName: "write", input: { path: REPORT } }, {})).block).toBe(true);
+    delete process.env.PI_CWD;
+    delete process.env.PI_WRITABLE_FILES;
   });
 });

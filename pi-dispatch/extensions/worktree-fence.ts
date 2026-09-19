@@ -32,7 +32,12 @@ export function inside(canonWork: string, p: string): boolean {
 
 export type Verdict = { block: true; reason: string } | undefined;
 
-export function checkToolCall(toolName: string, input: any, canonWork: string): Verdict {
+export function checkToolCall(
+  toolName: string,
+  input: any,
+  canonWork: string,
+  allowed?: ReadonlySet<string>,
+): Verdict {
   if (toolName !== "write" && toolName !== "edit") return undefined;
   const raw = input?.path;
   if (typeof raw !== "string" || !raw) return undefined;
@@ -41,6 +46,8 @@ export function checkToolCall(toolName: string, input: any, canonWork: string): 
   const p = raw.replace(/^@/, "").replace(/^~(?=\/|$)/, process.env.HOME ?? "~");
   const abs = resolve(canonWork, p);
   if (inside(canonWork, abs)) return undefined;
+  // Declared files match exactly, never as a prefix: the unit is a file.
+  if (allowed?.has(canon(abs))) return undefined;
   return {
     block: true,
     reason: `BLOCKED by worktree-fence: ${toolName} to ${abs}, outside your worktree ${canonWork}. All writes stay inside the worktree.`,
@@ -51,5 +58,6 @@ export default function (pi: ExtensionAPI) {
   const work = process.env.PI_CWD;
   if (!work) return;
   const canonWork = canon(work);
-  pi.on("tool_call", async (event) => checkToolCall(event.toolName, event.input, canonWork));
+  const allowed = new Set((process.env.PI_WRITABLE_FILES ?? "").split(":").filter(Boolean).map(canon));
+  pi.on("tool_call", async (event) => checkToolCall(event.toolName, event.input, canonWork, allowed));
 }
