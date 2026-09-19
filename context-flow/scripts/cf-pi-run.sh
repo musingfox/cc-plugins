@@ -260,6 +260,34 @@ do_postmortem() {
   echo "$out"
 }
 
+# The batch's quota wall: $FLOW_SESSION/quota-wall, lines TAG=, SHARD=, EPOCH=.
+# Only a wall recorded since this run started counts, so an old wall never
+# stops a later re-run and nothing has to clean the file up.
+# Sets WALL_TAG and WALL_SHARD; returns 0 when the wall counts.
+quota_wall_valid() {
+  local m="$FLOW_SESSION/quota-wall" epoch
+  [ -f "$m" ] || return 1
+  epoch=$(sed -n 's/^EPOCH=//p' "$m" 2>/dev/null || true)
+  WALL_TAG=$(sed -n 's/^TAG=//p' "$m" 2>/dev/null || true)
+  WALL_SHARD=$(sed -n 's/^SHARD=//p' "$m" 2>/dev/null || true)
+  case "$epoch" in ''|*[!0-9]*) return 1 ;; esac
+  case "$WALL_TAG" in QUOTA|QUOTA-WINDOW) ;; *) return 1 ;; esac
+  [ "$epoch" -ge "$START_TS" ]
+}
+
+# record_quota_wall TAG: tell the batch this shard hit a wall. Written through a
+# temp file so a sibling never reads half a marker. A QUOTA-WINDOW never replaces
+# a QUOTA this run can see: the hard wall is the one that needs re-routing.
+record_quota_wall() {
+  local tag="$1" tmp
+  if [ "$tag" = QUOTA-WINDOW ] && quota_wall_valid && [ "$WALL_TAG" = QUOTA ]; then
+    return 0
+  fi
+  tmp=$(mktemp "$FLOW_SESSION/quota-wall.XXXXXX" 2>/dev/null) || return 0
+  { printf 'TAG=%s\nSHARD=%s\nEPOCH=%s\n' "$tag" "$SHARD_ID" "$(date +%s)" > "$tmp" \
+      && mv -f "$tmp" "$FLOW_SESSION/quota-wall"; } 2>/dev/null || rm -f "$tmp"
+}
+
 # Step 0 removed the previous round's outcome, so from here on an abort with no
 # outcome.md leaves cf-pi-watch.sh waiting on a file that will never appear (its
 # all_done tests -s outcome.md) and main with nothing to route. Everything below
@@ -423,8 +451,8 @@ dispatch_and_poll() {
       # A spend wall is not fixed by retrying on the same routing, so the tag
       # becomes the reason main routes on. Matched before every failure arm,
       # only after a space so an OUTPUT= path cannot trip it, and WINDOW first.
-      *\ QUOTA-WINDOW*)        fail_kill QUOTA-WINDOW "poll $status_line" ;;
-      *\ QUOTA*)               fail_kill QUOTA "poll $status_line" ;;
+      *\ QUOTA-WINDOW*)        record_quota_wall QUOTA-WINDOW; fail_kill QUOTA-WINDOW "poll $status_line" ;;
+      *\ QUOTA*)               record_quota_wall QUOTA; fail_kill QUOTA "poll $status_line" ;;
       *exit\ rc=*)             fail_kill rc-fail "poll $status_line" ;;
       *TIMEOUT*)               fail_kill timeout "poll $status_line" ;;
       *STALL*)                 fail_kill stall "poll $status_line" ;;

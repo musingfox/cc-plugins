@@ -105,3 +105,49 @@ assert_eq "error" "$(reason_for 'STATUS=FAIL OUTPUT=/r/result.md ERROR terminal=
   "rate limit: an untagged error keeps its error reason"
 assert_eq "timeout" "$(reason_for 'STATUS=FAIL OUTPUT=/QUOTA/result.md TIMEOUT 1800s')" \
   "path: QUOTA inside the OUTPUT= path is not a tag"
+
+# ---- the wall is recorded where every sibling in the batch can see it ----
+
+# field KEY: the value of KEY= in the batch's quota-wall marker
+field() { sed -n "s/^$1=//p" "$FLOW/quota-wall" 2>/dev/null; }
+
+# no_temp_left LABEL: the atomic write leaves no quota-wall.* behind
+no_temp_left() {
+  assert_eq "0" "$(find "$FLOW" -maxdepth 1 -name 'quota-wall.*' | wc -l | tr -d ' ')" \
+    "$1: no quota-wall temp file remains"
+}
+
+build_fixture A "echo 'STATUS=FAIL OUTPUT=/r/result.md exit rc=1 QUOTA 5s cause:insufficient quota'"
+before=$(date +%s)
+run_shard
+assert_eq "QUOTA" "$(field TAG)" "record: the marker carries the tag"
+assert_eq "A" "$(field SHARD)" "record: the marker names the shard that hit the wall"
+epoch=$(field EPOCH)
+assert_eq "yes" "$([ "${epoch:-0}" -ge "$before" ] 2>/dev/null && echo yes || echo no)" \
+  "record: the marker's EPOCH ($epoch) is no earlier than the run's start ($before)"
+no_temp_left "record"
+rm -rf "$FLOW"
+
+build_fixture A "printf 'TAG=QUOTA\nSHARD=B\nEPOCH=%s\n' \"\$(date +%s)\" > \"\$(dirname \"\$0\")/../quota-wall\"
+echo 'STATUS=FAIL OUTPUT=/r/result.md ERROR QUOTA-WINDOW terminal=error 5s'"
+run_shard
+assert_eq "QUOTA" "$(field TAG)" "precedence: a QUOTA-WINDOW does not replace a QUOTA recorded this run"
+assert_eq "B" "$(field SHARD)" "precedence: the QUOTA marker keeps its shard"
+assert_eq "QUOTA-WINDOW" "$(section Reason)" "precedence: the shard still ends with its own tag"
+no_temp_left "precedence"
+rm -rf "$FLOW"
+
+build_fixture A "echo 'STATUS=FAIL OUTPUT=/r/result.md ERROR QUOTA-WINDOW terminal=error 5s'"
+printf 'TAG=QUOTA\nSHARD=B\nEPOCH=1\n' > "$FLOW/quota-wall"
+run_shard
+assert_eq "QUOTA-WINDOW" "$(field TAG)" "stale: a wall from before this run is replaced"
+assert_eq "A" "$(field SHARD)" "stale: the replaced marker names this shard"
+no_temp_left "stale"
+rm -rf "$FLOW"
+
+build_fixture A "echo 'STATUS=FAIL OUTPUT=/r/result.md ERROR terminal=error 5s cause:rate limit 429'"
+run_shard
+assert_eq "no" "$([ -e "$FLOW/quota-wall" ] && echo yes || echo no)" \
+  "rate limit: an untagged failure records no wall"
+no_temp_left "rate limit"
+rm -rf "$FLOW"
