@@ -16,4 +16,10 @@ assert_contains "$any_fail" "QUOTA-WINDOW" "Any FAIL names QUOTA-WINDOW"
 assert_contains "$any_fail" "QUOTA" "Any FAIL names QUOTA"
 assert_contains "$any_fail" "re-launch" "Any FAIL speaks of the re-launch"
 
+exempt="$(printf '%s\n' "$any_fail" | grep -m1 'exempt from the re-launch')"
+for reason in test-stalled probe-stalled QUOTA QUOTA-WINDOW; do
+  assert_contains "$exempt" "\`$reason\`" "the exemption sentence lists $reason"
+done
+assert_eq "0" "$(grep -c 'Two reasons' "$CF_MD")" "the exemption list carries no count"
+
 assert_contains "$(grep -m1 '^### 3\.6' "$CF_MD")" "QUOTA" "§3.6 heading names the quota tags"
