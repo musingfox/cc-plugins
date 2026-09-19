@@ -151,3 +151,33 @@ assert_eq "no" "$([ -e "$FLOW/quota-wall" ] && echo yes || echo no)" \
   "rate limit: an untagged failure records no wall"
 no_temp_left "rate limit"
 rm -rf "$FLOW"
+
+# ---- a still-running sibling stops on the recorded wall ----
+
+# sibling_poll TAG: round 1 records TAG as hit by shard A, and B's worker is still running
+sibling_poll() {
+  printf '%s' "if [ \"\$r\" -eq 1 ]; then printf 'TAG=$1\nSHARD=A\nEPOCH=%s\n' \"\$(date +%s)\" > \"\$(dirname \"\$0\")/../quota-wall\"; fi
+echo 'RUNNING 30s'"
+}
+
+build_fixture B "$(sibling_poll QUOTA)"
+run_shard; rc=$?
+assert_eq "1" "$rc" "sibling: the shard exits 1"
+assert_eq "QUOTA" "$(section Reason)" "sibling: Reason is the wall's tag"
+assert_contains "$(cat "$SHARD/outcome.md")" "(all): QUOTA sibling-abort (wall hit by shard A)" \
+  "sibling: Affected names the shard that hit the wall"
+assert_contains "$(section Cause)" "wall hit by shard A" "sibling: Cause names the shard that hit the wall"
+assert_contains "$(cat "$FLOW/stop.log" 2>/dev/null)" "--abort" "sibling: the running worker is stopped"
+assert_eq "1" "$(count_of "$FLOW/dispatch.count")" "sibling: no further dispatch"
+rm -rf "$FLOW"
+
+build_fixture B "$(sibling_poll QUOTA-WINDOW)"
+run_shard
+assert_eq "QUOTA-WINDOW" "$(section Reason)" "sibling window: Reason is the window tag"
+rm -rf "$FLOW"
+
+build_fixture B "if [ \"\$r\" -eq 1 ]; then echo 'RUNNING 30s'; else echo 'STATUS=FAIL OUTPUT=/r/result.md TIMEOUT 1800s'; fi"
+printf 'TAG=QUOTA\nSHARD=A\nEPOCH=1\n' > "$FLOW/quota-wall"
+run_shard
+assert_eq "timeout" "$(section Reason)" "sibling stale: a wall from before this run does not stop the worker"
+rm -rf "$FLOW"

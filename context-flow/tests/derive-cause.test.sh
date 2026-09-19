@@ -59,4 +59,11 @@ DISPATCH_RC=2
 assert_eq "cf-pi-dispatch exited 2" "$(derive_cause FAIL dispatch-refused)" \
   "T7: with no stderr at all, the exit code"
 
+# T8: a sibling stopped by another shard's quota wall -> names that shard
+FLOW_SESSION="$SHARD_SESSION"
+printf 'TAG=QUOTA\nSHARD=A\nEPOCH=1\n' > "$FLOW_SESSION/quota-wall"
+SHARD_ID=B
+assert_eq "QUOTA wall hit by shard A" "$(derive_cause FAIL QUOTA)" \
+  "T8: a sibling's quota cause names the shard that hit the wall"
+
 rm -rf "$SHARD_SESSION"

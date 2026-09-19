@@ -129,6 +129,18 @@ derive_cause() {
       [ -s "$TEST_LOG" ] && cause="last output before the deadline: $(tail -1 "$TEST_LOG" 2>/dev/null)" ;;
     undeclared_file_touched)
       cause="scope violation — see undeclared_files below" ;;
+    QUOTA|QUOTA-WINDOW)
+      # A sibling stopped by the wall has no error of its own: name who hit it.
+      # The shard that hit it keeps its own errorMessage.
+      local wall_tag wall_shard
+      wall_tag=$(sed -n 's/^TAG=//p' "$FLOW_SESSION/quota-wall" 2>/dev/null || true)
+      wall_shard=$(sed -n 's/^SHARD=//p' "$FLOW_SESSION/quota-wall" 2>/dev/null || true)
+      if [ "$wall_tag" = "$reason" ] && [ -n "$wall_shard" ] && [ "$wall_shard" != "$SHARD_ID" ]; then
+        cause="$reason wall hit by shard $wall_shard"
+      else
+        local _j; _j=$(newest_jsonl)
+        [ -n "$_j" ] && cause=$(grep -m1 -o '"errorMessage":"[^"]*"' "$_j" 2>/dev/null) || true
+      fi ;;
     dispatch-refused)
       # pi-dispatch.sh prefixes its refusals; anything else is a wrapper's own
       # complaint, whose last line is the one that says why it gave up.
@@ -447,7 +459,12 @@ dispatch_and_poll() {
     # Match the canonical pi-poll.sh STATUS= grammar directly (legacy tokens retired).
     case "$status_line" in
       STATUS=OK*)              return 0 ;;
-      RUNNING*)                continue ;;   # includes "RUNNING settling"
+      RUNNING*)                              # includes "RUNNING settling"
+        # A sibling's wall is this worker's wall too: same routing, same spend.
+        if quota_wall_valid; then
+          fail_kill "$WALL_TAG" "$WALL_TAG sibling-abort (wall hit by shard $WALL_SHARD)"
+        fi
+        continue ;;
       # A spend wall is not fixed by retrying on the same routing, so the tag
       # becomes the reason main routes on. Matched before every failure arm,
       # only after a space so an OUTPUT= path cannot trip it, and WINDOW first.
