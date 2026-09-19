@@ -79,7 +79,7 @@ rm -f "$OUTCOME_FILE" "$REPORT_FILE" "$ESCALATE_FILE" "$DIFF_FILE" "$TEST_LOG" \
       "$SHARD_SESSION/pi-rundir" "$SHARD_SESSION/pi-rundir-prev" \
       "$SHARD_SESSION/escalate-snippet.md" "$SHARD_SESSION/postmortem.log" \
       "$SHARD_SESSION/gate3.out" "$SHARD_SESSION/gate3-retest.out" \
-      "$SHARD_SESSION/gate3-retry.out" 2>/dev/null || true
+      "$SHARD_SESSION/gate3-retry.out" "$SHARD_SESSION/dispatch.stderr" 2>/dev/null || true
 
 # -------- helpers --------------------------------------------------------
 
@@ -129,6 +129,12 @@ derive_cause() {
       [ -s "$TEST_LOG" ] && cause="last output before the deadline: $(tail -1 "$TEST_LOG" 2>/dev/null)" ;;
     undeclared_file_touched)
       cause="scope violation — see undeclared_files below" ;;
+    dispatch-refused)
+      # pi-dispatch.sh prefixes its refusals; anything else is a wrapper's own
+      # complaint, whose last line is the one that says why it gave up.
+      cause=$(grep -m1 '^pi-dispatch:' "$SHARD_SESSION/dispatch.stderr" 2>/dev/null) || \
+        cause=$(grep -v '^[[:space:]]*$' "$SHARD_SESSION/dispatch.stderr" 2>/dev/null | tail -1) || true
+      [ -n "$cause" ] || cause="cf-pi-dispatch exited ${DISPATCH_RC:-?}" ;;
     *)
       # infra failures (stall/timeout/rc-fail/error/...): worker-side error stream
       local _j; _j=$(newest_jsonl)
@@ -370,8 +376,18 @@ dispatch_and_poll() {
   if [ -f "$SHARD_SESSION/pi-rundir" ]; then
     cp "$SHARD_SESSION/pi-rundir" "$SHARD_SESSION/pi-rundir-prev" 2>/dev/null || true
   fi
+  # A refusal exits 2, the NEEDS_REPLAN code; left to set -e it would end the
+  # shard as an unexplained outcome-missing that routes to replan.
   local pi_pid
-  pi_pid=$("$SCRIPTS/cf-pi-dispatch.sh" "$SHARD_SESSION" ${resume_file:+"$resume_file"})
+  DISPATCH_RC=0
+  pi_pid=$("$SCRIPTS/cf-pi-dispatch.sh" "$SHARD_SESSION" ${resume_file:+"$resume_file"} \
+             2>"$SHARD_SESSION/dispatch.stderr") || DISPATCH_RC=$?
+  if [ "$DISPATCH_RC" -ne 0 ]; then
+    write_outcome FAIL dispatch-refused "" "(all): dispatch refused (rc=$DISPATCH_RC)" "-" "-"
+    say "FAIL dispatch-refused (rc=$DISPATCH_RC)"
+    exit 1
+  fi
+  cat "$SHARD_SESSION/dispatch.stderr" >&2 2>/dev/null || true
   say "pi pid=$pi_pid"
 
   local rundir

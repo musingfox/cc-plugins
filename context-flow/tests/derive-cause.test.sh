@@ -46,4 +46,17 @@ rm -f "$PI_SESSION_DIR"/*.jsonl
 assert_contains "$(derive_cause FAIL stall)" "stalled mid-resume" \
   "T6: cause falls back to the run dir the resume replaced"
 
+# T7: a refused dispatch -> the pi-dispatch refusal line, else the last
+# stderr line, else the exit code
+printf 'banner\npi-dispatch: refused\ntrailer\n' > "$SHARD_SESSION/dispatch.stderr"
+assert_eq "pi-dispatch: refused" "$(derive_cause FAIL dispatch-refused)" \
+  "T7: dispatch-refused cause is the pi-dispatch line"
+printf 'first\nlast words\n\n' > "$SHARD_SESSION/dispatch.stderr"
+assert_eq "last words" "$(derive_cause FAIL dispatch-refused)" \
+  "T7: without a pi-dispatch line, the last non-empty line"
+: > "$SHARD_SESSION/dispatch.stderr"
+DISPATCH_RC=2
+assert_eq "cf-pi-dispatch exited 2" "$(derive_cause FAIL dispatch-refused)" \
+  "T7: with no stderr at all, the exit code"
+
 rm -rf "$SHARD_SESSION"

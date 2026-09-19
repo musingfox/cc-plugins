@@ -70,6 +70,7 @@ EOF
   mkdir -p "$FLOW/last-round/sessions"
   printf '{"errorMessage":"last round exploded"}\n' > "$FLOW/last-round/sessions/old.jsonl"
   printf '%s\n' "$FLOW/last-round" > "$SHARD/pi-rundir"
+  printf 'pi-dispatch: stale\n' > "$SHARD/dispatch.stderr"
 
   for s in cf-pi-worktree.sh cf-pi-brief.sh cf-pi-stop.sh; do
     printf '#!/bin/bash\nexit 0\n' > "$STUBS/$s"
@@ -154,6 +155,10 @@ assert_eq "0" "$(grep -c 'last round exploded' "$SHARD/outcome.md" || true)" \
   "probe-fails: last round's errorMessage is not reported as this round's cause"
 assert_contains "$(cat "$SHARD/outcome.md")" "session_jsonl: -" \
   "probe-fails: no session JSONL is claimed for a round that never dispatched"
+assert_eq "no" "$([ -e "$SHARD/dispatch.stderr" ] && echo yes || echo no)" \
+  "probe-fails: last round's dispatch stderr is removed"
+assert_eq "0" "$(sed -n '/^## Cause$/{n;p;q;}' "$SHARD/outcome.md" | grep -c stale || true)" \
+  "probe-fails: last round's dispatch refusal is not this round's cause"
 rm -rf "$FLOW"
 
 # ---- scenario 4: abort before any gate -> an outcome is still written ----
