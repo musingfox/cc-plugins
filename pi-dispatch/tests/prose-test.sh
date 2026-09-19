@@ -64,5 +64,16 @@ case "$section" in
   *) bad "SKILL's output contract never names PI_WRITABLE_FILES" ;;
 esac
 
+# --- every env var read has a README row ---
+for v in PI_PROMPT PI_RESOLVE_ROUTING_ONLY PI_WALL_CLOCK_S PI_STALL_THRESHOLD_S PI_NO_MARKER_GRACE_S PI_RUN_DEADLINE_S PI_POLL_INTERVAL_S PI_WRITABLE_FILES; do
+  n="$(grep -c "^| \`$v\`" "$README")"
+  [ "$n" = 1 ] && ok "README has one row for $v" || bad "README has $n rows for $v"
+done
+row="$(grep "^| \`PI_WRITABLE_FILES\`" "$README")"
+case "$row" in
+  *"exit 2"*resume*|*resume*"exit 2"*) ok "the PI_WRITABLE_FILES row names the exit 2 refusal and the replay on resume" ;;
+  *) bad "the PI_WRITABLE_FILES row lacks 'exit 2' or 'resume': $row" ;;
+esac
+
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

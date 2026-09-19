@@ -59,6 +59,21 @@ A provider set without a model is refused with exit 2 — pi resolves the model 
 
 Routing is recorded in `RUNDIR/routing` and replayed on resume: a follow-up turn that names a `PRIOR_RUNDIR` always inherits the original routing, so a resumed session never changes model mid-conversation.
 
+## Environment
+
+`PI_PROVIDER`, `PI_MODEL`, `PI_BIN`, `PI_CWD` and `PI_SANDBOX` are described above. The rest:
+
+| variable | read by | what it does |
+|---|---|---|
+| `PI_WRITABLE_FILES` | `pi-dispatch.sh` | Colon-separated absolute paths of extra files outside `PI_CWD` the worker may write (a report, a verdict file). Each file gets an exact sandbox rule and a write/edit fence exception; a sibling in the same directory stays denied. Empty segments are skipped. An entry that is relative, has no existing parent directory, contains `"` or `\`, or names a directory, or a list containing a newline, is refused with exit 2 before any `RUNDIR` exists. Recorded as `WRITABLE=` in `RUNDIR/routing`, shown on the launch line, and replayed on resume: the record beats the env, even when empty. |
+| `PI_PROMPT` | `pi-dispatch.sh` | The prompt passed to pi after the brief. Default: `Read the brief above and complete it. Output only the result.` |
+| `PI_RESOLVE_ROUTING_ONLY` | `pi-dispatch.sh` | `1` prints the resolved `PROVIDER=… MODEL=…` and exits without launching. `pi-probe.sh` uses it. |
+| `PI_WALL_CLOCK_S` | `pi-poll.sh` | Hard elapsed ceiling for a live run before it is killed as `TIMEOUT`. Default 900; `pi-run.sh` sets it to its deadline. |
+| `PI_STALL_THRESHOLD_S` | `pi-poll.sh` | Seconds a live run may go without output before it is killed as `STALL`. Default 300. |
+| `PI_NO_MARKER_GRACE_S` | `pi-poll.sh` | Seconds a dead run may go without an `rc` file before it fails as `no-rc`. Default 30. |
+| `PI_RUN_DEADLINE_S` | `pi-run.sh` | Deadline for the whole call when `--deadline` is not given. Default 480. |
+| `PI_POLL_INTERVAL_S` | `pi-run.sh` | Seconds between polls. Default 5. |
+
 ## Scaling to N parallel tasks (dispatch → review)
 
 Dispatch is non-blocking, so fan-out is just N launches:
