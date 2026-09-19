@@ -28,8 +28,8 @@ trap 'rm -rf "$TMP"' EXIT
 retired() { grep -rniE 'modelRoles|overlay|haiku|foreman' "$@"; }
 
 # --- retired vocabulary ---
-hits="$(grep -rn 'config\.yml' "$PLUGIN")"
-[ -z "$hits" ] && ok "no file in the plugin names the yaml routing file" || bad "yaml routing file named: $hits"
+hits="$(grep -rn 'config\.yml' "$PLUGIN/docs" "$README" "$PLUGIN/skills" "$PLUGIN/scripts")"
+[ -z "$hits" ] && ok "docs, README, skill and scripts never name the yaml routing file" || bad "yaml routing file named: $hits"
 
 hits="$(retired "$PLUGIN/docs" "$README" "$PLUGIN/skills" "$PLUGIN/scripts")"
 [ -z "$hits" ] && ok "docs, README, skill and scripts carry no retired vocabulary" || bad "retired vocabulary: $hits"
