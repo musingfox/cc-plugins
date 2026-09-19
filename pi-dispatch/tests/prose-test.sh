@@ -75,5 +75,12 @@ case "$row" in
   *) bad "the PI_WRITABLE_FILES row lacks 'exit 2' or 'resume': $row" ;;
 esac
 
+# --- the README's test instructions cover every suite ---
+for t in "$SCRIPT_DIR"/*.sh; do
+  b="$(basename "$t")"
+  grep -qF "$b" "$README" && ok "README names $b" || bad "README never names $b"
+done
+[ "$(grep -c 'tests/run-all.sh' "$README")" -ge 1 ] && ok "README names tests/run-all.sh" || bad "README never names tests/run-all.sh"
+
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

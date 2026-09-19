@@ -92,4 +92,6 @@ Context hygiene: main never reads worker streams or source material — only bri
 
 ## Tests
 
-`bash tests/routing-test.sh && bash tests/wrapper-test.sh && bash tests/cwd-test.sh && bash tests/shim-test.sh && bash tests/poll-test.sh && bash tests/worktree-cleanup-test.sh && bash tests/probe-watch-test.sh && bash tests/agent-test.sh` — all pure-local, no network (agent-test and cwd-test use a bash shim in place of `pi`; shim-test runs real git against scratch repos). `bun test extensions/` covers the write/edit fence.
+From the repository root, `bash tests/run-all.sh` runs every suite below, the bun suite, and the context-flow suites, printing one `ok`/`not ok` line per suite and `suites: N, failed: M` last.
+
+Each suite also runs alone from this directory as `bash tests/<name>`: `routing-test.sh`, `wrapper-test.sh`, `cwd-test.sh`, `shim-test.sh`, `poll-test.sh`, `worktree-cleanup-test.sh`, `probe-watch-test.sh`, `agent-test.sh`, `run-test.sh`, `writable-test.sh`, `settings-warning-test.sh`, `builder-seat-test.sh` and `prose-test.sh`. All are pure-local, no network (agent-test, cwd-test and writable-test use a bash shim in place of `pi`; shim-test runs real git against scratch repos; prose-test reads the docs). `bun test extensions/` covers the write/edit fence.
