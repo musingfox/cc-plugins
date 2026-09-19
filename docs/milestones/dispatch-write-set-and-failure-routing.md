@@ -1,6 +1,6 @@
 ---
-status: accepted    # accepted | done | superseded
-delivered:          # commit or tag ref — filled when acceptance passes
+status: done        # accepted | done | superseded
+delivered: 0ff9a5f  # commit or tag ref — filled when acceptance passes
 depends: []         # milestone slugs that must land first
 ---
 

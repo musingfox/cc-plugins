@@ -1,6 +1,6 @@
 ---
 id: quota-ends-the-batch
-status: proposed
+status: accepted
 scope:
   - "pi-dispatch/scripts/pi-poll.sh"
   - "pi-dispatch/scripts/pi-agent.sh"

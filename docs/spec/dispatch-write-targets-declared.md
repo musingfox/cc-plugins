@@ -1,6 +1,6 @@
 ---
 id: dispatch-write-targets-declared
-status: proposed
+status: accepted
 scope:
   - "pi-dispatch/scripts/pi-dispatch.sh"
   - "pi-dispatch/extensions/worktree-fence.ts"
