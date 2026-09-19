@@ -236,7 +236,7 @@ describe('a drawn diagram swaps in', () => {
 })
 
 describe('a diagram that could not be drawn', () => {
-  const asToday = (tree: any) => {
+  const keepsCodeBlock = (tree: any) => {
     expect(nodesOf(tree, 'Code').length).toBe(0)
     expect(nodesOf(tree, 'Markdown').length).toBe(1)
     expect(nodesOf(tree, 'Markdown')[0].props.text).toBe(MERMAID_BODY)
@@ -245,20 +245,20 @@ describe('a diagram that could not be drawn', () => {
   test('blank output leaves the code block', async ($, on) => {
     const w = world(on, { read: MERMAID_CARD, termaid: '\n' })
     await shown($, w, 'm')
-    asToday(await $.ui.render(PANE))
+    keepsCodeBlock(await $.ui.render(PANE))
   })
 
   test('a failed run leaves the code block', async ($, on) => {
     const w = world(on, { read: MERMAID_CARD, termaid: { exitCode: 1, stderr: 'Error: Empty input.\n' } })
     await shown($, w, 'm')
-    asToday(await $.ui.render(PANE))
+    keepsCodeBlock(await $.ui.render(PANE))
   })
 
   test('a run that cannot start leaves the code block and says nothing', async ($, on) => {
     const w = world(on, { read: MERMAID_CARD, termaid: { deny: 'ENOENT' } })
     await shown($, w, 'm')
     const tree = await $.ui.render(PANE)
-    asToday(tree)
+    keepsCodeBlock(tree)
     expect(stringsIn(tree).some((text) => /termaid|uvx/.test(text))).toBe(false)
     expect(tree.type).not.toBe('engine')
   })
