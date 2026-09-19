@@ -55,7 +55,7 @@ After setup, read `$PI_AVAILABLE` from env.sh:
 - `PI_AVAILABLE=1` → Phase 3 uses OMP (default).
 - `PI_AVAILABLE=0` → Phase 3 falls back to Claude `cf:implement` agent. Log: `pi CLI not on PATH — Phase 3 will use Claude implement agent. Install pi (npm i -g @earendil-works/pi-coding-agent) to use the pi implementer.` Do NOT abort.
 
-The fallback path is also reachable mid-flow (a shard's `Status: FAIL` with unrecoverable probe error, the pre-dispatch quota gate reports the OMP provider near-saturated — §3.2, or the human selects "Fall back to Claude implement agent" at a recovery prompt). Procedure: §3.6.
+The fallback path is also reachable mid-flow (a shard's `Status: FAIL` with unrecoverable probe error or with Reason `QUOTA` or `QUOTA-WINDOW` — §3.4, or the human selects "Fall back to Claude implement agent" at a recovery prompt). Procedure: §3.6.
 
 ---
 
@@ -332,7 +332,7 @@ SHARD_IDS=$(jq -r '.groups | keys[]' "$SESSION/shards.json")
 
 ### 3.2 Fan-out
 
-**No pre-dispatch quota gate.** There is none, deliberately: since dispatch moved from omp to pi there is no provider-side headroom signal to read (`pi auth check` reports readiness, not remaining balance, and is blind to package-provided providers). Exhaustion is caught reactively — `cf-pi-run.sh`'s poll classifies it as `QUOTA` (balance or plan, which only paying resets) or `QUOTA-WINDOW` (a rolling window that clears on its own in hours), and one worker hitting the wall aborts its whole batch rather than letting every sibling pay for the same wall. On that outcome, route the round through the Claude fallback (§3.6) or re-run later against a different `$PI_PROVIDER`/`$PI_MODEL`.
+**No pre-dispatch quota gate.** There is none, deliberately: since dispatch moved from omp to pi there is no provider-side headroom signal to read (`pi auth check` reports readiness, not remaining balance, and is blind to package-provided providers). Exhaustion is caught reactively — `cf-pi-run.sh`'s poll classifies it as `QUOTA` (balance or plan, which only paying resets) or `QUOTA-WINDOW` (a rolling window that clears on its own in hours), and one worker hitting the wall aborts its whole batch rather than letting every sibling pay for the same wall: the shard that hits it records the wall for the flow, and every sibling `cf-pi-run.sh` stops its own worker from that record with the same tag. On that outcome (§3.4 Any FAIL), route the round through the Claude fallback (§3.6) or re-run later against a different `$PI_PROVIDER`/`$PI_MODEL`.
 
 **Wave rule.** A shard is READY when every id in its `depends_on` already has a PASS checkpoint (`jq -r '.checkpoints | keys[]' "$SESSION/dispatch-state.json"`); shards with `depends_on: []` are READY immediately. Launch ONLY the READY shards — a dependent shard dispatched early forks a base without its prerequisites' interfaces and `cf-pi-run.sh` refuses it (`FAIL prereq-missing`). Dependent shards launch as the next wave from §3.4 routing; `cf-pi-run.sh` merges their prerequisites' checkpoints into their worktree base automatically.
 
@@ -406,6 +406,8 @@ Precedence within one round: **FAIL retries are resolved first, then NEEDS_REPLA
 #### Any FAIL
 
 **Two reasons are exempt from the re-launch: `test-stalled` and `probe-stalled`.** Both mean something never returned within its deadline — the shard already burned `CF_TEST_DEADLINE_S` (or `PI_PROBE_DEADLINE_S`) once, and re-launching with the same inputs buys exactly the same wait a second time. Same argument as `INT_STATUS=TEST_STALLED` below: this is infrastructure, not a contract failure. Show the human the reason line and `$SESSION/shards/<id>/outcome.md`, and ask whether to raise the deadline and re-run that shard or to investigate what hangs. Do not count these against the retry budget.
+
+**`QUOTA` and `QUOTA-WINDOW` are never re-launched either.** The shard hit the provider's quota wall — `QUOTA` is balance or plan, which only paying resets; `QUOTA-WINDOW` is a rolling window that clears on its own in hours — and a re-launch on the same `$PI_PROVIDER`/`$PI_MODEL` pays for the same wall a second time. Siblings of the same batch end with the same tag as their Reason and `sibling-abort` in Affected. Show the human the reason line and each affected shard's `outcome.md`, and ask via `AskUserQuestion` whether to route those shards through the Claude fallback (§3.6) or to stop so the human can change `$PI_PROVIDER`/`$PI_MODEL` and re-run. Do not count these against the retry budget.
 
 Otherwise a FAIL means OMP infrastructure failure (probe error, dispatch broken, stall after in-script retry, report still missing after its own report-only re-dispatch). Re-launch `cf-pi-run.sh` for that shard with the same inputs — one message, one background `Bash` per failed shard if multiple. The re-launch clears the previous round's outcome/report/escalate/diff itself, so the shard's session directory needs no cleanup from you. Re-arm the progress monitor in a LATER message than the re-launch, not the same one: `cf-pi-watch.sh` evaluates "all done" on its first iteration, so a watch racing the re-launch could still catch the stale `outcome.md` before the script clears it.
 
@@ -499,7 +501,7 @@ If either fires, escalate to the user via `AskUserQuestion`:
 
 Replan budget = 2 attempts per contract (third NEEDS_REPLAN escalates). Rollback budget = 2 cycles per flow (third escalates). FAIL retry budget = 1 per shard per round (handled in §3.4 Any FAIL).
 
-### 3.6 Fallback: Claude implement agent (PI_AVAILABLE=0, quota-saturated, or human-selected)
+### 3.6 Fallback: Claude implement agent (PI_AVAILABLE=0, a `QUOTA`/`QUOTA-WINDOW` outcome, or human-selected)
 
 The fallback fills the SAME seat under the SAME contract — only the builder changes. Per shard, sequentially (Claude agents are not free fan-out):
 
