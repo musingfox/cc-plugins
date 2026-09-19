@@ -77,5 +77,26 @@ refused "existing directory" "$WDIR"
 RD="$(launch PI_BIN="$SHIM" PI_CWD="$WORK" "PI_WRITABLE_FILES=:$WDIR/report.md:" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
 if [ -n "$RD" ] && [ "$(sed -n 's/^WRITABLE=//p' "$RD/routing")" = "$WDIR_C/report.md" ]; then ok "empty segments skipped -> routing records exactly one path"; else bad "empty segments -> $(tr '\n' ' ' < "$RD/routing" 2>/dev/null)"; fi
 
+# --- on macOS the sandbox lets the worker write the declared file and nothing beside it ---
+if [ "$(uname -s)" = Darwin ] && command -v sandbox-exec >/dev/null 2>&1; then
+  cat > "$TMP/pi-writer" <<'EOF2'
+#!/usr/bin/env bash
+dir="${@: -1}"   # the PROMPT is pi's last argv; the test passes the declared dir there
+{ : > "$dir/report.md" && echo body >> "$dir/report.md"; } 2>/dev/null && echo DECLARED=written || echo DECLARED=denied
+: > "$dir/sibling.md" 2>/dev/null && echo SIBLING=written || echo SIBLING=denied
+EOF2
+  chmod +x "$TMP/pi-writer"
+  RD="$(launch PI_BIN="$TMP/pi-writer" PI_CWD="$WORK" PI_PROMPT="$WDIR" "PI_WRITABLE_FILES=$WDIR/report.md" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
+  if [ -f "$RD/sandbox.sb" ] && [ "$(field "$RD" DECLARED)" = written ] && [ "$(field "$RD" SIBLING)" = denied ]; then ok "sandbox: declared file written, sibling denied"; else bad "sandbox enforcement -> $(grep -E '^(DECLARED|SIBLING)=' "$RD/result.md" | tr '\n' ' ')"; fi
+  if [ -f "$WDIR/report.md" ] && [ ! -e "$WDIR/sibling.md" ]; then ok "sandbox: report.md exists, sibling.md absent"; else bad "sandbox files -> $(ls "$WDIR" | tr '\n' ' ')"; fi
+  if grep -qF "(literal \"$WDIR_C/report.md\")" "$RD/sandbox.sb" && ! grep -qF "(subpath \"$WDIR_C\")" "$RD/sandbox.sb"; then ok "sandbox.sb holds a canonical literal and no subpath of its parent"; else bad "sandbox.sb -> $(grep -F "$WDIR_C" "$RD/sandbox.sb")"; fi
+  rm -f "$WDIR/report.md" "$WDIR/sibling.md"
+  RD="$(launch PI_BIN="$TMP/pi-writer" PI_CWD="$WORK" PI_SANDBOX=0 PI_PROMPT="$WDIR" "PI_WRITABLE_FILES=$WDIR/report.md" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
+  if [ ! -f "$RD/sandbox.sb" ] && [ "$(field "$RD" SIBLING)" = written ]; then ok "PI_SANDBOX=0 -> the sibling is writable (positive control)"; else bad "PI_SANDBOX=0 -> $(grep SIBLING= "$RD/result.md")"; fi
+  rm -f "$WDIR/report.md" "$WDIR/sibling.md"
+else
+  echo "skip - sandbox cases need macOS sandbox-exec"
+fi
+
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

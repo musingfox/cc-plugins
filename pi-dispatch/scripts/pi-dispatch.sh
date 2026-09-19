@@ -257,6 +257,13 @@ if [ ${#SANDBOX[@]} -gt 0 ]; then
     # pi's bundled subagents extension keeps its scratch under /tmp/pi-subagents-uid-<uid>/.
     echo '  (regex #"^/private/tmp/pi-subagents-uid-[0-9]+(/|$)")'
     for d in "${SANDBOX_PROFILE_PATHS[@]}" "$RUNDIR"; do printf '  (subpath "%s")\n' "$d"; done
+    # One literal per declared file, never its parent: a sibling stays denied.
+    # The paths are canonical (/private/tmp, not /tmp), the only spelling SBPL matches.
+    rest="$WRITABLE"
+    while [ -n "$rest" ]; do
+      printf '  (literal "%s")\n' "${rest%%:*}"
+      case "$rest" in *:*) rest="${rest#*:}" ;; *) rest="" ;; esac
+    done
     echo ')'
   } > "$RUNDIR/sandbox.sb"
   SANDBOX=(sandbox-exec -f "$RUNDIR/sandbox.sb")
