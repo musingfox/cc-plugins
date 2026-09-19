@@ -5,6 +5,11 @@ export const SESSION = { surface: 'terminal', isInteractive: true, cwd: '/work' 
 export const CARD =
   '---\ntitle: "Claude Mod：面板顯示 obw 的 task 與 issue"\nstatus: todo\npriority: medium\ndue:\ntags:\n  - claude-mods\ncreated: 2026-09-18\n---\n# mod-obw-issue-pane\n\n## Acceptance Criteria\n- [ ] one\n'
 
+// One mermaid block between two markdown runs; CARD stays fence-free.
+export const MERMAID_CARD = '---\ntitle: m\n---\n# m\n\n```mermaid\ngraph LR\nA-->B\n```\n\ntail\n'
+
+export const DIAGRAM = ' ┌─┐\n │A│\n └─┘\n'
+
 export const SEARCH_ARGV = [
   'obsidian',
   'vault=obsidian',
@@ -40,10 +45,12 @@ export type WorldOptions = {
   env?: Record<string, string>
   write?: { deny: string }
   render?: CliAnswer
+  termaid?: CliAnswer
 }
 
 // A stub world beneath the plugin: every $ call it makes is answered and recorded here.
-// `obsidian … search` and `obsidian … read` runs are answered by `search` and `read`, any other run by `render`.
+// `obsidian … search` and `obsidian … read` runs are answered by `search` and `read`, `uvx` runs by `termaid`,
+// any other run by `render`.
 // `$.env.get` is answered only when `env` is given; without it the call rejects.
 export function world(on: any, options: WorldOptions = {}) {
   const runs: any[] = []
@@ -59,8 +66,9 @@ export function world(on: any, options: WorldOptions = {}) {
     search: options.search ?? LIST,
     read: options.read ?? CARD,
     render: options.render ?? RENDERED,
+    termaid: options.termaid ?? DIAGRAM,
   }
-  const defaults: Record<string, string> = { search: LIST, read: CARD, render: RENDERED }
+  const defaults: Record<string, string> = { search: LIST, read: CARD, render: RENDERED, termaid: DIAGRAM }
 
   on('session.start', ($: any, e: any) => ({ cwd: e.cwd }))
   const clock = mock.clock(on)
@@ -95,7 +103,7 @@ export function world(on: any, options: WorldOptions = {}) {
   })
   on('process.run', async ($: any, e: any) => {
     runs.push(e)
-    const verb = e.argv[0] === 'obsidian' ? e.argv[2] : 'render'
+    const verb = e.argv[0] === 'obsidian' ? e.argv[2] : e.argv[0] === 'uvx' ? 'termaid' : 'render'
     const answer = answers[verb]
     if (answer === undefined) return { deny: `no answer for ${verb}` }
     if (answer === 'defer') {
