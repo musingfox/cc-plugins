@@ -1,5 +1,5 @@
 import type { On } from 'claude-code'
-import { bounded } from './bounds.ts'
+import { bounded, MAX_CHARS } from './bounds.ts'
 import { configOf } from './config.ts'
 import { listArgv, cardArgv, isBadCardName } from './argv.ts'
 import { searchOutput, readOutput, OBSIDIAN_TIMEOUT_MS } from './cli-output.ts'
@@ -267,8 +267,8 @@ async function drawPane($: any, e: any) {
   const card = view.card
   if (!card) return Box({ flexDirection: 'column', children })
   const columns = e.props?.bodyColumns
-  const rule = Number.isInteger(columns) && columns > 0 ? Math.min(columns, 10000) : 40
-  const region: any[] = [dim('─'.repeat(rule))]
+  const ruleWidth = Number.isInteger(columns) && columns > 0 ? Math.min(columns, MAX_CHARS) : 40
+  const region: any[] = [dim('─'.repeat(ruleWidth))]
   if (card.kind === 'loading') region.push(dim(`Reading ${card.name}…`))
   if (card.kind === 'error') region.push(red(card.message))
   if (card.kind === 'shown') {

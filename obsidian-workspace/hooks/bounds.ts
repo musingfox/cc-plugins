@@ -1,6 +1,8 @@
 const CONTROLS_BUT_TAB_AND_NEWLINE = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g
 
-export function bounded(text: string, max = 10000) {
+export const MAX_CHARS = 10000
+
+export function bounded(text: string, max = MAX_CHARS) {
   const clean = text.replace(CONTROLS_BUT_TAB_AND_NEWLINE, '')
   if (clean.length <= max) return { text: clean, clippedFrom: null }
   let end = max
