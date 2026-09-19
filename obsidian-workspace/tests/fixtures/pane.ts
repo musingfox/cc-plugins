@@ -16,6 +16,11 @@ export function nodesOf(node: any, type: string): any[] {
   return [...(node.type === type ? [node] : []), ...kids.flatMap((kid) => nodesOf(kid, type))]
 }
 
+// The header line: one Text whose spans read `status: … · priority: …`.
+export function headerIn(tree: any) {
+  return nodesOf(tree, 'Text').find((node) => stringsIn(node).join('').startsWith('status: '))
+}
+
 export async function issue($: any, args: string) {
   await $.session.start(SESSION)
   return $.command.run({ command: 'issue', args })

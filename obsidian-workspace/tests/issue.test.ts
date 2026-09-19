@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { PANE, issue, nodesOf, stringsIn } from './fixtures/pane.ts'
+import { PANE, headerIn, issue, nodesOf, stringsIn } from './fixtures/pane.ts'
 import { CARD, SEARCH_ARGV, SESSION, world } from './fixtures/world.ts'
 
 async function paneStrings($: any) {
@@ -271,7 +271,7 @@ describe('card', () => {
     expect(select.props.value).toBe('mod-obw-issue-pane')
     const strings = stringsIn(tree)
     expect(strings).toContain('Claude Mod：面板顯示 obw 的 task 與 issue')
-    expect(strings).toContain('status: todo · priority: medium')
+    expect(stringsIn(headerIn(tree)).join('')).toBe('status: todo · priority: medium · AC 0/1')
     const markdowns = nodesOf(tree, 'Markdown')
     expect(markdowns.length).toBe(1)
     expect(markdowns[0].props.text).toBe('# mod-obw-issue-pane\n\n## Acceptance Criteria\n- [ ] one\n')
@@ -332,7 +332,7 @@ describe('card', () => {
     const tree = await $.ui.render(PANE)
     const title = nodesOf(tree, 'Text').filter((node: any) => node.props?.bold)
     expect(stringsIn(title[0])).toEqual(['k'])
-    expect(stringsIn(tree)).toContain('status: todo · priority: —')
+    expect(stringsIn(headerIn(tree)).join('')).toBe('status: todo · priority: —')
   })
 
   test('the card region reads "Reading <card>…" while the read runs', async ($, on) => {

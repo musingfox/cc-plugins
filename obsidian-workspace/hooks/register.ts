@@ -4,10 +4,11 @@ import { configOf } from './config.ts'
 import { listArgv, cardArgv, isBadCardName } from './argv.ts'
 import { searchOutput, readOutput, OBSIDIAN_TIMEOUT_MS } from './cli-output.ts'
 import type { Run } from './cli-output.ts'
-import { headerOf } from './card.ts'
+import { acLabel, headerOf } from './card.ts'
 import type { CardHeader } from './card.ts'
 import { vizManifestPath, vizInstallPath, renderTarget, renderArgv, renderOutcome, RENDER_TIMEOUT_MS } from './viz.ts'
 import { splitFences, termaidHeaderAllowed, diagramOutcome, TERMAID_ARGV, TERMAID_TIMEOUT_MS } from './mermaid.ts'
+import { priorityColor, statusColor, RED } from './style.ts'
 
 const PANE = { id: 'obw-issue', title: 'obw issue', focus: true, closeOnEscape: true }
 
@@ -29,14 +30,14 @@ type CardRegion =
     }
 
 type View = {
-  message: string | null
+  message: { kind: 'error' | 'notice'; text: string } | null
   scope: { vault: string; project: string } | null
   cards: string[]
   selected: string | null
   card: CardRegion | null
 }
 
-const LOADING: View = { message: 'Reading the vault…', scope: null, cards: [], selected: null, card: null }
+const LOADING: View = { message: { kind: 'notice', text: 'Reading the vault…' }, scope: null, cards: [], selected: null, card: null }
 
 let view: View = LOADING
 // A CLI call can settle after a newer /issue or card read started; only the latest request writes the view.
@@ -57,7 +58,7 @@ function invalidate($: any) {
 
 function showMessage($: any, request: number, message: string) {
   if (request !== requests) return
-  view = { ...LOADING, message }
+  view = { ...LOADING, message: { kind: 'error', text: message } }
   invalidate($)
 }
 
@@ -162,7 +163,6 @@ function bodyParts(text: string, diagrams: (string | undefined)[]): ({ markdown:
 
 function browserLines(browser: Browser | null): string[] {
   if (browser?.kind === 'rendering') return ['Rendering in the browser…']
-  if (browser?.kind === 'error') return [browser.message]
   if (browser?.kind !== 'opened') return []
   // Over SSH render.sh opens nothing and prints a URL instead.
   return browser.url ? [`Rendered: ${browser.path}`, `URL: ${browser.url}`] : [`Opened in the browser: ${browser.path}`]
@@ -224,7 +224,7 @@ async function openIssue($: any, request: number, card: string) {
   if (request !== requests) return
   if (result.kind === 'error') return showMessage($, request, result.message)
   view = {
-    message: result.kind === 'empty' ? `No unfinished cards in pm/${config.project}.` : null,
+    message: result.kind === 'empty' ? { kind: 'notice', text: `No unfinished cards in pm/${config.project}.` } : null,
     scope: { vault: config.vault, project: config.project },
     cards: result.kind === 'cards' ? result.cards : [],
     selected: card || null,
@@ -238,6 +238,8 @@ async function drawPane($: any, e: any) {
   const { Box, Text, Select, Markdown, Button, Code } = await $.ui.resolve(e)
   const safe = (text: string) => bounded(text).text
   const dim = (text: string) => Text({ dimColor: true, children: [safe(text)] })
+  const red = (text: string) => Text({ color: RED, children: [safe(text)] })
+  const span = (text: string, color?: string) => Text({ ...(color ? { color } : {}), children: [safe(text)] })
   const clipNotice = (shown: string, clippedFrom: number) => dim(`Clipped: showing ${shown.length} of ${clippedFrom} characters.`)
   const children: any[] = []
   if (view.cards.length) {
@@ -252,18 +254,33 @@ async function drawPane($: any, e: any) {
       }),
     )
   }
-  if (view.message) children.push(dim(view.message))
+  if (view.message) children.push(view.message.kind === 'error' ? red(view.message.text) : dim(view.message.text))
   const card = view.card
-  if (card?.kind === 'loading') children.push(dim(`Reading ${card.name}…`))
-  if (card?.kind === 'error') children.push(dim(card.message))
-  if (card?.kind === 'shown') {
+  if (!card) return Box({ flexDirection: 'column', children })
+  const columns = e.props?.bodyColumns
+  const rule = Number.isInteger(columns) && columns > 0 ? Math.min(columns, 10000) : 40
+  const region: any[] = [dim('─'.repeat(rule))]
+  if (card.kind === 'loading') region.push(dim(`Reading ${card.name}…`))
+  if (card.kind === 'error') region.push(red(card.message))
+  if (card.kind === 'shown') {
     const { title, status, priority } = card.header
     const body = bounded(card.body)
-    children.push(Text({ bold: true, children: [safe(title ?? card.name)] }))
-    children.push(dim(`status: ${status ?? '—'} · priority: ${priority ?? '—'}`))
+    const ac = acLabel(card.body)
+    region.push(Text({ bold: true, children: [safe(title ?? card.name)] }))
+    region.push(
+      Text({
+        children: [
+          dim('status: '),
+          span(status ?? '—', statusColor(status)),
+          dim(' · priority: '),
+          span(priority ?? '—', priorityColor(priority)),
+          ...(ac ? [dim(' · '), span(ac)] : []),
+        ],
+      }),
+    )
     // Only the terminal can run render.sh: `process` is CLI only.
     if (card.vizRoot && e.surface === 'terminal') {
-      children.push(
+      region.push(
         Button({
           key: 'open-in-browser',
           label: 'Open in browser',
@@ -272,19 +289,22 @@ async function drawPane($: any, e: any) {
           },
         }),
       )
-      for (const line of browserLines(card.browser)) children.push(dim(line))
+      if (card.browser?.kind === 'error') region.push(red(card.browser.message))
+      for (const line of browserLines(card.browser)) region.push(dim(line))
     }
-    if (body.clippedFrom !== null) children.push(clipNotice(body.text, body.clippedFrom))
+    if (body.clippedFrom !== null) region.push(clipNotice(body.text, body.clippedFrom))
     for (const part of bodyParts(body.text, card.diagrams)) {
       if ('markdown' in part) {
-        children.push(Markdown({ text: part.markdown }))
+        region.push(Markdown({ text: part.markdown }))
         continue
       }
       const diagram = bounded(part.diagram)
-      if (diagram.clippedFrom !== null) children.push(clipNotice(diagram.text, diagram.clippedFrom))
-      children.push(Code({ source: diagram.text, wrap: 'truncate-end' }))
+      if (diagram.clippedFrom !== null) region.push(clipNotice(diagram.text, diagram.clippedFrom))
+      region.push(Code({ source: diagram.text, wrap: 'truncate-end' }))
     }
   }
+  // A blank row and a thin rule set the card off from the list above it.
+  children.push(Box({ flexDirection: 'column', marginTop: 1, children: region }))
   return Box({ flexDirection: 'column', children })
 }
 
