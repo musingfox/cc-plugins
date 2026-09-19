@@ -19,7 +19,7 @@ The card's d.ts line references are 2.1.273's. Everything below was checked agai
 
 `/issue` is a Claude Mod in obsidian-workspace's (plugin `obw`) module slot, which is free because obw has no hooks today. Every read of vault content goes through the `obsidian` CLI via `$.process.run`; `$.fs` reads only the project's own `.obsidian.yaml`, which is not in the vault, and viz's `installed_plugins.json` under `$CLAUDE_CONFIG_DIR` or `$HOME/.claude`, and writes only the card body to `/tmp/viz/obw/<slug>.md` for render.sh. The card is drawn in a pane opened by the command and never enters the conversation.
 
-`/issue` trusts nothing the CLI prints until it matches a known success shape, and draws nothing until it fits the element's bounds. Every other outcome — a closed app, an unknown vault, a missing card, an empty project, an oversized or malformed body — becomes a message in the pane, and the hook never throws. The mod makes one CLI call per view and scopes every query to the project's own folder. The only other process it starts is the viz plugin's `render.sh`, and only when the user presses the card's Open in browser Button.
+`/issue` trusts nothing the CLI prints until it matches a known success shape, and draws nothing until it fits the element's bounds. Every other outcome — a closed app, an unknown vault, a missing card, an empty project, an oversized or malformed body — becomes a message in the pane, and the hook never throws. The mod makes one CLI call per view and scopes every query to the project's own folder. It starts two other processes. `uvx termaid@0.9.0 --width 80` runs once per supported Mermaid block of a shown card, one block at a time, after the card is drawn and without holding the command; uv is an optional runtime dependency, and a block termaid does not draw stays a code block. The viz plugin's `render.sh` runs only when the user presses the card's Open in browser Button.
 
 ## Concrete enough to build on
 
@@ -44,7 +44,8 @@ Defaults taken on two-way doors, none visible outside the mod:
 
 - **Display:** a pane opened by the command, placed at any terminal width. Known cost: in fullscreen it docks beside the transcript at about half the screen, which is why omp-quota moved to the AbovePrompt band in b87e81e; the band was not taken because it is one shared instance omp-quota already draws in.
 - **One pane:** the `Select` on top, the chosen card below; `/issue <kebab>` preselects that card.
-- **Header:** title, status and priority as `Text`, parsed from `read`'s frontmatter; the body with frontmatter stripped as one `Markdown` block. `[[wikilinks]]` draw as plain text.
+- **Header:** title, status and priority as `Text`, parsed from `read`'s frontmatter; status and priority are coloured labels, followed by an `AC <checked>/<total>` count of the Acceptance Criteria checkboxes when there are any. The body with frontmatter stripped is one `Markdown` block until termaid draws a Mermaid block; then the body splits into `Markdown` around a `Code` element holding that diagram. `[[wikilinks]]` draw as plain text.
+- **Styling:** a blank row and a dim rule set the card off from the list; errors are red, progress and empty-list notices dim.
 - **List labels:** the kebab names from the search paths — one call, no per-card lookups.
 - **Obsidian closed:** show the CLI's message and stop; launch nothing.
 - **Over 10000 characters:** clip with a visible notice.
@@ -61,6 +62,7 @@ Defaults taken on two-way doors, none visible outside the mod:
 - One real session with `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` shows the list, a card, and the closed-app message correctly.
 - A shown card has an Open in browser Button in the terminal when viz is installed, and none when viz is absent or on another surface. A press writes the card body to `/tmp/viz/obw/`, runs viz's `render.sh` on it with a 15 s timeout, and the pane shows where the card was rendered or why it was not.
 - In one real session with `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`, pressing Open in browser on a card with a Mermaid block opens the rendered page in the browser.
+- A shown card's Mermaid blocks are drawn in the pane as text diagrams by `uvx termaid@0.9.0` with a 5 s timeout, after the card itself is drawn. A block with an unsupported diagram type, a leading `%%` comment or `---` frontmatter never runs; blank output, a failure, a missing uv or the timeout keep the code block. Diagram text is bounded like the body.
 
 ## Left open
 
@@ -70,6 +72,7 @@ Defaults taken on two-way doors, none visible outside the mod:
 - **The pm skill's own list query** (`obsidian-workspace/skills/pm/SKILL.md:62,105`) is unscoped and matches substrings too. Latent — no project name is a substring of another — and outside this card; flagged, not fixed.
 - **Sandboxing of the press.** Whether the Bash sandbox or a permission prompt applies to a mod's `$.fs.write` to `/tmp/viz/obw/` and its `$.process.run` of `bash`, and whether `onPress` side effects run live as in the test kit, is untested live.
 - **SSH holding the run.** Under SSH, `render.sh` starts a background server that inherits stdin, which may hold the run until the 15 s timeout; the pane then shows the timeout message. Untested live.
+- **Diagrams and colour live.** How a `Code` element with no language and `truncate-end` looks in the terminal and in herdr; whether herdr shows 24-bit hex colours; whether a permission or sandbox prompt applies to a mod's `uvx` run; whether the 5 s timeout is enforced (the test kit does not enforce `timeoutMs`); and the first run on a machine with no uv-managed Python. Untested live.
 
 ## What would overturn this
 

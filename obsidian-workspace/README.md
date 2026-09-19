@@ -23,6 +23,10 @@ Plugin identifier: `obw` (skills invoked as `/obw:<name>` or via natural languag
 
 Run `/issue` to list unfinished cards for the configured project, then select one to read its title, status, priority, and markdown body in the same pane. `/issue <card>` opens that card directly. The pane reports missing configuration, unavailable CLI output, and missing cards in place without adding vault content to the conversation.
 
+A thin rule sets the card off from the list. Status and priority are coloured labels, followed by an `AC <checked>/<total>` count when the card's Acceptance Criteria section has checkboxes. Errors are drawn in red; progress and empty-list notices stay dim.
+
+Mermaid blocks in the card body are drawn in the pane as text diagrams by `uvx termaid@0.9.0`, which needs [uv](https://docs.astral.sh/uv/). uv is optional: without it, a block stays the code block it is in the card. A block also stays a code block when its diagram type is not supported, when it starts with a `%%` comment or `---` frontmatter, or when termaid fails, prints nothing, or takes longer than 5 s. The card is drawn first and each diagram replaces its code block when it is ready, so the first run may show the code block until uv has fetched termaid.
+
 A shown card has an **Open in browser** Button that renders the card body, Mermaid included, through the [viz](../viz) plugin's `render.sh`. The Button appears only when viz is installed, found through `installed_plugins.json` under `$CLAUDE_CONFIG_DIR` or `~/.claude`, and only in the terminal. Opening the browser uses macOS `open`; over SSH the pane shows the page's URL instead. The pane reports where the card was rendered, or why it was not.
 
 Enable Claude Mods globally before using the pane:
@@ -47,6 +51,7 @@ Built and tested against Claude Code 2.1.276.
 - **Templates** core plugin enabled (required for `/obw:pm` — `task` / `doc` / `adr` templates)
 - **Daily Notes** core plugin enabled (required for `/obw:jot` quick capture)
 - **Bases** core plugin enabled (required only for `/obw:pm` dashboards — bundled in Obsidian 1.9+)
+- [uv](https://docs.astral.sh/uv/) (optional; lets the `/issue` pane draw Mermaid blocks as text diagrams through `uvx termaid@0.9.0` — without it they show as code blocks)
 
 ## Installation
 
