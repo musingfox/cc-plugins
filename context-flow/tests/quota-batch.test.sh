@@ -76,7 +76,7 @@ run_shard() {
 # section NAME: the line after `## NAME` in outcome.md
 section() { sed -n "/^## $1\$/{n;p;q;}" "$SHARD/outcome.md" 2>/dev/null; }
 
-count_of() { wc -l < "$1" 2>/dev/null | tr -d ' ' || echo 0; }
+count_of() { if [ -f "$1" ]; then wc -l < "$1" | tr -d ' '; else echo 0; fi; }
 
 # reason_for POLL_LINE: the Reason a shard ends with when its first poll prints POLL_LINE
 reason_for() {
@@ -180,4 +180,33 @@ build_fixture B "if [ \"\$r\" -eq 1 ]; then echo 'RUNNING 30s'; else echo 'STATU
 printf 'TAG=QUOTA\nSHARD=A\nEPOCH=1\n' > "$FLOW/quota-wall"
 run_shard
 assert_eq "timeout" "$(section Reason)" "sibling stale: a wall from before this run does not stop the worker"
+rm -rf "$FLOW"
+
+# ---- no dispatch, first or re-brief, into a recorded wall ----
+
+# write_wall EPOCH_EXPR: a shell line that records a QUOTA wall hit by shard A
+write_wall() {
+  printf '%s' "printf 'TAG=QUOTA\nSHARD=A\nEPOCH=%s\n' \"$1\" > \"\$(dirname \"\$0\")/../quota-wall\""
+}
+
+build_fixture B "$(write_wall '$(date +%s)'); echo STATUS=OK"
+run_shard; rc=$?
+assert_eq "1" "$(count_of "$FLOW/dispatch.count")" "re-brief: the gate-1 re-brief is not dispatched"
+assert_eq "QUOTA" "$(section Reason)" "re-brief: Reason is the wall's tag"
+assert_eq "1" "$rc" "re-brief: the shard exits 1"
+assert_contains "$(cat "$SHARD/outcome.md")" "(all): QUOTA sibling-abort (wall hit by shard A)" \
+  "re-brief: Affected names the shard that hit the wall"
+rm -rf "$FLOW"
+
+build_fixture B "echo STATUS=OK" "$(write_wall '$(date +%s)')"
+run_shard; rc=$?
+assert_eq "0" "$(count_of "$FLOW/dispatch.count")" "first dispatch: nothing is dispatched into a recorded wall"
+assert_eq "QUOTA" "$(section Reason)" "first dispatch: Reason is the wall's tag"
+assert_eq "1" "$rc" "first dispatch: the shard exits 1"
+rm -rf "$FLOW"
+
+build_fixture B "echo STATUS=OK" "$(write_wall 1)"
+run_shard
+assert_eq "yes" "$([ "$(count_of "$FLOW/dispatch.count")" -ge 1 ] && echo yes || echo no)" \
+  "stale: a wall from before this run does not block the first dispatch"
 rm -rf "$FLOW"

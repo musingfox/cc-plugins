@@ -410,6 +410,12 @@ esac
 # file as the new prompt (context-retaining re-brief); without, fresh dispatch.
 dispatch_and_poll() {
   local resume_file="${1:-}"
+  # Never launch into a wall the batch has already hit, a re-brief included.
+  if quota_wall_valid; then
+    write_outcome FAIL "$WALL_TAG" "" "(all): $WALL_TAG sibling-abort (wall hit by shard $WALL_SHARD)" "-" "-"
+    say "FAIL $WALL_TAG (wall hit by shard $WALL_SHARD, not dispatching)"
+    exit 1
+  fi
   say "dispatching pi${resume_file:+ (resume re-brief)}"
   # Keep the outgoing run dir: on a resume the new one's sessions/ stays empty,
   # so this is where a post-resume failure's evidence lives (newest_jsonl).
