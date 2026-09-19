@@ -239,6 +239,14 @@ if [ -z "$MODEL" ] && [ -n "$PROVIDER" ]; then
   exit 2
 fi
 
+# Unpinned routing leaves the choice to pi's settings.json. When that file is
+# missing, pi falls back to its built-in default without a word, so say it here.
+# A warning, not a refusal: running on pi's default can be deliberate.
+if [ -z "$MODEL" ]; then
+  settings="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/settings.json"
+  [ -f "$settings" ] || echo "pi-dispatch: warning: no routing pinned and $settings does not exist; pi will run on its built-in default model. Pin PI_PROVIDER/PI_MODEL or create that file." >&2
+fi
+
 PROMPT="${PI_PROMPT:-Read the brief above and complete it. Output only the result.}"
 
 RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
