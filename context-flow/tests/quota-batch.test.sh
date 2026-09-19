@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# A quota wall ends the shard, and the batch stops paying for it.
+#
+# A worker that dies on a provider spend wall carries a QUOTA or QUOTA-WINDOW
+# tag on its cf-pi-poll.sh line. Retrying on the same routing only pays again,
+# so the shard ends as FAIL with the tag as its Reason and is never dispatched
+# again.
+#
+# All sibling cf-pi-*.sh scripts (and `sleep`/`git`) are stubbed; the real
+# cf-pi-run.sh under scripts/ is the unit under test.
+
+CF_TESTS_DIR="${CF_TESTS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+. "$CF_TESTS_DIR/lib/assert.sh"
+
+REAL_SCRIPTS="$(cd "$CF_TESTS_DIR/../scripts" && pwd)"
+
+# build_fixture SHARD_ID POLL_BODY [PROBE_BODY]
+# POLL_BODY runs inside the poll stub after it counts itself; $r is the 1-based
+# poll round. The dispatch stub never writes a report. Sets: FLOW, SHARD, STUBS
+build_fixture() {
+  local sid="$1" poll_body="$2" probe_body="${3:-}"
+  FLOW="$(mktemp -d)"
+  SHARD="$FLOW/shards/$sid"
+  STUBS="$FLOW/stubs"
+  mkdir -p "$SHARD" "$STUBS"
+
+  cat > "$FLOW/shards.json" <<JSON
+{"groups": {"$sid": {"contracts": ["C1"], "files": ["src/x.ts"]}}}
+JSON
+
+  cat > "$SHARD/env.sh" <<EOF
+SESSION="$SHARD"
+SESSION_BASENAME="test-shard-$sid"
+PLUGIN_ROOT="$FLOW"
+SCRIPTS="$STUBS"
+FLOW_SESSION="$FLOW"
+SHARD_ID="$sid"
+PI_PROVIDER=""
+PI_MODEL=""
+PI_STALL_THRESHOLD_S=180
+PI_WALL_CLOCK_S=1800
+REPO_ROOT="$FLOW"
+BASE_BRANCH="main"
+BASE_HEAD="HEAD"
+EOF
+
+  for s in cf-pi-worktree.sh cf-pi-brief.sh; do
+    printf '#!/bin/bash\nexit 0\n' > "$STUBS/$s"
+  done
+  printf '#!/bin/bash\necho "$*" >> "%s/stop.log"\n' "$FLOW" > "$STUBS/cf-pi-stop.sh"
+  printf '#!/bin/bash\necho "pm"\n' > "$STUBS/cf-pi-postmortem.sh"
+  printf '#!/bin/bash\necho "test_exit=0"\nexit 0\n' > "$STUBS/cf-pi-test.sh"
+  printf '#!/bin/bash\n%s\necho OK\n' "$probe_body" > "$STUBS/cf-pi-probe.sh"
+  cat > "$STUBS/cf-pi-poll.sh" <<EOF
+#!/bin/bash
+echo 1 >> "$FLOW/poll.count"
+r=\$(wc -l < "$FLOW/poll.count" | tr -d ' ')
+$poll_body
+EOF
+  cat > "$STUBS/cf-pi-dispatch.sh" <<EOF
+#!/bin/bash
+echo 1 >> "$FLOW/dispatch.count"
+echo 12345
+EOF
+
+  printf '#!/bin/bash\nexit 0\n' > "$STUBS/sleep"
+  printf '#!/bin/bash\nexit 0\n' > "$STUBS/git"
+  chmod +x "$STUBS"/*
+}
+
+run_shard() {
+  PATH="$STUBS:$PATH" PI_RUNS_DIR="${PI_RUNS_DIR:-$FLOW/pi-runs}" \
+    bash "$REAL_SCRIPTS/cf-pi-run.sh" "$SHARD" "goal" "none" "true" > "$FLOW/run.log" 2>&1
+}
+
+# section NAME: the line after `## NAME` in outcome.md
+section() { sed -n "/^## $1\$/{n;p;q;}" "$SHARD/outcome.md" 2>/dev/null; }
+
+count_of() { wc -l < "$1" 2>/dev/null | tr -d ' ' || echo 0; }
+
+# reason_for POLL_LINE: the Reason a shard ends with when its first poll prints POLL_LINE
+reason_for() {
+  build_fixture A "echo '$1'"
+  run_shard
+  section Reason
+  rm -rf "$FLOW"
+}
+
+# ---- the worker's own quota wall ends the shard ----
+
+build_fixture A "echo 'STATUS=FAIL OUTPUT=/r/result.md exit rc=1 QUOTA 5s cause:insufficient quota'"
+run_shard; rc=$?
+assert_eq "1" "$rc" "quota: the shard exits 1"
+assert_eq "FAIL" "$(section Status)" "quota: Status is FAIL"
+assert_eq "QUOTA" "$(section Reason)" "quota: Reason is the tag, not rc-fail"
+assert_eq "1" "$(count_of "$FLOW/dispatch.count")" "quota: no further dispatch"
+assert_contains "$(cat "$FLOW/stop.log" 2>/dev/null)" "--abort" "quota: the worker is stopped"
+rm -rf "$FLOW"
+
+assert_eq "QUOTA-WINDOW" "$(reason_for 'STATUS=FAIL OUTPUT=/r/result.md ERROR QUOTA-WINDOW terminal=error 5s')" \
+  "quota-window: the window tag is kept, not collapsed to QUOTA or error"
+assert_eq "QUOTA" "$(reason_for 'STATUS=FAIL OUTPUT=/r/result.md QUOTA killed 5s')" \
+  "quota killed: Reason is QUOTA"
+assert_eq "error" "$(reason_for 'STATUS=FAIL OUTPUT=/r/result.md ERROR terminal=error 5s cause:rate limit 429')" \
+  "rate limit: an untagged error keeps its error reason"
+assert_eq "timeout" "$(reason_for 'STATUS=FAIL OUTPUT=/QUOTA/result.md TIMEOUT 1800s')" \
+  "path: QUOTA inside the OUTPUT= path is not a tag"

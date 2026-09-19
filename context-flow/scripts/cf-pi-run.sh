@@ -420,6 +420,11 @@ dispatch_and_poll() {
     case "$status_line" in
       STATUS=OK*)              return 0 ;;
       RUNNING*)                continue ;;   # includes "RUNNING settling"
+      # A spend wall is not fixed by retrying on the same routing, so the tag
+      # becomes the reason main routes on. Matched before every failure arm,
+      # only after a space so an OUTPUT= path cannot trip it, and WINDOW first.
+      *\ QUOTA-WINDOW*)        fail_kill QUOTA-WINDOW "poll $status_line" ;;
+      *\ QUOTA*)               fail_kill QUOTA "poll $status_line" ;;
       *exit\ rc=*)             fail_kill rc-fail "poll $status_line" ;;
       *TIMEOUT*)               fail_kill timeout "poll $status_line" ;;
       *STALL*)                 fail_kill stall "poll $status_line" ;;
