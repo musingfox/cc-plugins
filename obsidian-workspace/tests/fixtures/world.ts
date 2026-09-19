@@ -20,6 +20,7 @@ export const SEARCH_ARGV = [
 ]
 
 const LIST = '["pm/cc-plugins/tasks/a.md"]'
+export const AB = '["pm/cc-plugins/tasks/a.md","pm/cc-plugins/tasks/b.md"]'
 
 export const CONFIG = 'vault: obsidian\npm:\n  project: cc-plugins\n'
 

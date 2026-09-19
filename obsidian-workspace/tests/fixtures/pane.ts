@@ -10,6 +10,12 @@ export function stringsIn(node: any): string[] {
   return [...(node.children ?? []), ...(node.props?.children ?? []), node.props?.text, node.props?.source, ...options].flatMap(stringsIn)
 }
 
+// Every element in drawing order.
+export function elementsIn(node: any): any[] {
+  if (!node || typeof node !== 'object') return []
+  return [node, ...[...(node.children ?? []), ...(node.props?.children ?? [])].flatMap(elementsIn)]
+}
+
 export function nodesOf(node: any, type: string): any[] {
   if (!node || typeof node !== 'object') return []
   const kids = [...(node.children ?? []), ...(node.props?.children ?? [])]
@@ -24,6 +30,12 @@ export function headerIn(tree: any) {
 export async function issue($: any, args: string) {
   await $.session.start(SESSION)
   return $.command.run({ command: 'issue', args })
+}
+
+// /issue with its reads and runs settled.
+export async function shown($: any, w: any, card: string) {
+  await issue($, card)
+  await w.clock.settle()
 }
 
 export const HOME_MANIFEST = '/Users/u/.claude/plugins/installed_plugins.json'

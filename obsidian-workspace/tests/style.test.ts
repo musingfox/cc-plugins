@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 import { priorityColor, statusColor } from '../hooks/style.ts'
-import { PANE, headerIn, issue, nodesOf, press, stringsIn, vizWorld } from './fixtures/pane.ts'
-import { SESSION, world } from './fixtures/world.ts'
+import { PANE, headerIn, issue, nodesOf, press, shown, stringsIn, vizWorld } from './fixtures/pane.ts'
+import { AB, SESSION, world } from './fixtures/world.ts'
 
 describe('statusColor', () => {
   const cases: [string | undefined, string | undefined][] = [
@@ -31,7 +31,6 @@ const ORANGE = '#f5a524'
 const RED = '#e5484d'
 const GREY = '#8b8d98'
 const MOD = 'mod-obw-issue-pane'
-const AB = '["pm/cc-plugins/tasks/a.md","pm/cc-plugins/tasks/b.md"]'
 
 // The Text drawn with exactly `text` as its only child.
 const textIn = (tree: any, text: string) =>
@@ -41,8 +40,7 @@ const textIn = (tree: any, text: string) =>
 const propsOf = (node: any) => node.props ?? {}
 
 async function drawn($: any, w: any, card: string) {
-  await issue($, card)
-  await w.clock.settle()
+  await shown($, w, card)
   return $.ui.render(PANE)
 }
 
