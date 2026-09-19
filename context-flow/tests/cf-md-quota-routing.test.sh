@@ -22,4 +22,7 @@ for reason in test-stalled probe-stalled QUOTA QUOTA-WINDOW; do
 done
 assert_eq "0" "$(grep -c 'Two reasons' "$CF_MD")" "the exemption list carries no count"
 
+assert_contains "$any_fail" "When any shard in the round ended \`QUOTA\` or \`QUOTA-WINDOW\`, do not re-launch that round's other FAIL shards on the same \`\$PI_PROVIDER\`/\`\$PI_MODEL\`" \
+  "a quota outcome holds the round's other FAIL re-launches"
+
 assert_contains "$(grep -m1 '^### 3\.6' "$CF_MD")" "QUOTA" "§3.6 heading names the quota tags"
