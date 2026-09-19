@@ -98,5 +98,48 @@ else
   echo "skip - sandbox cases need macOS sandbox-exec"
 fi
 
+# --- the list is recorded and replayed on resume; the record beats the env ---
+HAS_SB=0
+[ "$(uname -s)" = Darwin ] && command -v sandbox-exec >/dev/null 2>&1 && HAS_SB=1
+rec() { sed -n 's/^WRITABLE=//p' "$1/routing"; }
+has_lit() { [ "$HAS_SB" = 0 ] || grep -qF "(literal \"$2\")" "$1/sandbox.sb"; }
+no_lit() { [ "$HAS_SB" = 0 ] || { [ -f "$1/sandbox.sb" ] && ! grep -q '(literal "/private/tmp/writable-test' "$1/sandbox.sb"; }; }
+DECL="$WDIR_C/report.md"
+
+P1="$(launch PI_BIN="$SHIM" PI_CWD="$WORK" "PI_WRITABLE_FILES=$WDIR/report.md" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
+if [ "$(rec "$P1")" = "$DECL" ] && [ "$(field "$P1" WRITABLE_ENV)" = "$DECL" ]; then ok "fresh -> routing and worker env hold the canonical path"; else bad "fresh -> rec=$(rec "$P1") env=$(field "$P1" WRITABLE_ENV)"; fi
+P0="$(launch PI_BIN="$SHIM" PI_CWD="$WORK" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
+if grep -qx 'WRITABLE=' "$P0/routing"; then ok "fresh with nothing declared -> routing has an empty WRITABLE= line"; else bad "fresh empty -> $(tr '\n' ' ' < "$P0/routing")"; fi
+
+RD="$(launch PI_BIN="$SHIM" "$DISPATCH" "$CALLER/brief.md" "$OUT" "$P1" 2>/dev/null)"
+if [ "$(rec "$RD")" = "$DECL" ] && has_lit "$RD" "$DECL" && [ "$(field "$RD" WRITABLE_ENV)" = "$DECL" ]; then ok "resume with the env unset -> recorded list replayed to routing, profile and worker"; else bad "resume unset -> rec=$(rec "$RD") env=$(field "$RD" WRITABLE_ENV)"; fi
+
+RD="$(launch PI_BIN="$SHIM" "PI_WRITABLE_FILES=$WDIR/other.md" "$DISPATCH" "$CALLER/brief.md" "$OUT" "$P1" 2>/dev/null)"
+if [ "$(rec "$RD")" = "$DECL" ] && [ "$(field "$RD" WRITABLE_ENV)" = "$DECL" ] && ! grep -q other.md "$RD/routing" && { [ "$HAS_SB" = 0 ] || ! grep -q other.md "$RD/sandbox.sb"; } && has_lit "$RD" "$DECL"; then ok "resume with a different env -> the record wins"; else bad "resume precedence -> rec=$(rec "$RD") env=$(field "$RD" WRITABLE_ENV)"; fi
+
+RD="$(launch PI_BIN="$SHIM" "PI_WRITABLE_FILES=$WDIR/report.md" "$DISPATCH" "$CALLER/brief.md" "$OUT" "$P0" 2>/dev/null)"
+if [ "$(rec "$RD")" = "" ] && grep -qx 'WRITABLE=' "$RD/routing" && no_lit "$RD" && [ "$(field "$RD" WRITABLE_ENV)" = "" ]; then ok "resume of an empty record -> the env does not widen it"; else bad "empty record -> rec=$(rec "$RD") env=$(field "$RD" WRITABLE_ENV)"; fi
+
+LEGACY="$(launch PI_BIN="$SHIM" PI_CWD="$WORK" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
+sed -i '' '/^WRITABLE=/d' "$LEGACY/routing"
+RD="$(launch PI_BIN="$SHIM" "PI_WRITABLE_FILES=$WDIR/report.md" "$DISPATCH" "$CALLER/brief.md" "$OUT" "$LEGACY" 2>/dev/null)"
+if [ "$(rec "$RD")" = "$DECL" ] && [ "$(field "$RD" WRITABLE_ENV)" = "$DECL" ]; then ok "resume of a legacy record without WRITABLE= -> the env is used and recorded"; else bad "legacy -> rec=$(rec "$RD")"; fi
+
+# A terminal poll back-fills MODEL into a default-routing record; WRITABLE= must survive it.
+POLL="$SCRIPT_DIR/../scripts/pi-poll.sh"
+JSHIM="$TMP/pi-json-shim"
+cat > "$JSHIM" <<'EOF3'
+#!/usr/bin/env bash
+printf '{"type":"session","id":"sess-new","cwd":"%s"}\n' "$(pwd -P)"
+echo '{"type":"message_end","message":{"role":"assistant","usage":{"cost":{"total":0.01}}}}'
+echo '{"type":"agent_end","messages":[{"role":"assistant","stopReason":"stop","text":"done","provider":"openai-codex","model":"gpt-5.6-terra"}]}'
+EOF3
+chmod +x "$JSHIM"
+RD="$(launch PI_BIN="$JSHIM" PI_CWD="$WORK" "PI_WRITABLE_FILES=$WDIR/report.md" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
+bash "$POLL" "$RD" >/dev/null 2>&1
+if grep -q '^MODEL=gpt-5.6-terra$' "$RD/routing" && [ "$(rec "$RD")" = "$DECL" ]; then ok "terminal poll back-fills MODEL and keeps WRITABLE="; else bad "back-fill -> $(tr '\n' ' ' < "$RD/routing")"; fi
+RD2="$(launch PI_BIN="$SHIM" "$DISPATCH" "$CALLER/brief.md" "$OUT" "$RD" 2>/dev/null)"
+if [ "$(rec "$RD2")" = "$DECL" ] && [ "$(field "$RD2" WRITABLE_ENV)" = "$DECL" ]; then ok "resume after a terminal poll -> WRITABLE= replayed"; else bad "resume after poll -> rec=$(rec "$RD2") env=$(field "$RD2" WRITABLE_ENV)"; fi
+
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

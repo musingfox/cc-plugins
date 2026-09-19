@@ -161,8 +161,16 @@ writable_refuse() {
   echo "pi-dispatch: PI_WRITABLE_FILES entry '$1' $2; declare absolute, colon-separated file paths whose directory exists." >&2
   exit 2
 }
+#
+# Like CWD=, the record beats the env on a resume, even when it is empty: a
+# resuming shell cannot widen a worker's write set. Recorded paths replay as-is;
+# only a run recorded before WRITABLE= existed falls back to the env.
 WRITABLE=""
 writable_env="${PI_WRITABLE_FILES:-}"
+if [ -n "$PRIOR_RUNDIR" ] && [ -f "$PRIOR_RUNDIR/routing" ] && grep -q '^WRITABLE=' "$PRIOR_RUNDIR/routing"; then
+  WRITABLE="$(sed -n 's/^WRITABLE=//p' "$PRIOR_RUNDIR/routing" | head -n 1)"
+  writable_env=""
+fi
 case "$writable_env" in *$'\n'*) writable_refuse "$writable_env" "contains a newline" ;; esac
 rest="$writable_env"
 while [ -n "$rest" ]; do
