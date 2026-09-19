@@ -75,6 +75,9 @@ export PI_MODEL="${PI_MODEL:-}"
 # The worker starts inside its worktree. Without this it inherited cf's own
 # directory — the human's checkout — and a bare `git commit` landed there.
 export PI_CWD="$WORK"
+# The report and escalate files live beside the worktree, outside the sandbox;
+# without this every pi shard ended report-malformed. Replaces any inherited list.
+export PI_WRITABLE_FILES="$REPORT_FILE:$ESCALATE_FILE"
 export PI_WALL_CLOCK_S="${PI_WALL_CLOCK_S:-1800}"
 export PI_STALL_THRESHOLD_S="${PI_STALL_THRESHOLD_S:-180}"
 
