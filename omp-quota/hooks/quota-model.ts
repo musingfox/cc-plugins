@@ -23,7 +23,7 @@ const RED = '#e5484d'
 const ORANGE = '#f5a524'
 const GREEN = '#46a758'
 
-export function percentOf(share: number | null): string {
+function percentOf(share: number | null): string {
   return share === null ? '—' : `${Math.round(share * 100)}%`
 }
 

@@ -1,7 +1,6 @@
 import type { On } from 'claude-code'
 import { quotaModelOf } from './quota-model.ts'
 import type { QuotaView } from './quota-model.ts'
-import { statusLineOf } from './status-line.ts'
 import { readUsage, worsenedProviders } from './usage.ts'
 import type { OmpOutcome, UsageReading } from './usage.ts'
 
@@ -49,7 +48,6 @@ async function publish($: any, seq: number, reading: UsageReading) {
   } else {
     view = { ...view, failure: reading.reason }
   }
-  $.ui.status(statusLineOf(view))
   $.ui.invalidate('ui.render')
 }
 
@@ -110,7 +108,6 @@ async function renderBand($: any, e: any) {
 
 export function register(on: On) {
   on('session.start', async ($, e, next) => {
-    $.ui.status(statusLineOf(view))
     try {
       await $.command.register({
         name: 'quota',
@@ -119,7 +116,7 @@ export function register(on: On) {
         immediate: true,
       })
     } catch {
-      // A refused /quota leaves the status line and the poll working.
+      // A refused /quota leaves the poll working.
     }
     await readBand($)
     void fetchAndPublish($).catch(() => {})

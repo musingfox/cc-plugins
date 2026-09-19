@@ -2,17 +2,10 @@ import { describe, expect, test } from 'claude-code/testing'
 import { BAND } from './fixtures/band.ts'
 import { FIXTURE, NOW, SESSION, fixtureWith, world } from './fixtures/world.ts'
 
-const SUCCESS =
-  'omp quota: openai-codex 6% · ollama-cloud — · google-antigravity 100% · xai-oauth 100% · cursor 0% · anthropic 86%'
-
 function stringsIn(node: any): string[] {
   if (typeof node === 'string') return [node]
   if (!node || typeof node !== 'object') return []
   return [...(node.children ?? []), ...(node.props?.children ?? [])].flatMap(stringsIn)
-}
-
-function last(list: string[]) {
-  return list[list.length - 1]
 }
 
 const BENEATH = { type: 'Text', children: ['beneath'] }
@@ -23,6 +16,11 @@ function beneath(on: any) {
 
 function linesOf(tree: any): string[] {
   return (tree.props?.children ?? tree.children).map((line: any) => stringsIn(line).join(''))
+}
+
+// Each provider's name and share: the part of a band line that does not move with the clock.
+function sharesOf(lines: string[]) {
+  return lines.map((line) => line.split('  ')[0])
 }
 
 const BAND_LINES = [
@@ -39,6 +37,17 @@ test('session start passes through to the engine', async ($, on) => {
   expect(await $.session.start(SESSION)).toEqual({ cwd: '/work' })
 })
 
+test('never draws a status line, through a good fetch, a failed one, and a refresh', async ($, on) => {
+  const w = world(on)
+  w.omp(FIXTURE, { exitCode: 1 })
+  await $.session.start(SESSION)
+  await w.clock.settle()
+  await w.clock.advance(300000)
+  await $.command.run({ command: 'quota', args: 'refresh' })
+  expect(w.jsonRuns()).toBe(3)
+  expect(w.statuses).toEqual([])
+})
+
 describe('omp invocation', () => {
   test("runs omp against the user's own omp home with a 10 s limit", async ($, on) => {
     const w = world(on, { env: { HOME: '/home/u', PI_CODING_AGENT_DIR: '/home/u/.pi/dispatch' } })
@@ -49,81 +58,57 @@ describe('omp invocation', () => {
     expect(w.runs[0].init.timeoutMs).toBe(10000)
   })
 
-  test('without HOME, omp is not run and the status line says why', async ($, on) => {
-    const w = world(on, { env: {} })
+  test('without HOME, omp is not run and the band says why', async ($, on) => {
+    const w = world(on, { env: {}, store: { band: true } })
     await $.session.start(SESSION)
     await w.clock.settle()
     expect(w.runs).toEqual([])
-    expect(last(w.statuses)).toBe('omp quota: unavailable (HOME is unset)')
+    expect(linesOf(await $.ui.render(BAND))).toEqual(['Unavailable: HOME is unset'])
   })
 })
 
-describe('status line', () => {
-  test('reads fetching until the first fetch settles', async ($, on) => {
-    const w = world(on)
-    await $.session.start(SESSION)
-    expect(w.statuses[0]).toBe('omp quota: fetching')
-  })
-
+describe('held figures', () => {
   test('a second session start keeps the held figures while omp is still running', async ($, on) => {
-    const w = world(on)
+    const w = world(on, { store: { band: true } })
     w.omp(FIXTURE, 'hang')
     await $.session.start(SESSION)
     await w.clock.settle()
-    const before = w.statuses.length
     await $.session.start(SESSION)
-    expect(w.statuses.slice(before)).toEqual([SUCCESS])
+    expect(linesOf(await $.ui.render(BAND))).toEqual(BAND_LINES)
     await w.clock.advance(60000)
   })
 
-  test("shows each provider's lowest remaining share once omp answers", async ($, on) => {
-    const w = world(on)
-    await $.session.start(SESSION)
-    await w.clock.settle()
-    expect(last(w.statuses)).toBe(SUCCESS)
-  })
-
   test('an empty report list keeps the last figures and marks them stale', async ($, on) => {
-    const w = world(on)
+    const w = world(on, { store: { band: true } })
     w.omp(FIXTURE, { exitCode: 0, stdout: '{"reports":[]}' })
     await $.session.start(SESSION)
     await w.clock.settle()
     await w.clock.advance(300000)
-    expect(last(w.statuses)).toBe(`${SUCCESS} (stale)`)
+    const lines = linesOf(await $.ui.render(BAND))
+    expect(lines[0]).toBe('Stale: omp reported no providers; showing data from 5m ago')
+    expect(sharesOf(lines.slice(1))).toEqual(sharesOf(BAND_LINES))
   })
 
   test('a non-zero exit keeps the last figures and marks them stale', async ($, on) => {
-    const w = world(on)
+    const w = world(on, { store: { band: true } })
     w.omp(FIXTURE, { exitCode: 1, stdout: '', stderr: 'boom' })
     await $.session.start(SESSION)
     await w.clock.settle()
     await w.clock.advance(300000)
-    expect(last(w.statuses)).toBe(`${SUCCESS} (stale)`)
+    const lines = linesOf(await $.ui.render(BAND))
+    expect(lines[0]).toBe('Stale: omp exited 1; showing data from 5m ago')
+    expect(sharesOf(lines.slice(1))).toEqual(sharesOf(BAND_LINES))
   })
 
   test('a good fetch after a failed one clears the stale mark', async ($, on) => {
-    const w = world(on)
+    const w = world(on, { store: { band: true } })
     w.omp(FIXTURE, { exitCode: 1, stdout: '', stderr: 'boom' }, FIXTURE)
     await $.session.start(SESSION)
     await w.clock.settle()
     await w.clock.advance(300000)
     await w.clock.advance(300000)
-    expect(last(w.statuses)).toBe(SUCCESS)
-  })
-
-  test('with no good fetch yet the line names the failure', async ($, on) => {
-    const w = world(on)
-    w.omp({ deny: 'timed out' })
-    await $.session.start(SESSION)
-    await w.clock.settle()
-    expect(last(w.statuses)).toBe('omp quota: unavailable (omp did not answer)')
-  })
-
-  test('a refused /quota registration does not stop the status line', async ($, on) => {
-    const w = world(on, { commandRegister: () => ({ deny: 'taken' }) })
-    expect(await $.session.start(SESSION)).toEqual({ cwd: '/work' })
-    await w.clock.settle()
-    expect(last(w.statuses)).toBe(SUCCESS)
+    const lines = linesOf(await $.ui.render(BAND))
+    expect(sharesOf(lines)).toEqual(sharesOf(BAND_LINES))
   })
 })
 
@@ -159,15 +144,24 @@ describe('poll schedule', () => {
     await w.clock.advance(300000)
     expect(w.jsonRuns()).toBe(2)
   })
+
+  test('a refused /quota registration leaves the poll working', async ($, on) => {
+    const w = world(on, { commandRegister: () => ({ deny: 'taken' }) })
+    expect(await $.session.start(SESSION)).toEqual({ cwd: '/work' })
+    await w.clock.settle()
+    expect(w.jsonRuns()).toBe(1)
+    await w.clock.advance(300000)
+    expect(w.jsonRuns()).toBe(2)
+  })
 })
 
 describe('fetch never blocks', () => {
   test('session start returns while omp is still running', async ($, on) => {
-    const w = world(on)
+    const w = world(on, { store: { band: true } })
     w.omp('hang')
     expect(await $.session.start(SESSION)).toEqual({ cwd: '/work' })
     expect(await w.clock.now()).toBe(NOW)
-    expect(w.statuses).toEqual(['omp quota: fetching'])
+    expect(linesOf(await $.ui.render(BAND))).toEqual(['Fetching omp usage'])
     await w.clock.advance(60000)
   })
 })
@@ -221,18 +215,18 @@ describe('overlapping fetches', () => {
   }
 
   test('a poll that settles after a refresh leaves the refreshed figures alone', async ($, on) => {
-    const w = world(on)
+    const w = world(on, { store: { band: true } })
     w.omp(FIXTURE, 'hang', codexAt(0.5))
     await $.session.start(SESSION)
     await w.clock.settle()
     await w.clock.advance(300000)
     expect(await $.command.run({ command: 'quota', args: 'refresh' })).toEqual({ text: 'omp quota refreshed' })
-    const refreshed = SUCCESS.replace('openai-codex 6%', 'openai-codex 50%')
-    expect(last(w.statuses)).toBe(refreshed)
-    const before = { statuses: w.statuses.length, invalidates: w.invalidates }
+    const refreshed = linesOf(await $.ui.render(BAND))
+    expect(refreshed[0]).toStartWith('openai-codex 50%  7 days 50% warning')
+    const invalidates = w.invalidates
     await w.clock.advance(60000)
-    expect(w.statuses.slice(before.statuses)).toEqual([])
-    expect(w.invalidates).toBe(before.invalidates)
+    expect(linesOf(await $.ui.render(BAND))[0]).toBe(refreshed[0])
+    expect(w.invalidates).toBe(invalidates)
   })
 
   test('two fetches settling together raise one toast for the same worsening', async ($, on) => {
@@ -317,15 +311,15 @@ describe('/quota refresh', () => {
     expect(await $.ui.render(BAND)).toEqual(BENEATH)
   })
 
-  test('a failed refetch answers the reason and marks the status line stale', async ($, on) => {
-    const w = world(on)
+  test('a failed refetch answers the reason and marks the band stale', async ($, on) => {
+    const w = world(on, { store: { band: true } })
     await $.session.start(SESSION)
     await w.clock.settle()
     w.omp({ exitCode: 0, stdout: '{"reports":[]}' })
     expect(await $.command.run({ command: 'quota', args: 'refresh' })).toEqual({
       text: 'omp quota refresh failed: omp reported no providers',
     })
-    expect(last(w.statuses)).toEndWith(' (stale)')
+    expect(linesOf(await $.ui.render(BAND))[0]).toBe('Stale: omp reported no providers; showing data from 0m ago')
   })
 
   test('a failed invalidate still refetches and says the cache was kept', async ($, on) => {
@@ -463,7 +457,7 @@ describe('account data', () => {
     return { exitCode: 0, stdout: JSON.stringify(copy), stderr: '' }
   }
 
-  test("omp's account data never reaches the status line, a toast, the transcript, or the band", async ($, on) => {
+  test("omp's account data never reaches a toast, the transcript, or the band", async ($, on) => {
     const w = world(on, { store: { band: true } })
     w.omp(planted({ 'openai-codex:secondary': 'ok' }), planted())
     await $.session.start(SESSION)
@@ -472,11 +466,11 @@ describe('account data', () => {
     const band = stringsIn(await $.ui.render(BAND))
     expect(w.toasts).toHaveLength(1)
     expect(band).not.toEqual([])
-    const shown = [...w.statuses, ...w.toasts, answer.text, ...band]
+    const shown = [...w.toasts, answer.text, ...band]
     expect(shown.filter((text) => text.includes('planted'))).toEqual([])
   })
 
-  test("omp's error output never reaches the status line, the transcript, or the band", async ($, on) => {
+  test("omp's error output never reaches a toast, the transcript, or the band", async ($, on) => {
     const w = world(on, { store: { band: true } })
     const failing = { exitCode: 1, stdout: '', stderr: 'Bearer sk-planted' }
     w.omp(planted(), failing)
@@ -484,11 +478,12 @@ describe('account data', () => {
     await w.clock.settle()
     await w.clock.advance(300000)
     const answer = await $.command.run({ command: 'quota', args: 'refresh' })
-    const band = stringsIn(await $.ui.render(BAND))
+    const tree = await $.ui.render(BAND)
+    const band = stringsIn(tree)
     expect(band).not.toEqual([])
-    const shown = [...w.statuses, ...w.toasts, answer.text, ...band]
+    const shown = [...w.toasts, answer.text, ...band]
     expect(shown.filter((text) => text.includes('sk-planted'))).toEqual([])
-    expect(last(w.statuses)).toEndWith(' (stale)')
+    expect(linesOf(tree)[0]).toBe('Stale: omp exited 1; showing data from 5m ago')
     expect(answer).toEqual({ text: 'omp quota refresh failed: omp exited 1' })
   })
 })
