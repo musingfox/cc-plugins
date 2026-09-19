@@ -166,7 +166,7 @@ shard_group="$SHARD_ID"
   fi
   echo
   echo "## Rules"
-  echo "- All file writes MUST stay inside WORK_DIR. Never \`cd\` out, never edit files in the parent repo checkout."
+  echo "- All file writes MUST stay inside WORK_DIR, except REPORT_FILE and ESCALATE_FILE; every other path outside WORK_DIR is denied. Never \`cd\` out, never edit files in the parent repo checkout."
   echo "- Forbidden: \`git push\`, \`git remote\` operations, modifying or switching to any branch other than CF_BRANCH."
   echo "- Per-contract commit to CF_BRANCH (see Methodology). Write the subject in this repo's own commit convention — never put the contract name, shard id, or any other cf vocabulary in it."
   echo "- If a referenced file is missing, consult the contract's touches_files list. Do NOT invent locations under other paths."
