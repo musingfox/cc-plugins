@@ -196,6 +196,27 @@ describe('a drawn diagram swaps in', () => {
     expect(stringsIn(tree)).toContain('Clipped: showing 10000 of 11024 characters.')
   })
 
+  test('a diagram lands on its own block when a block before it is not drawable', async ($, on) => {
+    const w = world(on, { read: cardOf('```mermaid\nsankey-beta\n```\n\n```mermaid\ngraph LR\n```\n') })
+    await shown($, w)
+    expect(uvxRuns(w).length).toBe(1)
+    expect(bodyOf(await $.ui.render(PANE))).toEqual([
+      ['Markdown', '```mermaid\nsankey-beta\n```\n\n'],
+      ['Code', DRAWN],
+    ])
+  })
+
+  test('a block whose closing fence the clip cuts stays markdown after a drawn one', async ($, on) => {
+    const cut = 'x'.repeat(9960) + '\n```mermaid\npie\n'
+    const w = world(on, { read: cardOf('```mermaid\ngraph LR\n```\n' + cut + '```\n') })
+    await shown($, w)
+    expect(uvxRuns(w).length).toBe(1)
+    expect(bodyOf(await $.ui.render(PANE))).toEqual([
+      ['Code', DRAWN],
+      ['Markdown', cut],
+    ])
+  })
+
   test('the diagram is among the strings drawn', async ($, on) => {
     const w = world(on, { read: MERMAID_CARD })
     await shown($, w)

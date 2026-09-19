@@ -8,6 +8,7 @@ import { acLabel, headerOf } from './card.ts'
 import type { CardHeader } from './card.ts'
 import { vizManifestPath, vizInstallPath, renderTarget, renderArgv, renderOutcome, RENDER_TIMEOUT_MS } from './viz.ts'
 import { splitFences, termaidHeaderAllowed, diagramOutcome, TERMAID_ARGV, TERMAID_TIMEOUT_MS } from './mermaid.ts'
+import type { Segment } from './mermaid.ts'
 import { priorityColor, statusColor, RED } from './style.ts'
 
 const PANE = { id: 'obw-issue', title: 'obw issue', focus: true, closeOnEscape: true }
@@ -15,7 +16,7 @@ const PANE = { id: 'obw-issue', title: 'obw issue', focus: true, closeOnEscape: 
 type Browser = { kind: 'rendering' } | ReturnType<typeof renderOutcome>
 
 // The card region under the list has its own state, so a card's outcome never replaces the list's message.
-// `diagrams` is indexed by a block's ordinal among the mermaid blocks of the clipped body.
+// `segments` splits the clipped body once; `diagrams` is indexed by a mermaid block's position in `segments`.
 type CardRegion =
   | { kind: 'loading'; name: string }
   | { kind: 'error'; message: string }
@@ -24,6 +25,7 @@ type CardRegion =
       name: string
       header: CardHeader
       body: string
+      segments: Segment[]
       vizRoot: string | null
       browser: Browser | null
       diagrams: (string | undefined)[]
@@ -91,29 +93,29 @@ async function show($: any, name: string) {
   if (output.kind === 'error') return showCard($, request, name, { kind: 'error', message: output.message })
   const vizRoot = await findViz($)
   const header = headerOf(output.frontmatter)
-  showCard($, request, name, { kind: 'shown', name, header, body: output.body, vizRoot, browser: null, diagrams: [] })
+  const segments = splitFences(bounded(output.body).text)
+  showCard($, request, name, { kind: 'shown', name, header, body: output.body, segments, vizRoot, browser: null, diagrams: [] })
   // termaid never holds /issue: an offline uvx can take seconds, and the card is already drawn.
-  void drawDiagrams($, request, bounded(output.body).text).catch(() => {})
+  void drawDiagrams($, request, segments).catch(() => {})
 }
 
 // One run at a time: a rejected run means uvx fails for every block, and a superseded read never draws.
-async function drawDiagrams($: any, request: number, body: string) {
-  const sources = splitFences(body).flatMap((segment) => (segment.kind === 'mermaid' ? [segment.source] : []))
-  for (const [ordinal, source] of sources.entries()) {
-    if (!termaidHeaderAllowed(source)) continue
+async function drawDiagrams($: any, request: number, segments: Segment[]) {
+  for (const [index, segment] of segments.entries()) {
+    if (segment.kind !== 'mermaid' || !termaidHeaderAllowed(segment.source)) continue
     if (request !== requests) return
-    const run = await runProcess($, TERMAID_ARGV, TERMAID_TIMEOUT_MS, source)
+    const run = await runProcess($, TERMAID_ARGV, TERMAID_TIMEOUT_MS, segment.source)
     if (run.kind === 'rejected') return
     const diagram = diagramOutcome(run)
-    if (diagram !== null) showDiagram($, request, ordinal, diagram)
+    if (diagram !== null) showDiagram($, request, index, diagram)
   }
 }
 
-function showDiagram($: any, request: number, ordinal: number, diagram: string) {
+function showDiagram($: any, request: number, index: number, diagram: string) {
   const card = view.card
   if (request !== requests || card?.kind !== 'shown') return
   const diagrams = [...card.diagrams]
-  diagrams[ordinal] = diagram
+  diagrams[index] = diagram
   view = { ...view, card: { ...card, diagrams } }
   invalidate($)
 }
@@ -142,13 +144,12 @@ async function openInBrowser($: any) {
 }
 
 // A block without a drawn diagram stays inside the markdown around it, so a pending or failed block reads as code.
-function bodyParts(text: string, diagrams: (string | undefined)[]): ({ markdown: string } | { diagram: string })[] {
-  if (!diagrams.some((diagram) => diagram !== undefined)) return [{ markdown: text }]
+function bodyParts(segments: Segment[], diagrams: (string | undefined)[]): ({ markdown: string } | { diagram: string })[] {
+  if (!diagrams.some((diagram) => diagram !== undefined)) return [{ markdown: segments.map((segment) => segment.text).join('') }]
   const parts: ({ markdown: string } | { diagram: string })[] = []
   let markdown = ''
-  let ordinal = 0
-  for (const segment of splitFences(text)) {
-    const diagram = segment.kind === 'mermaid' ? diagrams[ordinal++] : undefined
+  for (const [index, segment] of segments.entries()) {
+    const diagram = diagrams[index]
     if (diagram === undefined) {
       markdown += segment.text
       continue
@@ -293,7 +294,7 @@ async function drawPane($: any, e: any) {
       for (const line of browserLines(card.browser)) region.push(dim(line))
     }
     if (body.clippedFrom !== null) region.push(clipNotice(body.text, body.clippedFrom))
-    for (const part of bodyParts(body.text, card.diagrams)) {
+    for (const part of bodyParts(card.segments, card.diagrams)) {
       if ('markdown' in part) {
         region.push(Markdown({ text: part.markdown }))
         continue
