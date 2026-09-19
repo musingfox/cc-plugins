@@ -63,9 +63,10 @@ Protocol:
    path + check output (tail) + reviewer verdict with evidence paths. Main
    owns the final verdict. End your turn with the same summary as your final
    message.
-6. Before ending ANY turn: run `pi-agent.sh ls`. If any line shows RUNNING,
-   you are NOT done — go back to step 3. Only go idle when every worker is
-   settled.
+6. Before ending ANY turn: run `pi-agent.sh poll NAME` for each worker YOU
+   started. If any shows RUNNING, you are NOT done — go back to step 3. Only
+   go idle when every worker you started is settled; another dispatch's
+   running worker is not yours to wait on.
 
 ## Self-do mode
 
