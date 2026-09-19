@@ -29,6 +29,17 @@ artifact in the brief instead, and make the worker verify before claiming:
 > or `STATUS=BLOCKED <what is missing and what you need>` — you cannot
 > proceed. Do not print it in the terminal. Reply only `DONE`.
 
+The worker may write only inside `PI_CWD`. When the verdict path lies outside
+it, declare the file at launch; otherwise the write/edit fence refuses it, and
+on macOS so does the sandbox outside its allowed directories:
+
+```bash
+PI_CWD=<worktree> PI_WRITABLE_FILES=/abs/path/verdict.md pi-agent.sh start NAME BRIEF
+```
+
+`PI_WRITABLE_FILES` takes colon-separated absolute file paths whose directory
+already exists; the worker may write each named file and nothing beside it.
+
 The caller routes on that line without reading anything else:
 
 - `DONE` → independent review (the caller re-runs the check; a mismatch with

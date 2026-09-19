@@ -57,5 +57,12 @@ done
 hits="$(grep -l 'Monitor tool' "$README" "$SKILL" "$DOCTRINE" "$AGENT")"
 [ -z "$hits" ] && ok "no doc or script says 'Monitor tool'" || bad "'Monitor tool' still in: $hits"
 
+# --- the output contract tells the dispatcher to declare its verdict file ---
+section="$(sed -n '/^## Output contract/,/^## Control plane/p' "$SKILL")"
+case "$section" in
+  *PI_WRITABLE_FILES*) ok "SKILL's output contract says to declare the verdict file in PI_WRITABLE_FILES" ;;
+  *) bad "SKILL's output contract never names PI_WRITABLE_FILES" ;;
+esac
+
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]
