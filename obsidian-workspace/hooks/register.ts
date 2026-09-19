@@ -31,6 +31,8 @@ type CardRegion =
       diagrams: (string | undefined)[]
     }
 
+type Shown = Extract<CardRegion, { kind: 'shown' }>
+
 type View = {
   message: { kind: 'error' | 'notice'; text: string } | null
   scope: { vault: string; project: string } | null
@@ -107,25 +109,25 @@ async function drawDiagrams($: any, request: number, segments: Segment[]) {
     const run = await runProcess($, TERMAID_ARGV, TERMAID_TIMEOUT_MS, segment.source)
     if (run.kind === 'rejected') return
     const diagram = diagramOutcome(run)
-    if (diagram !== null) showDiagram($, request, index, diagram)
+    if (diagram === null) continue
+    patchShown($, request, (card) => {
+      const diagrams = [...card.diagrams]
+      diagrams[index] = diagram
+      return { ...card, diagrams }
+    })
   }
 }
 
-function showDiagram($: any, request: number, index: number, diagram: string) {
+// A diagram or press result writes only under the card read it came from: a newer read, even of the same card, drops it.
+function patchShown($: any, request: number, patch: (card: Shown) => Shown) {
   const card = view.card
   if (request !== requests || card?.kind !== 'shown') return
-  const diagrams = [...card.diagrams]
-  diagrams[index] = diagram
-  view = { ...view, card: { ...card, diagrams } }
+  view = { ...view, card: patch(card) }
   invalidate($)
 }
 
-// A press result writes only under the card read it was pressed on: a newer read, even of the same card, drops it.
 function showBrowser($: any, request: number, browser: Browser) {
-  const card = view.card
-  if (request !== requests || card?.kind !== 'shown') return
-  view = { ...view, card: { ...card, browser } }
-  invalidate($)
+  patchShown($, request, (card) => ({ ...card, browser }))
 }
 
 async function openInBrowser($: any) {
