@@ -27,7 +27,7 @@ A thin rule sets the card off from the list. Status and priority are coloured la
 
 Mermaid blocks in the card body are drawn in the pane as text diagrams by `uvx termaid@0.9.0`, which needs [uv](https://docs.astral.sh/uv/). uv is optional: without it, a block stays the code block it is in the card. A block also stays a code block when its diagram type is not supported, when it starts with a `%%` comment or `---` frontmatter, or when termaid fails, prints nothing, or takes longer than 5 s. The card is drawn first and each diagram replaces its code block when it is ready, so the first run may show the code block until uv has fetched termaid.
 
-A shown card has an **Open in browser** Button that renders the card body, Mermaid included, through the [viz](../viz) plugin's `render.sh`. The Button appears only when viz is installed, found through `installed_plugins.json` under `$CLAUDE_CONFIG_DIR` or `~/.claude`, and only in the terminal. Opening the browser uses macOS `open`; over SSH the pane shows the page's URL instead. The pane reports where the card was rendered, or why it was not.
+A shown card has an **Open in browser** Button that renders the card body, Mermaid included, through the [viz](../viz) plugin's `render.sh`. The Button appears only when viz is installed, found through `installed_plugins.json` under `$CLAUDE_CONFIG_DIR` or `~/.claude`, and only in the terminal. Opening the browser uses macOS `open`; over SSH the pane shows the page's URL instead. The pane reports where the card was rendered, or why it was not. The page opens on the machine running Claude Code: when you reach the session through a terminal multiplexer or relay that does not set the SSH variables (herdr, for example), the browser opens on that host, not on the device you are looking at.
 
 Enable Claude Mods globally before using the pane:
 
@@ -52,6 +52,8 @@ Built and tested against Claude Code 2.1.276.
 - **Daily Notes** core plugin enabled (required for `/obw:jot` quick capture)
 - **Bases** core plugin enabled (required only for `/obw:pm` dashboards — bundled in Obsidian 1.9+)
 - [uv](https://docs.astral.sh/uv/) (optional; lets the `/issue` pane draw Mermaid blocks as text diagrams through `uvx termaid@0.9.0` — without it they show as code blocks)
+- [viz](../viz) plugin (optional; enables the `/issue` pane's **Open in browser** Button — without it the Button is not drawn)
+- `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` (required only for the `/issue` pane; skills work without it)
 
 ## Installation
 
