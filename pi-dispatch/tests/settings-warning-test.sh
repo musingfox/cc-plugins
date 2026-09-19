@@ -65,5 +65,13 @@ if grep -q '^RUNDIR=' "$TMP/out" && ! grep -q 'no routing pinned' "$TMP/err"; th
 env PI_RESOLVE_ROUTING_ONLY=1 PI_CODING_AGENT_DIR="$AGENT" "$DISPATCH" dummy >"$TMP/out" 2>"$TMP/err"
 if ! grep -q 'no routing pinned' "$TMP/err"; then ok "PI_RESOLVE_ROUTING_ONLY=1 -> no warning"; else bad "resolve-only -> $(cat "$TMP/err")"; fi
 
+# --- the comments describe what the runtime does ---
+FENCE="$SCRIPT_DIR/../extensions/worktree-fence.ts"
+[ "$(grep -c 'config\.yml' "$DISPATCH")" = 0 ] && ok "pi-dispatch.sh never names config.yml" || bad "config.yml still in pi-dispatch.sh"
+[ "$(grep -ci overlay "$DISPATCH")" = 0 ] && ok "pi-dispatch.sh never says overlay" || bad "overlay still in pi-dispatch.sh"
+bash "$SCRIPT_DIR/routing-test.sh" >/dev/null 2>&1 && ok "routing-test.sh passes (PI_CONFIG_FILES is ignored still pinned)" || bad "routing-test.sh fails"
+[ "$(grep -c 'whenever PI_CWD is set' "$FENCE")" = 0 ] && ok "fence header no longer says it loads only with PI_CWD" || bad "stale fence header"
+[ "$(sed -n '1,/^[^#]/p' "$DISPATCH" | grep '^#' | grep -c PI_WRITABLE_FILES)" -ge 1 ] && ok "pi-dispatch.sh header documents PI_WRITABLE_FILES" || bad "PI_WRITABLE_FILES missing from the header"
+
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

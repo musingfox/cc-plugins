@@ -30,7 +30,8 @@
 #   RUNDIR=<per-run dir holding result/stderr/pid/pgid/rc/start>
 #   ROUTING=<provider>/<model> CWD=<dir> WRITABLE=<list>   what the run actually resolved to
 #
-# Routing (nothing set = pi's own config.yml defaultProvider/defaultModel decide):
+# Routing (nothing set = pi's own settings.json decides, read from
+#   ${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/settings.json; a missing file warns on stderr):
 #   PI_BIN       agent binary to invoke (default: pi)
 #   PI_PROVIDER  optional; with PI_MODEL it is passed as --model PROVIDER/MODEL.
 #                Alone it is refused (exit 2): pi resolves the model first, so
@@ -54,6 +55,14 @@
 #                PI_REAL_GIT), extensions/worktree-fence.ts via -e, and on macOS
 #                a sandbox-exec profile (RUNDIR/sandbox.sb) that denies writes
 #                outside the worktree. PI_SANDBOX=0 skips the sandbox.
+#   PI_WRITABLE_FILES  optional colon-separated absolute paths of extra FILES
+#                outside the worktree the worker may write (a report, a verdict
+#                file). Each becomes an exact (literal) sandbox rule and a fence
+#                exception; a sibling stays denied. An entry that is relative, has
+#                no existing parent, contains " or \, names a directory, or a list
+#                with a newline, is refused (exit 2). Empty segments are skipped;
+#                a path containing ":" cannot be declared. Recorded as WRITABLE=
+#                and replayed on resume: the record beats the env, even when empty.
 #
 # Process-group model (macOS-first; darwin has no `setsid` binary):
 #   We launch pi through a perl POSIX::setsid THIN WRAPPER, backgrounded + disowned.
@@ -89,7 +98,7 @@ MODEL="${PI_MODEL:-}"
 # Migration guard: PI_CONFIG_FILES was the omp-era routing knob. pi has no
 # --config, so a leftover export would silently route to pi's default model.
 if [ -n "${PI_CONFIG_FILES:-}" ]; then
-  echo "pi-dispatch: warning: PI_CONFIG_FILES is ignored (omp-era overlay); route with PI_PROVIDER/PI_MODEL instead." >&2
+  echo "pi-dispatch: warning: PI_CONFIG_FILES is ignored (an omp-era routing knob); route with PI_PROVIDER/PI_MODEL instead." >&2
 fi
 
 # The agent binary. Default: pi. Override with PI_BIN for a pi-compatible fork.

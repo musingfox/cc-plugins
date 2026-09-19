@@ -1,7 +1,8 @@
 // worktree-fence.ts — pi extension: keep a dispatched worker's write/edit inside PI_CWD.
 //
-// Loaded by pi-dispatch.sh via `-e` whenever PI_CWD is set; a no-op otherwise, so
-// an interactive pi is untouched. Git mutations are fenced by shims/git, which
+// pi-dispatch.sh loads it via `-e` on every dispatch. Without PI_CWD it registers
+// nothing, so an interactive pi is untouched. Files named in PI_WRITABLE_FILES are
+// allowed by exact path. Git mutations are fenced by shims/git, which
 // sees the shell-expanded argv; this file only covers the write and edit tools,
 // whose paths arrive as plain strings.
 //
