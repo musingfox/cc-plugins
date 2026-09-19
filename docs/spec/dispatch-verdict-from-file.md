@@ -5,7 +5,7 @@ scope:
   - "pi-dispatch/**"
   - "context-flow/scripts/**"
 verify: null
-related: [cross-plugin-runtime-resolution, judge-seats-cannot-edit]
+related: [cross-plugin-runtime-resolution, judge-seats-cannot-edit, dispatch-write-targets-declared, quota-ends-the-batch]
 source: null
 adr: null
 ---
