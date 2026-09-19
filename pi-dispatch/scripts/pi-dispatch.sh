@@ -28,7 +28,7 @@
 #   OUTPUT=<absolute path to result file>     <- the handle the caller reads later
 #   PID=<background wrapper pid (== PGID)>     <- the perl setsid wrapper's pid
 #   RUNDIR=<per-run dir holding result/stderr/pid/pgid/rc/start>
-#   ROUTING=<provider>/<model> CWD=<dir>   what the run actually resolved to
+#   ROUTING=<provider>/<model> CWD=<dir> WRITABLE=<list>   what the run actually resolved to
 #
 # Routing (nothing set = pi's own config.yml defaultProvider/defaultModel decide):
 #   PI_BIN       agent binary to invoke (default: pi)
@@ -382,7 +382,7 @@ disown
 # ROUTING= states what the run actually resolved to. It is the only place the
 # caller sees the routing before a terminal poll, so a run on the wrong provider
 # is visible at launch instead of a ticket later.
-echo "ROUTING=${PROVIDER:-<pi-default>}/${MODEL:-<pi-default>} CWD=$PI_CWD"
+echo "ROUTING=${PROVIDER:-<pi-default>}/${MODEL:-<pi-default>} CWD=$PI_CWD WRITABLE=$WRITABLE"
 echo "OUTPUT=$OUTPUT_FILE"
 echo "PID=$WRAP_PID"
 echo "RUNDIR=$RUNDIR"

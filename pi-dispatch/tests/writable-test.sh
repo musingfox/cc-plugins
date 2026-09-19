@@ -141,5 +141,17 @@ if grep -q '^MODEL=gpt-5.6-terra$' "$RD/routing" && [ "$(rec "$RD")" = "$DECL" ]
 RD2="$(launch PI_BIN="$SHIM" "$DISPATCH" "$CALLER/brief.md" "$OUT" "$RD" 2>/dev/null)"
 if [ "$(rec "$RD2")" = "$DECL" ] && [ "$(field "$RD2" WRITABLE_ENV)" = "$DECL" ]; then ok "resume after a terminal poll -> WRITABLE= replayed"; else bad "resume after poll -> rec=$(rec "$RD2") env=$(field "$RD2" WRITABLE_ENV)"; fi
 
+# --- the launch line names the writable list ---
+out="$(cd "$CALLER" && env PI_BIN="$SHIM" PI_CWD="$WORK" "PI_WRITABLE_FILES=$WDIR/report.md" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
+if printf '%s\n' "$out" | head -n 1 | grep -qE "^ROUTING=.* CWD=.* WRITABLE=$DECL\$"; then ok "launch line ends with WRITABLE=<canonical list>"; else bad "launch line -> $(printf '%s\n' "$out" | head -n 1)"; fi
+out="$(cd "$CALLER" && env PI_BIN="$SHIM" PI_CWD="$WORK" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
+rundirs="$(printf '%s\n' "$out" | sed -n 's/^RUNDIR=//p')"
+case "$(printf '%s\n' "$out" | grep '^ROUTING=')" in
+  *" WRITABLE=") ok "launch with nothing declared -> ROUTING line ends with ' WRITABLE='" ;;
+  *) bad "empty launch line -> $(printf '%s\n' "$out" | grep '^ROUTING=')" ;;
+esac
+if [ "$(printf '%s\n' "$rundirs" | wc -l | tr -d ' ')" = 1 ] && [ -d "$rundirs" ]; then ok "RUNDIR= still yields one existing directory"; else bad "RUNDIR -> $rundirs"; fi
+for _ in $(seq 1 50); do [ -s "$rundirs/rc" ] && break; sleep 0.1; done
+
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]
