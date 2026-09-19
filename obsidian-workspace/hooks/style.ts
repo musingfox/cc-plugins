@@ -1,9 +1,9 @@
 // RED, ORANGE and GREEN are omp-quota's values; a module imports only its own plugin's files.
 export const RED = '#e5484d'
-export const ORANGE = '#f5a524'
-export const GREEN = '#46a758'
-export const GREY = '#8b8d98'
-export const BLUE = '#0090ff'
+const ORANGE = '#f5a524'
+const GREEN = '#46a758'
+const GREY = '#8b8d98'
+const BLUE = '#0090ff'
 
 const STATUS = new Map([
   ['todo', GREY],
