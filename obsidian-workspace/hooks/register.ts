@@ -7,16 +7,26 @@ import type { Run } from './cli-output.ts'
 import { headerOf } from './card.ts'
 import type { CardHeader } from './card.ts'
 import { vizManifestPath, vizInstallPath, renderTarget, renderArgv, renderOutcome, RENDER_TIMEOUT_MS } from './viz.ts'
+import { splitFences, termaidHeaderAllowed, diagramOutcome, TERMAID_ARGV, TERMAID_TIMEOUT_MS } from './mermaid.ts'
 
 const PANE = { id: 'obw-issue', title: 'obw issue', focus: true, closeOnEscape: true }
 
 type Browser = { kind: 'rendering' } | ReturnType<typeof renderOutcome>
 
 // The card region under the list has its own state, so a card's outcome never replaces the list's message.
+// `diagrams` is indexed by a block's ordinal among the mermaid blocks of the clipped body.
 type CardRegion =
   | { kind: 'loading'; name: string }
   | { kind: 'error'; message: string }
-  | { kind: 'shown'; name: string; header: CardHeader; body: string; vizRoot: string | null; browser: Browser | null }
+  | {
+      kind: 'shown'
+      name: string
+      header: CardHeader
+      body: string
+      vizRoot: string | null
+      browser: Browser | null
+      diagrams: (string | undefined)[]
+    }
 
 type View = {
   message: string | null
@@ -32,9 +42,9 @@ let view: View = LOADING
 // A CLI call can settle after a newer /issue or card read started; only the latest request writes the view.
 let requests = 0
 
-async function runProcess($: any, argv: string[], timeoutMs = OBSIDIAN_TIMEOUT_MS): Promise<Run> {
+async function runProcess($: any, argv: string[], timeoutMs = OBSIDIAN_TIMEOUT_MS, stdin?: string): Promise<Run> {
   try {
-    const result = await $.process.run(argv, { timeoutMs })
+    const result = await $.process.run(argv, { ...(stdin === undefined ? {} : { stdin }), timeoutMs })
     return { kind: 'exited', exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr }
   } catch {
     return { kind: 'rejected' }
@@ -79,7 +89,32 @@ async function show($: any, name: string) {
   const output = readOutput(await runProcess($, built.argv))
   if (output.kind === 'error') return showCard($, request, name, { kind: 'error', message: output.message })
   const vizRoot = await findViz($)
-  showCard($, request, name, { kind: 'shown', name, header: headerOf(output.frontmatter), body: output.body, vizRoot, browser: null })
+  const header = headerOf(output.frontmatter)
+  showCard($, request, name, { kind: 'shown', name, header, body: output.body, vizRoot, browser: null, diagrams: [] })
+  // termaid never holds /issue: an offline uvx can take seconds, and the card is already drawn.
+  void drawDiagrams($, request, bounded(output.body).text).catch(() => {})
+}
+
+// One run at a time: a rejected run means uvx fails for every block, and a superseded read never draws.
+async function drawDiagrams($: any, request: number, body: string) {
+  const sources = splitFences(body).flatMap((segment) => (segment.kind === 'mermaid' ? [segment.source] : []))
+  for (const [ordinal, source] of sources.entries()) {
+    if (!termaidHeaderAllowed(source)) continue
+    if (request !== requests) return
+    const run = await runProcess($, TERMAID_ARGV, TERMAID_TIMEOUT_MS, source)
+    if (run.kind === 'rejected') return
+    const diagram = diagramOutcome(run)
+    if (diagram !== null) showDiagram($, request, ordinal, diagram)
+  }
+}
+
+function showDiagram($: any, request: number, ordinal: number, diagram: string) {
+  const card = view.card
+  if (request !== requests || card?.kind !== 'shown') return
+  const diagrams = [...card.diagrams]
+  diagrams[ordinal] = diagram
+  view = { ...view, card: { ...card, diagrams } }
+  invalidate($)
 }
 
 // A press result writes only under the card read it was pressed on: a newer read, even of the same card, drops it.
