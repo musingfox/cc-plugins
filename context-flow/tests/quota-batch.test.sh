@@ -152,6 +152,19 @@ assert_eq "no" "$([ -e "$FLOW/quota-wall" ] && echo yes || echo no)" \
 no_temp_left "rate limit"
 rm -rf "$FLOW"
 
+build_fixture A "echo 'STATUS=FAIL OUTPUT=/r/result.md exit rc=1 QUOTA 5s cause:insufficient quota'"
+mkdir "$FLOW/ro"
+cp "$FLOW/shards.json" "$FLOW/ro/"
+chmod 555 "$FLOW/ro"
+printf 'FLOW_SESSION="%s"\n' "$FLOW/ro" >> "$SHARD/env.sh"
+run_shard; rc=$?
+assert_contains "$(cat "$FLOW/run.log")" "quota wall QUOTA not recorded" \
+  "unwritable: the task log says the wall was not recorded"
+assert_eq "QUOTA" "$(section Reason)" "unwritable: the shard still ends with the tag"
+assert_eq "1" "$rc" "unwritable: the shard exits 1"
+chmod 755 "$FLOW/ro"
+rm -rf "$FLOW"
+
 # ---- a still-running sibling stops on the recorded wall ----
 
 # sibling_poll TAG: round 1 records TAG as hit by shard A, and B's worker is still running

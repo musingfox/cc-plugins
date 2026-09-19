@@ -301,9 +301,15 @@ record_quota_wall() {
   if [ "$tag" = QUOTA-WINDOW ] && quota_wall_valid && [ "$WALL_TAG" = QUOTA ]; then
     return 0
   fi
-  tmp=$(mktemp "$FLOW_SESSION/quota-wall.XXXXXX" 2>/dev/null) || return 0
-  { printf 'TAG=%s\nSHARD=%s\nEPOCH=%s\n' "$tag" "$SHARD_ID" "$(date +%s)" > "$tmp" \
-      && mv -f "$tmp" "$FLOW_SESSION/quota-wall"; } 2>/dev/null || rm -f "$tmp"
+  if ! tmp=$(mktemp "$FLOW_SESSION/quota-wall.XXXXXX" 2>/dev/null); then
+    say "quota wall $tag not recorded: cannot create a temp file in $FLOW_SESSION"
+    return 0
+  fi
+  if ! { printf 'TAG=%s\nSHARD=%s\nEPOCH=%s\n' "$tag" "$SHARD_ID" "$(date +%s)" > "$tmp" \
+      && mv -f "$tmp" "$FLOW_SESSION/quota-wall"; } 2>/dev/null; then
+    rm -f "$tmp"
+    say "quota wall $tag not recorded: cannot write $FLOW_SESSION/quota-wall"
+  fi
 }
 
 # Step 0 removed the previous round's outcome, so from here on an abort with no
