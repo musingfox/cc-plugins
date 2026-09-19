@@ -1,16 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { PANE, issue, nodesOf, stringsIn } from './fixtures/pane.ts'
+import { CONFIG_PATH, HOME_MANIFEST, PANE, PRESS, ROOT, issue, nodesOf, press, stringsIn, vizWorld } from './fixtures/pane.ts'
 import { CONFIG, manifest, world } from './fixtures/world.ts'
-
-const HOME_MANIFEST = '/Users/u/.claude/plugins/installed_plugins.json'
-const CONFIG_PATH = '/work/.obsidian.yaml'
-const ROOT = '/Users/u/.claude/plugins/cache/m/viz/1.1.4'
-const PRESS = { plugin: 'obw', key: 'open-in-browser' }
-
-// A world where HOME finds one user-scope viz install at ROOT.
-function vizWorld(on: any, options: any = {}) {
-  return world(on, { env: { HOME: '/Users/u' }, files: { [CONFIG_PATH]: CONFIG, [HOME_MANIFEST]: manifest(ROOT) }, ...options })
-}
 
 describe('finding viz', () => {
   test('HOME alone reads the manifest under ~/.claude after the config', async ($, on) => {
@@ -130,14 +120,6 @@ describe('the button surface', () => {
     expect(nodesOf(await $.ui.render(PANE), 'Button').length).toBe(1)
   })
 })
-
-// The kit presses only a Button a render has drawn; the press's async work finishes on settle.
-async function press($: any, w: any) {
-  await $.ui.render(PANE)
-  const pressed = await $.ui.press(PRESS)
-  await w.clock.settle()
-  return pressed
-}
 
 describe('pressing Open in browser', () => {
   test('the whole card body is written to the temp file', async ($, on) => {
