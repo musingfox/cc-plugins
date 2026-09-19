@@ -48,7 +48,7 @@
 #   empty result                 STATUS=FAIL  empty    (dead-branch whitelist)
 #   no agent_end + rc==0         STATUS=FAIL  died-mid-stream
 #   no agent_end + no-rc         STATUS=FAIL  no-rc
-#   provider spend wall          QUOTA        STATUS=FAIL  (either branch; ALIVE kills on sight)
+#   provider spend wall          QUOTA        STATUS=FAIL  (every FAIL branch; ALIVE kills on sight)
 #     …resetting usage window    QUOTA-WINDOW STATUS=FAIL  (same, but a later batch may retry)
 #
 # Terminal lines carry " model=<provider/model> cost=$<sum over all turns> turns=<n>"
@@ -295,13 +295,15 @@ if [ "$alive_rc" -ne 0 ]; then
   if [ -n "$PI_RC" ]; then
     # rc != 0 is an abnormal-death backstop: surface immediately, no further checks.
     if [ "$PI_RC" -ne 0 ]; then
-      emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE exit rc=$PI_RC ${ELAPSED}s$(usage_tail)$(fail_cause)"
+      q="$(quota_class)"
+      emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE exit rc=$PI_RC ${q:+$q }${ELAPSED}s$(usage_tail)$(fail_cause)"
       exit 0
     fi
     # rc == 0: now check agent_end. Absent agent_end overrides a clean rc —
     # the process died mid-stream without emitting a terminal event.
     if [ -z "$AGENT_END_LINE" ]; then
-      emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE died-mid-stream no-terminal ${ELAPSED}s$(usage_tail)$(fail_cause)"
+      q="$(quota_class)"
+      emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE died-mid-stream no-terminal ${q:+$q }${ELAPSED}s$(usage_tail)$(fail_cause)"
       exit 0
     fi
     # agent_end present: judge stopReason via the shared whitelist.
@@ -312,7 +314,8 @@ if [ "$alive_rc" -ne 0 ]; then
   # forever. ELAPSED grows monotonically (start-ts is fixed on disk), so it always
   # crosses the grace on a later poll -> terminal FAIL.
   if [ "$ELAPSED" -gt "$NO_MARKER_GRACE" ]; then
-    emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE no-rc ${ELAPSED}s grace=${NO_MARKER_GRACE}s$(fail_cause)"
+    q="$(quota_class)"
+    emit "STATUS=FAIL OUTPUT=$OUTPUT_FILE no-rc ${q:+$q }${ELAPSED}s grace=${NO_MARKER_GRACE}s$(fail_cause)"
     exit 0
   fi
   echo "RUNNING settling ${ELAPSED}s (dead, awaiting rc within grace=${NO_MARKER_GRACE}s)"

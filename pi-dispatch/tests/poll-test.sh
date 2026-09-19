@@ -223,6 +223,34 @@ case "$OUT" in
 esac
 kill "$QPID" 2>/dev/null || true
 
+# --- (quota-branches) the tag rides on EVERY failure branch, not just ERROR/killed:
+#     a worker that dies with rc!=0, dies mid-stream, or dies without an rc still
+#     carries it, right after the branch words. No agent_end in these streams. ---
+quota_branch_stream() {
+  printf '%s\n{"type":"message_end","message":{"role":"assistant","stopReason":"error","errorMessage":"%s"}}' \
+    "$SESSION_LINE" "$1"
+}
+# Args: label, rc (""=none), errorMessage, required substring, forbidden substring.
+quota_branch_case() {
+  local label="$1" rc="$2" msg="$3" want="$4" deny="$5" d out
+  d="$TMP/c-qb-$label"; make_run "$d" "$DEAD" 100 "$rc" "$(quota_branch_stream "$msg")"
+  out="$(PI_NO_MARKER_GRACE_S=30 bash "$POLL" "$d")"
+  case "$out" in
+    *"$deny"*) bad "(quota-branch-$label) unexpected '$deny' in: $out";;
+    STATUS=FAIL*"$want"*) ok "(quota-branch-$label) -> $out";;
+    *) bad "(quota-branch-$label) expected STATUS=FAIL ... '$want', got: $out";;
+  esac
+}
+quota_branch_case rc-exhaust   1  'insufficient quota for this request' 'exit rc=1 QUOTA '        'QUOTA-WINDOW'
+quota_branch_case rc-window    1  'usage limit reached, resets at 5pm'  'exit rc=1 QUOTA-WINDOW ' '<none>'
+quota_branch_case rc-429       1  'rate limit exceeded (429)'           'exit rc=1 '              'QUOTA'
+quota_branch_case mid-exhaust  0  'out of credits'                      'died-mid-stream no-terminal QUOTA '        '<none>'
+quota_branch_case mid-window   0  'usage limit'                         'died-mid-stream no-terminal QUOTA-WINDOW ' '<none>'
+quota_branch_case mid-429      0  'rate limit 429'                      'died-mid-stream no-terminal ' 'QUOTA'
+quota_branch_case norc-exhaust '' 'billing hard limit'                  'no-rc QUOTA '            '<none>'
+quota_branch_case norc-window  '' 'usage limit'                         'no-rc QUOTA-WINDOW '     '<none>'
+quota_branch_case norc-429     '' 'rate limit 429'                      'no-rc '                  'QUOTA'
+
 # --- (cost) OK line sums usage over EVERY assistant message_end (not just the last
 #     one agent_end carries), names the model, and back-fills a blank routing ---
 COST_STREAM="$SESSION_LINE
