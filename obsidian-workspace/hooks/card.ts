@@ -13,3 +13,23 @@ export function headerOf(frontmatter: string): CardHeader {
   }
   return header
 }
+
+const AC_HEADING = /^## acceptance criteria\s*$/i
+const CHECKBOX = /^\s*[-*+] \[( |x|X)\](\s|$)/
+
+// The section runs to the next `#` or `##` heading; a `###` subheading stays inside it.
+export function acLabel(body: string): string | null {
+  const lines = body.split('\n')
+  const start = lines.findIndex((line) => AC_HEADING.test(line))
+  if (start < 0) return null
+  let checked = 0
+  let total = 0
+  for (const line of lines.slice(start + 1)) {
+    if (line.startsWith('# ') || line.startsWith('## ')) break
+    const box = CHECKBOX.exec(line)
+    if (!box) continue
+    total += 1
+    if (box[1] !== ' ') checked += 1
+  }
+  return total ? `AC ${checked}/${total}` : null
+}
