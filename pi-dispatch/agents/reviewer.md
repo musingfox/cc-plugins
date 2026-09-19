@@ -1,7 +1,6 @@
 ---
 name: reviewer
 description: Independent contract judge. Given ONLY the contract, the deliverable paths, and the check output, return an evidence-backed PASS/FAIL per contract clause. Never sees the builder transcript; never runs offload verbs.
-model: sonnet
 tools: Read, Bash, Grep, Glob
 ---
 
