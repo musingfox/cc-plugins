@@ -9,8 +9,7 @@ to use it. This doctrine is the choosing.
 
 Claude Code's native features are in-house employees; pi workers are
 contractors. Every native operating mode keeps its organizational shape — the
-only question is which seats are filled by a contractor with a thin haiku
-liaison in front. The worker side is always the same: pi processes managed
+only question is which seats are filled by a contractor. The worker side is always the same: pi processes managed
 by the `pi-agent.sh` primitives (start/send/poll/peek/ls/stop/watch).
 
 ## Two-node dispatch model (current shape)
@@ -56,14 +55,6 @@ deterministic checks, and assembles evidence — a context firewall and
 structured-output enforcement point. It never issues the verdict; that seat
 belongs to main, informed by the reviewer.
 
-### Historical note (retired topology)
-
-The previous (retired/legacy) control plane used a `pi-foreman` liaison node
-between main and the pi worker. That topology is **retired** (legacy, replaced
-by the two-node main → builder/reviewer model above). The empirical footnotes
-below describe live, current harness behavior of named sub-agents (SendMessage
-resume, idle notifications); only the `pi-foreman` liaison topology is retired.
-
 ## Dispatch decision — fit first, cost second
 
 Outsource when the contractor is the better fit, not merely cheaper:
@@ -71,8 +62,8 @@ Outsource when the contractor is the better fit, not merely cheaper:
 - **Capability fit**: the work suits the worker's model or environment —
   bulk web reading, multimedia generation, long-document summarization,
   massive parallel fan-out. `PI_PROVIDER`/`PI_MODEL` is the routing
-  unit — it carries the whole `modelRoles` table plus per-provider workarounds,
-  so one file expresses a worker's entire capability profile.
+  unit — two env vars passed to pi as one `--model provider/model` spec, so
+  the model a worker runs on is its capability profile.
 - **Cost fit**: mechanical work with a clear spec, where Claude tokens and
   latency buy nothing.
 
@@ -113,12 +104,12 @@ nor the dispatcher (main) — main has a close-the-task incentive
   transcript);
 - **main** owns the final verdict.
 
-Capability rule: **reviewer ≥ builder**. Config overlays are named by provider,
-not ranked by tier, so nothing in the tooling enforces this — the dispatcher
-picks the reviewer's overlay and owns the judgement. A builder already on the
-strongest overlay available gets a fresh session on that same overlay, or main
-itself, as reviewer. The reviewer is just another dispatch — same primitives,
-a routing at least as capable.
+Capability rule: **reviewer ≥ builder**. Routings are named by provider and
+model, not ranked by tier, so nothing in the tooling enforces this — the
+dispatcher picks the reviewer's routing and owns the judgement. A builder
+already on the strongest routing available gets a fresh session on that same
+routing, or main itself, as reviewer. The reviewer is just another dispatch —
+same primitives, a routing at least as capable.
 
 Proportionality: deterministic checks always run; a separate reviewer is
 dispatched only when the deliverable is a code change or the contract has
@@ -126,14 +117,13 @@ non-deterministic clauses; main may mark a dispatch `no-review` when it will
 read and judge the result itself. A dispatch with no reviewer on any seat is
 not a dispatch — it's abandonment.
 
-## Empirical footnotes (2026-07, verified live — describe named-agent harness behavior; the pi-foreman topology is retired/legacy)
+## Empirical footnotes (2026-07, verified live — named-agent harness behavior)
 
 - SendMessage to a completed named subagent resumes it from transcript with full context — a live, verified harness behavior. This is what makes the resident shape (consumption-shapes row 3) work: main → builder, cross-turn resume.
 - A background subagent can push `SendMessage(to: "main")` mid-invocation;
-  a named agent's idle notification carries no text, so all foreman-era
-  reporting went through that channel. The pi-foreman topology is legacy,
-  retired, deprecated (see the Historical note above).
-- Haiku wrappers drift after resumes (dispatch-and-sleep); pin discipline as
-  an end-of-turn check in the agent definition, not as one-time narrative.
+  a named agent's idle notification carries no text, so mid-run reporting
+  has to go through that channel.
+- Agents drift after resumes (dispatch-and-sleep); pin discipline as an
+  end-of-turn check in the agent definition, not as one-time narrative.
 - Official docs lag the product on both resume and to:"main" — trust live
   probes over doc verdicts for harness behavior.

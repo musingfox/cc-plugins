@@ -67,7 +67,7 @@ if ! grep -q 'no routing pinned' "$TMP/err"; then ok "PI_RESOLVE_ROUTING_ONLY=1 
 
 # --- the comments describe what the runtime does ---
 FENCE="$SCRIPT_DIR/../extensions/worktree-fence.ts"
-[ "$(grep -c 'config\.yml' "$DISPATCH")" = 0 ] && ok "pi-dispatch.sh never names config.yml" || bad "config.yml still in pi-dispatch.sh"
+[ "$(grep -c 'config\.yml' "$DISPATCH")" = 0 ] && ok "pi-dispatch.sh never names the yaml routing file" || bad "the yaml routing file is still named in pi-dispatch.sh"
 [ "$(grep -ci overlay "$DISPATCH")" = 0 ] && ok "pi-dispatch.sh never says overlay" || bad "overlay still in pi-dispatch.sh"
 bash "$SCRIPT_DIR/routing-test.sh" >/dev/null 2>&1 && ok "routing-test.sh passes (PI_CONFIG_FILES is ignored still pinned)" || bad "routing-test.sh fails"
 [ "$(grep -c 'whenever PI_CWD is set' "$FENCE")" = 0 ] && ok "fence header no longer says it loads only with PI_CWD" || bad "stale fence header"

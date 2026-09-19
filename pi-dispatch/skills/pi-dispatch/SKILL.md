@@ -99,8 +99,9 @@ carries one line per state change (verified: main is woken, no polling). A
 sub-agent cannot be woken this way — inside a sub-agent run `watch` in the
 foreground, or use `pi-run.sh` for a single worker.
 
-Every terminal line ends with `model=<provider/model> cost=$<sum> turns=<n>`
-summed over the whole run. Read it: a small task that shows 4 turns at ~20K
+A terminal line from a run whose stream carries usage includes
+`model=<provider/model> cost=$<sum> turns=<n>` summed over the whole run; the
+`empty`, `no-rc`, `handle=broken` and `no-pid` lines carry none. Read it: a small task that shows 4 turns at ~20K
 input each is paying the full prompt every tool call (no cache on some
 providers). Trim with `PI_EXTRA_ARGS="-nc -ns -np --tools read,bash,edit,write"`
 (measured 21.4K → 12.8K input/turn) — at the price of the dispatch-dir
@@ -147,10 +148,11 @@ the model first and the provider follows it, so `--provider X` alone lands on
 pi's default provider while looking pinned (measured 2026-09-15). Set `PI_MODEL`
 alone and pi matches the model pattern across providers.
 
-Give none and pi resolves from its own config — `$PI_CODING_AGENT_DIR/config.yml`
+Give none and pi resolves from its own settings — `$PI_CODING_AGENT_DIR/settings.json`
 when that variable is exported (a dedicated worker profile), else
-`~/.pi/agent/config.yml`, reading `defaultProvider` and `defaultModel`. Check
-which one binds before assuming a model: the launch prints the routing it
+`~/.pi/agent/settings.json`, reading `defaultProvider` and `defaultModel`. When
+that file is missing, the launch warns on stderr and names it. Check which one
+binds before assuming a model: the launch prints the routing it
 resolved as `ROUTING=<provider>/<model> CWD=<dir>`.
 
 Routing is recorded per run and replayed on resume, so `send` keeps the worker

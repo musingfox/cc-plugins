@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # pi-run.sh — RUN-TO-TERMINAL: dispatch a brief and BLOCK until terminal, in ONE call.
 #
-# The composition callers kept hand-rolling (spiral's pi-build loop, foreman's
-# wait loop, Workflow thin shells): launch via pi-dispatch.sh, poll pi-poll.sh
+# The composition callers kept hand-rolling (spiral's pi-build loop, ad-hoc
+# wait loops, Workflow thin shells): launch via pi-dispatch.sh, poll pi-poll.sh
 # until terminal, emit exactly ONE outcome line. Use it from contexts that must
 # block inside a single Bash call (sub-agents can't be woken by Monitor).
 #
