@@ -119,3 +119,21 @@ run_shard
 assert_contains "$(cat "$FLOW/run.log")" "pi-dispatch: warning: x" \
   "T4: a successful dispatch's stderr reaches the task log"
 rm -rf "$FLOW"
+
+# ---- T5: a warning printed before the refusal is not the Cause ----
+
+build_fixture "echo 'pi-dispatch: warning: PI_CONFIG_FILES is ignored' >&2; echo '$REFUSAL' >&2; exit 2"
+run_shard
+case "$(section Cause)" in
+  "pi-dispatch: provider openai is pinned without a model"*) _assert_pass ;;
+  *) _assert_fail "T5: Cause is not the refusal line after a warning: [$(section Cause)]" ;;
+esac
+rm -rf "$FLOW"
+
+# ---- T6: only a warning -> Cause falls back to the warning ----
+
+build_fixture "echo 'pi-dispatch: warning: PI_CONFIG_FILES is ignored' >&2; exit 2"
+run_shard
+assert_eq "pi-dispatch: warning: PI_CONFIG_FILES is ignored" "$(section Cause)" \
+  "T6: with no other pi-dispatch line, the warning is the Cause"
+rm -rf "$FLOW"

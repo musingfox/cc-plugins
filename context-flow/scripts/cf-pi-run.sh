@@ -143,8 +143,14 @@ derive_cause() {
       fi ;;
     dispatch-refused)
       # pi-dispatch.sh prefixes its refusals; anything else is a wrapper's own
-      # complaint, whose last line is the one that says why it gave up.
-      cause=$(grep -m1 '^pi-dispatch:' "$SHARD_SESSION/dispatch.stderr" 2>/dev/null) || \
+      # complaint, whose last line is the one that says why it gave up. Its
+      # warnings can print before the refusal, so one is the cause only when
+      # no other pi-dispatch line exists.
+      cause=$(awk '/^pi-dispatch: warning:/ { if (w == "") w = $0; next }
+                   /^pi-dispatch:/ { print; found = 1; exit }
+                   END { if (!found && w != "") print w }' \
+                "$SHARD_SESSION/dispatch.stderr" 2>/dev/null) || true
+      [ -n "$cause" ] || \
         cause=$(grep -v '^[[:space:]]*$' "$SHARD_SESSION/dispatch.stderr" 2>/dev/null | tail -1) || true
       [ -n "$cause" ] || cause="cf-pi-dispatch exited ${DISPATCH_RC:-?}" ;;
     *)
