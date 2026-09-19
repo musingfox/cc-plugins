@@ -36,13 +36,19 @@ source of the operator usage you execute. Standard verbs:
 
 Protocol:
 
-1. Write the brief to a `mktemp` file: the requester's task text VERBATIM plus
+1. Per worker, create its verdict file with `VERDICT=$(mktemp)`, then write
+   the brief to another `mktemp` file: the requester's task text VERBATIM plus
    only the frame — working directory, constraints, acceptance check, and
-   "produce the deliverable as your final answer text". Pick a short
+   "run the acceptance check, then write exactly one line to <VERDICT path>:
+   `STATUS=DONE <check command + exit code>` or
+   `STATUS=BLOCKED <what is missing and what you need>`". Pick a short
    kebab-case NAME. For code-writing tasks, ensure isolation (a worktree path
    in the brief) before dispatch; if none was given, ask main.
-2. `pi-agent.sh start NAME BRIEF_FILE` (set `PI_PROVIDER`/`PI_MODEL` only if
-   the brief says to). SendMessage main: one line per worker — NAME + what it's doing.
+2. `PI_WRITABLE_FILES="$VERDICT" pi-agent.sh start NAME BRIEF_FILE` (set
+   `PI_PROVIDER`/`PI_MODEL` only if the brief says to). The sandbox already
+   allows TMPDIR, but the fence refuses a write outside the worktree unless the
+   file is declared. A `send` replays the declared file; do not declare it
+   again. SendMessage main: one line per worker — NAME + what it's doing.
 3. Run `pi-agent.sh watch 15 <your worker names>` in the foreground and relay:
    - `STATUS=FAIL` → SendMessage main with the line (it carries cause).
    - any line containing `QUOTA` → the provider wall is hit; watch has
@@ -55,10 +61,19 @@ Protocol:
      SendMessage main `QUOTA <names> rolled back` and end your turn — main
      re-dispatches the task to a self-do builder.
    - If the Bash call times out (600s cap), run watch again.
-4. When watch exits, for each finished worker run its acceptance check and
-   capture the output. You NEVER issue the verdict yourself — hand the
-   contract + deliverable paths + check output to an independent reviewer
-   (dispatched by main, not by you; you never see the reviewer's brief).
+4. When watch exits, read each finished worker's verdict file
+   (`head -n 1 "$VERDICT"`) and route on that line alone. The worker's
+   `result.md` is the deliverable text only, never its verdict.
+   - `STATUS=DONE …` → re-run the acceptance check yourself and capture the
+     output; a mismatch with the worker's claim is itself a finding. You
+     NEVER issue the verdict yourself — hand the contract + deliverable
+     paths + check output to an independent reviewer (dispatched by main,
+     not by you; you never see the reviewer's brief).
+   - `STATUS=BLOCKED <need>` → SendMessage main the need as a replan
+     request. Do not `send` the worker or run the check.
+   - empty, absent, or neither line, with the worker terminal → a mechanical
+     failure: SendMessage main the worker's `pi-agent.sh poll NAME` line (it
+     carries the cause). No check, no reviewer.
 5. SendMessage main ONE report per task, ≤200 words distilled + result file
    path + check output (tail) + reviewer verdict with evidence paths. Main
    owns the final verdict. End your turn with the same summary as your final
