@@ -3,7 +3,6 @@
 Shows every omp provider's remaining quota inside a Claude Code session, as one Claude Mod
 (a function-hooks module, `hooks/register.ts`).
 
-- **Status line**: one line under the prompt with each provider's lowest remaining share.
 - **`/quota`**: toggles a compact table above the prompt, one line per provider.
 - **`/quota refresh`**: drops omp's cache and fetches fresh quota, without a model turn.
 - **Toast**: one in-session toast when a provider's status worsens from `ok`.
@@ -16,12 +15,14 @@ Each fetch runs `omp usage --json` with `PI_CODING_AGENT_DIR` set to `$HOME/.omp
 and a 10 s limit. The override matters: Claude Code may pass down a
 `PI_CODING_AGENT_DIR` of its own (pi-dispatch sets one), and omp reading that home answers
 with exit 0 and no providers. `omp` is found on Claude Code's `PATH` (it usually lives in
-`~/.bun/bin`). With `HOME` unset, omp is not run and the status line reads
-`omp quota: unavailable (HOME is unset)`.
+`~/.bun/bin`). With `HOME` unset, omp is not run, the band reads
+`Unavailable: HOME is unset`, and `/quota refresh` answers
+`omp quota refresh failed: HOME is unset`.
 
 Quota is fetched once at session start and then every 5 minutes. A failed fetch leaves the
-poll running; there is no other retry. When a reload re-fires session start, the previous
-poll is cancelled first, so the cadence never doubles.
+poll running; there is no other retry. A refused `/quota` registration leaves it running
+too. When a reload re-fires session start, the previous poll is cancelled first, so the
+cadence never doubles.
 
 Nothing waits on omp. Session start (which Claude Code awaits before the first prompt)
 starts the fetch without awaiting it, and the module hooks no tool-call or prompt event,
@@ -45,20 +46,7 @@ so no tool call or prompt is ever held up by a slow omp.
   the display. omp's error output is never shown.
 - **Account data**: only provider names, limit ids and labels, shares, statuses, and reset
   times are kept. omp's `metadata` (email, account id, endpoint) and each limit's `scope`
-  never reach the status line, a toast, the transcript, or the band.
-
-## The status line
-
-Exactly one of:
-
-- `omp quota: fetching` — no fetch has settled yet.
-- `omp quota: openai-codex 6% · ollama-cloud — · …` — each provider's lowest remaining
-  share, in omp's order, with omp's provider names.
-- the same followed by ` (stale)` — the latest fetch failed; the figures are from the last
-  good one. The next good fetch clears the mark.
-- `omp quota: unavailable (<reason>)` — no fetch has succeeded yet.
-
-A refused `/quota` registration does not affect it.
+  never reach a toast, the transcript, or the band.
 
 ## The toast
 
@@ -66,7 +54,7 @@ When a good fetch finds providers that worsened since the previous good fetch (s
 *Worsened provider* above), one in-session toast names them all:
 `omp quota: openai-codex now warning, anthropic now exhausted`. Failed fetches in between
 do not reset the comparison. There is no OS notification; a worsening that happens while
-you are in another window shows on the status line when you return.
+you are in another window shows in the band, if it is on, when you return.
 
 ## Commands
 
@@ -77,9 +65,9 @@ you are in another window shows on the status line when you return.
   that fails on the toggle still flips the band for this session.
 - `/quota refresh` runs `omp usage invalidate`, then fetches, both against the same omp
   home, and answers one line: `omp quota refreshed` or
-  `omp quota refresh failed: <reason>` (the status line then goes stale). When the
-  invalidate fails, the fetch still runs and the answer ends in `(cache not invalidated)`.
-  It does not change the band and needs no model turn.
+  `omp quota refresh failed: <reason>` (the band then shows the failure in its notice line).
+  When the invalidate fails, the fetch still runs and the answer ends in
+  `(cache not invalidated)`. It does not change the band and needs no model turn.
 - `/quota <anything else>` answers `usage: /quota [refresh]` and runs nothing.
 
 ## The band
@@ -95,7 +83,7 @@ the least share left, or the first limit when none has a share. Status reads `�
 gives none; time to reset reads `Xd Yh`, `Xh Ym`, or `Ym`, `now` when due, and `—` when
 omp gives none. A provider without limits shows `no limits reported`. Each share is colored
 by the percentage shown: red for 0–30%, orange for 31–60%, green for 61–100%; `—` stays
-uncolored. The status line stays plain text.
+uncolored.
 
 A limit's name is its label, plus `· <window>` when the window label differs. When the same
 name repeats inside a provider, each gets a tag in brackets: the parts of the limit id that

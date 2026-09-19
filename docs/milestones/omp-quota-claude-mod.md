@@ -68,3 +68,7 @@ Directions that lost:
 
 - `marketplace` — the module ships inside a plugin in this repo; the four-file invariant and version bump apply whichever plugin hosts it.
 - `plugin-dev:plugin-structure` — `hooks/hooks.json` gains a `modules` entry alongside or instead of classic `hooks`.
+
+## Changes after delivery
+
+- **2026-09-19: the always-on status line was removed** at the user's request. The module no longer calls `$.ui.status`. The `/quota` band now carries what the line said: a dim notice reads `Fetching omp usage`, `Unavailable: <reason>`, or `Stale: <reason>; showing data from <age> ago`. The poll, `/quota refresh`, and the toast are unchanged. This supersedes the status-line parts of the text above: the "always-on status line" and "all four outputs" in *What is committed* and *One mechanism* (three outputs remain); the acceptance criteria on the status line's per-provider share, on the status line marking stale data (the band's notice now does), and on a real session showing the status line; the open question on how staleness shows on the one line; and the falsifiers that name `ui.status` or a one-line summary being all that is read.
