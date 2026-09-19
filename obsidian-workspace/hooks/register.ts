@@ -140,6 +140,26 @@ async function openInBrowser($: any) {
   showBrowser($, request, renderOutcome(run))
 }
 
+// A block without a drawn diagram stays inside the markdown around it, so a pending or failed block reads as code.
+function bodyParts(text: string, diagrams: (string | undefined)[]): ({ markdown: string } | { diagram: string })[] {
+  if (!diagrams.some((diagram) => diagram !== undefined)) return [{ markdown: text }]
+  const parts: ({ markdown: string } | { diagram: string })[] = []
+  let markdown = ''
+  let ordinal = 0
+  for (const segment of splitFences(text)) {
+    const diagram = segment.kind === 'mermaid' ? diagrams[ordinal++] : undefined
+    if (diagram === undefined) {
+      markdown += segment.text
+      continue
+    }
+    if (markdown) parts.push({ markdown })
+    markdown = ''
+    parts.push({ diagram })
+  }
+  if (markdown) parts.push({ markdown })
+  return parts
+}
+
 function browserLines(browser: Browser | null): string[] {
   if (browser?.kind === 'rendering') return ['Rendering in the browser…']
   if (browser?.kind === 'error') return [browser.message]
@@ -215,9 +235,10 @@ async function openIssue($: any, request: number, card: string) {
 }
 
 async function drawPane($: any, e: any) {
-  const { Box, Text, Select, Markdown, Button } = await $.ui.resolve(e)
+  const { Box, Text, Select, Markdown, Button, Code } = await $.ui.resolve(e)
   const safe = (text: string) => bounded(text).text
   const dim = (text: string) => Text({ dimColor: true, children: [safe(text)] })
+  const clipNotice = (shown: string, clippedFrom: number) => dim(`Clipped: showing ${shown.length} of ${clippedFrom} characters.`)
   const children: any[] = []
   if (view.cards.length) {
     children.push(
@@ -253,8 +274,16 @@ async function drawPane($: any, e: any) {
       )
       for (const line of browserLines(card.browser)) children.push(dim(line))
     }
-    if (body.clippedFrom !== null) children.push(dim(`Clipped: showing ${body.text.length} of ${body.clippedFrom} characters.`))
-    children.push(Markdown({ text: body.text }))
+    if (body.clippedFrom !== null) children.push(clipNotice(body.text, body.clippedFrom))
+    for (const part of bodyParts(body.text, card.diagrams)) {
+      if ('markdown' in part) {
+        children.push(Markdown({ text: part.markdown }))
+        continue
+      }
+      const diagram = bounded(part.diagram)
+      if (diagram.clippedFrom !== null) children.push(clipNotice(diagram.text, diagram.clippedFrom))
+      children.push(Code({ source: diagram.text, wrap: 'truncate-end' }))
+    }
   }
   return Box({ flexDirection: 'column', children })
 }
