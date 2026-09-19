@@ -35,7 +35,9 @@ Claude (main, or a builder)                           pi worker (cheap model)
 | `TaskStop` | `pi-agent.sh stop NAME` |
 | background completion / needs-input notifications | `pi-agent.sh watch INTERVAL NAME…` |
 
-`send` on a finished run resumes its session (new RUNDIR, context preserved — native SendMessage semantics) and re-points the NAME. `watch` polls the agents named on its command line — the registry is machine-wide, so it takes its scope explicitly rather than sweeping other dispatches' workers — prints one line per meaningful state change (turn done, dead, stall — volatile counters normalized away), and exits when none of them is in flight; arm it on the Monitor tool so each line arrives as a chat notification.
+`send` on a finished run resumes its session (new RUNDIR, context preserved — native SendMessage semantics) and re-points the NAME. `watch` polls the agents named on its command line — the registry is machine-wide, so it takes its scope explicitly rather than sweeping other dispatches' workers — prints one line per meaningful state change (turn done, dead, stall — volatile counters normalized away), and exits when none of them is in flight.
+
+From main, run `pi-agent.sh watch` as a background task (`Bash(run_in_background: true)`) and follow it with Monitor; a sub-agent cannot be woken that way, so it runs `watch` in the foreground.
 
 When/how to choose between direct dispatch, dispatcher, builder/reviewer, Workflow
 thin-shells — and when not to outsource at all: see

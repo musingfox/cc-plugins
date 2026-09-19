@@ -45,5 +45,17 @@ printf 'the old liaison was a foreman\n' > "$TMP/control.md"
 [ "$(grep -c 'settings\.json' "$README")" -ge 1 ] && ok "README names settings.json" || bad "README does not name settings.json"
 [ "$(grep -c 'settings\.json' "$SKILL")" -ge 1 ] && ok "SKILL names settings.json" || bad "SKILL does not name settings.json"
 
+# --- one instruction for waiting on workers ---
+DOCTRINE="$PLUGIN/docs/dispatch-doctrine.md"
+AGENT="$PLUGIN/scripts/pi-agent.sh"
+SENTENCE='From main, run `pi-agent.sh watch` as a background task (`Bash(run_in_background: true)`) and follow it with Monitor; a sub-agent cannot be woken that way, so it runs `watch` in the foreground.'
+for f in "$README" "$SKILL" "$DOCTRINE"; do
+  n="$(grep -cF "$SENTENCE" "$f")"
+  [ "$n" = 1 ] && ok "$(basename "$f") carries the control-plane sentence once" || bad "$(basename "$f") carries the control-plane sentence $n times"
+done
+[ "$(grep -c run_in_background "$AGENT")" -ge 1 ] && ok "pi-agent.sh header names run_in_background" || bad "pi-agent.sh never names run_in_background"
+hits="$(grep -l 'Monitor tool' "$README" "$SKILL" "$DOCTRINE" "$AGENT")"
+[ -z "$hits" ] && ok "no doc or script says 'Monitor tool'" || bad "'Monitor tool' still in: $hits"
+
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

@@ -88,7 +88,9 @@ part of this workflow.
 ## Waiting without burning tokens
 
 Never poll from a Bash loop in the main thread — every poll is a tool call.
-Start the workers, then arm ONE blocking watch in the background:
+Start the workers, then arm ONE blocking watch:
+
+From main, run `pi-agent.sh watch` as a background task (`Bash(run_in_background: true)`) and follow it with Monitor; a sub-agent cannot be woken that way, so it runs `watch` in the foreground.
 
 ```
 Bash(command: "pi-agent.sh watch 15 NAME1 NAME2 …", run_in_background: true)
@@ -96,8 +98,7 @@ Bash(command: "pi-agent.sh watch 15 NAME1 NAME2 …", run_in_background: true)
 
 The command exits when nothing is in flight; the completion notification
 carries one line per state change (verified: main is woken, no polling). A
-sub-agent cannot be woken this way — inside a sub-agent run `watch` in the
-foreground, or use `pi-run.sh` for a single worker.
+sub-agent with a single worker can use `pi-run.sh` instead.
 
 A terminal line from a run whose stream carries usage includes
 `model=<provider/model> cost=$<sum> turns=<n>` summed over the whole run; the
