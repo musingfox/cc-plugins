@@ -33,8 +33,10 @@ type CardRegion =
 
 type Shown = Extract<CardRegion, { kind: 'shown' }>
 
+type Line = { kind: 'error' | 'notice'; text: string }
+
 type View = {
-  message: { kind: 'error' | 'notice'; text: string } | null
+  message: Line | null
   scope: { vault: string; project: string } | null
   cards: string[]
   selected: string | null
@@ -164,11 +166,14 @@ function bodyParts(segments: Segment[], diagrams: (string | undefined)[]): ({ ma
   return parts
 }
 
-function browserLines(browser: Browser | null): string[] {
-  if (browser?.kind === 'rendering') return ['Rendering in the browser…']
+function browserLines(browser: Browser | null): Line[] {
+  const notice = (text: string): Line => ({ kind: 'notice', text })
+  if (browser?.kind === 'error') return [{ kind: 'error', text: browser.message }]
+  if (browser?.kind === 'rendering') return [notice('Rendering in the browser…')]
   if (browser?.kind !== 'opened') return []
   // Over SSH render.sh opens nothing and prints a URL instead.
-  return browser.url ? [`Rendered: ${browser.path}`, `URL: ${browser.url}`] : [`Opened in the browser: ${browser.path}`]
+  const lines = browser.url ? [`Rendered: ${browser.path}`, `URL: ${browser.url}`] : [`Opened in the browser: ${browser.path}`]
+  return lines.map(notice)
 }
 
 type Config = { vault: string; project: string; path: string } | { error: string }
@@ -242,6 +247,7 @@ async function drawPane($: any, e: any) {
   const safe = (text: string) => bounded(text).text
   const dim = (text: string) => Text({ dimColor: true, children: [safe(text)] })
   const red = (text: string) => Text({ color: RED, children: [safe(text)] })
+  const line = ({ kind, text }: Line) => (kind === 'error' ? red(text) : dim(text))
   const span = (text: string, color?: string) => Text({ ...(color ? { color } : {}), children: [safe(text)] })
   const clipNotice = (shown: string, clippedFrom: number) => dim(`Clipped: showing ${shown.length} of ${clippedFrom} characters.`)
   const children: any[] = []
@@ -257,7 +263,7 @@ async function drawPane($: any, e: any) {
       }),
     )
   }
-  if (view.message) children.push(view.message.kind === 'error' ? red(view.message.text) : dim(view.message.text))
+  if (view.message) children.push(line(view.message))
   const card = view.card
   if (!card) return Box({ flexDirection: 'column', children })
   const columns = e.props?.bodyColumns
@@ -292,8 +298,7 @@ async function drawPane($: any, e: any) {
           },
         }),
       )
-      if (card.browser?.kind === 'error') region.push(red(card.browser.message))
-      for (const line of browserLines(card.browser)) region.push(dim(line))
+      region.push(...browserLines(card.browser).map(line))
     }
     if (body.clippedFrom !== null) region.push(clipNotice(body.text, body.clippedFrom))
     for (const part of bodyParts(card.segments, card.diagrams)) {
