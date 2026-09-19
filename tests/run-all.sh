@@ -20,6 +20,14 @@ SCRATCH="$(mktemp -d)"
 export PI_RUNS_DIR="$SCRATCH/pi-runs"
 trap 'rm -rf "$SCRATCH"' EXIT
 
+# Suites run with a scrubbed environment: the cf gate sources the flow env with
+# set -a, and cf's own integration tests read CF_BRANCH/CF_SLUG/SESSION if set.
+KEEP=("PI_RUNS_DIR=$PI_RUNS_DIR")
+for v in PATH HOME TMPDIR USER LOGNAME SHELL TERM LANG $(compgen -e | grep '^LC_'); do
+  [ -n "${!v+x}" ] && KEEP+=("$v=${!v}")
+done
+clean() { env -i "${KEEP[@]}" "$@"; }
+
 shopt -s nullglob
 total=0
 failed=0
@@ -36,7 +44,7 @@ report() {
 
 if [ -d "$ROOT/pi-dispatch/tests" ]; then
   for f in "$ROOT"/pi-dispatch/tests/*.sh; do
-    (cd "$ROOT/pi-dispatch" && bash "$f"); report $? "pi-dispatch/tests/$(basename "$f")"
+    (cd "$ROOT/pi-dispatch" && clean bash "$f"); report $? "pi-dispatch/tests/$(basename "$f")"
   done
 else
   report 1 "pi-dispatch/tests (missing)"
@@ -46,13 +54,13 @@ if ! command -v bun >/dev/null 2>&1; then
   report 1 "bun test (bun not found)"
 else
   # bun treats path arguments as filters over its cwd, so run it inside the dir.
-  (cd "$ROOT/pi-dispatch/extensions" && bun test); report $? "bun test pi-dispatch/extensions/"
+  (cd "$ROOT/pi-dispatch/extensions" && clean bun test); report $? "bun test pi-dispatch/extensions/"
 fi
 
-bash "$ROOT/context-flow/tests/run.sh"; report $? "context-flow/tests/run.sh"
+clean bash "$ROOT/context-flow/tests/run.sh"; report $? "context-flow/tests/run.sh"
 
 for f in "$ROOT"/tests/*.test.sh; do
-  (cd "$ROOT" && bash "$f"); report $? "tests/$(basename "$f")"
+  (cd "$ROOT" && clean bash "$f"); report $? "tests/$(basename "$f")"
 done
 
 echo "---"

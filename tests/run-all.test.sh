@@ -78,5 +78,14 @@ OUT="$(cd / && bash "$RUNNER" "$F" 2>&1)"; RC=$?
 check '[ "$RC" -eq 0 ]' "T7 all-passing fixture from / exits 0"
 check 'grep -q "failed: 0" <<<"$OUT"' "T7 reports failed: 0"
 
+# T8: flow variables exported by the caller never reach a suite.
+F="$(fixture t8)"
+cat > "$F/pi-dispatch/tests/env.sh" <<'SH'
+echo "LEAK=${CF_BRANCH-}${CF_SLUG-}${SESSION-}"
+SH
+OUT="$(CF_BRANCH=junk-branch CF_SLUG=junk-slug SESSION=junk-session bash "$RUNNER" "$F" 2>&1)"; RC=$?
+check '[ "$RC" -eq 0 ]' "T8 fixture passes with a flow env exported"
+check 'grep -qx "LEAK=" <<<"$OUT"' "T8 suite sees no CF_BRANCH, CF_SLUG or SESSION"
+
 echo "--- run-all: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
