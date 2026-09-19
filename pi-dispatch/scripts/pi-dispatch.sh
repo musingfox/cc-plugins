@@ -151,6 +151,32 @@ if [ ! -d "$PI_CWD" ]; then
 fi
 PI_CWD="$(abs "$PI_CWD")"
 export PI_CWD
+
+# PI_WRITABLE_FILES: extra files outside the worktree the worker may write.
+# Each entry lands raw in the SBPL profile and in the line-based routing record,
+# so anything that could break either (a quote, a backslash, a newline) is
+# refused rather than escaped. abs() prints "/<basename>" for a missing parent,
+# so the parent is checked on the raw path first.
+writable_refuse() {
+  echo "pi-dispatch: PI_WRITABLE_FILES entry '$1' $2; declare absolute, colon-separated file paths whose directory exists." >&2
+  exit 2
+}
+WRITABLE=""
+writable_env="${PI_WRITABLE_FILES:-}"
+case "$writable_env" in *$'\n'*) writable_refuse "$writable_env" "contains a newline" ;; esac
+rest="$writable_env"
+while [ -n "$rest" ]; do
+  f="${rest%%:*}"
+  case "$rest" in *:*) rest="${rest#*:}" ;; *) rest="" ;; esac
+  [ -n "$f" ] || continue
+  case "$f" in /*) ;; *) writable_refuse "$f" "is not absolute" ;; esac
+  [ -d "$(dirname "$f")" ] || writable_refuse "$f" "has no existing parent directory"
+  case "$f" in *'"'*|*'\'*) writable_refuse "$f" "contains a double quote or a backslash" ;; esac
+  [ -d "$f" ] && writable_refuse "$f" "is a directory; the unit is a file"
+  WRITABLE="${WRITABLE:+$WRITABLE:}$(abs "$f")"
+done
+PI_WRITABLE_FILES="$WRITABLE"
+export PI_WRITABLE_FILES
 # The fence: shims/git first on the worker's PATH (it needs the real git's
 # location, since it can no longer find it by scanning PATH) and the
 # write/edit extension via -e below.
@@ -219,7 +245,7 @@ START_FILE="$RUNDIR/pi-start.ts"
 mkdir -p "$SESSION_DIR"
 
 # Record the resolved routing so a later resume can replay it (see the inherit above).
-printf 'PROVIDER=%s\nMODEL=%s\nCWD=%s\n' "$PROVIDER" "$MODEL" "$PI_CWD" > "$RUNDIR/routing"
+printf 'PROVIDER=%s\nMODEL=%s\nCWD=%s\nWRITABLE=%s\n' "$PROVIDER" "$MODEL" "$PI_CWD" "$WRITABLE" > "$RUNDIR/routing"
 
 if [ ${#SANDBOX[@]} -gt 0 ]; then
   {

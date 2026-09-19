@@ -133,7 +133,7 @@ esac
 
 # --- routing is recorded ------------------------------------------------------
 got="$(cat "$R1/routing" 2>/dev/null | tr '\n' ' ')"
-[ "$got" = "PROVIDER=openai-codex MODEL=gpt-5.5 CWD=$(cd "$PI_CWD" && pwd -P) " ] \
+[ "$got" = "PROVIDER=openai-codex MODEL=gpt-5.5 CWD=$(cd "$PI_CWD" && pwd -P) WRITABLE= " ] \
   && ok "routing recorded in RUNDIR" || bad "routing file" "$got"
 
 # --- resume inherits the prior run's routing; the env must NOT hijack it ------
