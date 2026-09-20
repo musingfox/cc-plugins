@@ -187,12 +187,12 @@ describe('config', () => {
 })
 
 describe('bad card argument', () => {
-  test('a slash card name is refused before config lookup', async ($, on) => {
+  test('a name no view could carry is refused before config lookup', async ($, on) => {
     const w = world(on)
-    await issue($, 'a/b')
+    await issue($, 'a\u0001b')
     expect(w.runs).toEqual([])
     expect(w.existsCalls).toEqual([])
-    expect(await paneStrings($)).toContain('"a/b" is not a card name.')
+    expect(await paneStrings($)).toContain('"ab" is not a card name.')
   })
 
   test('a dot-dot card name is refused', async ($, on) => {
@@ -204,8 +204,23 @@ describe('bad card argument', () => {
 
   test('a bad card name is refused even without a config', async ($, on) => {
     world(on, { files: {} })
+    await issue($, '..')
+    expect(await paneStrings($)).toContain('".." is not a card name.')
+  })
+
+  test('a slash name no view carries is refused once the views are known', async ($, on) => {
+    const w = world(on)
     await issue($, 'a/b')
+    expect(w.runs.map((run: any) => run.argv)).toEqual([VIEWS_ARGV])
     expect(await paneStrings($)).toContain('"a/b" is not a card name.')
+  })
+
+  test('a view name holding a slash is queried, not refused as a card name', async ($, on) => {
+    const w = world(on, { views: 'Board / Active\ttable\nDocs\ttable\n', query: rows('pm/cc-plugins/tasks/a.md') })
+    await issue($, 'Board / Active')
+    expect(runsOf(w, 'base:query')[0].argv).toContain('view=Board / Active')
+    expect(runsOf(w, 'read')).toEqual([])
+    expect(viewSelect(await $.ui.render(PANE)).props.value).toBe('Board / Active')
   })
 
   test('spaces around a card name are trimmed and the name is read', async ($, on) => {

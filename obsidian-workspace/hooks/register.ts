@@ -71,7 +71,8 @@ async function openView($: any, scope: Scope, views: string[], chosen: string, c
   if (card) await show($, card)
 }
 async function openIssue($: any, request: number, argument: string) {
-  if (argument && isBadCardName(argument)) return showMessage($, request, `"${argument}" is not a card name.`)
+  // A name holding `/` can still be a view name, which only the dashboard's listing can tell; every other bad name is refused here.
+  if (argument && !argument.includes('/') && isBadCardName(argument)) return showMessage($, request, `"${argument}" is not a card name.`)
   let config: Config; try { config = await resolveConfig($) } catch (error) { return showMessage($, request, `Could not look for .obsidian.yaml: ${reasonOf(error)}`) }; if ('error' in config) return showMessage($, request, config.error)
   const list = viewsArgv(config.vault, config.project); if (!('argv' in list)) return showMessage($, request, list.refused === 'vault' ? `${config.path}: vault "${config.vault}" is not a vault name.` : `${config.path}: pm.project "${config.project}" cannot name a folder under pm/.`)
   const listing = viewsOutput(await runProcess($, list.argv)); if (request !== requests) return
@@ -79,7 +80,7 @@ async function openIssue($: any, request: number, argument: string) {
   // Prefixed: beside a list the query did draw, the CLI's bare complaint reads as a contradiction.
   const listingError = listing.kind === 'error' ? `The dashboard's views could not be listed: ${listing.message}` : null
   const resolved = resolveArgument(argument, names)
-  if (resolved.kind === 'card') { if (!names.length) { view = { ...LOADING, loading: false, scope: config, views: [], chosen: null, message: listing.kind === 'error' ? { kind: 'error', text: listing.message } : null, hint: listing.kind === 'error' ? pmHint(config.project) : null }; return show($, `${taskFolder(config.project)}${resolved.card}.md`) }; return openView($, config, names, defaultView(names), `${taskFolder(config.project)}${resolved.card}.md`, request, listingError) }
+  if (resolved.kind === 'card') { if (isBadCardName(resolved.card)) return showMessage($, request, `"${resolved.card}" is not a card name.`); if (!names.length) { view = { ...LOADING, loading: false, scope: config, views: [], chosen: null, message: listing.kind === 'error' ? { kind: 'error', text: listing.message } : null, hint: listing.kind === 'error' ? pmHint(config.project) : null }; return show($, `${taskFolder(config.project)}${resolved.card}.md`) }; return openView($, config, names, defaultView(names), `${taskFolder(config.project)}${resolved.card}.md`, request, listingError) }
   return openView($, config, names, resolved.kind === 'view' ? resolved.view : defaultView(names), null, request, listingError)
 }
 
