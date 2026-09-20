@@ -439,6 +439,12 @@ describe('the view switcher', () => {
     expect(runsOf(w, 'read')[0].argv).toEqual(readArgv('pm/cc-plugins/tasks/Docs.md'))
   })
 
+  test('a failed view listing carries the pm hint the missing dashboard would explain', async ($, on) => {
+    world(on, { views: { deny: 'spawn failed' } })
+    await issue($, 'Docs')
+    expect(await paneStrings($)).toContain('If pm/cc-plugins/dashboard.base is missing, run /obw:pm to create it.')
+  })
+
   test('switching views empties the list and the card before the new rows arrive', async ($, on) => {
     const w = world(on, { query: 'defer', read: CARD })
     await $.session.start(SESSION)

@@ -55,6 +55,7 @@ function configPathIn(dir: string) { return dir === '/' ? '/.obsidian.yaml' : `$
 function parentOf(dir: string) { const slash = dir.lastIndexOf('/'); return slash > 0 ? dir.slice(0, slash) : '/' }
 async function readConfig($: any, path: string): Promise<Config> { let text: string; try { text = await $.fs.read(path) } catch { return { error: `Could not read ${path}.` } }; const { vault, project } = configOf(text); if (!vault && !project) return { error: `${path} has no vault or pm.project.` }; if (!vault) return { error: `${path} has no vault.` }; if (!project) return { error: `${path} has no pm.project.` }; return { vault, project, path } }
 async function resolveConfig($: any): Promise<Config> { const cwd = await $.session.cwd(); for (let dir = cwd;; dir = parentOf(dir)) { const path = configPathIn(dir); if (await $.fs.exists(path)) return readConfig($, path); if (dir === '/') return { error: `No .obsidian.yaml in ${cwd} or any directory above it.` } } }
+function pmHint(project: string) { return `If pm/${project}/dashboard.base is missing, run /obw:pm to create it.` }
 function reasonOf(error: unknown) { return error instanceof Error ? error.message : String(error) }
 
 async function openView($: any, scope: Scope, views: string[], chosen: string, card: string | null, request = ++requests, listingError: string | null = null) {
@@ -62,7 +63,7 @@ async function openView($: any, scope: Scope, views: string[], chosen: string, c
   const built = baseQueryArgv(scope.vault, scope.project, chosen)
   if (!('argv' in built)) return showMessage($, request, `"${chosen}" is not a view.`)
   const result = baseQueryOutput(await runProcess($, built.argv)); if (request !== requests) return
-  if (result.kind === 'error') { view = { ...view, loading: false, message: { kind: 'error', text: result.message }, hint: `If pm/${scope.project}/dashboard.base is missing, run /obw:pm to create it.` }; invalidate($); return }
+  if (result.kind === 'error') { view = { ...view, loading: false, message: { kind: 'error', text: result.message }, hint: pmHint(scope.project) }; invalidate($); return }
   const cards = result.kind === 'rows' ? listRows(scope.project, result.rows) : []
   view = { message: result.kind === 'empty' || !cards.length ? { kind: 'notice', text: `No cards in the ${chosen} view of pm/${scope.project}.` } : null, hint: null, listingError, loading: false, scope, views, chosen, cards, selected: null, card: null }; invalidate($)
   if (card) await show($, card)
@@ -76,7 +77,7 @@ async function openIssue($: any, request: number, argument: string) {
   // Prefixed: beside a list the query did draw, the CLI's bare complaint reads as a contradiction.
   const listingError = listing.kind === 'error' ? `The dashboard's views could not be listed: ${listing.message}` : null
   const resolved = resolveArgument(argument, names)
-  if (resolved.kind === 'card') { if (!names.length) { view = { ...LOADING, loading: false, scope: config, views: [], chosen: null, message: listing.kind === 'error' ? { kind: 'error', text: listing.message } : null }; return show($, `${taskFolder(config.project)}${resolved.card}.md`) }; return openView($, config, names, 'Active', `${taskFolder(config.project)}${resolved.card}.md`, request, listingError) }
+  if (resolved.kind === 'card') { if (!names.length) { view = { ...LOADING, loading: false, scope: config, views: [], chosen: null, message: listing.kind === 'error' ? { kind: 'error', text: listing.message } : null, hint: listing.kind === 'error' ? pmHint(config.project) : null }; return show($, `${taskFolder(config.project)}${resolved.card}.md`) }; return openView($, config, names, 'Active', `${taskFolder(config.project)}${resolved.card}.md`, request, listingError) }
   return openView($, config, names, resolved.kind === 'view' ? resolved.view : 'Active', null, request, listingError)
 }
 
