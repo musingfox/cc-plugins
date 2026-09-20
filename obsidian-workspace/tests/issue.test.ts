@@ -406,12 +406,23 @@ describe('the view switcher', () => {
   })
 
   test('a view listing that could not be drawn is not offered', async ($, on) => {
-    world(on, { views: `${'v'.repeat(11000)}\ttable\nDocs\ttable\n` })
+    const w = world(on, { views: `${'v'.repeat(11000)}\ttable\nDocs\ttable\n` })
     await issue($, '')
     const tree = await $.ui.render(PANE)
     expect(tree.type).not.toBe('engine')
     expect(viewSelect(tree).props.options).toEqual([{ value: 'Docs', label: 'Docs' }])
+    expect(viewSelect(tree).props.value).toBe('Docs')
+    expect(runsOf(w, 'base:query')[0].argv).toContain('view=Docs')
     for (const text of stringsIn(tree)) expect(text.length).toBeLessThanOrEqual(10000)
+  })
+
+  test('a dashboard without an Active view is listed under its first view', async ($, on) => {
+    const w = world(on, { views: 'Backlog\ttable\nDocs\ttable\n', query: '[]' })
+    await issue($, '')
+    const tree = await $.ui.render(PANE)
+    expect(viewSelect(tree).props.value).toBe('Backlog')
+    expect(runsOf(w, 'base:query')[0].argv).toContain('view=Backlog')
+    expect(stringsIn(tree)).toContain('No cards in the Backlog view of pm/cc-plugins.')
   })
 
   test('a failed view listing leaves the card picker alone', async ($, on) => {
