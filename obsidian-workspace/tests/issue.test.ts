@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { PANE, cardSelect, headerIn, issue, nodesOf, runsOf, stringsIn, viewSelect } from './fixtures/pane.ts'
+import { NOT_DRAWN, PANE, cardSelect, expectDrawn, headerIn, issue, nodesOf, runsOf, stringsIn, viewSelect } from './fixtures/pane.ts'
 import { CARD, QUERY_ARGV, SESSION, VIEW_STRINGS, world } from './fixtures/world.ts'
 
 const VIEWS_ARGV = ['obsidian', 'vault=obsidian', 'base:views', 'path=pm/cc-plugins/dashboard.base']
@@ -43,6 +43,16 @@ describe('pane', () => {
     expect(w.runs).toEqual([])
     expect(w.existsCalls).toEqual([])
     expect(w.readCalls).toEqual([])
+  })
+
+  test('a pane whose drawing throws is one line, not a half-drawn tree', async ($, on) => {
+    world(on)
+    // The elements come from $.ui.resolve(e); one that throws is the only way into the pane's catch.
+    on('ui.resolve', async ($$: any, e: any, next: any) => ({ ...(await next(e)), Markdown: function Markdown() { throw new Error('no Markdown here') } }))
+    await issue($, MOD)
+    const tree = await $.ui.render(PANE)
+    expect(stringsIn(tree)).toEqual([NOT_DRAWN])
+    expect(tree.props.dimColor).toBe(true)
   })
 
   test('a pane that is not obw issue draws as it would without obw', async ($, on) => {
@@ -345,7 +355,7 @@ describe('list', () => {
     })
     await issue($, '')
     const tree = await $.ui.render(PANE)
-    expect(tree.type).not.toBe('engine')
+    expectDrawn(tree)
     expect(cardSelect(tree).props.options).toEqual([{ value: 'pm/cc-plugins/tasks/a.md', label: 'todo · a' }])
   })
 
@@ -441,7 +451,7 @@ describe('the view switcher', () => {
     const w = world(on, { views: `${'v'.repeat(11000)}\ttable\nDocs\ttable\n` })
     await issue($, '')
     const tree = await $.ui.render(PANE)
-    expect(tree.type).not.toBe('engine')
+    expectDrawn(tree)
     expect(viewSelect(tree).props.options).toEqual([{ value: 'Docs', label: 'Docs' }])
     expect(viewSelect(tree).props.value).toBe('Docs')
     expect(runsOf(w, 'base:query')[0].argv).toContain('view=Docs')
@@ -566,7 +576,7 @@ describe('card', () => {
     })
     await issue($, 'zzz')
     const tree = await $.ui.render(PANE)
-    expect(tree.type).not.toBe('engine')
+    expectDrawn(tree)
     expect(cardSelect(tree).props.value).toBe('pm/cc-plugins/tasks/zzz.md')
   })
 
@@ -610,7 +620,7 @@ describe('card', () => {
     const w = world(on)
     await issue($, 'x'.repeat(11000))
     const tree = await $.ui.render(PANE)
-    expect(tree.type).not.toBe('engine')
+    expectDrawn(tree)
     expect(runsOf(w, 'read')).toEqual([])
     expect(w.runs.length).toBe(2)
     const strings = stringsIn(tree)
@@ -748,7 +758,7 @@ describe('bounded drawing', () => {
     world(on, { read: `---\ntitle: t\n---\n${'x'.repeat(11000)}` })
     await issue($, 'k')
     const tree = await $.ui.render(PANE)
-    expect(tree.type).not.toBe('engine')
+    expectDrawn(tree)
     expect(nodesOf(tree, 'Markdown')[0].props.text.length).toBe(10000)
     expect(stringsIn(tree)).toContain('Clipped: showing 10000 of 11000 characters.')
   })

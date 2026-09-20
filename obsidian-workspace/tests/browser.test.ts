@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { CONFIG_PATH, HOME_MANIFEST, PANE, PRESS, ROOT, cardSelect, issue, nodesOf, press, renderRuns, stringsIn, vizWorld } from './fixtures/pane.ts'
+import { CONFIG_PATH, HOME_MANIFEST, PANE, PRESS, ROOT, cardSelect, expectDrawn, issue, nodesOf, press, renderRuns, stringsIn, vizWorld } from './fixtures/pane.ts'
 import { AB, CONFIG, manifest, world } from './fixtures/world.ts'
 
 const MOD = 'mod-obw-issue-pane'
@@ -31,7 +31,7 @@ describe('finding viz', () => {
     await issue($, MOD)
     expect(w.readCalls).toEqual([CONFIG_PATH])
     const tree = await $.ui.render(PANE)
-    expect(tree.type).not.toBe('engine')
+    expectDrawn(tree)
     expect(nodesOf(tree, 'Markdown').length).toBe(1)
   })
 
@@ -94,7 +94,8 @@ describe('the Open in browser button', () => {
     await issue($, MOD)
     const tree = await $.ui.render(PANE)
     expect(nodesOf(tree, 'Button').length).toBe(0)
-    expect(tree.type).not.toBe('engine')
+    expect(nodesOf(tree, 'Markdown').length).toBe(1)
+    expectDrawn(tree)
   })
 
   test('an environment that cannot be read draws no button', async ($, on) => {

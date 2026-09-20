@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { PANE, cardSelect, elementsIn, nodesOf, press, runsOf, shown, stringsIn, uvxRuns, vizWorld } from './fixtures/pane.ts'
+import { PANE, cardSelect, elementsIn, expectDrawn, nodesOf, press, runsOf, shown, stringsIn, uvxRuns, vizWorld } from './fixtures/pane.ts'
 import { AB, CARD, DIAGRAM, MERMAID_CARD, SESSION, world } from './fixtures/world.ts'
 
 const MERMAID_BODY = '# m\n\n```mermaid\ngraph LR\nA-->B\n```\n\ntail\n'
@@ -261,7 +261,7 @@ describe('a diagram that could not be drawn', () => {
     const tree = await $.ui.render(PANE)
     keepsCodeBlock(tree)
     expect(stringsIn(tree).some((text) => /termaid|uvx/.test(text))).toBe(false)
-    expect(tree.type).not.toBe('engine')
+    expectDrawn(tree)
   })
 })
 
@@ -317,7 +317,7 @@ describe('bounded diagram text', () => {
     const w = world(on, { read: MERMAID_CARD, termaid: 'y'.repeat(11000) })
     await shown($, w, 'm')
     const tree = await $.ui.render(PANE)
-    expect(tree.type).not.toBe('engine')
+    expectDrawn(tree)
     const elements = elementsIn(tree)
     const code = elements.findIndex((node) => node.type === 'Code')
     expect(elements[code].props.source.length).toBe(10000)

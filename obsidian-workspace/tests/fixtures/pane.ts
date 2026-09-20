@@ -1,3 +1,4 @@
+import { expect } from 'claude-code/testing'
 import { CONFIG, SESSION, manifest, world } from './world.ts'
 
 export const PANE = { component: 'Pane', surface: 'terminal', requestId: 'obw-issue', viewport: { columns: 160, rows: 40 }, props: { title: 'obw issue', isFocused: true, bodyColumns: 80, placement: 'inline', scroll: { offset: 0, bodyRows: 30 }, view: {} } } as const
@@ -26,6 +27,11 @@ export function nodesOf(node: any, type: string): any[] {
 export function headerIn(tree: any) {
   return nodesOf(tree, 'Text').find((node) => stringsIn(node).join('').startsWith('status: '))
 }
+
+// The line the pane's ui.render catch draws in place of the whole tree.
+export const NOT_DRAWN = 'obw: the card could not be drawn.'
+// The pane drew itself: a tree that holds that line is the catch's, whatever its root element is.
+export const expectDrawn = (tree: any) => expect(stringsIn(tree)).not.toContain(NOT_DRAWN)
 
 // The pane draws the view picker first and the card picker second; either may be absent.
 export const viewSelect = (tree: any) => nodesOf(tree, 'Select').find((node: any) => node.props.key === 'views')
