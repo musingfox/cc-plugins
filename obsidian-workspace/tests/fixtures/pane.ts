@@ -27,6 +27,15 @@ export function headerIn(tree: any) {
   return nodesOf(tree, 'Text').find((node) => stringsIn(node).join('').startsWith('status: '))
 }
 
+// The pane draws the view picker first and the card picker second; either may be absent.
+export const viewSelect = (tree: any) => nodesOf(tree, 'Select').find((node: any) => node.props.key === 'views')
+export const cardSelect = (tree: any) => nodesOf(tree, 'Select').find((node: any) => node.props.key === 'cards')
+
+// Runs by their verb, so an added obsidian call cannot shift an assertion off its target.
+export const runsOf = (w: any, verb: string) => w.runs.filter((run: any) => run.argv[0] === 'obsidian' && run.argv[2] === verb)
+export const uvxRuns = (w: any) => w.runs.filter((run: any) => run.argv[0] === 'uvx')
+export const renderRuns = (w: any) => w.runs.filter((run: any) => run.argv[0] === 'bash')
+
 export async function issue($: any, args: string) {
   await $.session.start(SESSION)
   return $.command.run({ command: 'issue', args })

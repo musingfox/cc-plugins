@@ -11,6 +11,9 @@ export const MERMAID_CARD = '---\ntitle: m\n---\n# m\n\n```mermaid\ngraph LR\nA-
 export const DIAGRAM = ' ┌─┐\n │A│\n └─┘\n'
 
 export const VIEWS = 'Active\ttable\nBlocked\ttable\nBy Parent\ttable\nRecently Completed\ttable\nBy Tag\ttable\nDocs\ttable\n'
+export const VIEW_NAMES = VIEWS.trimEnd().split('\n').map((line) => line.slice(0, line.indexOf('\t')))
+// Every string the view Select draws: each name is its own option value and label.
+export const VIEW_STRINGS = VIEW_NAMES.flatMap((name) => [name, name])
 export const QUERY_ARGV = ['obsidian', 'vault=obsidian', 'base:query', 'path=pm/cc-plugins/dashboard.base', 'view=Active', 'format=json']
 const LIST = '[{"path":"pm/cc-plugins/tasks/a.md","status":"todo"}]'
 export const AB = '[{"path":"pm/cc-plugins/tasks/a.md","status":"todo"},{"path":"pm/cc-plugins/tasks/b.md","status":"todo"}]'
