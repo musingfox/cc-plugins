@@ -20,8 +20,8 @@ type Shown = Extract<CardRegion, { kind: 'shown' }>
 type Line = { kind: 'error' | 'notice'; text: string }
 type Scope = { vault: string; project: string }
 // `loading` cannot be read off the message: the loading notice and the empty-view notice are both notices.
-type View = { message: Line | null; hint: string | null; loading: boolean; scope: Scope | null; views: string[]; chosen: string | null; cards: ReturnType<typeof listRows>; selected: string | null; card: CardRegion | null }
-const LOADING: View = { message: { kind: 'notice', text: 'Reading the vault…' }, hint: null, loading: true, scope: null, views: [], chosen: null, cards: [], selected: null, card: null }
+type View = { message: Line | null; hint: string | null; listingError: string | null; loading: boolean; scope: Scope | null; views: string[]; chosen: string | null; cards: ReturnType<typeof listRows>; selected: string | null; card: CardRegion | null }
+const LOADING: View = { message: { kind: 'notice', text: 'Reading the vault…' }, hint: null, listingError: null, loading: true, scope: null, views: [], chosen: null, cards: [], selected: null, card: null }
 let view: View = LOADING
 let requests = 0
 
@@ -57,14 +57,14 @@ async function readConfig($: any, path: string): Promise<Config> { let text: str
 async function resolveConfig($: any): Promise<Config> { const cwd = await $.session.cwd(); for (let dir = cwd;; dir = parentOf(dir)) { const path = configPathIn(dir); if (await $.fs.exists(path)) return readConfig($, path); if (dir === '/') return { error: `No .obsidian.yaml in ${cwd} or any directory above it.` } } }
 function reasonOf(error: unknown) { return error instanceof Error ? error.message : String(error) }
 
-async function openView($: any, scope: Scope, views: string[], chosen: string, card: string | null, request = ++requests) {
-  view = { ...LOADING, scope, views, chosen }; invalidate($)
+async function openView($: any, scope: Scope, views: string[], chosen: string, card: string | null, request = ++requests, listingError: string | null = null) {
+  view = { ...LOADING, scope, views, chosen, listingError }; invalidate($)
   const built = baseQueryArgv(scope.vault, scope.project, chosen)
   if (!('argv' in built)) return showMessage($, request, `"${chosen}" is not a view.`)
   const result = baseQueryOutput(await runProcess($, built.argv)); if (request !== requests) return
   if (result.kind === 'error') { view = { ...view, loading: false, message: { kind: 'error', text: result.message }, hint: `If pm/${scope.project}/dashboard.base is missing, run /obw:pm to create it.` }; invalidate($); return }
   const cards = result.kind === 'rows' ? listRows(scope.project, result.rows) : []
-  view = { message: result.kind === 'empty' || !cards.length ? { kind: 'notice', text: `No cards in the ${chosen} view of pm/${scope.project}.` } : null, hint: null, loading: false, scope, views, chosen, cards, selected: null, card: null }; invalidate($)
+  view = { message: result.kind === 'empty' || !cards.length ? { kind: 'notice', text: `No cards in the ${chosen} view of pm/${scope.project}.` } : null, hint: null, listingError, loading: false, scope, views, chosen, cards, selected: null, card: null }; invalidate($)
   if (card) await show($, card)
 }
 async function openIssue($: any, request: number, argument: string) {
@@ -73,13 +73,16 @@ async function openIssue($: any, request: number, argument: string) {
   const list = viewsArgv(config.vault, config.project); if (!('argv' in list)) return showMessage($, request, `${config.path}: pm.project "${config.project}" cannot name a folder under pm/.`)
   const listing = viewsOutput(await runProcess($, list.argv)); if (request !== requests) return
   const names = listing.kind === 'views' ? listing.views : []
+  // Prefixed: beside a list the query did draw, the CLI's bare complaint reads as a contradiction.
+  const listingError = listing.kind === 'error' ? `The dashboard's views could not be listed: ${listing.message}` : null
   const resolved = resolveArgument(argument, names)
-  if (resolved.kind === 'card') { if (!names.length) { view = { ...LOADING, loading: false, scope: config, views: [], chosen: null, message: listing.kind === 'error' ? { kind: 'error', text: listing.message } : null }; return show($, `${taskFolder(config.project)}${resolved.card}.md`) }; return openView($, config, names, 'Active', `${taskFolder(config.project)}${resolved.card}.md`, request) }
-  return openView($, config, names, resolved.kind === 'view' ? resolved.view : 'Active', null, request)
+  if (resolved.kind === 'card') { if (!names.length) { view = { ...LOADING, loading: false, scope: config, views: [], chosen: null, message: listing.kind === 'error' ? { kind: 'error', text: listing.message } : null }; return show($, `${taskFolder(config.project)}${resolved.card}.md`) }; return openView($, config, names, 'Active', `${taskFolder(config.project)}${resolved.card}.md`, request, listingError) }
+  return openView($, config, names, resolved.kind === 'view' ? resolved.view : 'Active', null, request, listingError)
 }
 
 async function drawPane($: any, e: any) {
   const { Box, Text, Select, Markdown, Button, Code } = await $.ui.resolve(e); const safe = (text: string) => bounded(text).text; const dim = (text: string) => Text({ dimColor: true, children: [safe(text)] }); const red = (text: string) => Text({ color: RED, children: [safe(text)] }); const line = ({ kind, text }: Line) => kind === 'error' ? red(text) : dim(text); const span = (text: string, color?: string) => Text({ ...(color ? { color } : {}), children: [safe(text)] }); const children: any[] = []
+  if (view.listingError) children.push(red(view.listingError))
   if (!view.loading && view.views.length && view.scope && view.chosen) children.push(Select({ key: 'views', options: view.views.map(name => ({ value: safe(name), label: safe(name) })), value: safe(view.chosen), onSelect: (name: string) => { void openView($, view.scope!, view.views, name, null).catch(() => {}) } }))
   if (view.cards.length) children.push(Select({ key: 'cards', options: view.cards.map(card => ({ value: safe(card.path), label: safe(card.label) })), ...(view.selected ? { value: safe(view.selected) } : {}), onSelect: (path: string) => { void show($, path).catch(() => {}) } }))
   if (view.message) children.push(line(view.message)); if (view.hint) children.push(dim(view.hint))

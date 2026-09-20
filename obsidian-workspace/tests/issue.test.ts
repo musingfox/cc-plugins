@@ -420,7 +420,10 @@ describe('the view switcher', () => {
     const tree = await $.ui.render(PANE)
     expect(nodesOf(tree, 'Select')).toHaveLength(1)
     expect(cardSelect(tree).props.key).toBe('cards')
-    expect(stringsIn(tree).some((text: string) => text.includes('did not run'))).toBe(false)
+    expect(stringsIn(tree)).toContain(
+      "The dashboard's views could not be listed: The obsidian CLI did not run: it is not on PATH, or it did not answer within 10 s.",
+    )
+    expect(stringsIn(tree).some((text: string) => text.includes('/obw:pm'))).toBe(false)
   })
 
   test('an argument is a card when no view could be listed', async ($, on) => {
