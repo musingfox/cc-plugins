@@ -42,6 +42,9 @@ export const runsOf = (w: any, verb: string) => w.runs.filter((run: any) => run.
 export const uvxRuns = (w: any) => w.runs.filter((run: any) => run.argv[0] === 'uvx')
 export const renderRuns = (w: any) => w.runs.filter((run: any) => run.argv[0] === 'bash')
 
+// The pane mounted: $.ui.render only draws, a mounted pane also takes the picks and presses a user makes.
+export const mounted = ($: any) => $.ui.mount({ plugin: 'obw', surface: 'terminal', component: 'Pane', props: PANE.props, requestId: PANE.requestId, viewport: PANE.viewport })
+
 export async function issue($: any, args: string) {
   await $.session.start(SESSION)
   return $.command.run({ command: 'issue', args })

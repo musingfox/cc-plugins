@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { CONFIG_PATH, HOME_MANIFEST, PANE, PRESS, ROOT, cardSelect, expectDrawn, issue, nodesOf, press, renderRuns, stringsIn, vizWorld } from './fixtures/pane.ts'
+import { CONFIG_PATH, HOME_MANIFEST, PANE, PRESS, ROOT, cardSelect, expectDrawn, issue, mounted, nodesOf, press, renderRuns, runsOf, stringsIn, vizWorld } from './fixtures/pane.ts'
 import { AB, CONFIG, manifest, world } from './fixtures/world.ts'
 
 const MOD = 'mod-obw-issue-pane'
@@ -139,10 +139,16 @@ describe('pressing Open in browser', () => {
 
   test('the temp file and page carry the folder the card was read from', async ($, on) => {
     const w = vizWorld(on, { query: '[{"path":"pm/cc-plugins/docs/a.md"}]' })
-    await issue($, 'a')
-    await press($, w)
-    expect(w.writes[0].path).toBe('/tmp/viz/obw/tasks-a.md')
-    expect(renderRuns(w)[0].argv[3]).toBe('obw-tasks-a')
+    await issue($, '')
+    const pane = await mounted($)
+    await pane.select({ key: 'cards', value: 'pm/cc-plugins/docs/a.md' })
+    await w.clock.settle()
+    await pane.redraw()
+    await pane.press({ key: 'open-in-browser' })
+    await w.clock.settle()
+    expect(runsOf(w, 'read')[0].argv[3]).toBe('path=pm/cc-plugins/docs/a.md')
+    expect(w.writes[0].path).toBe('/tmp/viz/obw/docs-a.md')
+    expect(renderRuns(w)[0].argv[3]).toBe('obw-docs-a')
   })
 
   test('a long body is written unclipped while the pane draws it clipped', async ($, on) => {
