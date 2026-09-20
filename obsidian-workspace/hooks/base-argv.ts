@@ -39,3 +39,9 @@ export function cardPathArgv(vault: string, project: string, path: string): Argv
   if (isBadCardPath(project, path)) return { refused: 'path' }
   return { argv: ['obsidian', `vault=${vault}`, 'read', `path=${path}`] }
 }
+
+export function viewsArgv(vault: string, project: string): ArgvResult {
+  if (isBadVault(vault)) return { refused: 'vault' }
+  if (isBadProject(project)) return { refused: 'project' }
+  return { argv: ['obsidian', `vault=${vault}`, 'base:views', `path=${dashboardPath(project)}`] }
+}

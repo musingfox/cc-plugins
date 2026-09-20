@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { baseQueryArgv, cardPathArgv } from '../hooks/base-argv.ts'
+import { baseQueryArgv, cardPathArgv, viewsArgv } from '../hooks/base-argv.ts'
 import { bounded } from '../hooks/bounds.ts'
 
 test('builds a dashboard query', () => expect(baseQueryArgv('obsidian', 'cc-plugins', 'Active')).toEqual({ argv: ['obsidian', 'vault=obsidian', 'base:query', 'path=pm/cc-plugins/dashboard.base', 'view=Active', 'format=json'] }))
@@ -31,3 +31,9 @@ test('never builds an ambiguous target', () => {
 })
 
 for (const path of ['pm/cc-plugins/tasks/a.md', 'pm/cc-plugins/tasks/archive/adr-three-conditions-audit.md', 'pm/cc-plugins/docs/mattpocock-skills-import.md', 'pm/cc-plugins/tasks/my card.md']) test(`preserves accepted row path ${path}`, () => expect(bounded(path).text).toBe(path))
+
+test('builds a dashboard views argv', () => expect(viewsArgv('obsidian', 'cc-plugins')).toEqual({ argv: ['obsidian', 'vault=obsidian', 'base:views', 'path=pm/cc-plugins/dashboard.base'] }))
+test('refuses an empty views vault', () => expect(viewsArgv('', 'cc-plugins')).toEqual({ refused: 'vault' }))
+test('refuses an empty views project', () => expect(viewsArgv('obsidian', '')).toEqual({ refused: 'project' }))
+test('refuses a slash in a views project', () => expect(viewsArgv('obsidian', 'a/b')).toEqual({ refused: 'project' }))
+test('refuses brackets in a views project', () => expect(viewsArgv('obsidian', 'x]y')).toEqual({ refused: 'project' }))
