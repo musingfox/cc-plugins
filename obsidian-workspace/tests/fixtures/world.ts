@@ -10,17 +10,10 @@ export const MERMAID_CARD = '---\ntitle: m\n---\n# m\n\n```mermaid\ngraph LR\nA-
 
 export const DIAGRAM = ' ┌─┐\n │A│\n └─┘\n'
 
-export const SEARCH_ARGV = [
-  'obsidian',
-  'vault=obsidian',
-  'search',
-  'query=[type:task] [project:cc-plugins] -[status:done]',
-  'path=pm/cc-plugins',
-  'format=json',
-]
-
-const LIST = '["pm/cc-plugins/tasks/a.md"]'
-export const AB = '["pm/cc-plugins/tasks/a.md","pm/cc-plugins/tasks/b.md"]'
+export const VIEWS = 'Active\ttable\nBlocked\ttable\nBy Parent\ttable\nRecently Completed\ttable\nBy Tag\ttable\nDocs\ttable\n'
+export const QUERY_ARGV = ['obsidian', 'vault=obsidian', 'base:query', 'path=pm/cc-plugins/dashboard.base', 'view=Active', 'format=json']
+const LIST = '[{"path":"pm/cc-plugins/tasks/a.md","status":"todo"}]'
+export const AB = '[{"path":"pm/cc-plugins/tasks/a.md","status":"todo"},{"path":"pm/cc-plugins/tasks/b.md","status":"todo"}]'
 
 export const CONFIG = 'vault: obsidian\npm:\n  project: cc-plugins\n'
 
@@ -39,7 +32,8 @@ export type WorldOptions = {
   cwd?: string
   files?: Record<string, string | { deny: string }>
   exists?: { deny: string }
-  search?: CliAnswer
+  views?: CliAnswer
+  query?: CliAnswer
   read?: CliAnswer
   register?: { deny: string }
   open?: { deny: string }
@@ -50,10 +44,11 @@ export type WorldOptions = {
 }
 
 // A stub world beneath the plugin: every $ call it makes is answered and recorded here.
-// `obsidian … search` and `obsidian … read` runs are answered by `search` and `read`, `uvx` runs by `termaid`,
+// `obsidian … base:views`, `base:query`, and `read` runs are answered by their matching options, `uvx` runs by `termaid`,
 // any other run by `render`.
 // `$.env.get` is answered only when `env` is given; without it the call rejects.
 export function world(on: any, options: WorldOptions = {}) {
+  for (const key of Object.keys(options)) if (!['cwd', 'files', 'exists', 'views', 'query', 'read', 'register', 'open', 'env', 'write', 'render', 'termaid'].includes(key)) throw new Error(`stale world option: ${key}`)
   const runs: any[] = []
   const existsCalls: string[] = []
   const readCalls: string[] = []
@@ -64,12 +59,13 @@ export function world(on: any, options: WorldOptions = {}) {
   const deferred = new Map<number, (stdout: string) => void>()
   const files = options.files ?? { '/work/.obsidian.yaml': CONFIG }
   const answers: Record<string, CliAnswer> = {
-    search: options.search ?? LIST,
+    'base:views': options.views ?? VIEWS,
+    'base:query': options.query ?? LIST,
     read: options.read ?? CARD,
     render: options.render ?? RENDERED,
     termaid: options.termaid ?? DIAGRAM,
   }
-  const defaults: Record<string, string> = { search: LIST, read: CARD, render: RENDERED, termaid: DIAGRAM }
+  const defaults: Record<string, string> = { 'base:views': VIEWS, 'base:query': LIST, read: CARD, render: RENDERED, termaid: DIAGRAM }
 
   on('session.start', ($: any, e: any) => ({ cwd: e.cwd }))
   const clock = mock.clock(on)
