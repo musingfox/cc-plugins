@@ -1,6 +1,6 @@
 # Obsidian Workspace
 
-Project-scoped Obsidian vault productivity for Claude Code — quick capture, long-form notes, and project management. Skills own folder layout + file templates + PM conventions, while the `/issue` Claude Mod opens unfinished task cards in a pane; vault I/O runs through the Obsidian CLI, deferring to the official `obsidian:obsidian-cli` skill for syntax. Each skill file is kept small so it doesn't burn your context budget.
+Project-scoped Obsidian vault productivity for Claude Code — quick capture, long-form notes, and project management. Skills own folder layout + file templates + PM conventions, while the `/issue` Claude Mod lists a view of the project's dashboard in a pane; vault I/O runs through the Obsidian CLI, deferring to the official `obsidian:obsidian-cli` skill for syntax. Each skill file is kept small so it doesn't burn your context budget.
 
 Plugin identifier: `obw` (skills invoked as `/obw:<name>` or via natural language).
 
@@ -21,7 +21,7 @@ Plugin identifier: `obw` (skills invoked as `/obw:<name>` or via natural languag
 
 ## Issue Pane
 
-Run `/issue` to list unfinished cards for the configured project, then select one to read its title, status, priority, and markdown body in the same pane. `/issue <card>` opens that card directly. The pane reports missing configuration, unavailable CLI output, and missing cards in place without adding vault content to the conversation.
+Run `/issue <view>` to list a view from the configured project's `dashboard.base`, created by `/obw:pm`, then select one to read its title, status, priority, and markdown body in the same pane. `/issue <card>` opens that card directly. The pane reports missing configuration, unavailable CLI output, and missing cards in place without adding vault content to the conversation.
 
 A thin rule sets the card off from the list. Status and priority are coloured labels, followed by an `AC <checked>/<total>` count when the card's Acceptance Criteria section has checkboxes. Errors are drawn in red; progress and empty-list notices stay dim.
 

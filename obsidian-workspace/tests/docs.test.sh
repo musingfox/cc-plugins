@@ -53,6 +53,22 @@ n="$(awk '/^### Obsidian Workspace/,/^### pi-dispatch/' README.md | grep -c '/is
 
 n="$(grep -cF '├── obsidian-workspace/ skills: init, jot, pm · templates, tests · hooks: register (Claude Mod)' README.md || true)"
 [ "$n" -eq 1 ] || fail "root README obw tree line count is $n, want 1"
+
+for f in obsidian-workspace/.claude-plugin/plugin.json .claude-plugin/marketplace.json obsidian-workspace/README.md README.md; do
+  n="$(grep -c 'unfinished task cards' "$f" || true)"
+  [ "$n" -eq 0 ] || fail "$f unfinished task cards count is $n, want 0"
+done
+
+n="$(awk '/^## Issue Pane/,/^## Prerequisites/' obsidian-workspace/README.md | grep -c 'dashboard.base' || true)"
+[ "$n" -ge 1 ] || fail "obw README Issue Pane must mention dashboard.base"
+n="$(awk '/^## Issue Pane/,/^## Prerequisites/' obsidian-workspace/README.md | grep -c '/obw:pm' || true)"
+[ "$n" -ge 1 ] || fail "obw README Issue Pane must mention /obw:pm"
+n="$(awk '/^## Issue Pane/,/^## Prerequisites/' obsidian-workspace/README.md | grep -c '/issue <view>' || true)"
+[ "$n" -ge 1 ] || fail "obw README Issue Pane must mention /issue <view>"
+
+n="$(git diff --name-only | grep -c '^docs/milestones/obw-issue-pane.md$' || true)"
+[ "$n" -eq 0 ] || fail "obw issue pane milestone must not be modified"
+
 n="$(grep -cF 'Built and tested against Claude Code 2.1.276.' obsidian-workspace/README.md || true)"
 [ "$n" -eq 1 ] || fail "obw README Claude Code version line count is $n, want 1"
 

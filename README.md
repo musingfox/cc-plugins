@@ -172,7 +172,7 @@ Interact with [Fizzy](https://fizzy.do) via the Fizzy CLI for project management
 ### Obsidian Workspace
 
 Personal Obsidian vault productivity — capture, notes, and project management through the Obsidian CLI:
-- **Issue Pane** (`/issue`): Claude Mod pane for selecting unfinished task cards and reading their details — coloured status and priority labels, an Acceptance Criteria count, Mermaid blocks drawn as text diagrams (`uvx termaid`), and an **Open in browser** Button that renders the card through viz
+- **Issue Pane** (`/issue`): Claude Mod pane for listing a view of the project's dashboard and reading a card's details — coloured status and priority labels, an Acceptance Criteria count, Mermaid blocks drawn as text diagrams (`uvx termaid`), and an **Open in browser** Button that renders the card through viz
 - **Jot** (`/obw:jot`): Quick capture (timestamped journal bullet) or long-form note — triages by input shape; filename strategies (title / slug / timestamp-title), `--folder` overrides per-call
 - **Project Management** (`/obw:pm`): Task/doc/ADR lifecycle, Bases dashboards, wikilink cross-references; split a spec into blocking tickets
 - **Interactive Init** (`/obw:init`): Guided setup of `.obsidian.yaml` — vault binding, note/pm sections
