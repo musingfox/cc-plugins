@@ -139,7 +139,7 @@ describe('config', () => {
   test('a project that is not one folder under pm/ is refused before any run', async ($, on) => {
     const w = world(on, { cwd: '/w', files: { '/w/.obsidian.yaml': 'vault: v\npm:\n  project: a/b\n' } })
     await issue($, '')
-    expect(await paneStrings($)).toContain('pm.project "a/b" cannot name a folder under pm/.')
+    expect(await paneStrings($)).toContain('/w/.obsidian.yaml: pm.project "a/b" cannot name a folder under pm/.')
     expect(w.runs).toEqual([])
   })
 
