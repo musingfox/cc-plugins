@@ -602,6 +602,43 @@ describe('overlapping requests', () => {
   })
 })
 
+describe('column labels are never keys', () => {
+  // A zh-TW Obsidian returns `檔案基本名稱` for file.name, and a vault owner can rename
+  // any formula's displayName, so the same rows arrive under headers the module never saw.
+  const TEMPLATE_LABELS = '[{"path":"pm/cc-plugins/tasks/a.md","Title":"A","status":"todo","priority":"high","due":null,"Days Until Due":"","tags":["x"]}]'
+  const RENAMED_LABELS = '[{"path":"pm/cc-plugins/tasks/a.md","檔案基本名稱":"A","status":"todo","優先度":"high","到期日":null,"距到期天數":"","標籤":["x"]}]'
+  const OPTIONS = [{ value: 'pm/cc-plugins/tasks/a.md', label: 'todo · a' }]
+
+  test('renaming every column header changes nothing the pane draws', async ($, on) => {
+    const w = world(on, { query: 'defer' })
+    await $.session.start(SESSION)
+
+    const template = $.command.run({ command: 'issue', args: '' })
+    await w.clock.settle()
+    w.release(1, TEMPLATE_LABELS)
+    await template
+    const withTemplateLabels = await $.ui.render(PANE)
+
+    const renamed = $.command.run({ command: 'issue', args: '' })
+    await w.clock.settle()
+    w.release(3, RENAMED_LABELS)
+    await renamed
+    const withRenamedLabels = await $.ui.render(PANE)
+
+    expect(stringsIn(withRenamedLabels)).toEqual(stringsIn(withTemplateLabels))
+    expect(cardSelect(withTemplateLabels).props.options).toEqual(OPTIONS)
+    expect(cardSelect(withRenamedLabels).props.options).toEqual(OPTIONS)
+  })
+
+  test('a display formula never becomes a card label', async ($, on) => {
+    const w = world(on, { query: RENAMED_LABELS })
+    await issue($, '')
+    const strings = await paneStrings($)
+    expect(strings).not.toContain('A')
+    expect(cardSelect(await $.ui.render(PANE)).props.options).toEqual(OPTIONS)
+  })
+})
+
 describe('bounded drawing', () => {
   const ESC = String.fromCharCode(27)
   const CR = String.fromCharCode(13)
