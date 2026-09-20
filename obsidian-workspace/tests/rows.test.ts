@@ -94,6 +94,8 @@ test('keeps null-status rows after their complete status group', () => {
     { path: 'pm/p/docs/d.md', status: null },
     { path: 'pm/p/tasks/b.md', status: 'todo' },
   ]).map(row => row.label)).toEqual(['todo · a', 'todo · b', 'd'])
+})
+
 test('uses each path below the project as a browser slug', () => {
   expect(rowSlug('cc-plugins', 'pm/cc-plugins/tasks/a.md')).toBe('tasks-a')
   expect(rowSlug('cc-plugins', 'pm/cc-plugins/docs/a.md')).toBe('docs-a')
