@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { searchOutput, readOutput, baseQueryOutput } from '../hooks/cli-output.ts'
+import { searchOutput, readOutput, baseQueryOutput, viewsOutput } from '../hooks/cli-output.ts'
 const run = (stdout: string, exitCode = 0, stderr = '') => ({ kind: 'exited' as const, exitCode, stdout, stderr })
 const closed = 'The CLI is unable to find Obsidian. Please make sure Obsidian is running and try again.\n'
 test('recognizes card search JSON', () => expect(searchOutput(run('["pm/p/tasks/a.md","pm/p/tasks/b.md"]\n'), 'p')).toEqual({ kind: 'cards', cards: ['a', 'b'] }))
@@ -21,6 +21,10 @@ test('recognizes dashboard rows without status', () => expect(baseQueryOutput(ru
 test('recognizes an empty dashboard', () => expect(baseQueryOutput(run('[]'))).toEqual({ kind: 'empty' }))
 test('rejects malformed dashboard rows', () => expect(baseQueryOutput(run('[{"path":"pm/p/tasks/a.md"},{"path":3}]'))).toEqual({ kind: 'error', message: '[{"path":"pm/p/tasks/a.md"},{"path":3}]' }))
 test('reports failed dashboard runs', () => expect(baseQueryOutput({ kind: 'rejected' })).toEqual({ kind: 'error', message: 'The obsidian CLI did not run: it is not on PATH, or it did not answer within 10 s.' }))
+test('reads dashboard view names', () => expect(viewsOutput(run('Active\ttable\nBlocked\ttable\nDocs\ttable\n'))).toEqual(['Active', 'Blocked', 'Docs']))
+test('keeps any valid dashboard view type', () => expect(viewsOutput(run('Cards\tcards\n'))).toEqual(['Cards']))
+test('drops undrawable dashboard view names', () => expect(viewsOutput(run('A\u001bB\ttable\nA\tB\ttable\nDocs\ttable\n'))).toEqual(['Docs']))
+test('drops dashboard views from failed runs', () => expect(viewsOutput({ kind: 'rejected' })).toEqual([]))
 const CARD = '---\ntitle: "Claude Mod：面板顯示 obw 的 task 與 issue"\nstatus: todo\npriority: medium\ndue:\ntags:\n  - claude-mods\ncreated: 2026-09-18\n---\n# mod-obw-issue-pane\n\n## Acceptance Criteria\n- [ ] one\n'
 test('recognizes closed card frontmatter', () => expect(readOutput(run(CARD))).toEqual({ kind: 'card', frontmatter: 'title: "Claude Mod：面板顯示 obw 的 task 與 issue"\nstatus: todo\npriority: medium\ndue:\ntags:\n  - claude-mods\ncreated: 2026-09-18', body: '# mod-obw-issue-pane\n\n## Acceptance Criteria\n- [ ] one\n' }))
 test('recognizes empty frontmatter', () => expect(readOutput(run('---\n---\nbody'))).toEqual({ kind: 'card', frontmatter: '', body: 'body' }))
