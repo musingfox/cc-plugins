@@ -518,6 +518,18 @@ describe('card', () => {
     expect(stringsIn(headerIn(tree)).join('')).toBe('status: todo · priority: —')
   })
 
+  test('a name that cannot become a card path is refused in the card region', async ($, on) => {
+    const w = world(on)
+    await issue($, 'x'.repeat(11000))
+    const tree = await $.ui.render(PANE)
+    expect(tree.type).not.toBe('engine')
+    expect(runsOf(w, 'read')).toEqual([])
+    expect(w.runs.length).toBe(2)
+    const strings = stringsIn(tree)
+    expect(strings.some((text: string) => text.startsWith('"pm/cc-plugins/tasks/xxxxxxxxxx'))).toBe(true)
+    for (const text of strings) expect(text.length).toBeLessThanOrEqual(10000)
+  })
+
   test('the card region reads "Reading <card>…" while the read runs', async ($, on) => {
     const w = world(on, { query: rows(MOD_PATH), read: 'hang' })
     await $.session.start(SESSION)
