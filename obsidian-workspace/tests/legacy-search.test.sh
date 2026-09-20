@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# The pane reads the dashboard, so no legacy search export may be named in it.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
+# The pane reads the dashboard, so no legacy search export may be named in it.
 
 fail() { echo "  ✗ $*"; exit 1; }
 
