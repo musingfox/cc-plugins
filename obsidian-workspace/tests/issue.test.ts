@@ -74,13 +74,13 @@ describe('command result', () => {
     const w = world(on, { query: rows(MOD_PATH) })
     const result = await issue($, MOD)
     expect(result).toEqual({})
-    expect(JSON.stringify(result).includes('Acceptance Criteria')).toBe(false)
+    expect((await paneStrings($)).some((s) => s.includes('Acceptance Criteria'))).toBe(true)
     expect(w.runs.length).toBe(3)
   })
 
   test('a query error returns an empty result', async ($, on) => {
     const w = world(on, { query: 'Vault not found.' })
-    expect(await issue($, '')).toEqual({})
+    expect(await issue($, MOD)).toEqual({})
     expect(runsOf(w, 'read')).toEqual([])
   })
 
