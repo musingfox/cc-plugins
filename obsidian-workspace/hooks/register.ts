@@ -19,8 +19,9 @@ type CardRegion = { kind: 'loading'; name: string } | { kind: 'error'; message: 
 type Shown = Extract<CardRegion, { kind: 'shown' }>
 type Line = { kind: 'error' | 'notice'; text: string }
 type Scope = { vault: string; project: string }
-type View = { message: Line | null; scope: Scope | null; views: string[]; chosen: string | null; cards: ReturnType<typeof listRows>; selected: string | null; card: CardRegion | null }
-const LOADING: View = { message: { kind: 'notice', text: 'Reading the vault…' }, scope: null, views: [], chosen: null, cards: [], selected: null, card: null }
+// `loading` cannot be read off the message: the loading notice and the empty-view notice are both notices.
+type View = { message: Line | null; loading: boolean; scope: Scope | null; views: string[]; chosen: string | null; cards: ReturnType<typeof listRows>; selected: string | null; card: CardRegion | null }
+const LOADING: View = { message: { kind: 'notice', text: 'Reading the vault…' }, loading: true, scope: null, views: [], chosen: null, cards: [], selected: null, card: null }
 let view: View = LOADING
 let requests = 0
 
@@ -28,7 +29,7 @@ async function runProcess($: any, argv: string[], timeoutMs = OBSIDIAN_TIMEOUT_M
   try { const result = await $.process.run(argv, { ...(stdin === undefined ? {} : { stdin }), timeoutMs }); return { kind: 'exited', exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr } } catch { return { kind: 'rejected' } }
 }
 function invalidate($: any) { $.ui.invalidate('ui.render') }
-function showMessage($: any, request: number, message: string) { if (request === requests) { view = { ...LOADING, message: { kind: 'error', text: message } }; invalidate($) } }
+function showMessage($: any, request: number, message: string) { if (request === requests) { view = { ...LOADING, loading: false, message: { kind: 'error', text: message } }; invalidate($) } }
 function showCard($: any, request: number, name: string, card: CardRegion) { if (request === requests) { view = { ...view, selected: name, card }; invalidate($) } }
 async function findViz($: any): Promise<string | null> { try { const path = vizManifestPath(await $.env.get('CLAUDE_CONFIG_DIR'), await $.env.get('HOME')); return path ? vizInstallPath(await $.fs.read(path)) : null } catch { return null } }
 
@@ -61,9 +62,9 @@ async function openView($: any, scope: Scope, views: string[], chosen: string, c
   const built = baseQueryArgv(scope.vault, scope.project, chosen)
   if (!('argv' in built)) return showMessage($, request, `"${chosen}" is not a view.`)
   const result = baseQueryOutput(await runProcess($, built.argv)); if (request !== requests) return
-  if (result.kind === 'error') { view = { ...view, message: { kind: 'error', text: result.message } }; invalidate($); return }
+  if (result.kind === 'error') { view = { ...view, loading: false, message: { kind: 'error', text: result.message } }; invalidate($); return }
   const cards = result.kind === 'rows' ? listRows(scope.project, result.rows) : []
-  view = { message: result.kind === 'empty' || !cards.length ? { kind: 'notice', text: `No cards in the ${chosen} view of pm/${scope.project}.` } : null, scope, views, chosen, cards, selected: null, card: null }; invalidate($)
+  view = { message: result.kind === 'empty' || !cards.length ? { kind: 'notice', text: `No cards in the ${chosen} view of pm/${scope.project}.` } : null, loading: false, scope, views, chosen, cards, selected: null, card: null }; invalidate($)
   if (card) await show($, card)
 }
 async function openIssue($: any, request: number, argument: string) {
@@ -72,13 +73,13 @@ async function openIssue($: any, request: number, argument: string) {
   const list = viewsArgv(config.vault, config.project); if (!('argv' in list)) return showMessage($, request, `pm.project "${config.project}" cannot name a folder under pm/.`)
   const names = viewsOutput(await runProcess($, list.argv)); if (request !== requests) return
   const resolved = resolveArgument(argument, names)
-  if (resolved.kind === 'card') { if (!names.length) { view = { ...LOADING, scope: config, views: [], chosen: null, message: null }; return show($, `${taskFolder(config.project)}${resolved.card}.md`) }; return openView($, config, names, 'Active', `${taskFolder(config.project)}${resolved.card}.md`, request) }
+  if (resolved.kind === 'card') { if (!names.length) { view = { ...LOADING, loading: false, scope: config, views: [], chosen: null, message: null }; return show($, `${taskFolder(config.project)}${resolved.card}.md`) }; return openView($, config, names, 'Active', `${taskFolder(config.project)}${resolved.card}.md`, request) }
   return openView($, config, names, resolved.kind === 'view' ? resolved.view : 'Active', null, request)
 }
 
 async function drawPane($: any, e: any) {
   const { Box, Text, Select, Markdown, Button, Code } = await $.ui.resolve(e); const safe = (text: string) => bounded(text).text; const dim = (text: string) => Text({ dimColor: true, children: [safe(text)] }); const red = (text: string) => Text({ color: RED, children: [safe(text)] }); const line = ({ kind, text }: Line) => kind === 'error' ? red(text) : dim(text); const span = (text: string, color?: string) => Text({ ...(color ? { color } : {}), children: [safe(text)] }); const children: any[] = []
-  if (view.views.length && view.scope && view.chosen) children.push(Select({ key: 'views', options: view.views.map(name => ({ value: safe(name), label: safe(name) })), value: safe(view.chosen), onSelect: (name: string) => { void openView($, view.scope!, view.views, name, null).catch(() => {}) } }))
+  if (!view.loading && view.views.length && view.scope && view.chosen) children.push(Select({ key: 'views', options: view.views.map(name => ({ value: safe(name), label: safe(name) })), value: safe(view.chosen), onSelect: (name: string) => { void openView($, view.scope!, view.views, name, null).catch(() => {}) } }))
   if (view.cards.length) children.push(Select({ key: 'cards', options: view.cards.map(card => ({ value: safe(card.path), label: safe(card.label) })), ...(view.selected ? { value: safe(view.selected) } : {}), onSelect: (path: string) => { void show($, path).catch(() => {}) } }))
   if (view.message) { children.push(line(view.message)); if (view.message.kind === 'error') children.push(dim(`If pm/${view.scope?.project ?? 'cc-plugins'}/dashboard.base is missing, run /obw:pm to create it.`)) }
   const card = view.card; if (!card) return Box({ flexDirection: 'column', children }); const columns = e.props?.bodyColumns, ruleWidth = Number.isInteger(columns) && columns > 0 ? Math.min(columns, MAX_CHARS) : 40, region: any[] = [dim('─'.repeat(ruleWidth))]
