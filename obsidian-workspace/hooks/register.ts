@@ -73,7 +73,7 @@ async function openView($: any, scope: Scope, views: string[], chosen: string, c
 async function openIssue($: any, request: number, argument: string) {
   if (argument && isBadCardName(argument)) return showMessage($, request, `"${argument}" is not a card name.`)
   let config: Config; try { config = await resolveConfig($) } catch (error) { return showMessage($, request, `Could not look for .obsidian.yaml: ${reasonOf(error)}`) }; if ('error' in config) return showMessage($, request, config.error)
-  const list = viewsArgv(config.vault, config.project); if (!('argv' in list)) return showMessage($, request, `${config.path}: pm.project "${config.project}" cannot name a folder under pm/.`)
+  const list = viewsArgv(config.vault, config.project); if (!('argv' in list)) return showMessage($, request, list.refused === 'vault' ? `${config.path}: vault "${config.vault}" is not a vault name.` : `${config.path}: pm.project "${config.project}" cannot name a folder under pm/.`)
   const listing = viewsOutput(await runProcess($, list.argv)); if (request !== requests) return
   const names = listing.kind === 'views' ? listing.views : []
   // Prefixed: beside a list the query did draw, the CLI's bare complaint reads as a contradiction.
