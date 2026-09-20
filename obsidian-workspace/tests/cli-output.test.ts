@@ -98,6 +98,9 @@ test('offers no view from a failed listing', () => {
   const listing = viewsOutput(run('Active\ttable\n', 1, closed))
   expect(namesOf(listing)).toEqual([])
   expect(listing).toEqual({ kind: 'error', message: closed.trim() })
+  const silent = viewsOutput(run('Active\ttable\n', 1))
+  expect(namesOf(silent)).toEqual([])
+  expect(silent).toEqual({ kind: 'error', message: 'Active\ttable' })
 })
 
 test('reads a dashboard that lists no view as empty', () => expect(viewsOutput(run(''))).toEqual({ kind: 'empty' }))
