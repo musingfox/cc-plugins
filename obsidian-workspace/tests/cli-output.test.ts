@@ -55,6 +55,9 @@ test('rejects successful shaped output on a failed query', () => expect(baseQuer
 test('uses stderr for a failed query that printed nothing', () =>
   expect(baseQueryOutput(run('', 1, closed))).toEqual({ kind: 'error', message: closed.trim() }))
 
+test('reports empty query output', () =>
+  expect(baseQueryOutput(run(''))).toEqual({ kind: 'error', message: 'obsidian exited 0 with no output.' }))
+
 test('reports a query that did not run', () =>
   expect(baseQueryOutput({ kind: 'rejected' })).toEqual({ kind: 'error', message: NOT_RUN }))
 
