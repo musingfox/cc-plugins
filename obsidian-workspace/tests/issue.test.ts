@@ -445,6 +445,15 @@ describe('the view switcher', () => {
     expect(await paneStrings($)).toContain('If pm/cc-plugins/dashboard.base is missing, run /obw:pm to create it.')
   })
 
+  test('a listing line that is not a view is said, not read as no views', async ($, on) => {
+    world(on, { views: 'Note: dashboard updated\nActive\ttable\n', query: rows('pm/cc-plugins/tasks/a.md') })
+    await issue($, '')
+    const tree = await $.ui.render(PANE)
+    expect(viewSelect(tree)).toBe(undefined)
+    expect(cardSelect(tree).props.key).toBe('cards')
+    expect(stringsIn(tree)).toContain("The dashboard's views could not be listed: Note: dashboard updated\nActive\ttable")
+  })
+
   test('switching views empties the list and the card before the new rows arrive', async ($, on) => {
     const w = world(on, { query: 'defer', read: CARD })
     await $.session.start(SESSION)
