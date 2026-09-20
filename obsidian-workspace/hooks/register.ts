@@ -20,8 +20,8 @@ type Shown = Extract<CardRegion, { kind: 'shown' }>
 type Line = { kind: 'error' | 'notice'; text: string }
 type Scope = { vault: string; project: string }
 // `loading` cannot be read off the message: the loading notice and the empty-view notice are both notices.
-type View = { message: Line | null; loading: boolean; scope: Scope | null; views: string[]; chosen: string | null; cards: ReturnType<typeof listRows>; selected: string | null; card: CardRegion | null }
-const LOADING: View = { message: { kind: 'notice', text: 'Reading the vault…' }, loading: true, scope: null, views: [], chosen: null, cards: [], selected: null, card: null }
+type View = { message: Line | null; hint: string | null; loading: boolean; scope: Scope | null; views: string[]; chosen: string | null; cards: ReturnType<typeof listRows>; selected: string | null; card: CardRegion | null }
+const LOADING: View = { message: { kind: 'notice', text: 'Reading the vault…' }, hint: null, loading: true, scope: null, views: [], chosen: null, cards: [], selected: null, card: null }
 let view: View = LOADING
 let requests = 0
 
@@ -62,9 +62,9 @@ async function openView($: any, scope: Scope, views: string[], chosen: string, c
   const built = baseQueryArgv(scope.vault, scope.project, chosen)
   if (!('argv' in built)) return showMessage($, request, `"${chosen}" is not a view.`)
   const result = baseQueryOutput(await runProcess($, built.argv)); if (request !== requests) return
-  if (result.kind === 'error') { view = { ...view, loading: false, message: { kind: 'error', text: result.message } }; invalidate($); return }
+  if (result.kind === 'error') { view = { ...view, loading: false, message: { kind: 'error', text: result.message }, hint: `If pm/${scope.project}/dashboard.base is missing, run /obw:pm to create it.` }; invalidate($); return }
   const cards = result.kind === 'rows' ? listRows(scope.project, result.rows) : []
-  view = { message: result.kind === 'empty' || !cards.length ? { kind: 'notice', text: `No cards in the ${chosen} view of pm/${scope.project}.` } : null, loading: false, scope, views, chosen, cards, selected: null, card: null }; invalidate($)
+  view = { message: result.kind === 'empty' || !cards.length ? { kind: 'notice', text: `No cards in the ${chosen} view of pm/${scope.project}.` } : null, hint: null, loading: false, scope, views, chosen, cards, selected: null, card: null }; invalidate($)
   if (card) await show($, card)
 }
 async function openIssue($: any, request: number, argument: string) {
@@ -81,7 +81,7 @@ async function drawPane($: any, e: any) {
   const { Box, Text, Select, Markdown, Button, Code } = await $.ui.resolve(e); const safe = (text: string) => bounded(text).text; const dim = (text: string) => Text({ dimColor: true, children: [safe(text)] }); const red = (text: string) => Text({ color: RED, children: [safe(text)] }); const line = ({ kind, text }: Line) => kind === 'error' ? red(text) : dim(text); const span = (text: string, color?: string) => Text({ ...(color ? { color } : {}), children: [safe(text)] }); const children: any[] = []
   if (!view.loading && view.views.length && view.scope && view.chosen) children.push(Select({ key: 'views', options: view.views.map(name => ({ value: safe(name), label: safe(name) })), value: safe(view.chosen), onSelect: (name: string) => { void openView($, view.scope!, view.views, name, null).catch(() => {}) } }))
   if (view.cards.length) children.push(Select({ key: 'cards', options: view.cards.map(card => ({ value: safe(card.path), label: safe(card.label) })), ...(view.selected ? { value: safe(view.selected) } : {}), onSelect: (path: string) => { void show($, path).catch(() => {}) } }))
-  if (view.message) { children.push(line(view.message)); if (view.message.kind === 'error') children.push(dim(`If pm/${view.scope?.project ?? 'cc-plugins'}/dashboard.base is missing, run /obw:pm to create it.`)) }
+  if (view.message) children.push(line(view.message)); if (view.hint) children.push(dim(view.hint))
   const card = view.card; if (!card) return Box({ flexDirection: 'column', children }); const columns = e.props?.bodyColumns, ruleWidth = Number.isInteger(columns) && columns > 0 ? Math.min(columns, MAX_CHARS) : 40, region: any[] = [dim('─'.repeat(ruleWidth))]
   if (card.kind === 'loading') region.push(dim(`Reading ${card.name}…`)); if (card.kind === 'error') region.push(red(card.message)); if (card.kind === 'shown') { const { title, status, priority } = card.header, body = bounded(card.body), ac = acLabel(card.body); region.push(Text({ bold: true, children: [safe(title ?? card.name)] })); region.push(Text({ children: [dim('status: '), span(status ?? '—', statusColor(status)), dim(' · priority: '), span(priority ?? '—', priorityColor(priority)), ...(ac ? [dim(' · '), span(ac)] : [])] })); if (card.vizRoot && e.surface === 'terminal') { region.push(Button({ key: 'open-in-browser', label: 'Open in browser', onPress: () => { void openInBrowser($).catch(() => {}) } }), ...browserLines(card.browser).map(line)) }; if (body.clippedFrom !== null) region.push(dim(`Clipped: showing ${body.text.length} of ${body.clippedFrom} characters.`)); for (const part of bodyParts(card.segments, card.diagrams)) { if ('markdown' in part) region.push(Markdown({ text: safe(part.markdown) })); else { const diagram = bounded(part.diagram); if (diagram.clippedFrom !== null) region.push(dim(`Clipped: showing ${diagram.text.length} of ${diagram.clippedFrom} characters.`)); region.push(Code({ source: diagram.text, wrap: 'truncate-end' })) } } }
   children.push(Box({ flexDirection: 'column', marginTop: 1, children: region })); return Box({ flexDirection: 'column', children })

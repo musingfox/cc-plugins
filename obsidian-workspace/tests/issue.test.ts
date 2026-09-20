@@ -150,6 +150,23 @@ describe('config', () => {
     expect(w.runs).toEqual([])
   })
 
+  test('a configuration error says nothing about /obw:pm', async ($, on) => {
+    world(on, { cwd: '/w', files: {} })
+    await issue($, '')
+    const missing = await paneStrings($)
+    expect(missing).toContain('No .obsidian.yaml in /w or any directory above it.')
+    expect(missing.some((s) => s.includes('/obw:pm'))).toBe(false)
+    expect(missing.some((s) => s.includes('cc-plugins'))).toBe(false)
+  })
+
+  test('a config without pm.project says nothing about /obw:pm', async ($, on) => {
+    world(on, { cwd: '/w', files: { '/w/.obsidian.yaml': 'vault: v\n' } })
+    await issue($, '')
+    const strings = await paneStrings($)
+    expect(strings).toContain('/w/.obsidian.yaml has no pm.project.')
+    expect(strings.some((s) => s.includes('/obw:pm'))).toBe(false)
+  })
+
   test('a failed existence check is shown, not taken for a missing file', async ($, on) => {
     const w = world(on, { exists: { deny: 'host refused' } })
     await issue($, '')
