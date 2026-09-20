@@ -276,12 +276,19 @@ describe('list', () => {
     expect(await paneStrings($)).toContain('No cards in the Docs view of pm/cc-plugins.')
   })
 
-  test('a view of rows that cannot be opened reads as empty', async ($, on) => {
+  test('a view of rows that cannot be opened says so, not that the view is empty', async ($, on) => {
     world(on, { query: '[{"path":"pm/other/tasks/a.md"}]' })
     await issue($, '')
     const tree = await $.ui.render(PANE)
     expect(cardSelect(tree)).toBe(undefined)
-    expect(stringsIn(tree)).toContain('No cards in the Active view of pm/cc-plugins.')
+    expect(stringsIn(tree)).toContain('1 row of the Active view is not a card under pm/cc-plugins and was left out.')
+    expect(stringsIn(tree)).not.toContain('No cards in the Active view of pm/cc-plugins.')
+  })
+
+  test('every row that is not a card is counted in the notice', async ($, on) => {
+    world(on, { query: '[{"path":"pm/other/tasks/a.md"},{"path":"pm/cc-plugins/notes/b.txt"}]' })
+    await issue($, '')
+    expect(await paneStrings($)).toContain('2 rows of the Active view are not cards under pm/cc-plugins and were left out.')
   })
 
   test('an empty view says nothing about /obw:pm', async ($, on) => {
@@ -362,6 +369,7 @@ describe('list', () => {
     expect(cardSelect(await $.ui.render(PANE)).props.options).toEqual([
       { value: 'pm/cc-plugins/tasks/ab.md', label: 'ab' },
     ])
+    expect(await paneStrings($)).toContain('1 row of the Active view is not a card under pm/cc-plugins and was left out.')
   })
 
   test('the pane reads "Reading the vault…" while the query runs', async ($, on) => {

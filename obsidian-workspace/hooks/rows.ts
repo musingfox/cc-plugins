@@ -29,6 +29,11 @@ export function listRows(project: string, rows: Row[]): ListRow[] {
   return [...grouped.values()].flat().concat(withoutStatus)
 }
 
+// Rows the dashboard sent that no card path can be built from: a filter widened past the project, or a row that is not a note.
+export function rowsOutside(project: string, rows: Row[]) {
+  return rows.filter((row) => isBadCardPath(project, row.path)).length
+}
+
 export function rowSlug(project: string, path: string) {
   return path.slice(`pm/${project}/`.length, -'.md'.length).replaceAll('/', '-')
 }

@@ -5,7 +5,7 @@ import { isBadCardName, taskFolder } from './argv.ts'
 import { baseQueryArgv, cardPathArgv, viewsArgv } from './base-argv.ts'
 import { baseQueryOutput, viewsOutput, readOutput, OBSIDIAN_TIMEOUT_MS } from './cli-output.ts'
 import type { Run } from './cli-output.ts'
-import { listRows, resolveArgument, rowSlug } from './rows.ts'
+import { listRows, resolveArgument, rowSlug, rowsOutside } from './rows.ts'
 import { acLabel, headerOf } from './card.ts'
 import type { CardHeader } from './card.ts'
 import { vizManifestPath, vizInstallPath, renderTarget, renderArgv, renderOutcome, RENDER_TIMEOUT_MS } from './viz.ts'
@@ -56,6 +56,8 @@ function parentOf(dir: string) { const slash = dir.lastIndexOf('/'); return slas
 async function readConfig($: any, path: string): Promise<Config> { let text: string; try { text = await $.fs.read(path) } catch { return { error: `Could not read ${path}.` } }; const { vault, project } = configOf(text); if (!vault && !project) return { error: `${path} has no vault or pm.project.` }; if (!vault) return { error: `${path} has no vault.` }; if (!project) return { error: `${path} has no pm.project.` }; return { vault, project, path } }
 async function resolveConfig($: any): Promise<Config> { const cwd = await $.session.cwd(); for (let dir = cwd;; dir = parentOf(dir)) { const path = configPathIn(dir); if (await $.fs.exists(path)) return readConfig($, path); if (dir === '/') return { error: `No .obsidian.yaml in ${cwd} or any directory above it.` } } }
 function pmHint(project: string) { return `If pm/${project}/dashboard.base is missing, run /obw:pm to create it.` }
+// Rows the dashboard sent that the pane cannot open are their own outcome, not an empty view.
+function outsideNotice(count: number, chosen: string, project: string) { return count === 1 ? `1 row of the ${chosen} view is not a card under pm/${project} and was left out.` : `${count} rows of the ${chosen} view are not cards under pm/${project} and were left out.` }
 // A dashboard whose views were renamed or reordered may have no Active view; its own first view is then the one to open.
 function defaultView(names: string[]) { return !names.length || names.includes('Active') ? 'Active' : names[0] }
 function reasonOf(error: unknown) { return error instanceof Error ? error.message : String(error) }
@@ -67,7 +69,9 @@ async function openView($: any, scope: Scope, views: string[], chosen: string, c
   const result = baseQueryOutput(await runProcess($, built.argv)); if (request !== requests) return
   if (result.kind === 'error') { view = { ...view, loading: false, message: { kind: 'error', text: result.message }, hint: pmHint(scope.project) }; invalidate($); return }
   const cards = result.kind === 'rows' ? listRows(scope.project, result.rows) : []
-  view = { message: result.kind === 'empty' || !cards.length ? { kind: 'notice', text: `No cards in the ${chosen} view of pm/${scope.project}.` } : null, hint: null, listingError, loading: false, scope, views, chosen, cards, selected: null, card: null }; invalidate($)
+  const outside = result.kind === 'rows' ? rowsOutside(scope.project, result.rows) : 0
+  const message: Line | null = outside ? { kind: 'notice', text: outsideNotice(outside, chosen, scope.project) } : !cards.length ? { kind: 'notice', text: `No cards in the ${chosen} view of pm/${scope.project}.` } : null
+  view = { message, hint: null, listingError, loading: false, scope, views, chosen, cards, selected: null, card: null }; invalidate($)
   if (card) await show($, card)
 }
 async function openIssue($: any, request: number, argument: string) {

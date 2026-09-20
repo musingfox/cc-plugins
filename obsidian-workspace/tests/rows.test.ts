@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 import { renderTarget } from '../hooks/viz.ts'
-import { listRows, resolveArgument, rowSlug } from '../hooks/rows.ts'
+import { listRows, resolveArgument, rowSlug, rowsOutside } from '../hooks/rows.ts'
 
 test('resolves an empty argument to no selection', () => {
   expect(resolveArgument('', ['Active', 'Docs'])).toEqual({ kind: 'none' })
@@ -50,6 +50,16 @@ test('deduplicates and rejects unopenable paths', () => {
     { path: 'pm/q/tasks/a.md', status: 'todo' },
     { path: 'pm/p/tasks/b\u0001.md', status: 'todo' },
   ])).toEqual([])
+})
+
+test('counts the rows no card path can be built from', () => {
+  expect(rowsOutside('p', [
+    { path: 'pm/p/tasks/a.md', status: 'todo' },
+    { path: 'pm/q/tasks/a.md', status: 'todo' },
+    { path: 'pm/p/tasks/b.txt', status: 'todo' },
+    { path: 'pm/p/tasks/c\u0001.md', status: 'todo' },
+  ])).toBe(3)
+  expect(rowsOutside('p', [{ path: 'pm/p/docs/d.md', status: null }])).toBe(0)
 })
 
 test('bounds row labels before rendering', () => {
