@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 import { priorityColor, statusColor } from '../hooks/style.ts'
-import { PANE, cardSelect, headerIn, issue, nodesOf, press, shown, stringsIn, viewSelect, vizWorld } from './fixtures/pane.ts'
+import { PANE, cardSelect, headerIn, issue, mounted, nodesOf, press, runsOf, shown, stringsIn, viewSelect, vizWorld } from './fixtures/pane.ts'
 import { AB, SESSION, VIEW_STRINGS, world } from './fixtures/world.ts'
 
 describe('statusColor', () => {
@@ -71,7 +71,11 @@ describe('the status label', () => {
     const w = world(on, { query: '[{"path":"pm/cc-plugins/docs/d.md"}]', read: '---\ntitle: d\n---\nbody\n' })
     const tree = await drawn($, w, '')
     expect(cardSelect(tree).props.options).toEqual([{ value: 'pm/cc-plugins/docs/d.md', label: 'd' }])
-    expect(stringsIn(headerIn(await drawn($, w, 'd'))).join('')).toBe('status: — · priority: —')
+    const pane = await mounted($)
+    await pane.select({ key: 'cards', value: 'pm/cc-plugins/docs/d.md' })
+    await w.clock.settle()
+    expect(runsOf(w, 'read')[0].argv[3]).toBe('path=pm/cc-plugins/docs/d.md')
+    expect(stringsIn(headerIn(await $.ui.render(PANE))).join('')).toBe('status: — · priority: —')
   })
 })
 
@@ -124,6 +128,7 @@ describe('the card separator', () => {
     expect(stringsIn(rule)).toEqual(['─'.repeat(80)])
     expect(rule.props.dimColor).toBe(true)
     const flat = JSON.stringify(tree)
+    expect(flat.indexOf('"type":"Select"')).toBeGreaterThan(-1)
     expect(flat.indexOf('"type":"Select"')).toBeLessThan(flat.indexOf('"marginTop":1'))
   })
 
