@@ -21,22 +21,41 @@ function cardPathsOf(text: string): string[] | null {
   }
 }
 
-export function searchOutput(
-  run: Run,
-  project: string,
-): { kind: 'cards'; cards: string[] } | { kind: 'empty' } | { kind: 'error'; message: string } {
+export function searchOutput(run: Run, project: string): { kind: 'cards'; cards: string[] } | { kind: 'empty' } | { kind: 'error'; message: string } {
   if (run.kind !== 'exited' || run.exitCode !== 0) return { kind: 'error', message: errorMessage(run) }
   const text = run.stdout.trim()
   if (text === 'No matches found.') return { kind: 'empty' }
   const paths = cardPathsOf(text)
   if (!paths) return { kind: 'error', message: errorMessage(run) }
   const folder = taskFolder(project)
-  const names = paths
-    .filter((path) => path.startsWith(folder) && path.endsWith('.md'))
-    .map((path) => path.slice(folder.length, -'.md'.length))
-    .filter((name) => !isBadCardName(name))
-  const cards = [...new Set(names)]
+  const cards = [...new Set(paths.filter((path) => path.startsWith(folder) && path.endsWith('.md')).map((path) => path.slice(folder.length, -3)).filter((name) => !isBadCardName(name)))]
   return cards.length ? { kind: 'cards', cards } : { kind: 'empty' }
+}
+
+type BaseRow = { path: string; status: string | null }
+
+export function baseQueryOutput(run: Run): { kind: 'rows'; rows: BaseRow[] } | { kind: 'empty' } | { kind: 'error'; message: string } {
+  if (run.kind !== 'exited' || run.exitCode !== 0) return { kind: 'error', message: errorMessage(run) }
+  try {
+    const parsed = JSON.parse(run.stdout)
+    if (!Array.isArray(parsed) || !parsed.every((row) => row && typeof row === 'object' && typeof row.path === 'string')) {
+      return { kind: 'error', message: errorMessage(run) }
+    }
+    const rows = parsed.map((row) => ({ path: row.path, status: typeof row.status === 'string' ? row.status : null }))
+    return rows.length ? { kind: 'rows', rows } : { kind: 'empty' }
+  } catch {
+    return { kind: 'error', message: errorMessage(run) }
+  }
+}
+
+export function viewsOutput(run: Run): string[] {
+  if (run.kind !== 'exited' || run.exitCode !== 0) return []
+  return run.stdout.split('\n').flatMap((line) => {
+    const tab = line.lastIndexOf('\t')
+    if (tab < 1) return []
+    const name = line.slice(0, tab)
+    return /^[^\x00-\x08\x0b-\x1f\x7f-\x9f\t\n\r]{1,10000}$/.test(name) ? [name] : []
+  })
 }
 
 function noteOf(stdout: string): { frontmatter: string; body: string } | null {

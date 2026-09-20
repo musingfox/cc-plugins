@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { searchOutput, readOutput } from '../hooks/cli-output.ts'
+import { searchOutput, readOutput, baseQueryOutput } from '../hooks/cli-output.ts'
 const run = (stdout: string, exitCode = 0, stderr = '') => ({ kind: 'exited' as const, exitCode, stdout, stderr })
 const closed = 'The CLI is unable to find Obsidian. Please make sure Obsidian is running and try again.\n'
 test('recognizes card search JSON', () => expect(searchOutput(run('["pm/p/tasks/a.md","pm/p/tasks/b.md"]\n'), 'p')).toEqual({ kind: 'cards', cards: ['a', 'b'] }))
@@ -16,6 +16,11 @@ test('uses stderr for failed search', () => expect(searchOutput(run('', 1, close
 test('rejects successful shaped output on failed search', () => expect(searchOutput(run('["pm/p/tasks/a.md"]', 1), 'p')).toEqual({ kind: 'error', message: '["pm/p/tasks/a.md"]' }))
 test('reports empty search output', () => expect(searchOutput(run(''), 'p')).toEqual({ kind: 'error', message: 'obsidian exited 0 with no output.' }))
 test('reports rejected search', () => expect(searchOutput({ kind: 'rejected' }, 'p')).toEqual({ kind: 'error', message: 'The obsidian CLI did not run: it is not on PATH, or it did not answer within 10 s.' }))
+test('recognizes dashboard rows by path and raw status', () => expect(baseQueryOutput(run('[{"path":"pm/p/tasks/a.md","Title":"A","status":"todo"}]'))).toEqual({ kind: 'rows', rows: [{ path: 'pm/p/tasks/a.md', status: 'todo' }] }))
+test('recognizes dashboard rows without status', () => expect(baseQueryOutput(run('[{"path":"pm/p/tasks/archive/x.md","Title":"X"}]'))).toEqual({ kind: 'rows', rows: [{ path: 'pm/p/tasks/archive/x.md', status: null }] }))
+test('recognizes an empty dashboard', () => expect(baseQueryOutput(run('[]'))).toEqual({ kind: 'empty' }))
+test('rejects malformed dashboard rows', () => expect(baseQueryOutput(run('[{"path":"pm/p/tasks/a.md"},{"path":3}]'))).toEqual({ kind: 'error', message: '[{"path":"pm/p/tasks/a.md"},{"path":3}]' }))
+test('reports failed dashboard runs', () => expect(baseQueryOutput({ kind: 'rejected' })).toEqual({ kind: 'error', message: 'The obsidian CLI did not run: it is not on PATH, or it did not answer within 10 s.' }))
 const CARD = '---\ntitle: "Claude Mod：面板顯示 obw 的 task 與 issue"\nstatus: todo\npriority: medium\ndue:\ntags:\n  - claude-mods\ncreated: 2026-09-18\n---\n# mod-obw-issue-pane\n\n## Acceptance Criteria\n- [ ] one\n'
 test('recognizes closed card frontmatter', () => expect(readOutput(run(CARD))).toEqual({ kind: 'card', frontmatter: 'title: "Claude Mod：面板顯示 obw 的 task 與 issue"\nstatus: todo\npriority: medium\ndue:\ntags:\n  - claude-mods\ncreated: 2026-09-18', body: '# mod-obw-issue-pane\n\n## Acceptance Criteria\n- [ ] one\n' }))
 test('recognizes empty frontmatter', () => expect(readOutput(run('---\n---\nbody'))).toEqual({ kind: 'card', frontmatter: '', body: 'body' }))
