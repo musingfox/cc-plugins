@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
-import { listRows, resolveArgument } from '../hooks/rows.ts'
+import { renderTarget } from '../hooks/viz.ts'
+import { listRows, resolveArgument, rowSlug } from '../hooks/rows.ts'
 
 test('resolves an empty argument to no selection', () => {
   expect(resolveArgument('', ['Active', 'Docs'])).toEqual({ kind: 'none' })
@@ -93,4 +94,10 @@ test('keeps null-status rows after their complete status group', () => {
     { path: 'pm/p/docs/d.md', status: null },
     { path: 'pm/p/tasks/b.md', status: 'todo' },
   ]).map(row => row.label)).toEqual(['todo · a', 'todo · b', 'd'])
+test('uses each path below the project as a browser slug', () => {
+  expect(rowSlug('cc-plugins', 'pm/cc-plugins/tasks/a.md')).toBe('tasks-a')
+  expect(rowSlug('cc-plugins', 'pm/cc-plugins/docs/a.md')).toBe('docs-a')
+  expect(renderTarget(rowSlug('p', 'pm/p/tasks/a.md')).file).toBe('/tmp/viz/obw/tasks-a.md')
+  expect(renderTarget(rowSlug('p', 'pm/p/docs/a.md')).file).toBe('/tmp/viz/obw/docs-a.md')
+  expect(rowSlug('cc-plugins', 'pm/cc-plugins/tasks/archive/adr-x.md')).toBe('tasks-archive-adr-x')
 })

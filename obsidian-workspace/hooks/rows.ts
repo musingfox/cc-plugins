@@ -28,3 +28,7 @@ export function listRows(project: string, rows: Row[]): ListRow[] {
   }
   return [...grouped.values()].flat().concat(withoutStatus)
 }
+
+export function rowSlug(project: string, path: string) {
+  return path.slice(`pm/${project}/`.length, -'.md'.length).replaceAll('/', '-')
+}
