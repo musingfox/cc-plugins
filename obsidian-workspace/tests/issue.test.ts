@@ -162,6 +162,14 @@ describe('config', () => {
     expect(w.runs).toEqual([])
   })
 
+  test('a vault too long to hand the CLI is named as the vault too', async ($, on) => {
+    world(on, { cwd: '/w', files: { '/w/.obsidian.yaml': `vault: ${'v'.repeat(11000)}\npm:\n  project: p\n` } })
+    await issue($, '')
+    const strings = await paneStrings($)
+    expect(strings.some((s) => s.startsWith('/w/.obsidian.yaml: vault "vvv'))).toBe(true)
+    expect(strings.some((s) => s.includes('pm.project'))).toBe(false)
+  })
+
   test('a config at the filesystem root is named without a doubled slash', async ($, on) => {
     const w = world(on, { cwd: '/', files: { '/.obsidian.yaml': 'vault: v\n' } })
     await issue($, '')
