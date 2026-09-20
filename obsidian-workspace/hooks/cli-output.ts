@@ -5,9 +5,12 @@ export const OBSIDIAN_TIMEOUT_MS = 10_000
 const NOT_RUN = `The obsidian CLI did not run: it is not on PATH, or it did not answer within ${OBSIDIAN_TIMEOUT_MS / 1000} s.`
 
 // Anything that is not a known success shape is shown as the CLI printed it.
+// The CLI prints its own errors on stdout with exit 0, so stdout is read first there;
+// a non-zero exit is the shell's failure and its complaint is on stderr.
 function errorMessage(run: Run) {
   if (run.kind === 'rejected') return NOT_RUN
-  return run.stdout.trim() || run.stderr.trim() || `obsidian exited ${run.exitCode} with no output.`
+  const [first, second] = run.exitCode === 0 ? [run.stdout, run.stderr] : [run.stderr, run.stdout]
+  return first.trim() || second.trim() || `obsidian exited ${run.exitCode} with no output.`
 }
 
 type BaseRow = { path: string; status: string | null }

@@ -50,7 +50,11 @@ test('passes an unknown view and its available views through', () =>
     message: 'Error: View not found: Nope\nAvailable views: Active, Blocked',
   }))
 
-test('rejects successful shaped output on a failed query', () => expect(baseQueryOutput(run('[]', 1, closed)).kind).toBe('error'))
+test('rejects successful shaped output on a failed query', () => {
+  const result = baseQueryOutput(run('[]', 1, closed))
+  expect(result.kind).toBe('error')
+  expect(result).toEqual({ kind: 'error', message: closed.trim() })
+})
 
 test('uses stderr for a failed query that printed nothing', () =>
   expect(baseQueryOutput(run('', 1, closed))).toEqual({ kind: 'error', message: closed.trim() }))
