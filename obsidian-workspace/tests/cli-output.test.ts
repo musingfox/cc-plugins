@@ -67,26 +67,43 @@ test('reports a query that did not run', () =>
 
 const VIEWS = 'Active\ttable\nBlocked\ttable\nBy Parent\ttable\nRecently Completed\ttable\nBy Tag\ttable\nDocs\ttable\n'
 const TABBED = 'A\tB\ttable\nDocs\ttable\n'
+// The names a listing offers the switcher: a listing of no known shape offers none.
+const namesOf = (listing: ReturnType<typeof viewsOutput>) => (listing.kind === 'views' ? listing.views : [])
 
-test('reads the dashboard view names in order', () =>
-  expect(viewsOutput(run(VIEWS))).toEqual(['Active', 'Blocked', 'By Parent', 'Recently Completed', 'By Tag', 'Docs']))
+test('reads the dashboard view names in order', () => {
+  expect(namesOf(viewsOutput(run(VIEWS)))).toEqual(['Active', 'Blocked', 'By Parent', 'Recently Completed', 'By Tag', 'Docs'])
+  expect(viewsOutput(run(VIEWS))).toEqual({ kind: 'views', views: ['Active', 'Blocked', 'By Parent', 'Recently Completed', 'By Tag', 'Docs'] })
+})
 
-test('does not whitelist a view type', () => expect(viewsOutput(run('Cards\tcards\n'))).toEqual(['Cards']))
+test('does not whitelist a view type', () => expect(namesOf(viewsOutput(run('Cards\tcards\n')))).toEqual(['Cards']))
 
 test('drops a view name that would be drawn stripped', () =>
-  expect(viewsOutput(run('A\u001bB\ttable\nDocs\ttable\n'))).toEqual(['Docs']))
+  expect(namesOf(viewsOutput(run('A\u001bB\ttable\nDocs\ttable\n')))).toEqual(['Docs']))
 
-test('drops a view name that still holds a tab', () => expect(viewsOutput(run(TABBED))).toEqual(['Docs']))
+test('drops a view name that still holds a tab', () => expect(namesOf(viewsOutput(run(TABBED)))).toEqual(['Docs']))
 
-test('offers no view when the base file is missing', () =>
-  expect(viewsOutput(run('Error: Base file not found: pm/p/dashboard.base'))).toEqual([]))
+test('offers no view when the base file is missing', () => {
+  const listing = viewsOutput(run('Error: Base file not found: pm/p/dashboard.base'))
+  expect(namesOf(listing)).toEqual([])
+  expect(listing).toEqual({ kind: 'error', message: 'Error: Base file not found: pm/p/dashboard.base' })
+})
 
-test('offers no view when the CLI did not run', () => expect(viewsOutput({ kind: 'rejected' })).toEqual([]))
+test('offers no view when the CLI did not run', () => {
+  const listing = viewsOutput({ kind: 'rejected' })
+  expect(namesOf(listing)).toEqual([])
+  expect(listing).toEqual({ kind: 'error', message: NOT_RUN })
+})
 
-test('offers no view from a failed listing', () => expect(viewsOutput(run('Active\ttable\n', 1))).toEqual([]))
+test('offers no view from a failed listing', () => {
+  const listing = viewsOutput(run('Active\ttable\n', 1, closed))
+  expect(namesOf(listing)).toEqual([])
+  expect(listing).toEqual({ kind: 'error', message: closed.trim() })
+})
+
+test('reads a dashboard that lists no view as empty', () => expect(viewsOutput(run(''))).toEqual({ kind: 'empty' }))
 
 test('offers only view names the query builder accepts', () => {
-  const offered = [...viewsOutput(run(VIEWS)), ...viewsOutput(run(TABBED))]
+  const offered = [...namesOf(viewsOutput(run(VIEWS))), ...namesOf(viewsOutput(run(TABBED)))]
   expect(offered).toHaveLength(7)
   for (const name of offered) expect(baseQueryArgv('obsidian', 'cc-plugins', name)).toHaveProperty('argv')
 })

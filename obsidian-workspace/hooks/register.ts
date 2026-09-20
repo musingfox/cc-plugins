@@ -71,9 +71,10 @@ async function openIssue($: any, request: number, argument: string) {
   if (argument && isBadCardName(argument)) return showMessage($, request, `"${argument}" is not a card name.`)
   let config: Config; try { config = await resolveConfig($) } catch (error) { return showMessage($, request, `Could not look for .obsidian.yaml: ${reasonOf(error)}`) }; if ('error' in config) return showMessage($, request, config.error)
   const list = viewsArgv(config.vault, config.project); if (!('argv' in list)) return showMessage($, request, `pm.project "${config.project}" cannot name a folder under pm/.`)
-  const names = viewsOutput(await runProcess($, list.argv)); if (request !== requests) return
+  const listing = viewsOutput(await runProcess($, list.argv)); if (request !== requests) return
+  const names = listing.kind === 'views' ? listing.views : []
   const resolved = resolveArgument(argument, names)
-  if (resolved.kind === 'card') { if (!names.length) { view = { ...LOADING, loading: false, scope: config, views: [], chosen: null, message: null }; return show($, `${taskFolder(config.project)}${resolved.card}.md`) }; return openView($, config, names, 'Active', `${taskFolder(config.project)}${resolved.card}.md`, request) }
+  if (resolved.kind === 'card') { if (!names.length) { view = { ...LOADING, loading: false, scope: config, views: [], chosen: null, message: listing.kind === 'error' ? { kind: 'error', text: listing.message } : null }; return show($, `${taskFolder(config.project)}${resolved.card}.md`) }; return openView($, config, names, 'Active', `${taskFolder(config.project)}${resolved.card}.md`, request) }
   return openView($, config, names, resolved.kind === 'view' ? resolved.view : 'Active', null, request)
 }
 

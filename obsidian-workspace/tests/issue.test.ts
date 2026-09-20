@@ -429,6 +429,13 @@ describe('the view switcher', () => {
     expect(runsOf(w, 'read')[0].argv).toEqual(readArgv('pm/cc-plugins/tasks/Active.md'))
   })
 
+  test('a failed view listing is said, not hidden behind the card it falls back to', async ($, on) => {
+    const w = world(on, { views: { deny: 'spawn failed' } })
+    await issue($, 'Docs')
+    expect(await paneStrings($)).toContain('The obsidian CLI did not run: it is not on PATH, or it did not answer within 10 s.')
+    expect(runsOf(w, 'read')[0].argv).toEqual(readArgv('pm/cc-plugins/tasks/Docs.md'))
+  })
+
   test('switching views empties the list and the card before the new rows arrive', async ($, on) => {
     const w = world(on, { query: 'defer', read: CARD })
     await $.session.start(SESSION)

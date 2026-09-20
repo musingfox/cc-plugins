@@ -29,14 +29,17 @@ export function baseQueryOutput(run: Run): { kind: 'rows'; rows: BaseRow[] } | {
   }
 }
 
-export function viewsOutput(run: Run): string[] {
-  if (run.kind !== 'exited' || run.exitCode !== 0) return []
-  return run.stdout.split('\n').flatMap((line) => {
-    const tab = line.lastIndexOf('\t')
-    if (tab < 1) return []
-    const name = line.slice(0, tab)
+// A listing is one `name\ttype` per line; a line of any other shape is the CLI
+// saying something else, which is shown rather than read as "this dashboard has no view".
+export function viewsOutput(run: Run): { kind: 'views'; views: string[] } | { kind: 'empty' } | { kind: 'error'; message: string } {
+  if (run.kind !== 'exited' || run.exitCode !== 0) return { kind: 'error', message: errorMessage(run) }
+  const lines = run.stdout.split('\n').filter((line) => line.trim() !== '')
+  if (lines.some((line) => line.lastIndexOf('\t') < 1)) return { kind: 'error', message: errorMessage(run) }
+  const views = lines.flatMap((line) => {
+    const name = line.slice(0, line.lastIndexOf('\t'))
     return /^[^\x00-\x08\x0b-\x1f\x7f-\x9f\t\n\r]{1,10000}$/.test(name) ? [name] : []
   })
+  return views.length ? { kind: 'views', views } : { kind: 'empty' }
 }
 
 function noteOf(stdout: string): { frontmatter: string; body: string } | null {
