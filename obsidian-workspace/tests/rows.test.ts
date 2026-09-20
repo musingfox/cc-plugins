@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { resolveArgument } from '../hooks/rows.ts'
+import { listRows, resolveArgument } from '../hooks/rows.ts'
 
 test('resolves an empty argument to no selection', () => {
   expect(resolveArgument('', ['Active', 'Docs'])).toEqual({ kind: 'none' })
@@ -16,4 +16,81 @@ test('resolves other arguments as case-sensitive card names', () => {
   expect(resolveArgument('mod-obw-issue-pane', ['Active', 'Docs'])).toEqual({ kind: 'card', card: 'mod-obw-issue-pane' })
   expect(resolveArgument('docs', ['Active', 'Docs'])).toEqual({ kind: 'card', card: 'docs' })
   expect(resolveArgument('Active', [])).toEqual({ kind: 'card', card: 'Active' })
+})
+
+test('lists paths by status and basename', () => {
+  expect(listRows('p', [
+    { path: 'pm/p/tasks/a.md', status: 'doing' },
+    { path: 'pm/p/tasks/b.md', status: 'todo' },
+    { path: 'pm/p/tasks/c.md', status: 'doing' },
+  ])).toEqual([
+    { path: 'pm/p/tasks/a.md', label: 'doing · a', status: 'doing' },
+    { path: 'pm/p/tasks/c.md', label: 'doing · c', status: 'doing' },
+    { path: 'pm/p/tasks/b.md', label: 'todo · b', status: 'todo' },
+  ])
+})
+
+test('puts rows without a status last', () => {
+  expect(listRows('p', [
+    { path: 'pm/p/docs/d.md', status: null },
+    { path: 'pm/p/tasks/a.md', status: 'todo' },
+  ])).toEqual([
+    { path: 'pm/p/tasks/a.md', label: 'todo · a', status: 'todo' },
+    { path: 'pm/p/docs/d.md', label: 'd', status: null },
+  ])
+})
+
+test('deduplicates and rejects unopenable paths', () => {
+  expect(listRows('p', [
+    { path: 'pm/p/tasks/a.md', status: 'todo' },
+    { path: 'pm/p/tasks/a.md', status: 'todo' },
+  ])).toEqual([{ path: 'pm/p/tasks/a.md', label: 'todo · a', status: 'todo' }])
+  expect(listRows('p', [
+    { path: 'pm/q/tasks/a.md', status: 'todo' },
+    { path: 'pm/p/tasks/b\u0001.md', status: 'todo' },
+  ])).toEqual([])
+})
+
+test('bounds row labels before rendering', () => {
+  const [row] = listRows('p', [{ path: 'pm/p/tasks/a.md', status: 'x'.repeat(11000) }])
+  expect(row.label).toHaveLength(10000)
+})
+
+test('keeps dashboard status groups in their arrival order', () => {
+  expect(listRows('p', [
+    { path: 'pm/p/tasks/a.md', status: 'todo' },
+    { path: 'pm/p/tasks/b.md', status: 'doing' },
+  ]).map(row => row.label)).toEqual(['todo · a', 'doing · b'])
+})
+
+test('keeps rows in their dashboard status group order', () => {
+  expect(listRows('p', [
+    { path: 'pm/p/tasks/a.md', status: 'todo' },
+    { path: 'pm/p/tasks/b.md', status: 'doing' },
+    { path: 'pm/p/tasks/c.md', status: 'todo' },
+    { path: 'pm/p/tasks/d.md', status: 'blocked' },
+  ]).map(row => row.label)).toEqual(['todo · a', 'todo · c', 'doing · b', 'blocked · d'])
+})
+
+test('does not own a status vocabulary', () => {
+  expect(listRows('p', [
+    { path: 'pm/p/tasks/a.md', status: 'zeta' },
+    { path: 'pm/p/tasks/b.md', status: 'alpha' },
+  ]).map(row => row.label)).toEqual(['zeta · a', 'alpha · b'])
+})
+
+test('keeps null-status dashboard rows in their arrival order', () => {
+  expect(listRows('p', [
+    { path: 'pm/p/docs/d.md', status: null },
+    { path: 'pm/p/docs/e.md', status: null },
+    { path: 'pm/p/docs/f.md', status: null },
+  ]).map(row => row.label)).toEqual(['d', 'e', 'f'])
+})
+
+test('keeps null-status rows after their complete status group', () => {
+  expect(listRows('p', [
+    { path: 'pm/p/tasks/a.md', status: 'todo' },
+    { path: 'pm/p/docs/d.md', status: null },
+    { path: 'pm/p/tasks/b.md', status: 'todo' },
+  ]).map(row => row.label)).toEqual(['todo · a', 'todo · b', 'd'])
 })
