@@ -113,3 +113,29 @@ describe('grouped All Tasks', () => {
     ])
   })
 })
+
+describe('other views', () => {
+  test('picking Active draws the flat list', async ($, on) => {
+    const w = world(on, { query: JSON.stringify(MIX) })
+    await issue($, '')
+    await pick($, w, 'views', 'Active')
+    expect(cardSelect(await $.ui.render(PANE)).props.options).toEqual([
+      { value: P('g'), label: 'waiting · g' },
+      { value: P('a'), label: 'todo · a' },
+      { value: P('b'), label: 'todo · b' },
+      { value: P('i'), label: 'todo · i' },
+      { value: P('j'), label: 'todo · j' },
+      { value: P('c'), label: 'in-progress · c' },
+      { value: P('d'), label: 'blocked · d' },
+      { value: P('e'), label: 'done · e' },
+      { value: P('f'), label: 'done · f' },
+      { value: P('h'), label: 'h' },
+    ])
+  })
+
+  test('/issue Active has no heading options', async ($, on) => {
+    world(on, { query: JSON.stringify(MIX) })
+    await issue($, 'Active')
+    expect(cardSelect(await $.ui.render(PANE)).props.options.some((option: any) => option.value.startsWith('#'))).toBe(false)
+  })
+})
