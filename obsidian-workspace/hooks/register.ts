@@ -5,7 +5,7 @@ import { isBadCardName, taskFolder } from './argv.ts'
 import { baseQueryArgv, cardPathArgv, viewsArgv } from './base-argv.ts'
 import { baseQueryOutput, viewsOutput, readOutput, OBSIDIAN_TIMEOUT_MS } from './cli-output.ts'
 import type { Run } from './cli-output.ts'
-import { listRows, resolveArgument, rowSlug, rowsOutside } from './rows.ts'
+import { listRows, resolveArgument, rowNamed, rowSlug, rowsOutside } from './rows.ts'
 import { acLabel, headerOf } from './card.ts'
 import type { CardHeader } from './card.ts'
 import { vizManifestPath, vizInstallPath, renderTarget, renderArgv, renderOutcome, RENDER_TIMEOUT_MS } from './viz.ts'
@@ -248,11 +248,21 @@ function defaultView(names: string[]) {
   return !names.length || names.includes('Active') ? 'Active' : names[0]
 }
 
+// The argument names a row wherever the view put it; a name no row carries falls back to the task folder.
+function cardPathIn(cards: ReturnType<typeof listRows>, project: string, name: string) {
+  return rowNamed(cards, project, name) ?? `${taskFolder(project)}${name}.md`
+}
+
+// A card argument stays on the view the pane is already showing, so the row the user is looking at is the row it opens.
+function shownView(chosen: string | null, names: string[]) {
+  return chosen && names.includes(chosen) ? chosen : defaultView(names)
+}
+
 function reasonOf(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
 
-async function openView($: any, scope: Scope, views: string[], chosen: string, card: string | null, request = ++requests, listingError: string | null = null) {
+async function openView($: any, scope: Scope, views: string[], chosen: string, named: string | null, request = ++requests, listingError: string | null = null) {
   view = { ...LOADING, scope, views, chosen, listingError }
   invalidate($)
   const built = baseQueryArgv(scope.vault, scope.project, chosen)
@@ -273,10 +283,10 @@ async function openView($: any, scope: Scope, views: string[], chosen: string, c
       : null
   view = { message, hint: null, listingError, loading: false, scope, views, chosen, cards, selected: null, card: null }
   invalidate($)
-  if (card) await show($, card)
+  if (named) await show($, cardPathIn(cards, scope.project, named))
 }
 
-async function openIssue($: any, request: number, argument: string) {
+async function openIssue($: any, request: number, argument: string, chosen: string | null) {
   // A name holding `/` can still be a view name, which only the dashboard's listing can tell; every other bad name is refused here.
   if (argument && !argument.includes('/') && isBadCardName(argument)) return showMessage($, request, `"${argument}" is not a card name.`)
   let config: Config
@@ -316,7 +326,7 @@ async function openIssue($: any, request: number, argument: string) {
       }
       return show($, `${taskFolder(config.project)}${resolved.card}.md`)
     }
-    return openView($, config, names, defaultView(names), `${taskFolder(config.project)}${resolved.card}.md`, request, listingError)
+    return openView($, config, names, shownView(chosen, names), resolved.card, request, listingError)
   }
   return openView($, config, names, resolved.kind === 'view' ? resolved.view : defaultView(names), null, request, listingError)
 }
@@ -424,6 +434,7 @@ export function register(on: On) {
 
   on('command.run', { command: 'issue' }, async ($, e) => {
     const argument = (e.args ?? '').trim()
+    const chosen = view.chosen
     const request = ++requests
     view = LOADING
     try {
@@ -431,7 +442,7 @@ export function register(on: On) {
     } catch {
       return { text: 'obw: the /issue pane could not open.' }
     }
-    await openIssue($, request, argument)
+    await openIssue($, request, argument, chosen)
     // Card text never goes into the result: the model would read it.
     return {}
   })

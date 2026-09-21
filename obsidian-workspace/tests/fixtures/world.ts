@@ -38,6 +38,7 @@ export type WorldOptions = {
   views?: CliAnswer
   query?: CliAnswer
   read?: CliAnswer
+  reads?: Record<string, CliAnswer>
   register?: { deny: string }
   open?: { deny: string }
   env?: Record<string, string>
@@ -46,12 +47,19 @@ export type WorldOptions = {
   termaid?: CliAnswer
 }
 
+// A read of a path the `reads` option does not name is the CLI's own miss, so a test that expects the
+// wrong path cannot pass on another card's text.
+function readAnswer(reads: Record<string, CliAnswer>, argv: string[]): CliAnswer {
+  const path = argv[3].slice('path='.length)
+  return reads[path] ?? `Error: File "${path}" not found.\n`
+}
+
 // A stub world beneath the plugin: every $ call it makes is answered and recorded here.
 // `obsidian … base:views`, `base:query`, and `read` runs are answered by their matching options, `uvx` runs by `termaid`,
-// any other run by `render`.
+// any other run by `render`; `reads` answers each card path on its own, where `read` answers every path alike.
 // `$.env.get` is answered only when `env` is given; without it the call rejects.
 export function world(on: any, options: WorldOptions = {}) {
-  for (const key of Object.keys(options)) if (!['cwd', 'files', 'exists', 'views', 'query', 'read', 'register', 'open', 'env', 'write', 'render', 'termaid'].includes(key)) throw new Error(`stale world option: ${key}`)
+  for (const key of Object.keys(options)) if (!['cwd', 'files', 'exists', 'views', 'query', 'read', 'reads', 'register', 'open', 'env', 'write', 'render', 'termaid'].includes(key)) throw new Error(`stale world option: ${key}`)
   const runs: any[] = []
   const existsCalls: string[] = []
   const readCalls: string[] = []
@@ -104,7 +112,7 @@ export function world(on: any, options: WorldOptions = {}) {
   on('process.run', async ($: any, e: any) => {
     runs.push(e)
     const verb = e.argv[0] === 'obsidian' ? e.argv[2] : e.argv[0] === 'uvx' ? 'termaid' : 'render'
-    const answer = answers[verb]
+    const answer = verb === 'read' && options.reads ? readAnswer(options.reads, e.argv) : answers[verb]
     if (answer === undefined) return { deny: `no answer for ${verb}` }
     if (answer === 'defer') {
       const stdout = await new Promise<string>((resolve) => deferred.set(runs.length - 1, resolve))

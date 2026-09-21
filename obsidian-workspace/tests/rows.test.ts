@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 import { renderTarget } from '../hooks/viz.ts'
-import { listRows, resolveArgument, rowSlug, rowsOutside } from '../hooks/rows.ts'
+import { listRows, resolveArgument, rowNamed, rowSlug, rowsOutside } from '../hooks/rows.ts'
 
 test('resolves an empty argument to no selection', () => {
   expect(resolveArgument('', ['Active', 'Docs'])).toEqual({ kind: 'none' })
@@ -50,6 +50,19 @@ test('deduplicates and rejects unopenable paths', () => {
     { path: 'pm/q/tasks/a.md', status: 'todo' },
     { path: 'pm/p/tasks/b\u0001.md', status: 'todo' },
   ])).toEqual([])
+})
+
+test('finds the row a name points at, wherever the view put it', () => {
+  const rows = listRows('p', [{ path: 'pm/p/docs/d.md', status: null }, { path: 'pm/p/tasks/archive/c.md', status: 'done' }])
+  expect(rowNamed(rows, 'p', 'd')).toBe('pm/p/docs/d.md')
+  expect(rowNamed(rows, 'p', 'c')).toBe('pm/p/tasks/archive/c.md')
+  expect(rowNamed(rows, 'p', 'nope')).toBe(null)
+  expect(rowNamed([], 'p', 'd')).toBe(null)
+})
+
+test('keeps the task folder for a name two folders spell the same', () => {
+  const rows = listRows('p', [{ path: 'pm/p/docs/a.md', status: null }, { path: 'pm/p/tasks/a.md', status: 'todo' }])
+  expect(rowNamed(rows, 'p', 'a')).toBe('pm/p/tasks/a.md')
 })
 
 test('counts the rows no card path can be built from', () => {

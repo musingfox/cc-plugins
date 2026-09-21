@@ -562,10 +562,29 @@ describe('card', () => {
   })
 
   test('a card read with no status in its frontmatter reads two dashes', async ($, on) => {
-    const w = world(on, { query: '[{"path":"pm/cc-plugins/docs/d.md"}]', read: '---\ntitle: d\n---\nbody\n' })
+    const w = world(on, { query: '[{"path":"pm/cc-plugins/docs/d.md"}]', reads: { 'pm/cc-plugins/docs/d.md': '---\ntitle: d\n---\nbody\n' } })
     await issue($, 'd')
-    expect(runsOf(w, 'read')[0].argv).toEqual(readArgv('pm/cc-plugins/tasks/d.md'))
+    expect(runsOf(w, 'read')[0].argv).toEqual(readArgv('pm/cc-plugins/docs/d.md'))
     expect(stringsIn(headerIn(await $.ui.render(PANE))).join('')).toBe('status: — · priority: —')
+  })
+
+  test('a name the shown view listed is read where that view put it', async ($, on) => {
+    const doc = 'pm/cc-plugins/docs/mattpocock-skills-import.md'
+    const w = world(on, { query: `[{"path":"${doc}"}]`, reads: { [doc]: '---\ntitle: skills import\n---\nbody\n' } })
+    await issue($, 'Docs')
+    await $.command.run({ command: 'issue', args: 'mattpocock-skills-import' })
+    expect(runsOf(w, 'base:query')[1].argv).toContain('view=Docs')
+    expect(runsOf(w, 'read')[0].argv).toEqual(readArgv(doc))
+    const strings = await paneStrings($)
+    expect(strings).toContain('skills import')
+    expect(strings.some((s) => s.includes('not found'))).toBe(false)
+  })
+
+  test('a name no row of the view carries is read from the task folder', async ($, on) => {
+    const w = world(on, { query: rows('pm/cc-plugins/docs/d.md'), reads: { 'pm/cc-plugins/tasks/zzz.md': CARD } })
+    await issue($, 'zzz')
+    expect(runsOf(w, 'read')[0].argv).toEqual(readArgv('pm/cc-plugins/tasks/zzz.md'))
+    expect(cardSelect(await $.ui.render(PANE)).props.value).toBe('pm/cc-plugins/tasks/zzz.md')
   })
 
   test('a missing card is a message under the list, with no body', async ($, on) => {

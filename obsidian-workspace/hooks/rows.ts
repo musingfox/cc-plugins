@@ -1,3 +1,4 @@
+import { taskFolder } from './argv.ts'
 import { isBadCardPath } from './base-argv.ts'
 import { bounded } from './bounds.ts'
 
@@ -9,6 +10,19 @@ export function resolveArgument(argument: string, views: string[]): { kind: 'non
   return views.includes(argument) ? { kind: 'view', view: argument } : { kind: 'card', card: argument }
 }
 
+function cardName(path: string) {
+  return path.slice(path.lastIndexOf('/') + 1, -'.md'.length)
+}
+
+// The row an argument names: a view can list a card from any folder under the project, so the name the
+// pane drew is the one to match. Two folders can spell one name, and the task folder keeps it.
+export function rowNamed(rows: ListRow[], project: string, name: string): string | null {
+  const named = rows.filter((row) => cardName(row.path) === name)
+  const task = `${taskFolder(project)}${name}.md`
+  if (named.some((row) => row.path === task)) return task
+  return named.length ? named[0].path : null
+}
+
 export function listRows(project: string, rows: Row[]): ListRow[] {
   const paths = new Set<string>()
   const grouped = new Map<string, ListRow[]>()
@@ -17,7 +31,7 @@ export function listRows(project: string, rows: Row[]): ListRow[] {
     if (paths.has(row.path) || isBadCardPath(project, row.path)) continue
     paths.add(row.path)
     const status = typeof row.status === 'string' ? row.status : null
-    const name = row.path.slice(row.path.lastIndexOf('/') + 1, -'.md'.length)
+    const name = cardName(row.path)
     const listed = { path: row.path, label: bounded(status ? `${status} · ${name}` : name).text, status }
     if (status === null) withoutStatus.push(listed)
     else {
