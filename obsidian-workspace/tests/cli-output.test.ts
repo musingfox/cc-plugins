@@ -12,22 +12,40 @@ test('removes legacy search output but keeps reads', () => {
   expect('readOutput' in out).toBe(true)
 })
 
-test('takes a row from its path and raw status, not its labels', () =>
+test('takes a row from its path and raw status and priority, not its labels', () =>
   expect(baseQueryOutput(run('[{"path":"pm/p/tasks/a.md","Title":"A","status":"todo","priority":"high","due":null,"Days Until Due":"","tags":["x"]}]'))).toEqual({
     kind: 'rows',
-    rows: [{ path: 'pm/p/tasks/a.md', status: 'todo' }],
+    rows: [{ path: 'pm/p/tasks/a.md', status: 'todo', priority: 'high' }],
   }))
 
 test('reads a row with no status key as no status', () =>
   expect(baseQueryOutput(run('[{"path":"pm/p/tasks/archive/x.md","Title":"X","completed":"2026-09-01","tags":[]}]'))).toEqual({
     kind: 'rows',
-    rows: [{ path: 'pm/p/tasks/archive/x.md', status: null }],
+    rows: [{ path: 'pm/p/tasks/archive/x.md', status: null, priority: null }],
   }))
 
 test('reads a null status as no status', () =>
   expect(baseQueryOutput(run('[{"path":"pm/p/docs/d.md","Title":"D","type":"doc","status":null,"updated":"2026-09-19"}]'))).toEqual({
     kind: 'rows',
-    rows: [{ path: 'pm/p/docs/d.md', status: null }],
+    rows: [{ path: 'pm/p/docs/d.md', status: null, priority: null }],
+  }))
+
+test('reads a non-string priority as no priority', () =>
+  expect(baseQueryOutput(run('[{"path":"pm/p/tasks/b.md","status":"todo","priority":1}]'))).toEqual({
+    kind: 'rows',
+    rows: [{ path: 'pm/p/tasks/b.md', status: 'todo', priority: null }],
+  }))
+
+test('reads raw priority, not a Priority label', () => {
+  const result = baseQueryOutput(run('[{"path":"pm/p/tasks/c.md","Priority":"high","priority":"low"}]'))
+  expect(result.kind).toBe('rows')
+  if (result.kind === 'rows') expect(result.rows[0].priority).toBe('low')
+})
+
+test('passes a missing All Tasks view through', () =>
+  expect(baseQueryOutput(run('Error: View not found: All Tasks\nAvailable views: Active'))).toEqual({
+    kind: 'error',
+    message: 'Error: View not found: All Tasks\nAvailable views: Active',
   }))
 
 test('reads an empty dashboard answer as empty', () => expect(baseQueryOutput(run('[]'))).toEqual({ kind: 'empty' }))
