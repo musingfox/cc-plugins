@@ -106,3 +106,17 @@ test('draws only the priorities that have a card', () =>
     { value: '#p0.0', label: '  medium' },
     { value: P('a'), label: '    a' },
   ]))
+
+test('shows done as a count heading with no cards or sub-headings', () => {
+  const options = groupedOptions('cc-plugins', MIX)
+  expect(options).toContainEqual({ value: '#3', label: 'done (2)' })
+  expect(options.map((option) => option.value)).not.toContain(P('e'))
+  expect(options.map((option) => option.value)).not.toContain(P('f'))
+  expect(options[options.findIndex((option) => option.value === '#3') + 1].value).toBe('#4')
+  expect(options.some((option) => option.value.startsWith('#p3.'))).toBe(false)
+})
+
+test('a listing of only done cards is just the heading', () =>
+  expect(groupedOptions('cc-plugins', [{ path: P('e'), status: 'done', priority: 'high' }])).toEqual([
+    { value: '#0', label: 'done (1)' },
+  ]))
