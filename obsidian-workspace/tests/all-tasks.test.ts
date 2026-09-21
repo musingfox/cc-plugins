@@ -154,6 +154,18 @@ describe('opening a grouped card', () => {
   })
 })
 
+describe('done cards', () => {
+  test('/issue still opens a done card that the list hides', async ($, on) => {
+    const w = world(on, { query: JSON.stringify(MIX), read: CARD })
+    await issue($, 'e')
+    const tree = await $.ui.render(PANE)
+    expect(runsOf(w, 'read')[0].argv[3]).toBe('path=pm/cc-plugins/tasks/e.md')
+    expect(nodesOf(tree, 'Markdown')).toHaveLength(1)
+    expect(cardSelect(tree).props.options.map((option: any) => option.value)).not.toContain(P('e'))
+    expectDrawn(tree)
+  })
+})
+
 describe('heading picks', () => {
   test('picking a status heading changes nothing', async ($, on) => {
     const w = world(on, { query: JSON.stringify(MIX) })
