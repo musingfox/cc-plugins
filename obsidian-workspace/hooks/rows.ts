@@ -23,13 +23,19 @@ export function rowNamed(rows: ListRow[], project: string, name: string): string
   return named.length ? named[0].path : null
 }
 
-export function listRows(project: string, rows: Row[]): ListRow[] {
+export function keptRows<R extends Row>(project: string, rows: R[]): R[] {
   const paths = new Set<string>()
+  return rows.filter((row) => {
+    if (paths.has(row.path) || isBadCardPath(project, row.path)) return false
+    paths.add(row.path)
+    return true
+  })
+}
+
+export function listRows(project: string, rows: Row[]): ListRow[] {
   const grouped = new Map<string, ListRow[]>()
   const withoutStatus: ListRow[] = []
-  for (const row of rows) {
-    if (paths.has(row.path) || isBadCardPath(project, row.path)) continue
-    paths.add(row.path)
+  for (const row of keptRows(project, rows)) {
     const status = typeof row.status === 'string' ? row.status : null
     const name = cardName(row.path)
     const listed = { path: row.path, label: bounded(status ? `${status} · ${name}` : name).text, status }
