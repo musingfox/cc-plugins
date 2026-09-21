@@ -1,10 +1,10 @@
 ---
 id: obsidian-cli-never-empty-target
-status: proposed
+status: accepted
 scope:
   - "obsidian-workspace/**"
 verify: null
-related: [obsidian-cli-output-classified-positively]
+related: [obsidian-cli-output-classified-positively, base-rows-keyed-by-path-not-labels]
 source: obw-issue-pane
 adr: null
 ---

@@ -1,6 +1,6 @@
 ---
 id: mod-ui-text-within-element-bounds
-status: proposed
+status: accepted
 scope:
   - "obsidian-workspace/hooks/**"
 verify: null
