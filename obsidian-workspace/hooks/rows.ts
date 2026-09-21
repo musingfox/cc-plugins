@@ -1,4 +1,4 @@
-import { taskFolder } from './argv.ts'
+import { projectRoot, taskFolder } from './argv.ts'
 import { isBadCardPath } from './base-argv.ts'
 import { bounded } from './bounds.ts'
 
@@ -50,5 +50,5 @@ export function rowsOutside(project: string, rows: Row[]) {
 }
 
 export function rowSlug(project: string, path: string) {
-  return path.slice(`pm/${project}/`.length, -'.md'.length).replaceAll('/', '-')
+  return path.slice(projectRoot(project).length, -'.md'.length).replaceAll('/', '-')
 }
