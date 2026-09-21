@@ -75,6 +75,14 @@ test('counts the rows no card path can be built from', () => {
   expect(rowsOutside('p', [{ path: 'pm/p/docs/d.md', status: null }])).toBe(0)
 })
 
+test('counts one left-out row per path, as the list keeps one option per path', () => {
+  expect(rowsOutside('p', [
+    { path: 'pm/q/tasks/a.md', status: 'todo' },
+    { path: 'pm/q/tasks/a.md', status: 'doing' },
+    { path: 'pm/q/tasks/a.md', status: 'todo' },
+  ])).toBe(1)
+})
+
 test('bounds row labels before rendering', () => {
   const [row] = listRows('p', [{ path: 'pm/p/tasks/a.md', status: 'x'.repeat(11000) }])
   expect(row.label).toHaveLength(10000)

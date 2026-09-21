@@ -44,8 +44,9 @@ export function listRows(project: string, rows: Row[]): ListRow[] {
 }
 
 // Rows the dashboard sent that no card path can be built from: a filter widened past the project, or a row that is not a note.
+// Counted by path, as the list itself is: a path the view sent twice is one row left out, not two.
 export function rowsOutside(project: string, rows: Row[]) {
-  return rows.filter((row) => isBadCardPath(project, row.path)).length
+  return new Set(rows.filter((row) => isBadCardPath(project, row.path)).map((row) => row.path)).size
 }
 
 export function rowSlug(project: string, path: string) {

@@ -309,6 +309,13 @@ describe('list', () => {
     expect(await paneStrings($)).toContain('2 rows of the Active view are not cards under pm/cc-plugins and were left out.')
   })
 
+  test('a row the view sent three times is left out once', async ($, on) => {
+    const repeated = '{"path":"pm/other/tasks/a.md"}'
+    world(on, { query: `[${repeated},${repeated},${repeated}]` })
+    await issue($, '')
+    expect(await paneStrings($)).toContain('1 row of the Active view is not a card under pm/cc-plugins and was left out.')
+  })
+
   test('an empty view says nothing about /obw:pm', async ($, on) => {
     world(on, { query: '[]' })
     await issue($, '')
