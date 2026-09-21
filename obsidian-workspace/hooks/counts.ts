@@ -26,3 +26,9 @@ export function countRows(project: string, rows: Row[]) {
     priority: tally(counted.map((row) => row.priority)),
   }
 }
+
+export function missingViewHint(project: string, message: string) {
+  return message.split('\n', 1)[0] === `Error: View not found: ${COUNT_VIEW}`
+    ? `pm/${project}/dashboard.base has no ${COUNT_VIEW} view. Run /obw:pm refresh dashboard to regenerate it from the plugin template; hand edits to that file are overwritten.`
+    : null
+}

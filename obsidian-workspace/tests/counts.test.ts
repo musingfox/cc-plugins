@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import { baseQueryArgv } from '../hooks/base-argv.ts'
 import { baseQueryOutput } from '../hooks/cli-output.ts'
-import { COUNT_VIEW, countRows } from '../hooks/counts.ts'
+import { COUNT_VIEW, countRows, missingViewHint } from '../hooks/counts.ts'
 import { listRows, rowsOutside } from '../hooks/rows.ts'
 
 const run = (stdout: string) => ({ kind: 'exited' as const, exitCode: 0, stdout, stderr: '' })
@@ -109,3 +109,20 @@ test('counts the same cards when column labels change', () => {
 
 test('keeps a priority the schema does not name', () =>
   expect(countRows('p', [{ path: 'pm/p/tasks/a.md', priority: 'urgent' }]).priority.values).toEqual([{ value: 'urgent', count: 1 }]))
+
+test('hints when All Tasks is missing', () =>
+  expect(missingViewHint('p', 'Error: View not found: All Tasks\nAvailable views: Active, Blocked')).toBe(
+    'pm/p/dashboard.base has no All Tasks view. Run /obw:pm refresh dashboard to regenerate it from the plugin template; hand edits to that file are overwritten.',
+  ))
+
+test('does not hint for a different missing view', () =>
+  expect(missingViewHint('p', 'Error: View not found: Nope\nAvailable views: Active')).toBe(null))
+
+test('does not hint for a missing base file', () =>
+  expect(missingViewHint('p', 'Error: Base file not found: pm/p/dashboard.base')).toBe(null))
+
+test('does not hint for a longer view name', () =>
+  expect(missingViewHint('p', 'Error: View not found: All Tasks Extra')).toBe(null))
+
+test('names the counted view in the hint', () =>
+  expect(missingViewHint('p', `Error: View not found: ${COUNT_VIEW}`)).toContain(`has no ${COUNT_VIEW} view`))
