@@ -1,6 +1,6 @@
 ---
 name: init
-description: Interactively create `.obsidian.yaml`, install starter templates (task / doc / adr), bootstrap the project's vault workspace, and migrate a pre-0.9 layout. Triggers via `/obw:init`, on "migrate my obw vault", or when another obw skill reports missing config.
+description: Interactively create `.obsidian.yaml`, install starter templates (task / doc / adr), bootstrap the project's vault workspace, migrate a pre-0.9 layout, and regenerate a dashboard that is missing a template view. Triggers via `/obw:init`, on "migrate my obw vault" or "upgrade my obw vault", or when another obw skill reports missing config.
 ---
 
 # init — Initialize Obsidian Workspace
@@ -45,13 +45,13 @@ Run everything directly in the main context — the flow is interactive (`AskUse
    ```
    The CLI has no folder verb, so the folders are created with `mkdir` — this and the templates copy are the only filesystem writes into the vault. Omit `overwrite` on the `create` so an existing dashboard is left alone; an already-exists error here means the dashboard was there, which is success, not failure.
 
-6. **Migrate a pre-0.9 project** — only if `pm/$PROJECT` already existed before step 5. Detect, report what was found, and ask before touching anything; each part is independently skippable.
+6. **Upgrade an existing project** — only if `pm/$PROJECT` already existed before step 5. Detect, report what was found, and ask before touching anything; each part is independently skippable.
 
    - **Legacy `archive/`** — if `$VAULT_PATH/pm/$PROJECT/archive` exists, list it with `ls`, then move each note to `pm/$PROJECT/tasks/archive` with the CLI's `move` (exact parameter names from the `obsidian:obsidian-cli` skill), one call per file, so Obsidian rewrites inbound links. Never `mv` these — a filesystem move breaks every wikilink pointing at them. Finish with `rmdir` on the old folder, never `rm -r`: `rmdir` refuses if anything is left behind, which is exactly the check you want. Report a moved/failed count, not a file listing.
 
    - **Missing `title`** — pre-0.9 notes have no `title` property. Dashboards fall back to the filename, so this is cosmetic; offer it, don't force it. Backfill by un-kebabbing the filename (`implement-auth` → `Implement Auth`) with one `property:set` per note. Skip notes that already have a `title`. On a large project, work in batches and report counts only — never read the notes into the conversation to recover exact original casing unless the user asks for that specifically.
 
-   - **Stale dashboards** — an existing `pm/$PROJECT/dashboard.base` predates the Blocked / By Parent / Docs views. Ask, then re-run the step 5 `create` **with** `overwrite`. Same for `pm/dashboard.base` using `templates/dashboard-cross.base`. This discards any hand edits to those files — say so before overwriting.
+   - **Missing template views** — list the project's view names with `obsidian vault=<VAULT_NAME> read path="pm/<PROJECT_NAME>/dashboard.base" | grep -E 'name:|^Error'` (not `base:views`, which ignores `path=` and reads whatever base is open) and the template's view names with `grep '^    name:' "${CLAUDE_PLUGIN_ROOT}/templates/dashboard-project.base"` (names only — never read the rest of the template into context). If any template view is missing, report the missing names, ask, then re-run the step 5 `create` **with** `overwrite`. Same for `pm/dashboard.base` using `templates/dashboard-cross.base`. This discards any hand edits to those files — say so before overwriting.
 
    Non-kebab filenames are left alone. Renaming them is a link-rewriting operation with no upside; the kebab rule applies to newly created notes.
 
