@@ -254,3 +254,24 @@ describe('view not found', () => {
     expect(strings).not.toContain(HINT)
   })
 })
+
+describe('query errors', () => {
+  test('a failed All Tasks query keeps the view picker', async ($, on) => {
+    world(on, { query: { deny: 'spawn failed' } })
+    await issue($, '')
+    const tree = await $.ui.render(PANE)
+    const message = 'The obsidian CLI did not run: it is not on PATH, or it did not answer within 10 s.'
+    const error = nodesOf(tree, 'Text').find((node: any) => stringsIn(node).includes(message))
+    expect(error.props.color).toBe(RED)
+    expect(viewSelect(tree).props.value).toBe('All Tasks')
+    expect(cardSelect(tree)).toBe(undefined)
+    expectDrawn(tree)
+  })
+
+  test('the picker still queries another view after a failed All Tasks query', async ($, on) => {
+    const w = world(on, { query: { deny: 'spawn failed' } })
+    await issue($, '')
+    await pick($, w, 'views', 'Docs')
+    expect(runsOf(w, 'base:query')[1].argv).toContain('view=Docs')
+  })
+})
