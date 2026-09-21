@@ -60,3 +60,7 @@ n=$(grep -cF 'templates/dashboard-project.base")" overwrite' "$pm" || true)
 # base:views ignores path= and lists the views of whichever base is open in Obsidian.
 n=$(cat "$init" "$pm" | grep -cE 'base:views[^`]*path=' || true)
 [ "$n" -eq 0 ] || fail "T4: a skill runs base:views with path=, got $n"
+
+# Quoted token only: a comment may still name the verb.
+n=$(grep -E "['\"]base:views['\"]" obsidian-workspace/hooks/*.ts | wc -l | tr -d ' ' || true)
+[ "$n" -eq 0 ] || fail "T5: a hook runs base:views, got $n"
