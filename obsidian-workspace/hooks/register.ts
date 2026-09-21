@@ -7,6 +7,7 @@ import type { Scope } from './base-argv.ts'
 import { baseQueryOutput, viewsOutput, readOutput, OBSIDIAN_TIMEOUT_MS } from './cli-output.ts'
 import type { Run } from './cli-output.ts'
 import { cardName, listRows, resolveArgument, rowNamed, rowSlug, rowsOutside } from './rows.ts'
+import { COUNT_VIEW } from './counts.ts'
 import { acLabel, headerOf } from './card.ts'
 import type { CardHeader } from './card.ts'
 import { vizManifestPath, vizInstallPath, renderTarget, renderArgv, renderOutcome, RENDER_TIMEOUT_MS } from './viz.ts'
@@ -244,6 +245,7 @@ function outsideNotice(count: number, chosen: string, project: string) {
 
 // A dashboard whose views were renamed or reordered may have no Active view; its own first view is then the one to open.
 function defaultView(names: string[]) {
+  if (names.includes(COUNT_VIEW)) return COUNT_VIEW
   return !names.length || names.includes('Active') ? 'Active' : names[0]
 }
 

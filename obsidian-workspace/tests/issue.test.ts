@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 import { NOT_DRAWN, PANE, cardSelect, expectDrawn, headerIn, issue, nodesOf, pick, runsOf, stringsIn, viewSelect } from './fixtures/pane.ts'
-import { CARD, DASHBOARD_ARGV, QUERY_ARGV, SESSION, VIEW_NAMES, VIEW_STRINGS, world } from './fixtures/world.ts'
+import { CARD, ALL_TASKS_ARGV, DASHBOARD_ARGV, QUERY_ARGV, SESSION, VIEW_NAMES, VIEW_STRINGS, world } from './fixtures/world.ts'
 
 const MOD = 'mod-obw-issue-pane'
 const MOD_PATH = `pm/cc-plugins/tasks/${MOD}.md`
@@ -250,7 +250,7 @@ describe('bad card argument', () => {
 describe('list', () => {
   test('the Active view is one dashboard query drawn as a Select', async ($, on) => {
     const w = world(on, { query: '[{"path":"pm/cc-plugins/tasks/a.md","status":"todo"},{"path":"pm/cc-plugins/tasks/b.md","status":"doing"}]' })
-    await issue($, '')
+    await issue($, 'Active')
     const tree = await $.ui.render(PANE)
     expect(w.runs.map((run: any) => run.argv)).toEqual([DASHBOARD_ARGV, QUERY_ARGV])
     for (const run of w.runs) expect(run.init.timeoutMs).toBe(10000)
@@ -284,7 +284,7 @@ describe('list', () => {
     const tree = await $.ui.render(PANE)
     expect(cardSelect(tree)).toBe(undefined)
     expect(nodesOf(tree, 'Select')).toHaveLength(1)
-    expect(stringsIn(tree)).toContain('No cards in the Active view of pm/cc-plugins.')
+    expect(stringsIn(tree)).toContain('No cards in the All Tasks view of pm/cc-plugins.')
   })
 
   test('an empty view names the view it asked for', async ($, on) => {
@@ -298,21 +298,21 @@ describe('list', () => {
     await issue($, '')
     const tree = await $.ui.render(PANE)
     expect(cardSelect(tree)).toBe(undefined)
-    expect(stringsIn(tree)).toContain('1 row of the Active view is not a card under pm/cc-plugins and was left out.')
-    expect(stringsIn(tree)).not.toContain('No cards in the Active view of pm/cc-plugins.')
+    expect(stringsIn(tree)).toContain('1 row of the All Tasks view is not a card under pm/cc-plugins and was left out.')
+    expect(stringsIn(tree)).not.toContain('No cards in the All Tasks view of pm/cc-plugins.')
   })
 
   test('every row that is not a card is counted in the notice', async ($, on) => {
     world(on, { query: '[{"path":"pm/other/tasks/a.md"},{"path":"pm/cc-plugins/notes/b.txt"}]' })
     await issue($, '')
-    expect(await paneStrings($)).toContain('2 rows of the Active view are not cards under pm/cc-plugins and were left out.')
+    expect(await paneStrings($)).toContain('2 rows of the All Tasks view are not cards under pm/cc-plugins and were left out.')
   })
 
   test('a row the view sent three times is left out once', async ($, on) => {
     const repeated = '{"path":"pm/other/tasks/a.md"}'
     world(on, { query: `[${repeated},${repeated},${repeated}]` })
     await issue($, '')
-    expect(await paneStrings($)).toContain('1 row of the Active view is not a card under pm/cc-plugins and was left out.')
+    expect(await paneStrings($)).toContain('1 row of the All Tasks view is not a card under pm/cc-plugins and was left out.')
   })
 
   test('an empty view says nothing about /obw:pm', async ($, on) => {
@@ -411,7 +411,7 @@ describe('list', () => {
     expect(cardSelect(await $.ui.render(PANE)).props.options).toEqual([
       { value: 'pm/cc-plugins/tasks/ab.md', label: 'ab' },
     ])
-    expect(await paneStrings($)).toContain('1 row of the Active view is not a card under pm/cc-plugins and was left out.')
+    expect(await paneStrings($)).toContain('1 row of the All Tasks view is not a card under pm/cc-plugins and was left out.')
   })
 
   test('the pane reads "Reading the vault…" while the query runs', async ($, on) => {
@@ -438,7 +438,7 @@ describe('the view switcher', () => {
     const tree = await $.ui.render(PANE)
     expect(nodesOf(tree, 'Select')).toHaveLength(2)
     expect(viewSelect(tree).props.options).toEqual(VIEW_NAMES.map((name) => ({ value: name, label: name })))
-    expect(viewSelect(tree).props.value).toBe('Active')
+    expect(viewSelect(tree).props.value).toBe('All Tasks')
   })
 
   test('an argument view is queried and shown as chosen', async ($, on) => {
@@ -599,7 +599,7 @@ describe('card', () => {
     const w = world(on, { query: rows(MOD_PATH, 'pm/cc-plugins/tasks/other.md'), read: CARD })
     await issue($, MOD)
     const tree = await $.ui.render(PANE)
-    expect(w.runs.map((run: any) => run.argv)).toEqual([DASHBOARD_ARGV, QUERY_ARGV, readArgv(MOD_PATH)])
+    expect(w.runs.map((run: any) => run.argv)).toEqual([DASHBOARD_ARGV, ALL_TASKS_ARGV, readArgv(MOD_PATH)])
     expect(cardSelect(tree).props.value).toBe(MOD_PATH)
     const strings = stringsIn(tree)
     expect(strings).toContain('Claude Mod：面板顯示 obw 的 task 與 issue')
@@ -680,7 +680,7 @@ describe('card', () => {
     world(on, { query: '[]', read: CARD })
     await issue($, 'done-card')
     const tree = await $.ui.render(PANE)
-    expect(stringsIn(tree)).toContain('No cards in the Active view of pm/cc-plugins.')
+    expect(stringsIn(tree)).toContain('No cards in the All Tasks view of pm/cc-plugins.')
     expect(nodesOf(tree, 'Markdown').length).toBe(1)
   })
 

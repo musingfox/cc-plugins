@@ -213,7 +213,7 @@ describe('error messages', () => {
   test('the empty-list notice stays dim', async ($, on) => {
     const w = world(on, { query: '[]' })
     const tree = await drawn($, w, '')
-    isDim(textIn(tree, 'No cards in the Active view of pm/cc-plugins.'))
+    isDim(textIn(tree, 'No cards in the All Tasks view of pm/cc-plugins.'))
     expect(nodesOf(tree, 'Text').some((node: any) => node.props?.color === RED)).toBe(false)
   })
 
@@ -239,7 +239,7 @@ describe('the view picker', () => {
   test('the view picker is drawn above the card picker with the chosen view selected', async ($, on) => {
     const w = world(on)
     const tree = await drawn($, w, '')
-    expect(viewSelect(tree).props.value).toBe('Active')
+    expect(viewSelect(tree).props.value).toBe('All Tasks')
     expect(viewSelect(tree).props.options).toEqual(VIEW_NAMES.map((name) => ({ value: name, label: name })))
     const flat = JSON.stringify(tree)
     expect(flat.indexOf('"key":"views"')).toBeLessThan(flat.indexOf('"key":"cards"'))

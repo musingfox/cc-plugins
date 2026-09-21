@@ -25,6 +25,7 @@ ${VIEW_NAMES.map((name) => `  - type: table
 export const VIEW_STRINGS = VIEW_NAMES.flatMap((name) => [name, name])
 export const DASHBOARD_ARGV = ['obsidian', 'vault=obsidian', 'read', 'path=pm/cc-plugins/dashboard.base']
 export const QUERY_ARGV = ['obsidian', 'vault=obsidian', 'base:query', 'path=pm/cc-plugins/dashboard.base', 'view=Active', 'format=json']
+export const ALL_TASKS_ARGV = ['obsidian', 'vault=obsidian', 'base:query', 'path=pm/cc-plugins/dashboard.base', 'view=All Tasks', 'format=json']
 const LIST = '[{"path":"pm/cc-plugins/tasks/a.md","status":"todo"}]'
 export const AB = '[{"path":"pm/cc-plugins/tasks/a.md","status":"todo"},{"path":"pm/cc-plugins/tasks/b.md","status":"todo"}]'
 
