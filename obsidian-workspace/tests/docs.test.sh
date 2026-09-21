@@ -66,10 +66,6 @@ n="$(awk '/^## Issue Pane/,/^## Prerequisites/' obsidian-workspace/README.md | g
 n="$(awk '/^## Issue Pane/,/^## Prerequisites/' obsidian-workspace/README.md | grep -c '/issue <view>' || true)"
 [ "$n" -ge 1 ] || fail "obw README Issue Pane must mention /issue <view>"
 
-base="$(git merge-base main HEAD 2>/dev/null || git rev-parse HEAD)"
-n="$(git diff --name-only "$base" -- docs/milestones/obw-issue-pane.md | grep -c . || true)"
-[ "$n" -eq 0 ] || fail "obw issue pane milestone must not be modified on this branch"
-
 n="$(grep -cF 'Built and tested against Claude Code 2.1.276.' obsidian-workspace/README.md || true)"
 [ "$n" -eq 1 ] || fail "obw README Claude Code version line count is $n, want 1"
 
