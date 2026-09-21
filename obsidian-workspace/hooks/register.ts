@@ -7,7 +7,7 @@ import type { Scope } from './base-argv.ts'
 import { baseQueryOutput, viewsOutput, readOutput, OBSIDIAN_TIMEOUT_MS } from './cli-output.ts'
 import type { Run } from './cli-output.ts'
 import { cardName, listRows, resolveArgument, rowNamed, rowSlug, rowsOutside } from './rows.ts'
-import { COUNT_VIEW, missingViewText } from './counts.ts'
+import { COUNT_VIEW, missingViewHint, missingViewText } from './counts.ts'
 import { groupedOptions } from './grouped.ts'
 import { acLabel, headerOf } from './card.ts'
 import type { CardHeader } from './card.ts'
@@ -274,7 +274,7 @@ async function openView($: any, scope: Scope, views: string[], chosen: string, n
   const result = baseQueryOutput(await runProcess($, built.argv))
   if (request !== requests) return
   if (result.kind === 'error') {
-    state = { ...state, loading: false, message: { kind: 'error', text: result.message }, hint: pmHint(scope.project) }
+    state = { ...state, loading: false, message: { kind: 'error', text: result.message }, hint: missingViewHint(scope.project, result.message) ?? pmHint(scope.project) }
     invalidate($)
     return
   }

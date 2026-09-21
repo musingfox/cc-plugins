@@ -225,10 +225,32 @@ describe('missing All Tasks', () => {
     await issue($, '')
     expect(stringsIn(await $.ui.render(PANE))[0]).toBe(HINT)
   })
+})
 
-  test('the template dashboard draws no refresh hint', async ($, on) => {
-    world(on)
+const PM_HINT = 'If pm/cc-plugins/dashboard.base is missing, run /obw:pm to create it.'
+
+describe('view not found', () => {
+  test('a listed All Tasks that Obsidian cannot find gets the refresh hint', async ($, on) => {
+    world(on, { query: 'Error: View not found: All Tasks\nAvailable views: Active\n' })
     await issue($, '')
-    expect(stringsIn(await $.ui.render(PANE))).not.toContain(HINT)
+    const tree = await $.ui.render(PANE)
+    const strings = stringsIn(tree)
+    const error = 'Error: View not found: All Tasks\nAvailable views: Active'
+    expect(strings).toContain(error)
+    expect(strings[strings.indexOf(error) + 1]).toBe(HINT)
+    const errorText = nodesOf(tree, 'Text').find((node: any) => stringsIn(node).includes(error))
+    expect(errorText.props.color).toBe(RED)
+    const hint = nodesOf(tree, 'Text').find((node: any) => stringsIn(node).includes(HINT))
+    expect(hint.props.dimColor).toBe(true)
+    expect(strings).not.toContain(PM_HINT)
+    expect(viewSelect(tree)).toBeDefined()
+  })
+
+  test('a different missing view keeps the pm hint', async ($, on) => {
+    world(on, { query: 'Error: View not found: All Tasks Extra' })
+    await issue($, '')
+    const strings = stringsIn(await $.ui.render(PANE))
+    expect(strings).toContain(PM_HINT)
+    expect(strings).not.toContain(HINT)
   })
 })
