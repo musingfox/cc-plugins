@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { PANE, cardSelect, expectDrawn, issue, nodesOf, pick, runsOf, stringsIn, viewSelect } from './fixtures/pane.ts'
-import { ALL_TASKS_ARGV, DASHBOARD_ARGV, VIEW_NAMES, VIEW_STRINGS, world } from './fixtures/world.ts'
+import { PANE, cardSelect, expectDrawn, headerIn, issue, nodesOf, pick, runsOf, stringsIn, viewSelect } from './fixtures/pane.ts'
+import { ALL_TASKS_ARGV, CARD, DASHBOARD_ARGV, VIEW_NAMES, VIEW_STRINGS, world } from './fixtures/world.ts'
 import { GROUPED_MIX, MIX } from './grouped.test.ts'
 import { RED } from '../hooks/style.ts'
 
@@ -137,5 +137,19 @@ describe('other views', () => {
     world(on, { query: JSON.stringify(MIX) })
     await issue($, 'Active')
     expect(cardSelect(await $.ui.render(PANE)).props.options.some((option: any) => option.value.startsWith('#'))).toBe(false)
+  })
+})
+
+describe('opening a grouped card', () => {
+  test('picking a grouped card reads it under the list', async ($, on) => {
+    const w = world(on, { query: JSON.stringify(MIX), read: CARD })
+    await issue($, '')
+    await pick($, w, 'cards', P('b'))
+    const tree = await $.ui.render(PANE)
+    expect(runsOf(w, 'read')[0].argv[3]).toBe('path=pm/cc-plugins/tasks/b.md')
+    expect(cardSelect(tree).props.value).toBe(P('b'))
+    expect(nodesOf(tree, 'Markdown')).toHaveLength(1)
+    expect(stringsIn(headerIn(tree)).join('')).toBe('status: todo · priority: medium · AC 0/1')
+    expect(cardSelect(tree).props.options).toEqual(GROUPED_MIX)
   })
 })
