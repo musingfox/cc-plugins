@@ -1,7 +1,15 @@
 import { expect, test } from 'claude-code/testing'
 import { baseQueryArgv } from '../hooks/base-argv.ts'
+import { baseQueryOutput } from '../hooks/cli-output.ts'
 import { COUNT_VIEW, countRows } from '../hooks/counts.ts'
 import { listRows, rowsOutside } from '../hooks/rows.ts'
+
+const run = (stdout: string) => ({ kind: 'exited' as const, exitCode: 0, stdout, stderr: '' })
+
+function rowsOf(stdout: string) {
+  const result = baseQueryOutput(run(stdout))
+  return result.kind === 'rows' ? result.rows : []
+}
 
 test('keeps the first card when a path appears twice', () =>
   expect(countRows('p', [
@@ -79,3 +87,25 @@ test('treats (none) as a status and null as missing', () =>
 
 test('tallies __proto__ as a status string', () =>
   expect(countRows('p', [{ path: 'pm/p/tasks/a.md', status: '__proto__' }]).status.values).toEqual([{ value: '__proto__', count: 1 }]))
+
+test('tallies each priority and counts cards with none', () =>
+  expect(countRows('p', [
+    { path: 'pm/p/tasks/a.md', priority: 'high' },
+    { path: 'pm/p/tasks/b.md', priority: 'low' },
+    { path: 'pm/p/tasks/c.md', priority: 'high' },
+    { path: 'pm/p/tasks/d.md', priority: null },
+  ]).priority).toEqual({ values: [{ value: 'high', count: 2 }, { value: 'low', count: 1 }], missing: 1 }))
+
+test('counts the same cards when column labels change', () => {
+  const a = '[{"path":"pm/p/tasks/a.md","Title":"A","status":"todo","priority":"high"},{"path":"pm/p/tasks/b.md","Title":"B","status":"done"}]'
+  const b = '[{"path":"pm/p/tasks/a.md","Name":"A","status":"todo","priority":"high"},{"path":"pm/p/tasks/b.md","Name":"B","status":"done"}]'
+  const countedA = countRows('p', rowsOf(a))
+  const countedB = countRows('p', rowsOf(b))
+  expect(countedA).toEqual(countedB)
+  expect(countedA.status.values).toEqual([{ value: 'todo', count: 1 }, { value: 'done', count: 1 }])
+  expect(countedA.priority.values).toEqual([{ value: 'high', count: 1 }])
+  expect(countedA.priority.missing).toBe(1)
+})
+
+test('keeps a priority the schema does not name', () =>
+  expect(countRows('p', [{ path: 'pm/p/tasks/a.md', priority: 'urgent' }]).priority.values).toEqual([{ value: 'urgent', count: 1 }]))
