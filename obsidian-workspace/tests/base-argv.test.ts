@@ -26,7 +26,7 @@ test('refuses a bad vault before a bad project on a read', () => expect(cardPath
 for (const path of ['', 'pm/other/tasks/a.md', 'pm/cc-plugins/tasks/../../secrets/a.md', 'pm/cc-plugins/tasks/a\u0001b.md', 'pm/cc-plugins/tasks/a\tb.md', 'pm/cc-plugins/tasks/a.txt', 'pm/cc-plugins/tasks/.md', 'pm/cc-plugins//tasks/a.md']) test(`refuses unsafe row path ${JSON.stringify(path)}`, () => expect(cardPathArgv(SCOPE, path)).toEqual({ refused: 'path' }))
 
 test('never builds an ambiguous target', () => {
-  const built = [baseQueryArgv(SCOPE, 'Active'), cardPathArgv(SCOPE, 'pm/cc-plugins/tasks/a.md')]
+  const built = [baseQueryArgv(SCOPE, 'Active'), cardPathArgv(SCOPE, 'pm/cc-plugins/tasks/a.md'), viewsArgv(SCOPE)]
   for (const result of built) if ('argv' in result) for (const arg of result.argv) {
     expect(arg).not.toBe('path=')
     expect(arg.startsWith('file=')).toBe(false)
@@ -37,7 +37,7 @@ test('never builds an ambiguous target', () => {
 
 for (const path of ['pm/cc-plugins/tasks/a.md', 'pm/cc-plugins/tasks/archive/adr-three-conditions-audit.md', 'pm/cc-plugins/docs/mattpocock-skills-import.md', 'pm/cc-plugins/tasks/my card.md']) test(`preserves accepted row path ${path}`, () => expect(bounded(path).text).toBe(path))
 
-test('builds a dashboard views argv', () => expect(viewsArgv(SCOPE)).toEqual({ argv: ['obsidian', 'vault=obsidian', 'base:views', 'path=pm/cc-plugins/dashboard.base'] }))
+test('builds a dashboard views argv', () => expect(viewsArgv(SCOPE)).toEqual({ argv: ['obsidian', 'vault=obsidian', 'read', 'path=pm/cc-plugins/dashboard.base'] }))
 test('refuses an empty views vault', () => expect(viewsArgv({ vault: '', project: 'cc-plugins' })).toEqual({ refused: 'vault' }))
 test('refuses a bad vault before a bad project on views', () => expect(viewsArgv({ vault: '', project: '' })).toEqual({ refused: 'vault' }))
 test('refuses an empty views project', () => expect(viewsArgv({ vault: 'obsidian', project: '' })).toEqual({ refused: 'project' }))

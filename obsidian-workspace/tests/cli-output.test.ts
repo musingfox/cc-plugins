@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import * as out from '../hooks/cli-output.ts'
 import { baseQueryArgv } from '../hooks/base-argv.ts'
+import { VIEWS, VIEW_NAMES } from './fixtures/world.ts'
 
 const { baseQueryOutput, readOutput, viewsOutput } = out
 const run = (stdout: string, exitCode = 0, stderr = '') => ({ kind: 'exited' as const, exitCode, stdout, stderr })
@@ -83,28 +84,52 @@ test('reports empty query output', () =>
 test('reports a query that did not run', () =>
   expect(baseQueryOutput({ kind: 'rejected' })).toEqual({ kind: 'error', message: NOT_RUN }))
 
-const VIEWS = 'Active\ttable\nBlocked\ttable\nBy Parent\ttable\nRecently Completed\ttable\nBy Tag\ttable\nDocs\ttable\n'
-const TABBED = 'A\tB\ttable\nDocs\ttable\n'
+const yamlViews = (...names: string[]) => `views:\n${names.map((name) => `  - type: table\n    name: "${name}"\n`).join('')}`
 // The names a listing offers the switcher: a listing of no known shape offers none.
 const namesOf = (listing: ReturnType<typeof viewsOutput>) => (listing.kind === 'views' ? listing.views : [])
 
 test('reads the dashboard view names in order', () => {
-  expect(namesOf(viewsOutput(run(VIEWS)))).toEqual(['Active', 'Blocked', 'By Parent', 'Recently Completed', 'By Tag', 'Docs'])
-  expect(viewsOutput(run(VIEWS))).toEqual({ kind: 'views', views: ['Active', 'Blocked', 'By Parent', 'Recently Completed', 'By Tag', 'Docs'] })
+  expect(namesOf(viewsOutput(run(VIEWS)))).toEqual(VIEW_NAMES)
+  expect(viewsOutput(run(VIEWS))).toEqual({ kind: 'views', views: VIEW_NAMES })
 })
 
-test('does not whitelist a view type', () => expect(namesOf(viewsOutput(run('Cards\tcards\n')))).toEqual(['Cards']))
+test('reads a name-first unquoted list', () =>
+  expect(viewsOutput(run('views:\n  - name: Active\n    type: table\n  - name: Docs\n    type: table\n'))).toEqual({
+    kind: 'views',
+    views: ['Active', 'Docs'],
+  }))
+
+test('reads column-0 view items', () => expect(viewsOutput(run('views:\n- type: table\n  name: Active\n'))).toEqual({ kind: 'views', views: ['Active'] }))
+
+test('drops an unquoted hash comment from a view name', () =>
+  expect(namesOf(viewsOutput(run('views:\n  - type: table\n    name: Board / Active # mine\n')))).toEqual(['Board / Active']))
+
+test('keeps a hash inside a quoted view name', () =>
+  expect(namesOf(viewsOutput(run('views:\n  - type: table\n    name: "A # B"\n')))).toEqual(['A # B']))
+
+test('ignores a properties displayName named name', () =>
+  expect(namesOf(viewsOutput(run('properties:\n  name:\n    displayName: Name\n  note.name:\n    displayName: N\nviews:\n  - type: table\n    name: "Docs"\n')))).toEqual(['Docs']))
+
+test('ignores a nested name under groupBy', () =>
+  expect(namesOf(viewsOutput(run('views:\n  - type: table\n    groupBy:\n      name: inner\n    name: "Active"\n')))).toEqual(['Active']))
 
 test('drops a view name that would be drawn stripped', () =>
-  expect(namesOf(viewsOutput(run('A\u001bB\ttable\nDocs\ttable\n')))).toEqual(['Docs']))
+  expect(namesOf(viewsOutput(run(yamlViews('A\u001bB', 'Docs'))))).toEqual(['Docs']))
 
-test('drops a view name that still holds a tab', () => expect(namesOf(viewsOutput(run(TABBED)))).toEqual(['Docs']))
+test('drops an overlong view name', () =>
+  expect(namesOf(viewsOutput(run(yamlViews('v'.repeat(11000), 'Docs'))))).toEqual(['Docs']))
 
-test('offers no view when the base file is missing', () => {
-  const listing = viewsOutput(run('Error: Base file not found: pm/p/dashboard.base'))
-  expect(namesOf(listing)).toEqual([])
-  expect(listing).toEqual({ kind: 'error', message: 'Error: Base file not found: pm/p/dashboard.base' })
+test('offers only view names the query builder accepts', () => {
+  const offered = [...namesOf(viewsOutput(run(VIEWS))), ...namesOf(viewsOutput(run(yamlViews('A\u001bB', 'Docs'))))]
+  expect(offered).toHaveLength(8)
+  for (const name of offered) expect(baseQueryArgv({ vault: 'obsidian', project: 'cc-plugins' }, name)).toHaveProperty('argv')
 })
+
+test('reads a views list with no items as empty', () => expect(viewsOutput(run('filters:\n  and: []\nviews:\n'))).toEqual({ kind: 'empty' }))
+
+test('reads an empty flow views list as empty', () => expect(viewsOutput(run('views: []\n'))).toEqual({ kind: 'empty' }))
+
+test('reads a views key with only a comment as empty', () => expect(viewsOutput(run("views:  # none yet\nformulas:\n  x: '1'\n"))).toEqual({ kind: 'empty' }))
 
 test('offers no view when the CLI did not run', () => {
   const listing = viewsOutput({ kind: 'rejected' })
@@ -113,33 +138,50 @@ test('offers no view when the CLI did not run', () => {
 })
 
 test('offers no view from a failed listing', () => {
-  const listing = viewsOutput(run('Active\ttable\n', 1, closed))
+  const listing = viewsOutput(run(VIEWS, 1, closed))
   expect(namesOf(listing)).toEqual([])
   expect(listing).toEqual({ kind: 'error', message: closed.trim() })
-  const silent = viewsOutput(run('Active\ttable\n', 1))
+  const silent = viewsOutput(run('views:\n  - name: Active\n', 1))
   expect(namesOf(silent)).toEqual([])
-  expect(silent).toEqual({ kind: 'error', message: 'Active\ttable' })
+  expect(silent).toEqual({ kind: 'error', message: 'views:\n  - name: Active' })
 })
 
-test('reads a dashboard that lists no view as empty', () => expect(viewsOutput(run(''))).toEqual({ kind: 'empty' }))
+test('offers no view when the base file is missing', () => {
+  const listing = viewsOutput(run('Error: File "pm/p/dashboard.base" not found.\n'))
+  expect(namesOf(listing)).toEqual([])
+  expect(listing).toEqual({ kind: 'error', message: 'Error: File "pm/p/dashboard.base" not found.' })
+})
+
+test('offers no view from a vault-not-found read', () =>
+  expect(viewsOutput(run('Vault not found.'))).toEqual({ kind: 'error', message: 'Vault not found.' }))
+
+test('does not read a base without views as empty', () =>
+  expect(viewsOutput(run('filters:\n  and: []\n'))).toEqual({ kind: 'error', message: 'filters:\n  and: []' }))
+
+test('does not read a flow views value as a list', () =>
+  expect(viewsOutput(run('views: [{type: table, name: Active}]'))).toEqual({
+    kind: 'error',
+    message: 'views: [{type: table, name: Active}]',
+  }))
 
 test('reads a listing whose every name could not be drawn as an error, not as no views', () => {
-  const listing = viewsOutput(run('A\u001bB\ttable\n'))
+  const stdout = 'views:\n  - type: table\n    name: "A\u001bB"\n'
+  const listing = viewsOutput(run(stdout))
   expect(namesOf(listing)).toEqual([])
-  expect(listing).toEqual({ kind: 'error', message: 'A\u001bB\ttable' })
+  expect(listing).toEqual({ kind: 'error', message: stdout.trim() })
 })
 
-test('reads a listing carrying a line that is not a view as an error', () => {
-  const listing = viewsOutput(run('Note: dashboard updated\nActive\ttable\n'))
-  expect(namesOf(listing)).toEqual([])
-  expect(listing).toEqual({ kind: 'error', message: 'Note: dashboard updated\nActive\ttable' })
-})
+test('reads an item with no name as an error, not as no views', () =>
+  expect(viewsOutput(run('views:\n  - type: table\n'))).toEqual({ kind: 'error', message: 'views:\n  - type: table' }))
 
-test('offers only view names the query builder accepts', () => {
-  const offered = [...namesOf(viewsOutput(run(VIEWS))), ...namesOf(viewsOutput(run(TABBED)))]
-  expect(offered).toHaveLength(7)
-  for (const name of offered) expect(baseQueryArgv({ vault: 'obsidian', project: 'cc-plugins' }, name)).toHaveProperty('argv')
-})
+test('does not read a name\\ttype listing as views', () =>
+  expect(viewsOutput(run('Active\ttable\nDocs\ttable\n'))).toEqual({ kind: 'error', message: 'Active\ttable\nDocs\ttable' }))
+
+test('reports empty dashboard output', () =>
+  expect(viewsOutput(run(''))).toEqual({ kind: 'error', message: 'obsidian exited 0 with no output.' }))
+
+test('does not read an indented views key as the dashboard list', () =>
+  expect(viewsOutput(run('    views:\n  - name: A\n')).kind).toBe('error'))
 
 const CARD = '---\ntitle: "Claude Mod：面板顯示 obw 的 task 與 issue"\nstatus: todo\npriority: medium\ndue:\ntags:\n  - claude-mods\ncreated: 2026-09-18\n---\n# mod-obw-issue-pane\n\n## Acceptance Criteria\n- [ ] one\n'
 test('recognizes closed card frontmatter', () => expect(readOutput(run(CARD))).toEqual({ kind: 'card', frontmatter: 'title: "Claude Mod：面板顯示 obw 的 task 與 issue"\nstatus: todo\npriority: medium\ndue:\ntags:\n  - claude-mods\ncreated: 2026-09-18', body: '# mod-obw-issue-pane\n\n## Acceptance Criteria\n- [ ] one\n' }))

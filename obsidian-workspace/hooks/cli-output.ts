@@ -1,3 +1,5 @@
+import { valueOf } from './config.ts'
+
 export type Run = { kind: 'exited'; exitCode: number; stdout: string; stderr: string } | { kind: 'rejected' }
 
 export const OBSIDIAN_TIMEOUT_MS = 10_000
@@ -29,20 +31,74 @@ export function baseQueryOutput(run: Run): { kind: 'rows'; rows: BaseRow[] } | {
   }
 }
 
-// A listing is one `name\ttype` per line; a line of any other shape is the CLI
+const DRAWABLE = /^[^\x00-\x08\x0b-\x1f\x7f-\x9f\t\n\r]{1,10000}$/
+
+// A listing is the dashboard file's top-level views: list; any other stdout is the CLI
 // saying something else, which is shown rather than read as "this dashboard has no view".
-// A listing that named views but none the pane could draw is shown the same way: only a
-// dashboard that listed nothing at all is empty.
+// Items whose names the pane could not draw are dropped; if every item is undrawable the
+// listing is an error. Only a views: block with no item is empty.
+function viewsFrom(stdout: string): { kind: 'views'; views: string[] } | { kind: 'empty' } | null {
+  let inViews = false
+  let sawViews = false
+  let itemIndent: number | null = null
+  let keyCol: number | null = null
+  let started = false
+  let current: string | undefined
+  const names: (string | undefined)[] = []
+
+  const finish = () => {
+    if (started) names.push(current)
+    current = undefined
+    started = false
+  }
+
+  for (const raw of stdout.split('\n')) {
+    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw
+    if (/^\s*(#|$)/.test(line)) continue
+
+    if (/^\S/.test(line) && !line.startsWith('- ')) {
+      if (inViews) finish()
+      inViews = false
+      if (/^views:/.test(line)) {
+        const rest = line.slice('views:'.length).trim()
+        if (rest !== '' && rest !== '[]' && !rest.startsWith('#')) return null
+        sawViews = true
+        inViews = true
+        itemIndent = null
+        keyCol = null
+      }
+      continue
+    }
+
+    if (!inViews) continue
+
+    const item = /^(\s*)-(\s+)(.*)$/.exec(line)
+    if (item) {
+      const indent = item[1].length
+      if (itemIndent === null) itemIndent = indent
+      if (indent === itemIndent) {
+        finish()
+        started = true
+        keyCol = indent + 1 + item[2].length
+        if (item[3].startsWith('name:')) current = valueOf(item[3].slice('name:'.length))
+        continue
+      }
+    }
+
+    if (keyCol !== null && started && line.slice(0, keyCol).trim() === '' && line.slice(keyCol).startsWith('name:') && current === undefined) {
+      current = valueOf(line.slice(keyCol + 'name:'.length))
+    }
+  }
+  finish()
+  if (!sawViews) return null
+  const views = names.flatMap((name) => (name && DRAWABLE.test(name) ? [name] : []))
+  if (views.length) return { kind: 'views', views }
+  return names.length ? null : { kind: 'empty' }
+}
+
 export function viewsOutput(run: Run): { kind: 'views'; views: string[] } | { kind: 'empty' } | { kind: 'error'; message: string } {
   if (run.kind !== 'exited' || run.exitCode !== 0) return { kind: 'error', message: errorMessage(run) }
-  const lines = run.stdout.split('\n').filter((line) => line.trim() !== '')
-  if (lines.some((line) => line.lastIndexOf('\t') < 1)) return { kind: 'error', message: errorMessage(run) }
-  const views = lines.flatMap((line) => {
-    const name = line.slice(0, line.lastIndexOf('\t'))
-    return /^[^\x00-\x08\x0b-\x1f\x7f-\x9f\t\n\r]{1,10000}$/.test(name) ? [name] : []
-  })
-  if (views.length) return { kind: 'views', views }
-  return lines.length ? { kind: 'error', message: errorMessage(run) } : { kind: 'empty' }
+  return viewsFrom(run.stdout) ?? { kind: 'error', message: errorMessage(run) }
 }
 
 function noteOf(stdout: string): { frontmatter: string; body: string } | null {

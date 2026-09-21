@@ -1,8 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 import { NOT_DRAWN, PANE, cardSelect, expectDrawn, headerIn, issue, nodesOf, pick, runsOf, stringsIn, viewSelect } from './fixtures/pane.ts'
-import { CARD, QUERY_ARGV, SESSION, VIEW_STRINGS, world } from './fixtures/world.ts'
+import { CARD, DASHBOARD_ARGV, QUERY_ARGV, SESSION, VIEW_NAMES, VIEW_STRINGS, world } from './fixtures/world.ts'
 
-const VIEWS_ARGV = ['obsidian', 'vault=obsidian', 'base:views', 'path=pm/cc-plugins/dashboard.base']
 const MOD = 'mod-obw-issue-pane'
 const MOD_PATH = `pm/cc-plugins/tasks/${MOD}.md`
 const readArgv = (path: string) => ['obsidian', 'vault=obsidian', 'read', `path=${path}`]
@@ -229,12 +228,12 @@ describe('bad card argument', () => {
   test('a slash name no view carries is refused once the views are known', async ($, on) => {
     const w = world(on)
     await issue($, 'a/b')
-    expect(w.runs.map((run: any) => run.argv)).toEqual([VIEWS_ARGV])
+    expect(w.runs.map((run: any) => run.argv)).toEqual([DASHBOARD_ARGV])
     expect(await paneStrings($)).toContain('"a/b" is not a card name.')
   })
 
   test('a view name holding a slash is queried, not refused as a card name', async ($, on) => {
-    const w = world(on, { views: 'Board / Active\ttable\nDocs\ttable\n', query: rows('pm/cc-plugins/tasks/a.md') })
+    const w = world(on, { views: 'views:\n  - type: table\n    name: "Board / Active"\n  - type: table\n    name: "Docs"\n', query: rows('pm/cc-plugins/tasks/a.md') })
     await issue($, 'Board / Active')
     expect(runsOf(w, 'base:query')[0].argv).toContain('view=Board / Active')
     expect(runsOf(w, 'read')).toEqual([])
@@ -253,7 +252,7 @@ describe('list', () => {
     const w = world(on, { query: '[{"path":"pm/cc-plugins/tasks/a.md","status":"todo"},{"path":"pm/cc-plugins/tasks/b.md","status":"doing"}]' })
     await issue($, '')
     const tree = await $.ui.render(PANE)
-    expect(w.runs.map((run: any) => run.argv)).toEqual([VIEWS_ARGV, QUERY_ARGV])
+    expect(w.runs.map((run: any) => run.argv)).toEqual([DASHBOARD_ARGV, QUERY_ARGV])
     for (const run of w.runs) expect(run.init.timeoutMs).toBe(10000)
     expect(cardSelect(tree).props.options).toEqual([
       { value: 'pm/cc-plugins/tasks/a.md', label: 'todo · a' },
@@ -323,13 +322,31 @@ describe('list', () => {
   })
 
   test('a missing dashboard is shown as the CLI printed it, with the pm hint', async ($, on) => {
-    const w = world(on, { query: 'Error: Base file not found: pm/cc-plugins/dashboard.base' })
+    const w = world(on, {
+      views: 'Error: File "pm/cc-plugins/dashboard.base" not found.\n',
+      query: 'Error: Base file not found: pm/cc-plugins/dashboard.base',
+    })
     await issue($, '')
-    const strings = await paneStrings($)
+    const tree = await $.ui.render(PANE)
+    const strings = stringsIn(tree)
+    expect(viewSelect(tree)).toBe(undefined)
+    expect(strings).toContain('The dashboard\'s views could not be listed: Error: File "pm/cc-plugins/dashboard.base" not found.')
     const cli = strings.indexOf('Error: Base file not found: pm/cc-plugins/dashboard.base')
     expect(cli).toBeGreaterThan(-1)
     expect(strings.indexOf('If pm/cc-plugins/dashboard.base is missing, run /obw:pm to create it.')).toBe(cli + 1)
     expect(w.runs.length).toBe(2)
+  })
+
+  test('a missing dashboard still opens a named card and keeps the pm hint', async ($, on) => {
+    const w = world(on, {
+      views: 'Error: File "pm/cc-plugins/dashboard.base" not found.\n',
+      query: 'Error: Base file not found: pm/cc-plugins/dashboard.base',
+    })
+    await issue($, 'Docs')
+    const tree = await $.ui.render(PANE)
+    expect(runsOf(w, 'read')[0].argv).toEqual(readArgv('pm/cc-plugins/tasks/Docs.md'))
+    expect(stringsIn(tree)).toContain('If pm/cc-plugins/dashboard.base is missing, run /obw:pm to create it.')
+    expect(viewSelect(tree)).toBe(undefined)
   })
 
   test('an unknown vault is shown as the CLI printed it', async ($, on) => {
@@ -420,9 +437,7 @@ describe('the view switcher', () => {
     await issue($, '')
     const tree = await $.ui.render(PANE)
     expect(nodesOf(tree, 'Select')).toHaveLength(2)
-    expect(viewSelect(tree).props.options).toEqual(
-      ['Active', 'Blocked', 'By Parent', 'Recently Completed', 'By Tag', 'Docs'].map((name) => ({ value: name, label: name })),
-    )
+    expect(viewSelect(tree).props.options).toEqual(VIEW_NAMES.map((name) => ({ value: name, label: name })))
     expect(viewSelect(tree).props.value).toBe('Active')
   })
 
@@ -463,7 +478,7 @@ describe('the view switcher', () => {
   })
 
   test('a view listing that could not be drawn is not offered', async ($, on) => {
-    const w = world(on, { views: `${'v'.repeat(11000)}\ttable\nDocs\ttable\n` })
+    const w = world(on, { views: `views:\n  - type: table\n    name: "${'v'.repeat(11000)}"\n  - type: table\n    name: "Docs"\n` })
     await issue($, '')
     const tree = await $.ui.render(PANE)
     expectDrawn(tree)
@@ -474,7 +489,7 @@ describe('the view switcher', () => {
   })
 
   test('a dashboard without an Active view is listed under its first view', async ($, on) => {
-    const w = world(on, { views: 'Backlog\ttable\nDocs\ttable\n', query: '[]' })
+    const w = world(on, { views: 'views:\n  - type: table\n    name: "Backlog"\n  - type: table\n    name: "Docs"\n', query: '[]' })
     await issue($, '')
     const tree = await $.ui.render(PANE)
     expect(viewSelect(tree).props.value).toBe('Backlog')
@@ -523,11 +538,11 @@ describe('the view switcher', () => {
   })
 
   test('a listing that offered no name the pane could draw is said, not read as no views', async ($, on) => {
-    world(on, { views: 'A\u001bB\ttable\n', query: '[]' })
+    world(on, { views: 'views:\n  - type: table\n    name: "A\u001bB"\n', query: '[]' })
     await issue($, '')
     const tree = await $.ui.render(PANE)
     expect(viewSelect(tree)).toBe(undefined)
-    expect(stringsIn(tree)).toContain("The dashboard's views could not be listed: AB\ttable")
+    expect(stringsIn(tree)).toContain('The dashboard\'s views could not be listed: views:\n  - type: table\n    name: "AB"')
   })
 
   test('picking a view in the switcher queries that view and lists its rows', async ($, on) => {
@@ -584,7 +599,7 @@ describe('card', () => {
     const w = world(on, { query: rows(MOD_PATH, 'pm/cc-plugins/tasks/other.md'), read: CARD })
     await issue($, MOD)
     const tree = await $.ui.render(PANE)
-    expect(w.runs.map((run: any) => run.argv)).toEqual([VIEWS_ARGV, QUERY_ARGV, readArgv(MOD_PATH)])
+    expect(w.runs.map((run: any) => run.argv)).toEqual([DASHBOARD_ARGV, QUERY_ARGV, readArgv(MOD_PATH)])
     expect(cardSelect(tree).props.value).toBe(MOD_PATH)
     const strings = stringsIn(tree)
     expect(strings).toContain('Claude Mod：面板顯示 obw 的 task 與 issue')

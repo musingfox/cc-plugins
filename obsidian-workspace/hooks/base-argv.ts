@@ -47,5 +47,5 @@ export function cardPathArgv(scope: Scope, path: string): ArgvResult {
 export function viewsArgv(scope: Scope): ArgvResult {
   const refused = scopeRefusal(scope)
   if (refused) return refused
-  return { argv: ['obsidian', `vault=${scope.vault}`, 'base:views', `path=${dashboardPath(scope.project)}`] }
+  return { argv: ['obsidian', `vault=${scope.vault}`, 'read', `path=${dashboardPath(scope.project)}`] }
 }

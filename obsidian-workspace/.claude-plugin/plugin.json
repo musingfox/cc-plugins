@@ -1,6 +1,6 @@
 {
   "name": "obw",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "description": "Obsidian Workspace — project-scoped vault productivity (capture / notes / PM). Skills own folder layout and templates; /obw:pm splits a spec into blocking tickets; /issue is a Claude Mod pane that lists a view of the project's dashboard, draws Mermaid as text diagrams, and can open a card in the browser through viz. Vault I/O uses the Obsidian CLI via the official obsidian-cli skill.",
   "dependencies": [
     { "name": "obsidian", "marketplace": "obsidian-skills" }

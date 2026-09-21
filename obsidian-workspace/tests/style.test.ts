@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 import { priorityColor, statusColor } from '../hooks/style.ts'
 import { PANE, cardSelect, headerIn, issue, mounted, nodesOf, press, runsOf, shown, stringsIn, viewSelect, vizWorld } from './fixtures/pane.ts'
-import { AB, SESSION, VIEW_STRINGS, world } from './fixtures/world.ts'
+import { AB, SESSION, VIEW_NAMES, VIEW_STRINGS, world } from './fixtures/world.ts'
 
 describe('statusColor', () => {
   const cases: [string | undefined, string | undefined][] = [
@@ -240,9 +240,7 @@ describe('the view picker', () => {
     const w = world(on)
     const tree = await drawn($, w, '')
     expect(viewSelect(tree).props.value).toBe('Active')
-    expect(viewSelect(tree).props.options).toEqual(
-      ['Active', 'Blocked', 'By Parent', 'Recently Completed', 'By Tag', 'Docs'].map((name) => ({ value: name, label: name })),
-    )
+    expect(viewSelect(tree).props.options).toEqual(VIEW_NAMES.map((name) => ({ value: name, label: name })))
     const flat = JSON.stringify(tree)
     expect(flat.indexOf('"key":"views"')).toBeLessThan(flat.indexOf('"key":"cards"'))
   })

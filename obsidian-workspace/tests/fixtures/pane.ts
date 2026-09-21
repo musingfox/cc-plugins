@@ -1,5 +1,5 @@
 import { expect } from 'claude-code/testing'
-import { CONFIG, SESSION, manifest, world } from './world.ts'
+import { CONFIG, SESSION, kindOf, manifest, world } from './world.ts'
 
 export const PANE = { component: 'Pane', surface: 'terminal', requestId: 'obw-issue', viewport: { columns: 160, rows: 40 }, props: { title: 'obw issue', isFocused: true, bodyColumns: 80, placement: 'inline', scroll: { offset: 0, bodyRows: 30 }, view: {} } } as const
 
@@ -38,7 +38,7 @@ export const viewSelect = (tree: any) => nodesOf(tree, 'Select').find((node: any
 export const cardSelect = (tree: any) => nodesOf(tree, 'Select').find((node: any) => node.props.key === 'cards')
 
 // Runs by their verb, so an added obsidian call cannot shift an assertion off its target.
-export const runsOf = (w: any, verb: string) => w.runs.filter((run: any) => run.argv[0] === 'obsidian' && run.argv[2] === verb)
+export const runsOf = (w: any, verb: string) => w.runs.filter((run: any) => run.argv[0] === 'obsidian' && kindOf(run.argv) === verb)
 export const uvxRuns = (w: any) => w.runs.filter((run: any) => run.argv[0] === 'uvx')
 export const renderRuns = (w: any) => w.runs.filter((run: any) => run.argv[0] === 'bash')
 
