@@ -8,6 +8,7 @@ import { baseQueryOutput, viewsOutput, readOutput, OBSIDIAN_TIMEOUT_MS } from '.
 import type { Run } from './cli-output.ts'
 import { cardName, listRows, resolveArgument, rowNamed, rowSlug, rowsOutside } from './rows.ts'
 import { COUNT_VIEW } from './counts.ts'
+import { groupedOptions } from './grouped.ts'
 import { acLabel, headerOf } from './card.ts'
 import type { CardHeader } from './card.ts'
 import { vizManifestPath, vizInstallPath, renderTarget, renderArgv, renderOutcome, RENDER_TIMEOUT_MS } from './viz.ts'
@@ -49,6 +50,7 @@ type PaneState = {
   views: string[]
   chosen: string | null
   cards: ReturnType<typeof listRows>
+  grouped: { value: string; label: string }[] | null
   selected: string | null
   card: CardRegion | null
 }
@@ -62,6 +64,7 @@ const LOADING: PaneState = {
   views: [],
   chosen: null,
   cards: [],
+  grouped: null,
   selected: null,
   card: null,
 }
@@ -282,7 +285,19 @@ async function openView($: any, scope: Scope, views: string[], chosen: string, n
     : !cards.length
       ? { kind: 'notice', text: `No cards in the ${chosen} view of pm/${scope.project}.` }
       : null
-  state = { message, hint: null, listingError, loading: false, scope, views, chosen, cards, selected: null, card: null }
+  state = {
+    message,
+    hint: null,
+    listingError,
+    loading: false,
+    scope,
+    views,
+    chosen,
+    cards,
+    grouped: chosen === COUNT_VIEW && result.kind === 'rows' ? groupedOptions(scope.project, result.rows) : null,
+    selected: null,
+    card: null,
+  }
   invalidate($)
   if (named) await show($, cardPathIn(cards, scope.project, named))
 }
@@ -364,11 +379,12 @@ async function drawPane($: any, e: any) {
       }),
     )
   }
-  if (state.cards.length) {
+  const options = state.grouped ?? state.cards.map(card => ({ value: safe(card.path), label: safe(card.label) }))
+  if (options.length) {
     children.push(
       Select({
         key: 'cards',
-        options: state.cards.map(card => ({ value: safe(card.path), label: safe(card.label) })),
+        options,
         ...(state.selected ? { value: safe(state.selected) } : {}),
         onSelect: (path: string) => {
           void show($, path).catch(() => {})

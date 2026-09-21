@@ -264,14 +264,14 @@ describe('list', () => {
 
   test('the pane re-orders nothing the CLI sent', async ($, on) => {
     const w = world(on, { query: '[{"path":"pm/cc-plugins/tasks/a.md","status":"zeta"},{"path":"pm/cc-plugins/tasks/b.md","status":"alpha"}]' })
-    await issue($, '')
+    await issue($, 'Active')
     expect(cardSelect(await $.ui.render(PANE)).props.options.map((option: any) => option.label)).toEqual(['zeta · a', 'alpha · b'])
     expect(runsOf(w, 'base:query')).toHaveLength(1)
   })
 
   test('drawing the pane again runs nothing', async ($, on) => {
     const w = world(on, { query: rows('pm/cc-plugins/tasks/a.md', 'pm/cc-plugins/tasks/b.md') })
-    await issue($, '')
+    await issue($, 'Active')
     await $.ui.render(PANE)
     await $.ui.render(PANE)
     await $.ui.render(PANE)
@@ -385,7 +385,7 @@ describe('list', () => {
     world(on, {
       query: '[{"path":"pm/cc-plugins/tasks/a.md","status":"todo"},{"path":"pm/cc-plugins/tasks/a.md","status":"todo"}]',
     })
-    await issue($, '')
+    await issue($, 'Active')
     const tree = await $.ui.render(PANE)
     expectDrawn(tree)
     expect(cardSelect(tree).props.options).toEqual([{ value: 'pm/cc-plugins/tasks/a.md', label: 'todo · a' }])
@@ -393,7 +393,7 @@ describe('list', () => {
 
   test('an archived row is listed under its own path', async ($, on) => {
     world(on, { query: '[{"path":"pm/cc-plugins/tasks/archive/c.md","status":"done"}]' })
-    await issue($, '')
+    await issue($, 'Active')
     expect(cardSelect(await $.ui.render(PANE)).props.options).toEqual([
       { value: 'pm/cc-plugins/tasks/archive/c.md', label: 'done · c' },
     ])
@@ -407,11 +407,11 @@ describe('list', () => {
 
   test('a row path that could name another note is left out', async ($, on) => {
     world(on, { query: '[{"path":"pm/cc-plugins/tasks/a\\u0001b.md"},{"path":"pm/cc-plugins/tasks/ab.md"}]' })
-    await issue($, '')
+    await issue($, 'Active')
     expect(cardSelect(await $.ui.render(PANE)).props.options).toEqual([
       { value: 'pm/cc-plugins/tasks/ab.md', label: 'ab' },
     ])
-    expect(await paneStrings($)).toContain('1 row of the All Tasks view is not a card under pm/cc-plugins and was left out.')
+    expect(await paneStrings($)).toContain('1 row of the Active view is not a card under pm/cc-plugins and was left out.')
   })
 
   test('the pane reads "Reading the vault…" while the query runs', async ($, on) => {
@@ -760,9 +760,13 @@ describe('overlapping requests', () => {
     await first
     await w.clock.settle()
     const tree = await $.ui.render(PANE)
-    expect(cardSelect(tree).props.options).toEqual([{ value: 'pm/cc-plugins/tasks/b.md', label: 'todo · b' }])
+    expect(cardSelect(tree).props.options).toEqual([
+      { value: '#0', label: 'todo (1)' },
+      { value: '#p0.0', label: '  —' },
+      { value: 'pm/cc-plugins/tasks/b.md', label: '    b' },
+    ])
     expect(cardSelect(tree).props.value).toBe(undefined)
-    expect(stringsIn(tree)).toEqual([...VIEW_STRINGS, 'pm/cc-plugins/tasks/b.md', 'todo · b'])
+    expect(stringsIn(tree)).toEqual([...VIEW_STRINGS, '#0', 'todo (1)', '#p0.0', '  —', 'pm/cc-plugins/tasks/b.md', '    b'])
     expect(runsOf(w, 'read')).toEqual([])
   })
 
@@ -782,9 +786,13 @@ describe('overlapping requests', () => {
     await first
     await w.clock.settle()
     const tree = await $.ui.render(PANE)
-    expect(cardSelect(tree).props.options).toEqual([{ value: 'pm/cc-plugins/tasks/b.md', label: 'todo · b' }])
+    expect(cardSelect(tree).props.options).toEqual([
+      { value: '#0', label: 'todo (1)' },
+      { value: '#p0.0', label: '  —' },
+      { value: 'pm/cc-plugins/tasks/b.md', label: '    b' },
+    ])
     expect(cardSelect(tree).props.value).toBe(undefined)
-    expect(stringsIn(tree)).toEqual([...VIEW_STRINGS, 'pm/cc-plugins/tasks/b.md', 'todo · b'])
+    expect(stringsIn(tree)).toEqual([...VIEW_STRINGS, '#0', 'todo (1)', '#p0.0', '  —', 'pm/cc-plugins/tasks/b.md', '    b'])
     expect(nodesOf(tree, 'Markdown').length).toBe(0)
   })
 })
@@ -800,13 +808,13 @@ describe('column labels are never keys', () => {
     const w = world(on, { query: 'defer' })
     await $.session.start(SESSION)
 
-    const template = $.command.run({ command: 'issue', args: '' })
+    const template = $.command.run({ command: 'issue', args: 'Active' })
     await w.clock.settle()
     w.release(1, TEMPLATE_LABELS)
     await template
     const withTemplateLabels = await $.ui.render(PANE)
 
-    const renamed = $.command.run({ command: 'issue', args: '' })
+    const renamed = $.command.run({ command: 'issue', args: 'Active' })
     await w.clock.settle()
     w.release(3, RENAMED_LABELS)
     await renamed
@@ -819,7 +827,7 @@ describe('column labels are never keys', () => {
 
   test('a display formula never becomes a card label', async ($, on) => {
     const w = world(on, { query: RENAMED_LABELS })
-    await issue($, '')
+    await issue($, 'Active')
     const strings = await paneStrings($)
     expect(strings).not.toContain('A')
     expect(cardSelect(await $.ui.render(PANE)).props.options).toEqual(OPTIONS)

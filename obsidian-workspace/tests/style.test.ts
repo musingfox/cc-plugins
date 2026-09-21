@@ -69,7 +69,7 @@ describe('the status label', () => {
 
   test('a doc row without a status reads a dash in its card header', async ($, on) => {
     const w = world(on, { query: '[{"path":"pm/cc-plugins/docs/d.md"}]', read: '---\ntitle: d\n---\nbody\n' })
-    const tree = await drawn($, w, '')
+    const tree = await drawn($, w, 'Active')
     expect(cardSelect(tree).props.options).toEqual([{ value: 'pm/cc-plugins/docs/d.md', label: 'd' }])
     const pane = await mounted($)
     await pane.select({ key: 'cards', value: 'pm/cc-plugins/docs/d.md' })
@@ -142,7 +142,7 @@ describe('the card separator', () => {
 
   test('a list without a card draws no separator', async ($, on) => {
     const w = world(on, { query: AB })
-    const tree = await drawn($, w, '')
+    const tree = await drawn($, w, 'Active')
     expect(separatorIn(tree)).toBe(undefined)
     expect(stringsIn(tree)).toEqual([
       ...VIEW_STRINGS,
