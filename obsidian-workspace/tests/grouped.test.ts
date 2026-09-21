@@ -1,4 +1,5 @@
 import { expect, test } from 'claude-code/testing'
+import { countRows } from '../hooks/counts.ts'
 import { groupedOptions } from '../hooks/grouped.ts'
 
 const P = (name: string) => `pm/cc-plugins/tasks/${name}.md`
@@ -120,3 +121,35 @@ test('a listing of only done cards is just the heading', () =>
   expect(groupedOptions('cc-plugins', [{ path: P('e'), status: 'done', priority: 'high' }])).toEqual([
     { value: '#0', label: 'done (1)' },
   ]))
+
+test('status heading numbers match countRows over the same rows', () => {
+  const counted = countRows('cc-plugins', MIX)
+  const headings = groupedOptions('cc-plugins', MIX).filter((option) => /^#\d+$/.test(option.value))
+  const numbers = Object.fromEntries(headings.map((option) => {
+    const match = /^(.*) \((\d+)\)$/.exec(option.label)!
+    return [match[1], Number(match[2])]
+  }))
+  expect(numbers).toEqual({ todo: 4, 'in-progress': 1, blocked: 1, done: 2, waiting: 1, '—': 1 })
+  for (const [status, count] of Object.entries(numbers)) {
+    expect(count).toBe(status === '—' ? counted.status.missing : counted.status.values.find((entry) => entry.value === status)!.count)
+  }
+  expect(Object.values(numbers).reduce((sum, n) => sum + n, 0)).toBe(counted.total)
+  expect(counted.total).toBe(10)
+})
+
+test('card options under each non-done heading match that heading\'s count', () => {
+  const options = groupedOptions('cc-plugins', MIX)
+  const counts: Record<string, number> = {}
+  let status = ''
+  for (const option of options) {
+    if (/^#\d+$/.test(option.value)) {
+      status = /^(.*) \((\d+)\)$/.exec(option.label)![1]
+      counts[status] = 0
+    } else if (option.value.startsWith('pm/')) counts[status]++
+  }
+  expect(counts.todo).toBe(4)
+  expect(counts['in-progress']).toBe(1)
+  expect(counts.blocked).toBe(1)
+  expect(counts.waiting).toBe(1)
+  expect(counts['—']).toBe(1)
+})
