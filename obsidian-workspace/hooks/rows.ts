@@ -10,7 +10,7 @@ export function resolveArgument(argument: string, views: string[]): { kind: 'non
   return views.includes(argument) ? { kind: 'view', view: argument } : { kind: 'card', card: argument }
 }
 
-function cardName(path: string) {
+export function cardName(path: string) {
   return path.slice(path.lastIndexOf('/') + 1, -'.md'.length)
 }
 

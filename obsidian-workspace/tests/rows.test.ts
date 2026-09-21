@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 import { renderTarget } from '../hooks/viz.ts'
-import { listRows, resolveArgument, rowNamed, rowSlug, rowsOutside } from '../hooks/rows.ts'
+import { cardName, listRows, resolveArgument, rowNamed, rowSlug, rowsOutside } from '../hooks/rows.ts'
 
 test('resolves an empty argument to no selection', () => {
   expect(resolveArgument('', ['Active', 'Docs'])).toEqual({ kind: 'none' })
@@ -133,4 +133,9 @@ test('uses each path below the project as a browser slug', () => {
   expect(renderTarget(rowSlug('p', 'pm/p/tasks/a.md')).file).toBe('/tmp/viz/obw/tasks-a.md')
   expect(renderTarget(rowSlug('p', 'pm/p/docs/a.md')).file).toBe('/tmp/viz/obw/docs-a.md')
   expect(rowSlug('cc-plugins', 'pm/cc-plugins/tasks/archive/adr-x.md')).toBe('tasks-archive-adr-x')
+})
+
+test('names a card from its vault path', () => {
+  expect(cardName('pm/cc-plugins/tasks/archive/adr-x.md')).toBe('adr-x')
+  expect(cardName('pm/cc-plugins/tasks/k.md')).toBe('k')
 })
