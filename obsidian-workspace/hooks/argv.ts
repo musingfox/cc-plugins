@@ -5,6 +5,10 @@ export function isBadCardName(value: string) {
   return !value || value === '.' || value === '..' || value.includes('/') || CONTROLS.test(value)
 }
 
+export function projectRoot(project: string) {
+  return `pm/${project}/`
+}
+
 export function taskFolder(project: string) {
-  return `pm/${project}/tasks/`
+  return `${projectRoot(project)}tasks/`
 }
