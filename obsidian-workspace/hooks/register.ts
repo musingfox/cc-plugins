@@ -339,6 +339,10 @@ async function openIssue($: any, request: number, argument: string, chosen: stri
   return openView($, config, names, resolved.kind === 'view' ? resolved.view : defaultView(names), null, request, listingError)
 }
 
+function clipNotice(clipped: { text: string; clippedFrom: number | null }) {
+  return clipped.clippedFrom === null ? null : `Clipped: showing ${clipped.text.length} of ${clipped.clippedFrom} characters.`
+}
+
 async function drawPane($: any, e: any) {
   const { Box, Text, Select, Markdown, Button, Code } = await $.ui.resolve(e)
   const safe = (text: string) => bounded(text).text
@@ -408,12 +412,14 @@ async function drawPane($: any, e: any) {
         ...browserLines(card.browser).map(line),
       )
     }
-    if (body.clippedFrom !== null) region.push(dim(`Clipped: showing ${body.text.length} of ${body.clippedFrom} characters.`))
+    const bodyClip = clipNotice(body)
+    if (bodyClip) region.push(dim(bodyClip))
     for (const part of bodyParts(card.segments, card.diagrams)) {
       if ('markdown' in part) region.push(Markdown({ text: safe(part.markdown) }))
       else {
         const diagram = bounded(part.diagram)
-        if (diagram.clippedFrom !== null) region.push(dim(`Clipped: showing ${diagram.text.length} of ${diagram.clippedFrom} characters.`))
+        const diagramClip = clipNotice(diagram)
+        if (diagramClip) region.push(dim(diagramClip))
         region.push(Code({ source: diagram.text, wrap: 'truncate-end' }))
       }
     }
