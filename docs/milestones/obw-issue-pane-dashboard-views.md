@@ -20,7 +20,7 @@ closed Obsidian.app does — is still true and is restated here where this chang
 
 The pane's list is a view of `pm/<project>/dashboard.base`, queried through the `obsidian` CLI.
 The module owns no list definition: editing the Active view in the vault changes what `/issue`
-lists, with no code change. `/issue` runs `base:views` on the dashboard and then one
+lists, with no code change. `/issue` reads `pm/<project>/dashboard.base` and then one
 `base:query` for the chosen view; the listing call is auxiliary and its failure is reported
 rather than swallowed, while the query is the one call that produces the list. A view is chosen
 by `/issue <view>` when the argument exactly equals a listed view name, and by a second `Select`
@@ -41,8 +41,8 @@ module imposes no status vocabulary, and `base:query` does not apply the view's 
 
 Classification stays positive, per `docs/spec/obsidian-cli-output-classified-positively.md`: the
 known success shapes are a note starting with `---\n`, a JSON array of row objects each carrying
-a string `path` (the empty array being a view with no rows), and a `name\ttype` listing (no line
-being a dashboard with no views). Anything else is an error shown as the CLI printed it, and a
+a string `path` (the empty array being a view with no rows), and the dashboard file's top-level
+`views:` list (no item being a dashboard with no views). Anything else is an error shown as the CLI printed it, and a
 run that exited non-zero is reported from stderr rather than from whatever success-shaped text it
 left on stdout. A failed dashboard query carries one fixed line pointing at `/obw:pm`; a
 configuration error never does, because a missing `.obsidian.yaml` or `pm.project` belongs to
@@ -50,8 +50,8 @@ configuration error never does, because a missing `.obsidian.yaml` or `pm.projec
 
 ## Concrete enough to build on
 
-- **CLI verbs** (Obsidian CLI 1.13.7): `base:views path=<base>` prints one `name\ttype` line per
-  view; `base:query path=<base> view=<name> format=json` returns the view's rows. Column keys are
+- **CLI verbs** (Obsidian CLI 1.13.7): `read path=<base>` returns the dashboard YAML; `base:views`
+  ignores `path=` and lists whichever base is open. `base:query path=<base> view=<name> format=json` returns the view's rows. Column keys are
   not stable — a formula's `displayName` and Obsidian's UI-language label for a file property
   both appear as keys — so only `path` and raw frontmatter names may be read.
 - **Views differ in shape.** Blocked and Recently Completed carry no `status` key at all; Docs
