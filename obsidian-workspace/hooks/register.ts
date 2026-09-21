@@ -286,6 +286,15 @@ async function openView($: any, scope: Scope, views: string[], chosen: string, n
   if (named) await show($, cardPathIn(cards, scope.project, named))
 }
 
+// A pick is taken from a drawing the pane has already replaced: a later /issue whose config resolution
+// failed leaves no scope, and there is nothing to query then. Writing the loading state and failing on
+// the way to the CLI would strand the pane on "Reading the vault…" with no picker to come back through.
+function pickView($: any, name: string) {
+  const { scope, views } = view
+  if (!scope) return
+  void openView($, scope, views, name, null).catch(() => {})
+}
+
 async function openIssue($: any, request: number, argument: string, chosen: string | null) {
   // A name holding `/` can still be a view name, which only the dashboard's listing can tell; every other bad name is refused here.
   if (argument && !argument.includes('/') && isBadCardName(argument)) return showMessage($, request, `"${argument}" is not a card name.`)
@@ -346,9 +355,7 @@ async function drawPane($: any, e: any) {
         key: 'views',
         options: view.views.map(name => ({ value: safe(name), label: safe(name) })),
         value: safe(view.chosen),
-        onSelect: (name: string) => {
-          void openView($, view.scope!, view.views, name, null).catch(() => {})
-        },
+        onSelect: (name: string) => pickView($, name),
       }),
     )
   }

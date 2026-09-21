@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { NOT_DRAWN, PANE, cardSelect, expectDrawn, headerIn, issue, nodesOf, runsOf, stringsIn, viewSelect } from './fixtures/pane.ts'
+import { NOT_DRAWN, PANE, cardSelect, expectDrawn, headerIn, issue, nodesOf, pick, runsOf, stringsIn, viewSelect } from './fixtures/pane.ts'
 import { CARD, QUERY_ARGV, SESSION, VIEW_STRINGS, world } from './fixtures/world.ts'
 
 const VIEWS_ARGV = ['obsidian', 'vault=obsidian', 'base:views', 'path=pm/cc-plugins/dashboard.base']
@@ -521,6 +521,26 @@ describe('the view switcher', () => {
     const tree = await $.ui.render(PANE)
     expect(viewSelect(tree)).toBe(undefined)
     expect(stringsIn(tree)).toContain("The dashboard's views could not be listed: AB\ttable")
+  })
+
+  test('picking a view in the switcher queries that view and lists its rows', async ($, on) => {
+    const w = world(on, { query: rows('pm/cc-plugins/tasks/a.md') })
+    await issue($, '')
+    await pick($, w, 'views', 'Docs')
+    const tree = await $.ui.render(PANE)
+    expect(runsOf(w, 'base:query')[1].argv).toContain('view=Docs')
+    expect(viewSelect(tree).props.value).toBe('Docs')
+    expect(cardSelect(tree).props.options).toEqual([{ value: 'pm/cc-plugins/tasks/a.md', label: 'todo · a' }])
+  })
+
+  test('picking a view leaves no card of the view it left', async ($, on) => {
+    const w = world(on, { query: rows(MOD_PATH), read: CARD })
+    await issue($, MOD)
+    expect(nodesOf(await $.ui.render(PANE), 'Markdown')).toHaveLength(1)
+    await pick($, w, 'views', 'Docs')
+    const tree = await $.ui.render(PANE)
+    expect(nodesOf(tree, 'Markdown')).toHaveLength(0)
+    expect(cardSelect(tree).props.value).toBe(undefined)
   })
 
   test('switching views empties the list and the card before the new rows arrive', async ($, on) => {

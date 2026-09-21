@@ -66,6 +66,13 @@ export function vizWorld(on: any, options: any = {}) {
   return world(on, { env: { HOME: '/Users/u' }, files: { [CONFIG_PATH]: CONFIG, [HOME_MANIFEST]: manifest(ROOT) }, ...options })
 }
 
+// A pick of a Select option, which only a mounted drawing takes; the pick's async work finishes on settle.
+export async function pick($: any, w: any, key: string, value: string) {
+  const picked = await (await mounted($)).select({ plugin: 'obw', key, value })
+  await w.clock.settle()
+  return picked
+}
+
 // The kit presses only a Button a render has drawn; the press's async work finishes on settle.
 export async function press($: any, w: any) {
   await $.ui.render(PANE)
