@@ -383,7 +383,7 @@ async function drawPane($: any, e: any) {
     const { title, status, priority } = card.header
     const body = bounded(card.body)
     const ac = acLabel(card.body)
-    region.push(Text({ bold: true, children: [safe(title ?? card.path)] }))
+    region.push(Text({ bold: true, children: [safe(title ?? cardName(card.path))] }))
     region.push(
       Text({
         children: [

@@ -669,12 +669,12 @@ describe('card', () => {
     expect(nodesOf(tree, 'Markdown').length).toBe(1)
   })
 
-  test('a card without title, or priority, falls back to its path and a dash', async ($, on) => {
+  test('a card without title, or priority, falls back to its name and a dash', async ($, on) => {
     world(on, { read: '---\nstatus: todo\n---\nbody\n' })
     await issue($, 'k')
     const tree = await $.ui.render(PANE)
     const title = nodesOf(tree, 'Text').filter((node: any) => node.props?.bold)
-    expect(stringsIn(title[0])).toEqual(['pm/cc-plugins/tasks/k.md'])
+    expect(stringsIn(title[0])).toEqual(['k'])
     expect(stringsIn(headerIn(tree)).join('')).toBe('status: todo · priority: —')
   })
 
