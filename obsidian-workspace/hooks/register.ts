@@ -1,7 +1,7 @@
 import type { On } from 'claude-code'
 import { bounded, MAX_CHARS } from './bounds.ts'
 import { configOf } from './config.ts'
-import { isBadCardName, taskFolder } from './argv.ts'
+import { isBadCardName, dashboardPath, taskFolder } from './argv.ts'
 import { baseQueryArgv, cardPathArgv, viewsArgv } from './base-argv.ts'
 import { baseQueryOutput, viewsOutput, readOutput, OBSIDIAN_TIMEOUT_MS } from './cli-output.ts'
 import type { Run } from './cli-output.ts'
@@ -233,7 +233,7 @@ async function resolveConfig($: any): Promise<Config> {
 // The only writer of this hint: a dashboard the CLI could not read may simply not exist yet, while a
 // configuration fault names the file it read and says nothing about /obw:pm.
 function pmHint(project: string) {
-  return `If pm/${project}/dashboard.base is missing, run /obw:pm to create it.`
+  return `If ${dashboardPath(project)} is missing, run /obw:pm to create it.`
 }
 
 // Rows the dashboard sent that the pane cannot open are their own outcome, not an empty view.

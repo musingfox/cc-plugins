@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 import * as argv from '../hooks/argv.ts'
-import { isBadCardName, projectRoot, taskFolder } from '../hooks/argv.ts'
+import { isBadCardName, dashboardPath, projectRoot, taskFolder } from '../hooks/argv.ts'
 import { baseQueryArgv, cardPathArgv, viewsArgv } from '../hooks/base-argv.ts'
 
 test('removes legacy list argv but keeps card-name validation', () => {
@@ -23,6 +23,10 @@ test('allows a plain card name', () => expect(isBadCardName('mod-obw-issue-pane'
 
 test('names the project root', () => {
   expect(projectRoot('cc-plugins')).toBe('pm/cc-plugins/')
+})
+
+test('names the dashboard under the project', () => {
+  expect(dashboardPath('cc-plugins')).toBe('pm/cc-plugins/dashboard.base')
 })
 
 test('names the task folder under the project', () => {

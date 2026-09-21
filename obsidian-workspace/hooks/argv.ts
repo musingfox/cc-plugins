@@ -9,6 +9,10 @@ export function projectRoot(project: string) {
   return `pm/${project}/`
 }
 
+export function dashboardPath(project: string) {
+  return `${projectRoot(project)}dashboard.base`
+}
+
 export function taskFolder(project: string) {
   return `${projectRoot(project)}tasks/`
 }

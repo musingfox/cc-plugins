@@ -1,14 +1,10 @@
-import { isBadCardName, taskFolder } from './argv.ts'
+import { isBadCardName, dashboardPath, taskFolder } from './argv.ts'
 import { bounded } from './bounds.ts'
 
 type ArgvResult = { argv: string[] } | { refused: 'vault' | 'project' | 'view' | 'path' }
 
 function isBadProject(value: string) {
   return isBadCardName(value) || /[\[\]"\s]/.test(value)
-}
-
-function dashboardPath(project: string) {
-  return `pm/${project}/dashboard.base`
 }
 
 function isBadVault(value: string) {
