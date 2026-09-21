@@ -17,6 +17,9 @@ const PRIORITY = new Map([
   ['low', GREY],
 ])
 
+export const STATUS_ORDER = [...STATUS.keys()]
+export const PRIORITY_ORDER = [...PRIORITY.keys()]
+
 export function statusColor(status: string | undefined): string | undefined {
   return status === undefined ? undefined : STATUS.get(status)
 }

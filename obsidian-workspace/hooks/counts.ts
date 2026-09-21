@@ -4,11 +4,15 @@ export const COUNT_VIEW = 'All Tasks'
 
 type Row = { path: string; status?: string | null; priority?: string | null }
 
+export function isMissing(value: string | null | undefined): value is null | undefined | '' {
+  return typeof value !== 'string' || value === ''
+}
+
 function tally(values: (string | null | undefined)[]) {
   const counts = new Map<string, number>()
   let missing = 0
   for (const value of values) {
-    if (typeof value !== 'string' || value === '') {
+    if (isMissing(value)) {
       missing++
       continue
     }
