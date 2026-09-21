@@ -99,3 +99,17 @@ views:
     groupBy:
       property: type
       direction: ASC
+
+  - type: table
+    name: "All Tasks"
+    filters:
+      and:
+        - 'type == "task"'
+    order:
+      - title
+      - status
+      - priority
+      - due
+      - completed
+      - type
+      - tags
