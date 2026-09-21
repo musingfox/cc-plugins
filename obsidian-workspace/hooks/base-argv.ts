@@ -1,4 +1,4 @@
-import { isBadCardName, dashboardPath, taskFolder } from './argv.ts'
+import { isBadCardName, dashboardPath, projectRoot } from './argv.ts'
 import { bounded } from './bounds.ts'
 
 type ArgvResult = { argv: string[] } | { refused: 'vault' | 'project' | 'view' | 'path' }
@@ -23,7 +23,7 @@ export function baseQueryArgv(vault: string, project: string, view: string): Arg
 }
 
 export function isBadCardPath(project: string, path: string) {
-  const root = taskFolder(project).replace(/tasks\/$/, '')
+  const root = projectRoot(project)
   return !path.startsWith(root) || !path.endsWith('.md') || path.endsWith('/.md') ||
     bounded(path).text !== path || /[\t\n\r]/.test(path) ||
     path.split('/').some(segment => segment === '.' || segment === '..' || isBadCardName(segment))

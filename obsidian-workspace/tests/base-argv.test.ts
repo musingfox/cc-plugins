@@ -15,6 +15,7 @@ test('refuses an empty vault', () => expect(baseQueryArgv('', 'cc-plugins', 'Act
 test('builds a read argv from a row path', () => expect(cardPathArgv('obsidian', 'cc-plugins', 'pm/cc-plugins/tasks/a.md')).toEqual({ argv: ['obsidian', 'vault=obsidian', 'read', 'path=pm/cc-plugins/tasks/a.md'] }))
 test('accepts nested task paths', () => expect(cardPathArgv('obsidian', 'cc-plugins', 'pm/cc-plugins/tasks/archive/adr-three-conditions-audit.md')).toHaveProperty('argv'))
 test('accepts non-task row paths', () => expect(cardPathArgv('obsidian', 'cc-plugins', 'pm/cc-plugins/docs/mattpocock-skills-import.md')).toHaveProperty('argv'))
+test('refuses a path under a different project', () => expect(cardPathArgv('obsidian', 'cc', 'pm/cc-plugins/tasks/a.md')).toEqual({ refused: 'path' }))
 test('accepts spaces in a basename', () => expect(cardPathArgv('obsidian', 'cc-plugins', 'pm/cc-plugins/tasks/my card.md')).toEqual({ argv: ['obsidian', 'vault=obsidian', 'read', 'path=pm/cc-plugins/tasks/my card.md'] }))
 test('refuses an empty card project', () => expect(cardPathArgv('obsidian', '', 'pm/cc-plugins/tasks/a.md')).toEqual({ refused: 'project' }))
 test('refuses an empty card vault', () => expect(cardPathArgv('', 'cc-plugins', 'pm/cc-plugins/tasks/a.md')).toEqual({ refused: 'vault' }))
