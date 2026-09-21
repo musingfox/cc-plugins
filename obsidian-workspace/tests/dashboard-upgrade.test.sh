@@ -36,4 +36,27 @@ n=$(printf '%s\n' "$readme" | grep -cF 'hand edits' || true)
 n=$(printf '%s\n' "$readme" | grep -cF 'Upgrading a vault from before 0.9: re-run `/obw:init`' || true)
 [ "$n" -eq 1 ] || fail "README Vault Layout pre-0.9 upgrade line count is $n, want 1"
 
-bash obsidian-workspace/tests/docs.test.sh || fail "docs.test.sh failed"
+pm=obsidian-workspace/skills/pm/SKILL.md
+dash=$(awk '/^## Dashboards/,/^## Important Rules/' "$pm")
+n=$(printf '%s\n' "$dash" | grep -c 'refresh dashboard' || true)
+[ "$n" -ge 1 ] || fail "pm Dashboards refresh dashboard count is $n, want >=1"
+n=$(printf '%s\n' "$dash" | grep -cF 'read path="pm/{project}/dashboard.base"' || true)
+[ "$n" -eq 1 ] || fail "pm Dashboards read path count is $n, want 1"
+n=$(printf '%s\n' "$dash" | grep -c 'hand edits' || true)
+[ "$n" -ge 1 ] || fail "pm Dashboards hand edits count is $n, want >=1"
+n=$(printf '%s\n' "$dash" | grep -cF '"${CLAUDE_PLUGIN_ROOT}/templates/dashboard-project.base"`' || true)
+[ "$n" -eq 1 ] || fail "pm Dashboards template names grep count is $n, want 1"
+n=$(printf '%s\n' "$dash" | grep -c 'missing from the vault' || true)
+[ "$n" -ge 1 ] || fail "pm Dashboards must report missing view names"
+n=$(printf '%s\n' "$dash" | grep -c 'base file is not found' || true)
+[ "$n" -ge 1 ] || fail "pm Dashboards must handle a missing base file"
+n=$(printf '%s\n' "$dash" | grep -cF 'Conversation-mode status (user asks in chat, not Obsidian): run the equivalent `search` and format a summary table in the reply.' || true)
+[ "$n" -eq 1 ] || fail "pm Dashboards conversation-mode status sentence count is $n, want 1"
+
+n=$(grep -cF 'templates/dashboard-project.base")" overwrite' "$pm" || true)
+[ "$n" -eq 1 ] || fail "pm SKILL dashboard-project overwrite count is $n, want 1"
+
+
+# base:views ignores path= and lists the views of whichever base is open in Obsidian.
+n=$(cat "$init" "$pm" | grep -cE 'base:views[^`]*path=' || true)
+[ "$n" -eq 0 ] || fail "T4: a skill runs base:views with path=, got $n"

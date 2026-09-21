@@ -129,7 +129,16 @@ Generated from plugin templates via shell (template contents never enter context
     content="$(sed "s/__PROJECT__/{project}/g" "${CLAUDE_PLUGIN_ROOT}/templates/dashboard-project.base")" overwrite
   ```
 
-Conversation-mode status (user asks in chat, not Obsidian): run the equivalent `search` and format a summary table in the reply. Don't rewrite an existing `.base` file unless asked to — the only unprompted write is recreating a project dashboard that has gone missing.
+A `refresh dashboard` request brings an existing project dashboard up to the template:
+
+1. List the vault dashboard's view names: `obsidian vault={vault} read path="pm/{project}/dashboard.base" | grep -E 'name:|^Error'`. Never use `base:views` here: it ignores `path=` and lists the views of whatever base is open in Obsidian. An `Error: File "…" not found.` line means the base file is not found: the dashboard is missing — recreate it with the per-project command above and stop. Obsidian may drop the quotes around a name, so compare names without them.
+2. List the template's view names only: `grep '^    name:' "${CLAUDE_PLUGIN_ROOT}/templates/dashboard-project.base"`. Never read the rest of the template into context.
+3. Report which template views are missing from the vault's list. If none are, say so and stop. Otherwise warn that regenerating overwrites `dashboard.base` and discards any hand edits to it.
+4. Only after the user agrees, regenerate with the per-project create command above.
+
+The cross-project file follows the same steps with `pm/dashboard.base` and `templates/dashboard-cross.base`.
+
+Conversation-mode status (user asks in chat, not Obsidian): run the equivalent `search` and format a summary table in the reply. Don't rewrite an existing `.base` file unless asked to (a `refresh dashboard` request is asking) — the only unprompted write is recreating a project dashboard that has gone missing.
 
 ## Important Rules
 
