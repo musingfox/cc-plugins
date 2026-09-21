@@ -3,6 +3,7 @@ import { bounded, MAX_CHARS } from './bounds.ts'
 import { configOf } from './config.ts'
 import { isBadCardName, dashboardPath, taskFolder } from './argv.ts'
 import { baseQueryArgv, cardPathArgv, viewsArgv } from './base-argv.ts'
+import type { Scope } from './base-argv.ts'
 import { baseQueryOutput, viewsOutput, readOutput, OBSIDIAN_TIMEOUT_MS } from './cli-output.ts'
 import type { Run } from './cli-output.ts'
 import { listRows, resolveArgument, rowNamed, rowSlug, rowsOutside } from './rows.ts'
@@ -36,8 +37,6 @@ type CardRegion =
 type Shown = Extract<CardRegion, { kind: 'shown' }>
 
 type Line = { kind: 'error' | 'notice'; text: string }
-
-type Scope = { vault: string; project: string }
 
 // `loading` cannot be read off the message: the loading notice and the empty-view notice are both notices.
 type View = {
@@ -111,7 +110,7 @@ async function show($: any, path: string) {
   const { scope } = view
   if (!scope) return
   const request = ++requests
-  const built = cardPathArgv(scope.vault, scope.project, path)
+  const built = cardPathArgv(scope, path)
   if (!('argv' in built)) return showCard($, request, path, { kind: 'error', message: `"${path}" is not a card path.` })
   showCard($, request, path, { kind: 'loading', name: path })
   const output = readOutput(await runProcess($, built.argv))
@@ -265,7 +264,7 @@ function reasonOf(error: unknown) {
 async function openView($: any, scope: Scope, views: string[], chosen: string, named: string | null, request = ++requests, listingError: string | null = null) {
   view = { ...LOADING, scope, views, chosen, listingError }
   invalidate($)
-  const built = baseQueryArgv(scope.vault, scope.project, chosen)
+  const built = baseQueryArgv(scope, chosen)
   if (!('argv' in built)) return showMessage($, request, `"${chosen}" is not a view.`)
   const result = baseQueryOutput(await runProcess($, built.argv))
   if (request !== requests) return
@@ -305,7 +304,7 @@ async function openIssue($: any, request: number, argument: string, chosen: stri
     return showMessage($, request, `Could not look for .obsidian.yaml: ${reasonOf(error)}`)
   }
   if ('error' in config) return showMessage($, request, config.error)
-  const list = viewsArgv(config.vault, config.project)
+  const list = viewsArgv(config)
   if (!('argv' in list)) {
     return showMessage(
       $,

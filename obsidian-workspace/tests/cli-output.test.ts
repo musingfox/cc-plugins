@@ -120,7 +120,7 @@ test('reads a listing carrying a line that is not a view as an error', () => {
 test('offers only view names the query builder accepts', () => {
   const offered = [...namesOf(viewsOutput(run(VIEWS))), ...namesOf(viewsOutput(run(TABBED)))]
   expect(offered).toHaveLength(7)
-  for (const name of offered) expect(baseQueryArgv('obsidian', 'cc-plugins', name)).toHaveProperty('argv')
+  for (const name of offered) expect(baseQueryArgv({ vault: 'obsidian', project: 'cc-plugins' }, name)).toHaveProperty('argv')
 })
 
 const CARD = '---\ntitle: "Claude Mod：面板顯示 obw 的 task 與 issue"\nstatus: todo\npriority: medium\ndue:\ntags:\n  - claude-mods\ncreated: 2026-09-18\n---\n# mod-obw-issue-pane\n\n## Acceptance Criteria\n- [ ] one\n'

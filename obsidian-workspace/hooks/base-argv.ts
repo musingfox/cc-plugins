@@ -3,6 +3,8 @@ import { bounded } from './bounds.ts'
 
 type ArgvResult = { argv: string[] } | { refused: 'vault' | 'project' | 'view' | 'path' }
 
+export type Scope = { vault: string; project: string }
+
 function isBadProject(value: string) {
   return isBadCardName(value) || /[\[\]"\s]/.test(value)
 }
@@ -15,11 +17,11 @@ function isBadView(value: string) {
   return !value || bounded(value).text !== value || /[\t\n\r]/.test(value)
 }
 
-export function baseQueryArgv(vault: string, project: string, view: string): ArgvResult {
-  if (isBadVault(vault)) return { refused: 'vault' }
-  if (isBadProject(project)) return { refused: 'project' }
+export function baseQueryArgv(scope: Scope, view: string): ArgvResult {
+  if (isBadVault(scope.vault)) return { refused: 'vault' }
+  if (isBadProject(scope.project)) return { refused: 'project' }
   if (isBadView(view)) return { refused: 'view' }
-  return { argv: ['obsidian', `vault=${vault}`, 'base:query', `path=${dashboardPath(project)}`, `view=${view}`, 'format=json'] }
+  return { argv: ['obsidian', `vault=${scope.vault}`, 'base:query', `path=${dashboardPath(scope.project)}`, `view=${view}`, 'format=json'] }
 }
 
 export function isBadCardPath(project: string, path: string) {
@@ -29,15 +31,15 @@ export function isBadCardPath(project: string, path: string) {
     path.split('/').some(segment => segment === '.' || segment === '..' || isBadCardName(segment))
 }
 
-export function cardPathArgv(vault: string, project: string, path: string): ArgvResult {
-  if (isBadVault(vault)) return { refused: 'vault' }
-  if (isBadProject(project)) return { refused: 'project' }
-  if (isBadCardPath(project, path)) return { refused: 'path' }
-  return { argv: ['obsidian', `vault=${vault}`, 'read', `path=${path}`] }
+export function cardPathArgv(scope: Scope, path: string): ArgvResult {
+  if (isBadVault(scope.vault)) return { refused: 'vault' }
+  if (isBadProject(scope.project)) return { refused: 'project' }
+  if (isBadCardPath(scope.project, path)) return { refused: 'path' }
+  return { argv: ['obsidian', `vault=${scope.vault}`, 'read', `path=${path}`] }
 }
 
-export function viewsArgv(vault: string, project: string): ArgvResult {
-  if (isBadVault(vault)) return { refused: 'vault' }
-  if (isBadProject(project)) return { refused: 'project' }
-  return { argv: ['obsidian', `vault=${vault}`, 'base:views', `path=${dashboardPath(project)}`] }
+export function viewsArgv(scope: Scope): ArgvResult {
+  if (isBadVault(scope.vault)) return { refused: 'vault' }
+  if (isBadProject(scope.project)) return { refused: 'project' }
+  return { argv: ['obsidian', `vault=${scope.vault}`, 'base:views', `path=${dashboardPath(scope.project)}`] }
 }

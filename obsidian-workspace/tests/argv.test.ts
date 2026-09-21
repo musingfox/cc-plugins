@@ -36,10 +36,10 @@ test('names the task folder under the project', () => {
 
 test('never emits an empty or file target', () => {
   const built = [
-    baseQueryArgv('obsidian', 'cc-plugins', 'Active'),
-    cardPathArgv('obsidian', 'cc-plugins', `${taskFolder('cc-plugins')}mod-obw-issue-pane.md`),
-    cardPathArgv('obsidian', 'cc-plugins', `${taskFolder('cc-plugins')}my card.md`),
-    viewsArgv('obsidian', 'cc-plugins'),
+    baseQueryArgv({ vault: 'obsidian', project: 'cc-plugins' }, 'Active'),
+    cardPathArgv({ vault: 'obsidian', project: 'cc-plugins' }, `${taskFolder('cc-plugins')}mod-obw-issue-pane.md`),
+    cardPathArgv({ vault: 'obsidian', project: 'cc-plugins' }, `${taskFolder('cc-plugins')}my card.md`),
+    viewsArgv({ vault: 'obsidian', project: 'cc-plugins' }),
   ]
   for (const result of built) {
     expect(result).toHaveProperty('argv')
