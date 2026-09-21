@@ -49,8 +49,14 @@ cmd_verify() {
 }
 
 cmd_slice() {
-  local f id p g
-  for f in $(entries); do
+  local f id p g files
+  files=$(entries)
+  # A scope is a pattern, and an unquoted `$(scopes …)` would let the shell
+  # expand it against the working tree first: `foo/**` would come back as the
+  # files that exist under foo today, so a path the run is about to create
+  # matches nothing and the entry silently fails to reach the worker.
+  set -f
+  for f in $files; do
     [ "$(field "$f" status)" = accepted ] || continue
     id=$(field "$f" id)
     for p in "$@"; do
