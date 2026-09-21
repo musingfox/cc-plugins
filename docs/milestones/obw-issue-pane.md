@@ -1,10 +1,20 @@
 ---
-status: accepted    # accepted | done | superseded
+status: superseded  # accepted | done | superseded
 delivered:          # commit or tag ref — filled when acceptance passes
 depends: []         # milestone slugs that must land first
 ---
 
 # `/issue`: an obw task card in a pane, read through the Obsidian CLI
+
+**Superseded on 2026-09-21 by `obw-issue-pane-dashboard-views.md`, after the pane it describes
+shipped.** The pane was delivered as written; what this milestone no longer records truthfully is
+where its list comes from. Four of its commitments were replaced when the list moved to the
+project's Bases dashboard: the hand-written search query below, one CLI call per view, kebab
+names as list labels, and the acceptance criterion that `/issue` lists "unfinished cards". Its
+reason for rejecting `base:query` — that a base row's keys are localized display names — is
+answered by `docs/spec/base-rows-keyed-by-path-not-labels.md`, which forbids reading a row by any
+column label. Everything else here, in particular the CLI's output shapes, the element bounds and
+the config lookup, is still accurate and is why this file is kept rather than deleted.
 
 The source card is the Obsidian task `pm/cc-plugins/tasks/mod-obw-issue-pane.md` (vault `obsidian`): show an obsidian-workspace task card in a Claude Mod pane instead of reading it into the conversation, so the card costs no conversation tokens. Four of that card's premises are false against the installed Claude Code 2.1.276 and Obsidian CLI 1.13.7, and this milestone restates them:
 
