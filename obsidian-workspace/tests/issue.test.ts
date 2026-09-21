@@ -698,7 +698,7 @@ describe('card', () => {
     const loading = await $.ui.render(PANE)
     expect(w.runs.length).toBe(3)
     expect(cardSelect(loading)).toBeDefined()
-    expect(stringsIn(loading)).toContain(`Reading ${MOD_PATH}…`)
+    expect(stringsIn(loading)).toContain(`Reading ${MOD}…`)
     await w.clock.advance(60000)
     await done
   })

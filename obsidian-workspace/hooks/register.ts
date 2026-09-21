@@ -6,7 +6,7 @@ import { baseQueryArgv, cardPathArgv, viewsArgv } from './base-argv.ts'
 import type { Scope } from './base-argv.ts'
 import { baseQueryOutput, viewsOutput, readOutput, OBSIDIAN_TIMEOUT_MS } from './cli-output.ts'
 import type { Run } from './cli-output.ts'
-import { listRows, resolveArgument, rowNamed, rowSlug, rowsOutside } from './rows.ts'
+import { cardName, listRows, resolveArgument, rowNamed, rowSlug, rowsOutside } from './rows.ts'
 import { acLabel, headerOf } from './card.ts'
 import type { CardHeader } from './card.ts'
 import { vizManifestPath, vizInstallPath, renderTarget, renderArgv, renderOutcome, RENDER_TIMEOUT_MS } from './viz.ts'
@@ -377,7 +377,7 @@ async function drawPane($: any, e: any) {
   const columns = e.props?.bodyColumns
   const ruleWidth = Number.isInteger(columns) && columns > 0 ? Math.min(columns, MAX_CHARS) : 40
   const region: any[] = [dim('─'.repeat(ruleWidth))]
-  if (card.kind === 'loading') region.push(dim(`Reading ${card.path}…`))
+  if (card.kind === 'loading') region.push(dim(`Reading ${cardName(card.path)}…`))
   if (card.kind === 'error') region.push(red(card.message))
   if (card.kind === 'shown') {
     const { title, status, priority } = card.header

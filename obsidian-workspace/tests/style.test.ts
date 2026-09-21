@@ -160,7 +160,7 @@ describe('the card separator', () => {
     await w.clock.settle()
     const strings = stringsIn(await $.ui.render(PANE))
     expect(strings).toContain('─'.repeat(80))
-    expect(strings).toContain(`Reading ${MOD_PATH}…`)
+    expect(strings).toContain(`Reading ${MOD}…`)
     await w.clock.advance(60000)
     await done
   })
