@@ -275,3 +275,14 @@ describe('query errors', () => {
     expect(runsOf(w, 'base:query')[1].argv).toContain('view=Docs')
   })
 })
+
+describe('command result', () => {
+  test('the grouped list never enters the command result', async ($, on) => {
+    world(on, { query: '[{"path":"pm/cc-plugins/tasks/a.md","status":"zz-marker"}]' })
+    const result = await issue($, '')
+    expect(result).toEqual({})
+    expect(stringsIn(await $.ui.render(PANE))).toContain('zz-marker (1)')
+    expect(JSON.stringify(result).includes('zz-marker')).toBe(false)
+    expect(JSON.stringify(result).includes('(1)')).toBe(false)
+  })
+})
