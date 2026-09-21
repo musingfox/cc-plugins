@@ -153,3 +153,25 @@ describe('opening a grouped card', () => {
     expect(cardSelect(tree).props.options).toEqual(GROUPED_MIX)
   })
 })
+
+describe('heading picks', () => {
+  test('picking a status heading changes nothing', async ($, on) => {
+    const w = world(on, { query: JSON.stringify(MIX) })
+    await issue($, '')
+    const before = stringsIn(await $.ui.render(PANE))
+    await pick($, w, 'cards', '#0')
+    expect(w.runs.length).toBe(2)
+    expect(stringsIn(await $.ui.render(PANE))).toEqual(before)
+    expect(nodesOf(await $.ui.render(PANE), 'Box').some((node: any) => node.props?.marginTop === 1)).toBe(false)
+  })
+
+  test('picking a priority sub-heading changes nothing', async ($, on) => {
+    const w = world(on, { query: JSON.stringify(MIX) })
+    await issue($, '')
+    const before = stringsIn(await $.ui.render(PANE))
+    await pick($, w, 'cards', '#p0.0')
+    expect(w.runs.length).toBe(2)
+    expect(stringsIn(await $.ui.render(PANE))).toEqual(before)
+    expect(nodesOf(await $.ui.render(PANE), 'Box').some((node: any) => node.props?.marginTop === 1)).toBe(false)
+  })
+})

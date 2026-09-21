@@ -153,3 +153,9 @@ test('card options under each non-done heading match that heading\'s count', () 
   expect(counts.waiting).toBe(1)
   expect(counts['—']).toBe(1)
 })
+
+test('every grouped option is a heading, a sub-heading, or a card path', () => {
+  for (const option of groupedOptions('cc-plugins', MIX)) {
+    expect(/^#\d+$/.test(option.value) || /^#p\d+\.\d+$/.test(option.value) || option.value.startsWith('pm/')).toBe(true)
+  }
+})

@@ -387,6 +387,7 @@ async function drawPane($: any, e: any) {
         options,
         ...(state.selected ? { value: safe(state.selected) } : {}),
         onSelect: (path: string) => {
+          if (path.startsWith('#')) return
           void show($, path).catch(() => {})
         },
       }),
