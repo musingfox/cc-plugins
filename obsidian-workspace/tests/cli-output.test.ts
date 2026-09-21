@@ -105,6 +105,12 @@ test('offers no view from a failed listing', () => {
 
 test('reads a dashboard that lists no view as empty', () => expect(viewsOutput(run(''))).toEqual({ kind: 'empty' }))
 
+test('reads a listing whose every name could not be drawn as an error, not as no views', () => {
+  const listing = viewsOutput(run('A\u001bB\ttable\n'))
+  expect(namesOf(listing)).toEqual([])
+  expect(listing).toEqual({ kind: 'error', message: 'A\u001bB\ttable' })
+})
+
 test('reads a listing carrying a line that is not a view as an error', () => {
   const listing = viewsOutput(run('Note: dashboard updated\nActive\ttable\n'))
   expect(namesOf(listing)).toEqual([])

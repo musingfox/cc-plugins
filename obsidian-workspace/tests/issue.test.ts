@@ -515,6 +515,14 @@ describe('the view switcher', () => {
     expect(stringsIn(tree)).toContain("The dashboard's views could not be listed: Note: dashboard updated\nActive\ttable")
   })
 
+  test('a listing that offered no name the pane could draw is said, not read as no views', async ($, on) => {
+    world(on, { views: 'A\u001bB\ttable\n', query: '[]' })
+    await issue($, '')
+    const tree = await $.ui.render(PANE)
+    expect(viewSelect(tree)).toBe(undefined)
+    expect(stringsIn(tree)).toContain("The dashboard's views could not be listed: AB\ttable")
+  })
+
   test('switching views empties the list and the card before the new rows arrive', async ($, on) => {
     const w = world(on, { query: 'defer', read: CARD })
     await $.session.start(SESSION)

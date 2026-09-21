@@ -31,6 +31,8 @@ export function baseQueryOutput(run: Run): { kind: 'rows'; rows: BaseRow[] } | {
 
 // A listing is one `name\ttype` per line; a line of any other shape is the CLI
 // saying something else, which is shown rather than read as "this dashboard has no view".
+// A listing that named views but none the pane could draw is shown the same way: only a
+// dashboard that listed nothing at all is empty.
 export function viewsOutput(run: Run): { kind: 'views'; views: string[] } | { kind: 'empty' } | { kind: 'error'; message: string } {
   if (run.kind !== 'exited' || run.exitCode !== 0) return { kind: 'error', message: errorMessage(run) }
   const lines = run.stdout.split('\n').filter((line) => line.trim() !== '')
@@ -39,7 +41,8 @@ export function viewsOutput(run: Run): { kind: 'views'; views: string[] } | { ki
     const name = line.slice(0, line.lastIndexOf('\t'))
     return /^[^\x00-\x08\x0b-\x1f\x7f-\x9f\t\n\r]{1,10000}$/.test(name) ? [name] : []
   })
-  return views.length ? { kind: 'views', views } : { kind: 'empty' }
+  if (views.length) return { kind: 'views', views }
+  return lines.length ? { kind: 'error', message: errorMessage(run) } : { kind: 'empty' }
 }
 
 function noteOf(stdout: string): { frontmatter: string; body: string } | null {
