@@ -21,11 +21,11 @@ type Browser = { kind: 'rendering' } | ReturnType<typeof renderOutcome>
 // The card region under the list has its own state, so a card's outcome never replaces the list's message.
 // `segments` splits the clipped body once; `diagrams` is indexed by a mermaid block's position in `segments`.
 type CardRegion =
-  | { kind: 'loading'; name: string }
+  | { kind: 'loading'; path: string }
   | { kind: 'error'; message: string }
   | {
       kind: 'shown'
-      name: string
+      path: string
       header: CardHeader
       body: string
       segments: Segment[]
@@ -112,13 +112,13 @@ async function show($: any, path: string) {
   const request = ++requests
   const built = cardPathArgv(scope, path)
   if (!('argv' in built)) return showCard($, request, path, { kind: 'error', message: `"${path}" is not a card path.` })
-  showCard($, request, path, { kind: 'loading', name: path })
+  showCard($, request, path, { kind: 'loading', path })
   const output = readOutput(await runProcess($, built.argv))
   if (output.kind === 'error') return showCard($, request, path, { kind: 'error', message: output.message })
   const vizRoot = await findViz($)
   const header = headerOf(output.frontmatter)
   const segments = splitFences(bounded(output.body).text)
-  showCard($, request, path, { kind: 'shown', name: path, header, body: output.body, segments, vizRoot, browser: null, diagrams: [] })
+  showCard($, request, path, { kind: 'shown', path, header, body: output.body, segments, vizRoot, browser: null, diagrams: [] })
   // termaid never holds /issue: an offline uvx can take seconds, and the card is already drawn.
   void drawDiagrams($, request, segments).catch(() => {})
 }
@@ -157,7 +157,7 @@ async function openInBrowser($: any) {
   const card = view.card
   if (card?.kind !== 'shown' || !card.vizRoot || !view.scope) return
   const request = requests
-  const target = renderTarget(rowSlug(view.scope.project, card.name))
+  const target = renderTarget(rowSlug(view.scope.project, card.path))
   showBrowser($, request, { kind: 'rendering' })
   try {
     await $.fs.write(target.file, card.body)
@@ -377,13 +377,13 @@ async function drawPane($: any, e: any) {
   const columns = e.props?.bodyColumns
   const ruleWidth = Number.isInteger(columns) && columns > 0 ? Math.min(columns, MAX_CHARS) : 40
   const region: any[] = [dim('─'.repeat(ruleWidth))]
-  if (card.kind === 'loading') region.push(dim(`Reading ${card.name}…`))
+  if (card.kind === 'loading') region.push(dim(`Reading ${card.path}…`))
   if (card.kind === 'error') region.push(red(card.message))
   if (card.kind === 'shown') {
     const { title, status, priority } = card.header
     const body = bounded(card.body)
     const ac = acLabel(card.body)
-    region.push(Text({ bold: true, children: [safe(title ?? card.name)] }))
+    region.push(Text({ bold: true, children: [safe(title ?? card.path)] }))
     region.push(
       Text({
         children: [
