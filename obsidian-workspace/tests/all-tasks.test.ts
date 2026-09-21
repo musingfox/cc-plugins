@@ -286,3 +286,25 @@ describe('command result', () => {
     expect(JSON.stringify(result).includes('(1)')).toBe(false)
   })
 })
+
+describe('bounded grouped text', () => {
+  test('vault values in grouped options stay within draw bounds', async ($, on) => {
+    const CR = String.fromCharCode(13)
+    world(on, {
+      query: JSON.stringify([
+        { path: P('a'), status: 'x'.repeat(11000) },
+        { path: P('b'), status: `a${CR}b`, priority: `c${CR}d` },
+      ]),
+    })
+    await issue($, '')
+    const tree = await $.ui.render(PANE)
+    expectDrawn(tree)
+    const strings = stringsIn(tree)
+    for (const text of strings) expect(text.length).toBeLessThanOrEqual(10000)
+    expect(strings).toContain('x'.repeat(10000))
+    expect(strings).toContain('ab (1)')
+    expect(strings).toContain('  cd')
+    expect(strings).toContain('    b')
+    expect(strings.some((text) => text.includes(CR))).toBe(false)
+  })
+})
