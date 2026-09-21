@@ -31,8 +31,10 @@ export function countRows(project: string, rows: Row[]) {
   }
 }
 
+export function missingViewText(project: string) {
+  return `pm/${project}/dashboard.base has no ${COUNT_VIEW} view. Run /obw:pm refresh dashboard to regenerate it from the plugin template; hand edits to that file are overwritten.`
+}
+
 export function missingViewHint(project: string, message: string) {
-  return message.split('\n', 1)[0] === `Error: View not found: ${COUNT_VIEW}`
-    ? `pm/${project}/dashboard.base has no ${COUNT_VIEW} view. Run /obw:pm refresh dashboard to regenerate it from the plugin template; hand edits to that file are overwritten.`
-    : null
+  return message.split('\n', 1)[0] === `Error: View not found: ${COUNT_VIEW}` ? missingViewText(project) : null
 }

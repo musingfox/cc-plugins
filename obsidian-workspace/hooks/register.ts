@@ -7,7 +7,7 @@ import type { Scope } from './base-argv.ts'
 import { baseQueryOutput, viewsOutput, readOutput, OBSIDIAN_TIMEOUT_MS } from './cli-output.ts'
 import type { Run } from './cli-output.ts'
 import { cardName, listRows, resolveArgument, rowNamed, rowSlug, rowsOutside } from './rows.ts'
-import { COUNT_VIEW } from './counts.ts'
+import { COUNT_VIEW, missingViewText } from './counts.ts'
 import { groupedOptions } from './grouped.ts'
 import { acLabel, headerOf } from './card.ts'
 import type { CardHeader } from './card.ts'
@@ -44,7 +44,7 @@ type Line = { kind: 'error' | 'notice'; text: string }
 type PaneState = {
   message: Line | null
   hint: string | null
-  listingError: string | null
+  listing: Line | null
   loading: boolean
   scope: Scope | null
   views: string[]
@@ -58,7 +58,7 @@ type PaneState = {
 const LOADING: PaneState = {
   message: { kind: 'notice', text: 'Reading the vault…' },
   hint: null,
-  listingError: null,
+  listing: null,
   loading: true,
   scope: null,
   views: [],
@@ -266,8 +266,8 @@ function reasonOf(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
 
-async function openView($: any, scope: Scope, views: string[], chosen: string, named: string | null, request = ++requests, listingError: string | null = null) {
-  state = { ...LOADING, scope, views, chosen, listingError }
+async function openView($: any, scope: Scope, views: string[], chosen: string, named: string | null, request = ++requests, listing: Line | null = null) {
+  state = { ...LOADING, scope, views, chosen, listing }
   invalidate($)
   const built = baseQueryArgv(scope, chosen)
   if (!('argv' in built)) return showMessage($, request, `"${chosen}" is not a view.`)
@@ -288,7 +288,7 @@ async function openView($: any, scope: Scope, views: string[], chosen: string, n
   state = {
     message,
     hint: null,
-    listingError,
+    listing,
     loading: false,
     scope,
     views,
@@ -335,7 +335,12 @@ async function openIssue($: any, request: number, argument: string, chosen: stri
   if (request !== requests) return
   const names = listing.kind === 'views' ? listing.views : []
   // Prefixed: beside a list the query did draw, the CLI's bare complaint reads as a contradiction.
-  const listingError = listing.kind === 'error' ? `The dashboard's views could not be listed: ${listing.message}` : null
+  const listingLine: Line | null =
+    listing.kind === 'error'
+      ? { kind: 'error', text: `The dashboard's views could not be listed: ${listing.message}` }
+      : names.includes(COUNT_VIEW)
+        ? null
+        : { kind: 'notice', text: missingViewText(config.project) }
   const resolved = resolveArgument(argument, names)
   if (resolved.kind === 'card') {
     if (isBadCardName(resolved.card)) return showMessage($, request, `"${resolved.card}" is not a card name.`)
@@ -351,9 +356,9 @@ async function openIssue($: any, request: number, argument: string, chosen: stri
       }
       return show($, `${taskFolder(config.project)}${resolved.card}.md`)
     }
-    return openView($, config, names, shownView(chosen, names), resolved.card, request, listingError)
+    return openView($, config, names, shownView(chosen, names), resolved.card, request, listingLine)
   }
-  return openView($, config, names, resolved.kind === 'view' ? resolved.view : defaultView(names), null, request, listingError)
+  return openView($, config, names, resolved.kind === 'view' ? resolved.view : defaultView(names), null, request, listingLine)
 }
 
 function clipNotice(clipped: { text: string; clippedFrom: number | null }) {
@@ -368,7 +373,7 @@ async function drawPane($: any, e: any) {
   const line = ({ kind, text }: Line) => (kind === 'error' ? red(text) : dim(text))
   const span = (text: string, color?: string) => Text({ ...(color ? { color } : {}), children: [safe(text)] })
   const children: any[] = []
-  if (state.listingError) children.push(red(state.listingError))
+  if (state.listing) children.push(line(state.listing))
   if (!state.loading && state.views.length && state.scope && state.chosen) {
     children.push(
       Select({

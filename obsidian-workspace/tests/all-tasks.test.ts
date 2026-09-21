@@ -187,3 +187,48 @@ describe('heading picks', () => {
     expect(nodesOf(await $.ui.render(PANE), 'Box').some((node: any) => node.props?.marginTop === 1)).toBe(false)
   })
 })
+
+const HINT =
+  'pm/cc-plugins/dashboard.base has no All Tasks view. Run /obw:pm refresh dashboard to regenerate it from the plugin template; hand edits to that file are overwritten.'
+
+describe('missing All Tasks', () => {
+  test('a listing without All Tasks opens Active with the refresh hint', async ($, on) => {
+    const w = world(on, {
+      views: 'views:\n  - type: table\n    name: "Active"\n  - type: table\n    name: "Docs"\n',
+      query: '[{"path":"pm/cc-plugins/tasks/a.md","status":"todo"}]',
+    })
+    await issue($, '')
+    const tree = await $.ui.render(PANE)
+    expect(stringsIn(tree)).toEqual([HINT, 'Active', 'Active', 'Docs', 'Docs', P('a'), 'todo · a'])
+    const hint = nodesOf(tree, 'Text').find((node: any) => stringsIn(node).includes(HINT))
+    expect(hint.props.dimColor).toBe(true)
+    expect('color' in (hint.props ?? {})).toBe(false)
+    expect(runsOf(w, 'base:query')[0].argv).toContain('view=Active')
+  })
+
+  test('a listing of only Backlog falls back to it', async ($, on) => {
+    world(on, { views: 'views:\n  - type: table\n    name: "Backlog"\n', query: '[]' })
+    await issue($, '')
+    const tree = await $.ui.render(PANE)
+    expect(stringsIn(tree)[0]).toBe(HINT)
+    expect(viewSelect(tree).props.value).toBe('Backlog')
+  })
+
+  test('a failed listing draws no refresh hint', async ($, on) => {
+    world(on, { views: { deny: 'spawn failed' } })
+    await issue($, '')
+    expect(stringsIn(await $.ui.render(PANE))).not.toContain(HINT)
+  })
+
+  test('a dashboard with no views still hints', async ($, on) => {
+    world(on, { views: 'views:\n' })
+    await issue($, '')
+    expect(stringsIn(await $.ui.render(PANE))[0]).toBe(HINT)
+  })
+
+  test('the template dashboard draws no refresh hint', async ($, on) => {
+    world(on)
+    await issue($, '')
+    expect(stringsIn(await $.ui.render(PANE))).not.toContain(HINT)
+  })
+})

@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import { baseQueryArgv } from '../hooks/base-argv.ts'
 import { baseQueryOutput } from '../hooks/cli-output.ts'
-import { COUNT_VIEW, countRows, missingViewHint } from '../hooks/counts.ts'
+import { COUNT_VIEW, countRows, missingViewHint, missingViewText } from '../hooks/counts.ts'
 import { listRows, rowsOutside } from '../hooks/rows.ts'
 
 const run = (stdout: string) => ({ kind: 'exited' as const, exitCode: 0, stdout, stderr: '' })
@@ -126,3 +126,8 @@ test('does not hint for a longer view name', () =>
 
 test('names the counted view in the hint', () =>
   expect(missingViewHint('p', `Error: View not found: ${COUNT_VIEW}`)).toContain(`has no ${COUNT_VIEW} view`))
+
+test('exports the refresh hint text', () =>
+  expect(missingViewText('p')).toBe(
+    'pm/p/dashboard.base has no All Tasks view. Run /obw:pm refresh dashboard to regenerate it from the plugin template; hand edits to that file are overwritten.',
+  ))
