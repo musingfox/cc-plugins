@@ -114,6 +114,8 @@ Every project gets `tasks/`, `docs/`, and `dashboard.base` — `/obw:init` creat
 
 Upgrading a vault from before 0.9: re-run `/obw:init`. It detects the old layout and offers, each separately, to move `archive/` into `tasks/archive/` (through the CLI, so links follow), backfill the `title` property on existing notes, and regenerate the dashboards with the new views. Existing filenames are never renamed.
 
+A plugin update can add dashboard views. Run `/obw:pm refresh dashboard` to bring in All Tasks (and any other new template view) on an existing vault. The refresh regenerates `dashboard.base` from the template, so hand edits to that file are overwritten; it warns and asks first.
+
 ## Filenames
 
 All notes are kebab-cased (`Implement Auth` → `implement-auth.md`), for both `/obw:jot` notes and `/obw:pm` tasks / docs / ADRs. Because Obsidian's `{{title}}` resolves to the filename, the human-readable title lives in the `title` property — that is what the dashboards display.

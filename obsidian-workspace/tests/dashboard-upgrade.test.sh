@@ -25,3 +25,15 @@ n=$(printf '%s\n' "$step6" | grep -cF 'read path="pm/<PROJECT_NAME>/dashboard.ba
 [ "$n" -eq 1 ] || fail "T1: init step 6 literal read path count is $n, want 1"
 n=$(printf '%s\n' "$step6" | grep -cF 'Missing `title`' || true)
 [ "$n" -eq 1 ] || fail "T3: Missing title count is $n, want 1"
+
+readme=$(awk '/^## Vault Layout/,/^## Filenames/' obsidian-workspace/README.md)
+n=$(printf '%s\n' "$readme" | grep -cF '/obw:pm refresh dashboard' || true)
+[ "$n" -ge 1 ] || fail "README Vault Layout refresh dashboard count is $n, want >=1"
+n=$(printf '%s\n' "$readme" | grep -cF 'All Tasks' || true)
+[ "$n" -ge 1 ] || fail "README Vault Layout All Tasks count is $n, want >=1"
+n=$(printf '%s\n' "$readme" | grep -cF 'hand edits' || true)
+[ "$n" -ge 1 ] || fail "README Vault Layout hand edits count is $n, want >=1"
+n=$(printf '%s\n' "$readme" | grep -cF 'Upgrading a vault from before 0.9: re-run `/obw:init`' || true)
+[ "$n" -eq 1 ] || fail "README Vault Layout pre-0.9 upgrade line count is $n, want 1"
+
+bash obsidian-workspace/tests/docs.test.sh || fail "docs.test.sh failed"
