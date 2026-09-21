@@ -39,7 +39,7 @@ type Shown = Extract<CardRegion, { kind: 'shown' }>
 type Line = { kind: 'error' | 'notice'; text: string }
 
 // `loading` cannot be read off the message: the loading notice and the empty-view notice are both notices.
-type View = {
+type PaneState = {
   message: Line | null
   hint: string | null
   listingError: string | null
@@ -52,7 +52,7 @@ type View = {
   card: CardRegion | null
 }
 
-const LOADING: View = {
+const LOADING: PaneState = {
   message: { kind: 'notice', text: 'Reading the vault…' },
   hint: null,
   listingError: null,
@@ -65,8 +65,8 @@ const LOADING: View = {
   card: null,
 }
 
-let view: View = LOADING
-// A CLI call can settle after a newer /issue or card read started; only the latest request writes the view.
+let state: PaneState = LOADING
+// A CLI call can settle after a newer /issue or card read started; only the latest request writes the state.
 let requests = 0
 
 async function runProcess($: any, argv: string[], timeoutMs = OBSIDIAN_TIMEOUT_MS, stdin?: string): Promise<Run> {
@@ -84,14 +84,14 @@ function invalidate($: any) {
 
 function showMessage($: any, request: number, message: string) {
   if (request === requests) {
-    view = { ...LOADING, loading: false, message: { kind: 'error', text: message } }
+    state = { ...LOADING, loading: false, message: { kind: 'error', text: message } }
     invalidate($)
   }
 }
 
 function showCard($: any, request: number, name: string, card: CardRegion) {
   if (request === requests) {
-    view = { ...view, selected: name, card }
+    state = { ...state, selected: name, card }
     invalidate($)
   }
 }
@@ -107,7 +107,7 @@ async function findViz($: any): Promise<string | null> {
 }
 
 async function show($: any, path: string) {
-  const { scope } = view
+  const { scope } = state
   if (!scope) return
   const request = ++requests
   const built = cardPathArgv(scope, path)
@@ -142,9 +142,9 @@ async function drawDiagrams($: any, request: number, segments: Segment[]) {
 
 // A diagram or press result writes only under the card read it came from: a newer read, even of the same card, drops it.
 function patchShown($: any, request: number, patch: (card: Shown) => Shown) {
-  const card = view.card
+  const card = state.card
   if (request === requests && card?.kind === 'shown') {
-    view = { ...view, card: patch(card) }
+    state = { ...state, card: patch(card) }
     invalidate($)
   }
 }
@@ -154,10 +154,10 @@ function showBrowser($: any, request: number, browser: Browser) {
 }
 
 async function openInBrowser($: any) {
-  const card = view.card
-  if (card?.kind !== 'shown' || !card.vizRoot || !view.scope) return
+  const card = state.card
+  if (card?.kind !== 'shown' || !card.vizRoot || !state.scope) return
   const request = requests
-  const target = renderTarget(rowSlug(view.scope.project, card.path))
+  const target = renderTarget(rowSlug(state.scope.project, card.path))
   showBrowser($, request, { kind: 'rendering' })
   try {
     await $.fs.write(target.file, card.body)
@@ -262,14 +262,14 @@ function reasonOf(error: unknown) {
 }
 
 async function openView($: any, scope: Scope, views: string[], chosen: string, named: string | null, request = ++requests, listingError: string | null = null) {
-  view = { ...LOADING, scope, views, chosen, listingError }
+  state = { ...LOADING, scope, views, chosen, listingError }
   invalidate($)
   const built = baseQueryArgv(scope, chosen)
   if (!('argv' in built)) return showMessage($, request, `"${chosen}" is not a view.`)
   const result = baseQueryOutput(await runProcess($, built.argv))
   if (request !== requests) return
   if (result.kind === 'error') {
-    view = { ...view, loading: false, message: { kind: 'error', text: result.message }, hint: pmHint(scope.project) }
+    state = { ...state, loading: false, message: { kind: 'error', text: result.message }, hint: pmHint(scope.project) }
     invalidate($)
     return
   }
@@ -280,7 +280,7 @@ async function openView($: any, scope: Scope, views: string[], chosen: string, n
     : !cards.length
       ? { kind: 'notice', text: `No cards in the ${chosen} view of pm/${scope.project}.` }
       : null
-  view = { message, hint: null, listingError, loading: false, scope, views, chosen, cards, selected: null, card: null }
+  state = { message, hint: null, listingError, loading: false, scope, views, chosen, cards, selected: null, card: null }
   invalidate($)
   if (named) await show($, cardPathIn(cards, scope.project, named))
 }
@@ -289,7 +289,7 @@ async function openView($: any, scope: Scope, views: string[], chosen: string, n
 // failed leaves no scope, and there is nothing to query then. Writing the loading state and failing on
 // the way to the CLI would strand the pane on "Reading the vault…" with no picker to come back through.
 function pickView($: any, name: string) {
-  const { scope, views } = view
+  const { scope, views } = state
   if (!scope) return
   void openView($, scope, views, name, null).catch(() => {})
 }
@@ -323,7 +323,7 @@ async function openIssue($: any, request: number, argument: string, chosen: stri
   if (resolved.kind === 'card') {
     if (isBadCardName(resolved.card)) return showMessage($, request, `"${resolved.card}" is not a card name.`)
     if (!names.length) {
-      view = {
+      state = {
         ...LOADING,
         loading: false,
         scope: config,
@@ -351,32 +351,32 @@ async function drawPane($: any, e: any) {
   const line = ({ kind, text }: Line) => (kind === 'error' ? red(text) : dim(text))
   const span = (text: string, color?: string) => Text({ ...(color ? { color } : {}), children: [safe(text)] })
   const children: any[] = []
-  if (view.listingError) children.push(red(view.listingError))
-  if (!view.loading && view.views.length && view.scope && view.chosen) {
+  if (state.listingError) children.push(red(state.listingError))
+  if (!state.loading && state.views.length && state.scope && state.chosen) {
     children.push(
       Select({
         key: 'views',
-        options: view.views.map(name => ({ value: safe(name), label: safe(name) })),
-        value: safe(view.chosen),
+        options: state.views.map(name => ({ value: safe(name), label: safe(name) })),
+        value: safe(state.chosen),
         onSelect: (name: string) => pickView($, name),
       }),
     )
   }
-  if (view.cards.length) {
+  if (state.cards.length) {
     children.push(
       Select({
         key: 'cards',
-        options: view.cards.map(card => ({ value: safe(card.path), label: safe(card.label) })),
-        ...(view.selected ? { value: safe(view.selected) } : {}),
+        options: state.cards.map(card => ({ value: safe(card.path), label: safe(card.label) })),
+        ...(state.selected ? { value: safe(state.selected) } : {}),
         onSelect: (path: string) => {
           void show($, path).catch(() => {})
         },
       }),
     )
   }
-  if (view.message) children.push(line(view.message))
-  if (view.hint) children.push(dim(view.hint))
-  const card = view.card
+  if (state.message) children.push(line(state.message))
+  if (state.hint) children.push(dim(state.hint))
+  const card = state.card
   if (!card) return Box({ flexDirection: 'column', children })
   const columns = e.props?.bodyColumns
   const ruleWidth = Number.isInteger(columns) && columns > 0 ? Math.min(columns, MAX_CHARS) : 40
@@ -446,9 +446,9 @@ export function register(on: On) {
 
   on('command.run', { command: 'issue' }, async ($, e) => {
     const argument = (e.args ?? '').trim()
-    const chosen = view.chosen
+    const chosen = state.chosen
     const request = ++requests
-    view = LOADING
+    state = LOADING
     try {
       await $.ui.open(PANE)
     } catch {
