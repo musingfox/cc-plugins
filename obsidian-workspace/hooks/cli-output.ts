@@ -15,7 +15,15 @@ function errorMessage(run: Run) {
   return first.trim() || second.trim() || `obsidian exited ${run.exitCode} with no output.`
 }
 
-type BaseRow = { path: string; status: string | null; priority: string | null }
+type BaseRow = { path: string; status: string | null; priority: string | null; title: string | null; due: string | null; tags: string | null }
+
+const text = (value: unknown) => (typeof value === 'string' ? value : null)
+
+function tagsOf(value: unknown) {
+  if (typeof value === 'string') return value
+  if (!Array.isArray(value)) return null
+  return value.filter((tag) => typeof tag === 'string').join(', ') || null
+}
 
 export function baseQueryOutput(run: Run): { kind: 'rows'; rows: BaseRow[] } | { kind: 'empty' } | { kind: 'error'; message: string } {
   if (run.kind !== 'exited' || run.exitCode !== 0) return { kind: 'error', message: errorMessage(run) }
@@ -24,7 +32,7 @@ export function baseQueryOutput(run: Run): { kind: 'rows'; rows: BaseRow[] } | {
     if (!Array.isArray(parsed) || !parsed.every((row) => row && typeof row === 'object' && typeof row.path === 'string')) {
       return { kind: 'error', message: errorMessage(run) }
     }
-    const rows = parsed.map((row) => ({ path: row.path, status: typeof row.status === 'string' ? row.status : null, priority: typeof row.priority === 'string' ? row.priority : null }))
+    const rows = parsed.map((row) => ({ path: row.path, status: text(row.status), priority: text(row.priority), title: text(row.title), due: text(row.due), tags: tagsOf(row.tags) }))
     return rows.length ? { kind: 'rows', rows } : { kind: 'empty' }
   } catch {
     return { kind: 'error', message: errorMessage(run) }

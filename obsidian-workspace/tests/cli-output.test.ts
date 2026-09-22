@@ -16,31 +16,53 @@ test('removes legacy search output but keeps reads', () => {
 test('takes a row from its path and raw status and priority, not its labels', () =>
   expect(baseQueryOutput(run('[{"path":"pm/p/tasks/a.md","Title":"A","status":"todo","priority":"high","due":null,"Days Until Due":"","tags":["x"]}]'))).toEqual({
     kind: 'rows',
-    rows: [{ path: 'pm/p/tasks/a.md', status: 'todo', priority: 'high' }],
+    rows: [{ path: 'pm/p/tasks/a.md', status: 'todo', priority: 'high', title: null, due: null, tags: 'x' }],
   }))
 
 test('reads a row with no status key as no status', () =>
   expect(baseQueryOutput(run('[{"path":"pm/p/tasks/archive/x.md","Title":"X","completed":"2026-09-01","tags":[]}]'))).toEqual({
     kind: 'rows',
-    rows: [{ path: 'pm/p/tasks/archive/x.md', status: null, priority: null }],
+    rows: [{ path: 'pm/p/tasks/archive/x.md', status: null, priority: null, title: null, due: null, tags: null }],
   }))
 
 test('reads a null status as no status', () =>
   expect(baseQueryOutput(run('[{"path":"pm/p/docs/d.md","Title":"D","type":"doc","status":null,"updated":"2026-09-19"}]'))).toEqual({
     kind: 'rows',
-    rows: [{ path: 'pm/p/docs/d.md', status: null, priority: null }],
+    rows: [{ path: 'pm/p/docs/d.md', status: null, priority: null, title: null, due: null, tags: null }],
   }))
 
 test('reads a non-string priority as no priority', () =>
   expect(baseQueryOutput(run('[{"path":"pm/p/tasks/b.md","status":"todo","priority":1}]'))).toEqual({
     kind: 'rows',
-    rows: [{ path: 'pm/p/tasks/b.md', status: 'todo', priority: null }],
+    rows: [{ path: 'pm/p/tasks/b.md', status: 'todo', priority: null, title: null, due: null, tags: null }],
   }))
 
 test('reads raw priority, not a Priority label', () => {
   const result = baseQueryOutput(run('[{"path":"pm/p/tasks/c.md","Priority":"high","priority":"low"}]'))
   expect(result.kind).toBe('rows')
   if (result.kind === 'rows') expect(result.rows[0].priority).toBe('low')
+})
+
+test('takes title, due and tags from their raw property names', () =>
+  expect(baseQueryOutput(run('[{"path":"pm/p/tasks/a.md","title":"T","status":"todo","priority":"high","due":"2026-09-30","tags":"#a, #b"}]'))).toEqual({
+    kind: 'rows',
+    rows: [{ path: 'pm/p/tasks/a.md', status: 'todo', priority: 'high', title: 'T', due: '2026-09-30', tags: '#a, #b' }],
+  }))
+
+test('reads no title from a Title label, and a null due as no due', () => {
+  const result = baseQueryOutput(run('[{"path":"pm/p/tasks/a.md","Title":"A","due":null,"tags":["x"]}]'))
+  expect(result.kind).toBe('rows')
+  if (result.kind === 'rows') expect([result.rows[0].title, result.rows[0].due, result.rows[0].tags]).toEqual([null, null, 'x'])
+})
+
+test('joins string tags and reads anything else as no tags or no title', () => {
+  const tagsOf = (tags: string) => {
+    const result = baseQueryOutput(run(`[{"path":"pm/p/tasks/a.md","title":7,"tags":${tags}}]`))
+    return result.kind === 'rows' ? [result.rows[0].tags, result.rows[0].title] : result
+  }
+  expect(tagsOf('["x",3,"y"]')).toEqual(['x, y', null])
+  expect(tagsOf('[]')).toEqual([null, null])
+  expect(tagsOf('5')).toEqual([null, null])
 })
 
 test('passes a missing All Tasks view through', () =>
