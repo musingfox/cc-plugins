@@ -1,9 +1,14 @@
 import type { ClientSurface } from 'claude-code'
+import { RED } from './style.ts'
 import { displayWidth, fitWidth } from './width.ts'
 
 type BoardRow = { path: string; badge: 'H' | 'M' | 'L' | ' '; title: string; due: string; tags: string }
 type Group = { status: string | null; count: number; rows: BoardRow[] }
-type Props = { rows: number; columns: number; groups: Group[]; hidden: number; card: null }
+type Card =
+  | { kind: 'loading'; name: string }
+  | { kind: 'error'; message: string }
+  | { kind: 'shown'; path: string; title: string; status: string; priority: string; ac: string | null; clip: string | null; body: string }
+type Props = { rows: number; columns: number; groups: Group[]; hidden: number; card: Card | null }
 type State = { cursor: number; top: number; collapsed: string[] }
 type Item = { kind: 'heading'; group: Group; open: boolean } | { kind: 'row'; row: BoardRow }
 
@@ -39,10 +44,50 @@ function rowLine(columns: number, groups: Group[]) {
     ).trimEnd()
 }
 
+// The body's lines, each hard-wrapped at `columns` cells; an empty body has none.
+function wrapped(body: string, columns: number) {
+  if (body === '') return []
+  return body.split('\n').flatMap((text) => {
+    const lines = ['']
+    let used = 0
+    for (const char of text) {
+      const width = displayWidth(char)
+      if (used + width > columns && used > 0) {
+        lines.push('')
+        used = 0
+      }
+      lines[lines.length - 1] += char
+      used += width
+    }
+    return lines
+  })
+}
+
 export default function Board(props: Props, surface: ClientSurface<State>) {
   const { Box, Text } = surface.elements
   const st = surface.state ?? START
   const column = (children: any[]) => Box({ flexDirection: 'column', children })
+
+  if (props.card) {
+    const card = props.card
+    surface.onKey(() => {})
+    const back = Text({ dimColor: true, children: ['← list'] })
+    if (card.kind === 'loading') return column([back, Text({ dimColor: true, children: [`Reading ${card.name}…`] })])
+    if (card.kind === 'error') return column([back, Text({ color: RED, children: [card.message] })])
+    const header = [
+      Text({ bold: true, children: [card.title] }),
+      Text({ children: [[card.status, card.priority, ...(card.ac ? [card.ac] : [])].join(' · ')] }),
+      ...(card.clip ? [Text({ dimColor: true, children: [card.clip] })] : []),
+    ]
+    const lines = wrapped(card.body, props.columns)
+    const window = Math.max(1, props.rows - 1 - header.length)
+    const scroll = 0
+    return column([
+      Text({ dimColor: true, children: [`↑↓ scroll  ← list  ${lines.length ? scroll + 1 : 0}/${lines.length}`] }),
+      ...header,
+      ...lines.slice(scroll, scroll + window).map((text) => Text({ children: [text] })),
+    ])
+  }
 
   const items = itemsOf(props.groups, st.collapsed)
   if (items.length === 0) {

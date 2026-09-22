@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 import Board from '../hooks/board.ts'
+import { RED } from '../hooks/style.ts'
 import { fakeSurface, linesOf, textsOf } from './fixtures/surface.ts'
 
 const P = (name: string) => `pm/cc-plugins/tasks/${name}.md`
@@ -156,4 +157,38 @@ test('return on a heading opens nothing', () => {
   const s = board(list())
   s.key('return')
   expect(s.posts).toEqual([])
+})
+
+const BODY = Array.from({ length: 20 }, (_, i) => `l${i + 1}`).join('\n')
+const shown = (fields: any = {}) => ({ kind: 'shown', path: P('b'), title: 'T', status: 'todo', priority: 'high', ac: 'AC 0/1', clip: null, body: BODY, ...fields })
+const cardProps = (card: any) => ({ rows: 6, columns: 40, groups: [], hidden: 0, card })
+
+test('draws a shown card in place of the list', () => {
+  expect(linesOf(board(cardProps(shown())).tree)).toEqual(['↑↓ scroll  ← list  1/20', 'T', 'todo · high · AC 0/1', 'l1', 'l2', 'l3'])
+})
+
+test('wraps a wide body line at the width', () => {
+  expect(linesOf(board(cardProps(shown({ body: '中'.repeat(25) }))).tree).slice(3)).toEqual(['中'.repeat(20), '中'.repeat(5)])
+})
+
+test('draws a card being read', () => {
+  expect(linesOf(board(cardProps({ kind: 'loading', name: 'b' })).tree)).toContain('Reading b…')
+})
+
+test('draws a card read failure in red', () => {
+  const message = 'Error: File "x" not found.'
+  const text = textsOf(board(cardProps({ kind: 'error', message })).tree).find((node) => node.props.children.join('') === message)
+  expect(text.props.color).toBe(RED)
+})
+
+test('counts no lines for an empty body', () => {
+  expect(counter(board(cardProps(shown({ body: '' }))).tree)).toBe('0/0')
+})
+
+test('keeps the list cursor while a card is shown', () => {
+  const s = board(list())
+  downTo(s, 3)
+  s.render(cardProps(shown()))
+  s.render(list())
+  expect(counter(s.tree)).toBe('4/14')
 })
