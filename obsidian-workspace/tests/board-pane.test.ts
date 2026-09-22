@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { PANE, cardSelect, clientNode, expectDrawn, issue, mounted, nodesOf, pick, stringsIn, viewSelect } from './fixtures/pane.ts'
-import { CARD, SESSION, world } from './fixtures/world.ts'
+import { PANE, cardSelect, clientNode, expectDrawn, issue, mounted, nodesOf, runsOf, stringsIn, uvxRuns, viewSelect } from './fixtures/pane.ts'
+import { CARD, MERMAID_CARD, SESSION, world } from './fixtures/world.ts'
 import { MIX, P } from './fixtures/rows.ts'
 import { RED } from '../hooks/style.ts'
 
@@ -169,5 +169,70 @@ describe('the /issue result', () => {
     expect(result).toEqual({})
     expect(stringsIn(await $.ui.render(PANE))).toContain('Claude Mod：面板顯示 obw 的 task 與 issue')
     expect(JSON.stringify(result).includes('面板顯示')).toBe(false)
+  })
+})
+
+describe('a card opened from the list', () => {
+  const TITLE = 'Claude Mod：面板顯示 obw 的 task 與 issue'
+
+  // The world answers ui.invalidate itself, so a mounted drawing redraws only when asked.
+  async function openFirstRow($: any, w: any) {
+    await issue($, '')
+    const m = await mounted($)
+    await m.key({ key: 'down', in: 'board' })
+    await m.key({ key: 'return', in: 'board' })
+    await w.clock.settle()
+    await m.redraw()
+    return m
+  }
+
+  test('is drawn inside the Client in place of the list', async ($, on) => {
+    const w = world(on)
+    const m = await openFirstRow($, w)
+    expect(runsOf(w, 'read').map((run: any) => run.argv[3])).toEqual(['path=pm/cc-plugins/tasks/a.md'])
+    expect(await m.find({ type: 'Text', text: TITLE, in: 'board' })).toBeDefined()
+    const tree = await $.ui.render(PANE)
+    expect(nodesOf(tree, 'Markdown')).toHaveLength(0)
+    expect(clientNode(tree).props.props.groups).toEqual([])
+  })
+
+  test('runs no termaid', async ($, on) => {
+    const w = world(on, { read: MERMAID_CARD })
+    await openFirstRow($, w)
+    expect(runsOf(w, 'read')).toHaveLength(1)
+    expect(uvxRuns(w)).toHaveLength(0)
+  })
+
+  test('a failed read is drawn inside the Client', async ($, on) => {
+    const w = world(on, { read: 'Error: File "pm/cc-plugins/tasks/a.md" not found.' })
+    const m = await openFirstRow($, w)
+    expect(await m.find({ type: 'Text', text: 'Error: File "pm/cc-plugins/tasks/a.md" not found.', in: 'board' })).toBeDefined()
+  })
+
+  test('a post naming a path outside the list reads nothing', async ($, on) => {
+    const w = world(on)
+    await issue($, '')
+    const m = await mounted($)
+    await m.post({ open: 'pm/cc-plugins/../x.md' }, { in: 'board' })
+    await w.clock.settle()
+    expect(runsOf(w, 'read')).toHaveLength(0)
+    await m.post({ open: 'pm/cc-plugins/tasks/a.md' }, { in: 'board' })
+    await w.clock.settle()
+    expect(runsOf(w, 'read')).toHaveLength(1)
+  })
+
+  test('card text stays within draw bounds', async ($, on) => {
+    const CR = String.fromCharCode(13)
+    const w = world(on, { read: `---\ntitle: "a${CR}b"\n---\n${'x'.repeat(11000)}` })
+    const m = await openFirstRow($, w)
+    const card = clientNode(await $.ui.render(PANE)).props.props.card
+    expect(card.body.length).toBe(10000)
+    expect(card.clip).toBe('Clipped: showing 10000 of 11000 characters.')
+    const texts = await m.findAll({ type: 'Text', in: 'board' })
+    expect(texts.some((text: any) => text.text === 'ab')).toBe(true)
+    for (const text of texts) {
+      expect(text.text.length).toBeLessThanOrEqual(10000)
+      expect(text.text.includes(CR)).toBe(false)
+    }
   })
 })

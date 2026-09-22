@@ -10,6 +10,7 @@ import { cardName, listRows, resolveArgument, rowNamed, rowSlug, rowsOutside } f
 import { COUNT_VIEW, missingViewHint, missingViewText } from './counts.ts'
 import { listGroups } from './list.ts'
 import { boardSize } from './board-size.ts'
+import { boardMessage } from './board-message.ts'
 import { acLabel, headerOf } from './card.ts'
 import type { CardHeader } from './card.ts'
 import { vizManifestPath, vizInstallPath, renderTarget, renderArgv, renderOutcome, RENDER_TIMEOUT_MS } from './viz.ts'
@@ -41,6 +42,9 @@ type Shown = Extract<CardRegion, { kind: 'shown' }>
 
 type Line = { kind: 'error' | 'notice'; text: string }
 
+// Where the shown card was asked for: `list` is a row opened inside the All Tasks Client, drawn there as plain text.
+type Origin = 'argument' | 'list'
+
 // `loading` cannot be read off the message: the loading notice and the empty-view notice are both notices.
 type PaneState = {
   message: Line | null
@@ -54,6 +58,7 @@ type PaneState = {
   groups: ReturnType<typeof listGroups> | null
   selected: string | null
   card: CardRegion | null
+  origin: Origin
 }
 
 const LOADING: PaneState = {
@@ -68,6 +73,7 @@ const LOADING: PaneState = {
   groups: null,
   selected: null,
   card: null,
+  origin: 'argument',
 }
 
 let state: PaneState = LOADING
@@ -94,9 +100,9 @@ function showMessage($: any, request: number, message: string) {
   }
 }
 
-function showCard($: any, request: number, name: string, card: CardRegion) {
+function showCard($: any, request: number, name: string, card: CardRegion, origin: Origin = 'argument') {
   if (request === requests) {
-    state = { ...state, selected: name, card }
+    state = { ...state, selected: name, card, origin }
     invalidate($)
   }
 }
@@ -111,19 +117,22 @@ async function findViz($: any): Promise<string | null> {
   }
 }
 
-async function show($: any, path: string) {
+async function show($: any, path: string, origin: Origin = 'argument') {
   const { scope } = state
   if (!scope) return
   const request = ++requests
+  const put = (card: CardRegion) => showCard($, request, path, card, origin)
   const built = cardPathArgv(scope, path)
-  if (!('argv' in built)) return showCard($, request, path, { kind: 'error', message: `"${path}" is not a card path.` })
-  showCard($, request, path, { kind: 'loading', path })
+  if (!('argv' in built)) return put({ kind: 'error', message: `"${path}" is not a card path.` })
+  put({ kind: 'loading', path })
   const output = readOutput(await runProcess($, built.argv))
-  if (output.kind === 'error') return showCard($, request, path, { kind: 'error', message: output.message })
-  const vizRoot = await findViz($)
+  if (output.kind === 'error') return put({ kind: 'error', message: output.message })
+  // The Client draws a card as plain text: it has no Button to open the browser and no room for diagrams.
+  const vizRoot = origin === 'list' ? null : await findViz($)
   const header = headerOf(output.frontmatter)
   const segments = splitFences(bounded(output.body).text)
-  showCard($, request, path, { kind: 'shown', path, header, body: output.body, segments, vizRoot, browser: null, diagrams: [] })
+  put({ kind: 'shown', path, header, body: output.body, segments, vizRoot, browser: null, diagrams: [] })
+  if (origin === 'list') return
   // termaid never holds /issue: an offline uvx can take seconds, and the card is already drawn.
   void drawDiagrams($, request, segments).catch(() => {})
 }
@@ -366,6 +375,25 @@ function clipNotice(clipped: { text: string; clippedFrom: number | null }) {
   return clipped.clippedFrom === null ? null : `Clipped: showing ${clipped.text.length} of ${clipped.clippedFrom} characters.`
 }
 
+// The Client module draws its props as given, so every vault string is bounded here.
+function boardCard(card: CardRegion) {
+  const safe = (text: string) => bounded(text).text
+  if (card.kind === 'loading') return { kind: 'loading', name: safe(cardName(card.path)) }
+  if (card.kind === 'error') return { kind: 'error', message: safe(card.message) }
+  const { title, status, priority } = card.header
+  const body = bounded(card.body)
+  return {
+    kind: 'shown',
+    path: card.path,
+    title: safe(title ?? cardName(card.path)),
+    status: safe(status ?? '—'),
+    priority: safe(priority ?? '—'),
+    ac: acLabel(card.body),
+    clip: clipNotice(body),
+    body: body.text,
+  }
+}
+
 async function drawPane($: any, e: any) {
   const { Box, Text, Select, Markdown, Button, Code, Client } = await $.ui.resolve(e)
   const safe = (text: string) => bounded(text).text
@@ -395,7 +423,9 @@ async function drawPane($: any, e: any) {
       siblings: [state.listing, state.message].flatMap((line) => (line ? [safe(line.text)] : [])),
       argumentCard: false,
     })
-    children.push(Client({ key: 'board', module: './board.ts', width: columns, height: rows, props: { rows, columns, groups: board.groups, hidden: board.hidden, card: null } }))
+    const listCard = state.card && state.origin === 'list' ? boardCard(state.card) : null
+    const shown = listCard ? { groups: [], hidden: 0, card: listCard } : { groups: board.groups, hidden: board.hidden, card: null }
+    children.push(Client({ key: 'board', module: './board.ts', width: columns, height: rows, props: { rows, columns, ...shown } }))
   } else if (state.cards.length) {
     children.push(
       Select({
@@ -411,7 +441,7 @@ async function drawPane($: any, e: any) {
   if (state.message) children.push(line(state.message))
   if (state.hint) children.push(dim(state.hint))
   const card = state.card
-  if (!card) return Box({ flexDirection: 'column', children })
+  if (!card || (board && state.origin === 'list')) return Box({ flexDirection: 'column', children })
   const columns = e.props?.bodyColumns
   const ruleWidth = Number.isInteger(columns) && columns > 0 ? Math.min(columns, MAX_CHARS) : 40
   const region: any[] = [dim('─'.repeat(ruleWidth))]
@@ -490,6 +520,14 @@ export function register(on: On) {
     }
     await openIssue($, request, argument, chosen)
     // Card text never goes into the result: the model would read it.
+    return {}
+  })
+
+  on('ui.message', async ($, e, next) => {
+    const listed = state.groups && state.chosen === COUNT_VIEW ? state.groups.groups.flatMap((group) => group.rows.map((row) => row.path)) : null
+    const message = boardMessage(e, listed)
+    if (!message) return next(e)
+    if (message.kind === 'open') void show($, message.path, 'list').catch(() => {})
     return {}
   })
 
