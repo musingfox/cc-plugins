@@ -54,6 +54,12 @@ test('bounds and caps the drawn fields', () => {
   expect(groups[0].rows[0].tags).toBe('cd')
 })
 
+test('keeps each drawn field on one line', () => {
+  const { groups } = listGroups('cc-plugins', [{ path: P('a'), status: 'x\ny', title: 'a\n\nb', due: '1\t2', tags: 'c\td' }])
+  expect(groups[0].status).toBe('x y')
+  expect(groups[0].rows[0]).toMatchObject({ title: 'a b', due: '1 2', tags: 'c d' })
+})
+
 test('the worst-case list stays within 100,000 serialized characters', () => {
   const quotes = '"'.repeat(11000)
   const rows = Array.from({ length: 100 }, (_, n) => {

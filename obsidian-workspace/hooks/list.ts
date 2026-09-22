@@ -17,6 +17,9 @@ const MAX_TAGS = 48
 const MAX_DUE = 16
 const MAX_STATUS = 32
 
+// bounded keeps tab and newline; either would break a list line in two or skew its columns.
+const oneLine = (text: string, max: number) => bounded(text, max).text.replace(/[\t\n]+/g, ' ')
+
 function statusCount(counted: ReturnType<typeof countRows>, status: string | null) {
   return status === null ? counted.status.missing : counted.status.values.find((entry) => entry.value === status)!.count
 }
@@ -41,9 +44,9 @@ function boardRow(row: Row): BoardRow {
   return {
     path: row.path,
     badge: (typeof row.priority === 'string' && BADGES[row.priority]) || ' ',
-    title: bounded(row.title ?? '', MAX_TITLE).text || bounded(cardName(row.path), MAX_TITLE).text,
-    due: bounded(row.due ?? '', MAX_DUE).text,
-    tags: bounded(row.tags ?? '', MAX_TAGS).text,
+    title: oneLine(row.title ?? '', MAX_TITLE) || oneLine(cardName(row.path), MAX_TITLE),
+    due: oneLine(row.due ?? '', MAX_DUE),
+    tags: oneLine(row.tags ?? '', MAX_TAGS),
   }
 }
 
@@ -70,7 +73,7 @@ export function listGroups(project: string, rows: Row[]): { groups: BoardGroup[]
       }
     }
     if (drawn.length) {
-      groups.push({ status: status === null ? null : bounded(status, MAX_STATUS).text, count: statusCount(counted, status), rows: drawn })
+      groups.push({ status: status === null ? null : oneLine(status, MAX_STATUS), count: statusCount(counted, status), rows: drawn })
     }
   }
   return { groups, hidden }
