@@ -63,7 +63,8 @@ function rowLine(columns: number, groups: Group[]) {
 // The body's lines, each hard-wrapped at `columns` cells; an empty body has none.
 function wrapped(body: string, columns: number) {
   if (body === '') return []
-  return body.split('\n').flatMap((text) => {
+  // A terminal draws a tab several cells wide, but displayWidth counts it as one.
+  return body.replaceAll('\t', '    ').split('\n').flatMap((text) => {
     const lines = ['']
     let used = 0
     for (const char of text) {

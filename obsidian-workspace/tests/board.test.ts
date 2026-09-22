@@ -198,6 +198,10 @@ test('draws a card read failure in red', () => {
   expect(text.props.color).toBe(RED)
 })
 
+test('expands a tab in the card body to spaces before wrapping', () => {
+  expect(linesOf(board(cardProps(shown({ body: '\t' + 'x'.repeat(38) }))).tree).slice(3)).toEqual(['    ' + 'x'.repeat(36), 'xx'])
+})
+
 test('counts no lines for an empty body', () => {
   expect(counter(board(cardProps(shown({ body: '' }))).tree)).toBe('0/0')
 })
