@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 import { PANE, cardSelect, clientNode, expectDrawn, issue, mounted, nodesOf, pick, stringsIn, viewSelect } from './fixtures/pane.ts'
-import { SESSION, world } from './fixtures/world.ts'
+import { CARD, SESSION, world } from './fixtures/world.ts'
 import { MIX, P } from './fixtures/rows.ts'
 import { RED } from '../hooks/style.ts'
 
@@ -148,5 +148,26 @@ describe('All Tasks without a list', () => {
     const tree = await $.ui.render(PANE)
     expect(nodesOf(tree, 'Client')).toHaveLength(0)
     expect(stringsIn(tree)).toContain('No cards in the All Tasks view of pm/cc-plugins.')
+  })
+})
+
+describe('the /issue result', () => {
+  test('list text reaches the Client props and never the result', async ($, on) => {
+    world(on, { query: JSON.stringify([{ path: P('a'), status: 'zz-marker', title: 'tt-marker' }]) })
+    const result = await issue($, '')
+    expect(result).toEqual({})
+    const props = JSON.stringify(clientNode(await $.ui.render(PANE)).props.props)
+    expect(props).toContain('zz-marker')
+    expect(props).toContain('tt-marker')
+    expect(JSON.stringify(result).includes('zz-marker')).toBe(false)
+    expect(JSON.stringify(result).includes('tt-marker')).toBe(false)
+  })
+
+  test('card text never reaches the result', async ($, on) => {
+    world(on, { read: CARD })
+    const result = await issue($, 'a')
+    expect(result).toEqual({})
+    expect(stringsIn(await $.ui.render(PANE))).toContain('Claude Mod：面板顯示 obw 的 task 與 issue')
+    expect(JSON.stringify(result).includes('面板顯示')).toBe(false)
   })
 })
