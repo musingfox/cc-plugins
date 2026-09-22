@@ -49,3 +49,57 @@ test('draws only the window of a large list within the tree bounds', () => {
   expect(textsOf(tree).length).toBeLessThanOrEqual(150)
   expect(JSON.stringify(tree).length).toBeLessThan(100000)
 })
+
+const inverse = (tree: any) => linesOf({ props: { children: textsOf(tree).filter((text) => text.props.inverse) } })[0]
+
+test('moves the cursor line down', () => {
+  const s = board(list({ rows: 6 }))
+  s.key('down'), s.key('down'), s.key('down')
+  expect(counter(s.tree)).toBe('4/14')
+  expect(inverse(s.tree)).toBe('  [ ] i')
+})
+
+test('pages by the window and scrolls to keep the cursor shown', () => {
+  const s = board(list({ rows: 6 }))
+  s.key('pagedown')
+  let lines = linesOf(s.tree)
+  expect(counter(s.tree)).toBe('6/14')
+  expect([lines[1], lines.at(-1)]).toEqual(['  [H] b', '▾ in-progress  1'])
+  s.key('pageup')
+  lines = linesOf(s.tree)
+  expect(counter(s.tree)).toBe('1/14')
+  expect(lines[1]).toBe('▾ todo  4')
+})
+
+test('stops at either end of the list', () => {
+  const s = board(list({ rows: 6 }))
+  s.key('up')
+  expect(counter(s.tree)).toBe('1/14')
+  for (let i = 0; i < 5; i++) s.key('pagedown')
+  expect(counter(s.tree)).toBe('14/14')
+})
+
+test('left on a row jumps to its heading', () => {
+  const s = board(list({ rows: 6 }))
+  s.key('down'), s.key('down')
+  expect(inverse(s.tree)).toBe('  [M] a')
+  s.key('left')
+  expect(counter(s.tree)).toBe('1/14')
+})
+
+test('sets state only from a key, never while drawing', () => {
+  const s = board(list({ rows: 6 }))
+  for (let i = 0; i < 5; i++) s.render(list({ rows: 6 + i }))
+  expect(s.setStateCalls).toBe(0)
+  s.key('down')
+  expect(s.setStateCalls).toBe(1)
+})
+
+test('clamps a stored cursor past the end of new props without setting state', () => {
+  const s = board(list({ rows: 6 }))
+  for (let i = 0; i < 10; i++) s.key('down')
+  const calls = s.setStateCalls
+  s.render(list({ rows: 6, groups: MIX_GROUPS.slice(0, 1) }))
+  expect(counter(s.tree)).toBe('5/5')
+  expect(s.setStateCalls).toBe(calls)
+})

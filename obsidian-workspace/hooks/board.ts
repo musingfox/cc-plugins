@@ -11,6 +11,9 @@ const MISSING = '—'
 const TAGS_MAX = 24
 const START: State = { cursor: 0, top: 0, collapsed: ['done'] }
 
+// The first line drawn: the stored one, moved just enough to keep the cursor in the window.
+const topFor = (cursor: number, top: number, window: number) => Math.min(Math.max(top, cursor - window + 1), cursor)
+
 const statusKey = (group: Group) => group.status ?? MISSING
 
 function itemsOf(groups: Group[], collapsed: string[]) {
@@ -42,11 +45,26 @@ export default function Board(props: Props, surface: ClientSurface<State>) {
   const column = (children: any[]) => Box({ flexDirection: 'column', children })
 
   const items = itemsOf(props.groups, st.collapsed)
-  if (items.length === 0) return column([Text({ dimColor: true, children: ['No cards.'] })])
+  if (items.length === 0) {
+    surface.onKey(() => {})
+    return column([Text({ dimColor: true, children: ['No cards.'] })])
+  }
 
   const window = Math.max(1, props.rows - 1 - (props.hidden > 0 ? 1 : 0))
   const cursor = Math.min(st.cursor, items.length - 1)
-  const top = Math.min(Math.max(st.top, cursor - window + 1), cursor)
+  const top = topFor(cursor, st.top, window)
+  const move = (to: number) => {
+    const next = Math.min(Math.max(to, 0), items.length - 1)
+    surface.setState({ ...st, cursor: next, top: topFor(next, top, window) })
+  }
+  surface.onKey(({ key }) => {
+    const item = items[cursor]
+    if (key === 'down') move(cursor + 1)
+    else if (key === 'up') move(cursor - 1)
+    else if (key === 'pagedown') move(cursor + window)
+    else if (key === 'pageup') move(cursor - window)
+    else if (key === 'left' && item.kind === 'row') move(items.findLastIndex((it, i) => i < cursor && it.kind === 'heading'))
+  })
 
   const line = rowLine(props.columns, props.groups)
   const drawn = items.slice(top, top + window).map((item, i) =>
