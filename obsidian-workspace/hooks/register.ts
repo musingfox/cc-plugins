@@ -428,8 +428,8 @@ async function drawPane($: any, e: any) {
       argumentCard: state.card?.origin === 'argument',
     })
     const listCard = state.card?.origin === 'list' ? boardCard(state.card) : null
-    const shown = listCard ? { groups: [], hidden: 0, card: listCard } : { groups: board.groups, hidden: board.hidden, card: null }
-    children.push(Client({ key: BOARD_KEY, module: './board.ts', width: columns, height: rows, props: { rows, columns, ...shown } }))
+    const boardProps = listCard ? { groups: [], hidden: 0, card: listCard } : { groups: board.groups, hidden: board.hidden, card: null }
+    children.push(Client({ key: BOARD_KEY, module: './board.ts', width: columns, height: rows, props: { rows, columns, ...boardProps } }))
   } else if (state.cards.length) {
     children.push(
       Select({
