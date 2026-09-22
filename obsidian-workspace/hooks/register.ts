@@ -46,6 +46,8 @@ type Line = { kind: 'error' | 'notice'; text: string }
 // Where the shown card was asked for: `list` is a row opened inside the All Tasks Client, drawn there as plain text.
 type Origin = 'argument' | 'list'
 
+type PlacedCard = CardRegion & { origin: Origin }
+
 // `loading` cannot be read off the message: the loading notice and the empty-view notice are both notices.
 type PaneState = {
   message: Line | null
@@ -58,8 +60,7 @@ type PaneState = {
   cards: ReturnType<typeof listRows>
   groups: ReturnType<typeof listGroups> | null
   selected: string | null
-  card: CardRegion | null
-  origin: Origin
+  card: PlacedCard | null
 }
 
 const LOADING: PaneState = {
@@ -74,7 +75,6 @@ const LOADING: PaneState = {
   groups: null,
   selected: null,
   card: null,
-  origin: 'argument',
 }
 
 let state: PaneState = LOADING
@@ -101,9 +101,9 @@ function showMessage($: any, request: number, message: string) {
   }
 }
 
-function showCard($: any, request: number, name: string, card: CardRegion, origin: Origin = 'argument') {
+function showCard($: any, request: number, name: string, card: PlacedCard) {
   if (request === requests) {
-    state = { ...state, selected: name, card, origin }
+    state = { ...state, selected: name, card }
     invalidate($)
   }
 }
@@ -122,7 +122,7 @@ async function show($: any, path: string, origin: Origin = 'argument') {
   const { scope } = state
   if (!scope) return
   const request = ++requests
-  const put = (card: CardRegion) => showCard($, request, path, card, origin)
+  const put = (card: CardRegion) => showCard($, request, path, { ...card, origin })
   const built = cardPathArgv(scope, path)
   if (!('argv' in built)) return put({ kind: 'error', message: `"${path}" is not a card path.` })
   put({ kind: 'loading', path })
@@ -159,7 +159,7 @@ async function drawDiagrams($: any, request: number, segments: Segment[]) {
 function patchShown($: any, request: number, patch: (card: Shown) => Shown) {
   const card = state.card
   if (request === requests && card?.kind === 'shown') {
-    state = { ...state, card: patch(card) }
+    state = { ...state, card: { ...patch(card), origin: card.origin } }
     invalidate($)
   }
 }
@@ -425,9 +425,9 @@ async function drawPane($: any, e: any) {
       bodyRows: e.props?.scroll?.bodyRows,
       bodyColumns: e.props?.bodyColumns,
       siblings: [state.listing, state.message].flatMap((line) => (line ? [safe(line.text)] : [])),
-      argumentCard: state.card !== null && state.origin === 'argument',
+      argumentCard: state.card?.origin === 'argument',
     })
-    const listCard = state.card && state.origin === 'list' ? boardCard(state.card) : null
+    const listCard = state.card?.origin === 'list' ? boardCard(state.card) : null
     const shown = listCard ? { groups: [], hidden: 0, card: listCard } : { groups: board.groups, hidden: board.hidden, card: null }
     children.push(Client({ key: BOARD_KEY, module: './board.ts', width: columns, height: rows, props: { rows, columns, ...shown } }))
   } else if (state.cards.length) {
@@ -445,7 +445,7 @@ async function drawPane($: any, e: any) {
   if (state.message) children.push(line(state.message))
   if (state.hint) children.push(dim(state.hint))
   const card = state.card
-  if (!card || (board && state.origin === 'list')) return Box({ flexDirection: 'column', children })
+  if (!card || (board && card.origin === 'list')) return Box({ flexDirection: 'column', children })
   const columns = e.props?.bodyColumns
   const ruleWidth = Number.isInteger(columns) && columns > 0 ? Math.min(columns, MAX_CHARS) : 40
   const region: any[] = [dim('─'.repeat(ruleWidth))]
@@ -528,15 +528,15 @@ export function register(on: On) {
   })
 
   on('ui.message', async ($, e, next) => {
-    const listDrawn = hasClient(e.surface) && state.groups && state.chosen === COUNT_VIEW && !(state.card && state.origin === 'list')
+    const listDrawn = hasClient(e.surface) && state.groups && state.chosen === COUNT_VIEW && state.card?.origin !== 'list'
     const listed = listDrawn ? state.groups!.groups.flatMap((group) => group.rows.map((row) => row.path)) : null
     const message = boardMessage(e, listed)
     if (!message) return next(e)
     if (message.kind === 'open') void show($, message.path, 'list').catch(() => {})
-    else if (state.card && state.origin === 'list') {
+    else if (state.card?.origin === 'list') {
       // A read still running for the card left behind must not bring it back.
       ++requests
-      state = { ...state, selected: null, card: null, origin: 'argument' }
+      state = { ...state, selected: null, card: null }
       invalidate($)
     }
     return {}
