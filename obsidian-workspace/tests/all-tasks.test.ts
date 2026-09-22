@@ -265,7 +265,7 @@ describe('bounded list text', () => {
     const flat = JSON.stringify(props)
     expect(flat.includes(CR)).toBe(false)
     expect(flat.includes('x'.repeat(33))).toBe(false)
-    expect(props.groups.map((group: any) => group.status)).toEqual(['x'.repeat(32), 'ab'])
+    expect(props.groups.map((group: any) => group.status)).toEqual(['x'.repeat(31) + '…', 'ab'])
     expect(props.groups[1].rows[0].title).toBe('tu')
   })
 })

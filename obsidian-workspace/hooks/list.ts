@@ -20,6 +20,11 @@ const MAX_STATUS = 32
 // bounded keeps tab and newline; either would break a list line in two or skew its columns.
 const oneLine = (text: string, max: number) => bounded(text, max).text.replace(/[\t\n]+/g, ' ')
 
+// A cut status ends in …, so two statuses sharing a capped prefix are not taken for one.
+function statusLabel(status: string) {
+  return bounded(status, MAX_STATUS).clippedFrom === null ? oneLine(status, MAX_STATUS) : `${oneLine(status, MAX_STATUS - 1)}…`
+}
+
 function statusCount(counted: ReturnType<typeof countRows>, status: string | null) {
   return status === null ? counted.status.missing : counted.status.values.find((entry) => entry.value === status)!.count
 }
@@ -73,7 +78,7 @@ export function listGroups(project: string, rows: Row[]): { groups: BoardGroup[]
       }
     }
     if (drawn.length) {
-      groups.push({ status: status === null ? null : oneLine(status, MAX_STATUS), count: statusCount(counted, status), rows: drawn })
+      groups.push({ status: status === null ? null : statusLabel(status), count: statusCount(counted, status), rows: drawn })
     }
   }
   return { groups, hidden }

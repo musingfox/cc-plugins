@@ -60,6 +60,11 @@ test('keeps each drawn field on one line', () => {
   expect(groups[0].rows[0]).toMatchObject({ title: 'a b', due: '1 2', tags: 'c d' })
 })
 
+test('marks a status cut to the cap', () => {
+  const { groups } = listGroups('cc-plugins', [{ path: P('a'), status: 'x'.repeat(40) }, { path: P('b'), status: 'y'.repeat(32) }])
+  expect(groups.map((group) => group.status)).toEqual(['x'.repeat(31) + '…', 'y'.repeat(32)])
+})
+
 test('the worst-case list stays within 100,000 serialized characters', () => {
   const quotes = '"'.repeat(11000)
   const rows = Array.from({ length: 100 }, (_, n) => {
