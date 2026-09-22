@@ -10,7 +10,7 @@ type Card =
   | { kind: 'shown'; path: string; title: string; status: string; priority: string; ac: string | null; clip: string | null; body: string }
 type Props = { rows: number; columns: number; groups: Group[]; hidden: number; card: Card | null }
 type State = { cursor: number; top: number; collapsed: string[]; scroll: number; scrollPath: string | null }
-type Item = { kind: 'heading'; group: Group; open: boolean } | { kind: 'row'; row: BoardRow }
+type Item = { kind: 'heading'; group: Group; key: string; open: boolean } | { kind: 'row'; row: BoardRow }
 
 const MISSING = '—'
 const TAGS_MAX = 24
@@ -19,13 +19,24 @@ const START: State = { cursor: 0, top: 0, collapsed: ['done'], scroll: 0, scroll
 // The first line drawn: the stored one, moved just enough to keep the cursor in the window.
 const topFor = (cursor: number, top: number, window: number) => Math.min(Math.max(top, cursor - window + 1), cursor)
 
-const statusKey = (group: Group) => group.status ?? MISSING
+// A fold is kept under its heading's key. A bounded status never holds \0, so neither the missing-status
+// group nor a status that reads the same as an earlier one once capped shares a key with another group.
+function keysOf(groups: Group[]) {
+  const seen = new Map<string | null, number>()
+  return groups.map((group) => {
+    const repeat = seen.get(group.status) ?? 0
+    seen.set(group.status, repeat + 1)
+    return (group.status ?? '\0') + '\0'.repeat(repeat)
+  })
+}
 
 function itemsOf(groups: Group[], collapsed: string[]) {
   const items: Item[] = []
-  for (const group of groups) {
-    const open = !collapsed.includes(statusKey(group))
-    items.push({ kind: 'heading', group, open })
+  const keys = keysOf(groups)
+  for (const [index, group] of groups.entries()) {
+    const key = keys[index]
+    const open = !collapsed.includes(key)
+    items.push({ kind: 'heading', group, key, open })
     if (open) for (const row of group.rows) items.push({ kind: 'row', row })
   }
   return items
@@ -126,8 +137,8 @@ export default function Board(props: Props, surface: ClientSurface<State>) {
     else if (item.kind === 'row') {
       if (key === 'left') move(items.findLastIndex((it, i) => i < cursor && it.kind === 'heading'))
       else if (key === 'right' || key === 'return') surface.post({ open: item.row.path })
-    } else if ((key === 'right' || key === 'return') && !item.open) fold(st.collapsed.filter((status) => status !== statusKey(item.group)))
-    else if (key === 'left' && item.open) fold([...st.collapsed, statusKey(item.group)])
+    } else if ((key === 'right' || key === 'return') && !item.open) fold(st.collapsed.filter((key) => key !== item.key))
+    else if (key === 'left' && item.open) fold([...st.collapsed, item.key])
   })
 
   const line = rowLine(props.columns, props.groups)
@@ -135,7 +146,7 @@ export default function Board(props: Props, surface: ClientSurface<State>) {
     Text({
       ...(top + i === cursor ? { inverse: true } : {}),
       wrap: 'truncate-end',
-      children: [item.kind === 'heading' ? `${item.open ? '▾' : '▸'} ${statusKey(item.group)}  ${item.group.count}` : line(item.row)],
+      children: [item.kind === 'heading' ? `${item.open ? '▾' : '▸'} ${item.group.status ?? MISSING}  ${item.group.count}` : line(item.row)],
     }),
   )
   return column([

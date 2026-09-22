@@ -129,6 +129,18 @@ test('folds a heading under left and unfolds it under return', () => {
   expect(counter(s.tree)).toBe('1/14')
 })
 
+test('folds a status named — apart from the missing-status group', () => {
+  const s = board(list({ groups: [{ status: '—', count: 1, rows: [row('a', ' ')] }, { status: null, count: 1, rows: [row('b', ' ')] }] }))
+  s.key('left')
+  expect(linesOf(s.tree).slice(1)).toEqual(['▸ —  1', '▾ —  1', '  [ ] b'])
+})
+
+test('folds two headings that read the same apart', () => {
+  const s = board(list({ groups: [{ status: 'x…', count: 1, rows: [row('a', ' ')] }, { status: 'x…', count: 1, rows: [row('b', ' ')] }] }))
+  s.key('left')
+  expect(linesOf(s.tree).slice(1)).toEqual(['▸ x…  1', '▾ x…  1', '  [ ] b'])
+})
+
 test('right on an unfolded heading changes nothing', () => {
   const s = board(list())
   s.key('right')
