@@ -2,11 +2,10 @@ import { expect, test } from 'claude-code/testing'
 import Board from '../hooks/board.ts'
 import { RED } from '../hooks/style.ts'
 import { fakeSurface, linesOf, textsOf } from './fixtures/surface.ts'
-
-const P = (name: string) => `pm/cc-plugins/tasks/${name}.md`
+import { P } from './fixtures/rows.ts'
 const row = (name: string, badge: string, fields: any = {}) => ({ path: P(name), badge, title: name, due: '', tags: '', ...fields })
 
-// MIX (grouped.test.ts) as the pane hands it over: status groups in schema order, rows by priority.
+// MIX (fixtures/rows.ts) as the pane hands it over: status groups in schema order, rows by priority.
 const MIX_GROUPS = [
   { status: 'todo', count: 4, rows: [row('b', 'H'), row('a', 'M'), row('i', ' '), row('j', ' ')] },
   { status: 'in-progress', count: 1, rows: [row('c', 'L')] },

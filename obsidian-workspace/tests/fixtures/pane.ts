@@ -29,6 +29,9 @@ export function headerIn(tree: any) {
 }
 
 // The line the pane's ui.render catch draws in place of the whole tree.
+export const REFRESH_HINT =
+  'pm/cc-plugins/dashboard.base has no All Tasks view. Run /obw:pm refresh dashboard to regenerate it from the plugin template; hand edits to that file are overwritten.'
+
 export const NOT_DRAWN = 'obw: the card could not be drawn.'
 // The pane drew itself: a tree that holds that line is the catch's, whatever its root element is.
 export const expectDrawn = (tree: any) => expect(stringsIn(tree)).not.toContain(NOT_DRAWN)

@@ -1,7 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 import { boardMessage } from '../hooks/board-message.ts'
-
-const P = (name: string) => `pm/cc-plugins/tasks/${name}.md`
+import { P } from './fixtures/rows.ts'
 const post = (data: unknown) => ({ requestId: 'obw-issue', element: 'board', data })
 
 test('opens a listed path', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { PANE, cardSelect, clientNode, expectDrawn, headerIn, issue, mounted, nodesOf, runsOf, stringsIn, uvxRuns, viewSelect, vizWorld } from './fixtures/pane.ts'
+import { PANE, REFRESH_HINT as HINT, cardSelect, clientNode, expectDrawn, headerIn, issue, mounted, nodesOf, runsOf, stringsIn, uvxRuns, viewSelect, vizWorld } from './fixtures/pane.ts'
 import { CARD, MERMAID_CARD, SESSION, world } from './fixtures/world.ts'
 import { MIX, P } from './fixtures/rows.ts'
 import { RED } from '../hooks/style.ts'
@@ -108,9 +108,6 @@ describe('surfaces without Client', () => {
 })
 
 describe('All Tasks without a list', () => {
-  const HINT =
-    'pm/cc-plugins/dashboard.base has no All Tasks view. Run /obw:pm refresh dashboard to regenerate it from the plugin template; hand edits to that file are overwritten.'
-
   test('a failed query draws its error with the picker and no list', async ($, on) => {
     world(on, { query: { deny: 'spawn failed' } })
     await issue($, '')
@@ -172,19 +169,19 @@ describe('the /issue result', () => {
   })
 })
 
+// The world answers ui.invalidate itself, so a mounted drawing redraws only when asked.
+async function openFirstRow($: any, w: any) {
+  await issue($, '')
+  const m = await mounted($)
+  await m.key({ key: 'down', in: 'board' })
+  await m.key({ key: 'return', in: 'board' })
+  await w.clock.settle()
+  await m.redraw()
+  return m
+}
+
 describe('a card opened from the list', () => {
   const TITLE = 'Claude Mod：面板顯示 obw 的 task 與 issue'
-
-  // The world answers ui.invalidate itself, so a mounted drawing redraws only when asked.
-  async function openFirstRow($: any, w: any) {
-    await issue($, '')
-    const m = await mounted($)
-    await m.key({ key: 'down', in: 'board' })
-    await m.key({ key: 'return', in: 'board' })
-    await w.clock.settle()
-    await m.redraw()
-    return m
-  }
 
   test('is drawn inside the Client in place of the list', async ($, on) => {
     const w = world(on)
@@ -247,12 +244,7 @@ describe('a card opened from the list', () => {
 
 describe('back to the list', () => {
   async function openAndGoBack($: any, w: any) {
-    await issue($, '')
-    const m = await mounted($)
-    await m.key({ key: 'down', in: 'board' })
-    await m.key({ key: 'return', in: 'board' })
-    await w.clock.settle()
-    await m.redraw()
+    const m = await openFirstRow($, w)
     await m.key({ key: 'left', in: 'board' })
     await w.clock.settle()
     await m.redraw()

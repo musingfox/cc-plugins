@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { PANE, cardSelect, clientNode, expectDrawn, issue, nodesOf, pick, runsOf, stringsIn, viewSelect } from './fixtures/pane.ts'
+import { PANE, REFRESH_HINT as HINT, cardSelect, clientNode, expectDrawn, issue, nodesOf, pick, runsOf, stringsIn, viewSelect } from './fixtures/pane.ts'
 import { ALL_TASKS_ARGV, CARD, DASHBOARD_ARGV, VIEW_NAMES, VIEW_STRINGS, world } from './fixtures/world.ts'
 import { MIX, P } from './fixtures/rows.ts'
 import { RED } from '../hooks/style.ts'
@@ -150,9 +150,6 @@ describe('done cards', () => {
     expectDrawn(tree)
   })
 })
-
-const HINT =
-  'pm/cc-plugins/dashboard.base has no All Tasks view. Run /obw:pm refresh dashboard to regenerate it from the plugin template; hand edits to that file are overwritten.'
 
 describe('missing All Tasks', () => {
   test('a listing without All Tasks opens Active with the refresh hint', async ($, on) => {
