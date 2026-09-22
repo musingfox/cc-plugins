@@ -222,3 +222,23 @@ test('starts another card from the top without setting state', () => {
   expect(counter(s.tree)).toBe('1/20')
   expect(s.setStateCalls).toBe(calls)
 })
+
+test('left on a shown card asks to go back to the list', () => {
+  const s = board(cardProps(shown()))
+  s.key('left')
+  expect(s.posts).toEqual([{ back: true }])
+})
+
+test('left on a card read failure asks to go back to the list', () => {
+  const s = board(cardProps({ kind: 'error', message: 'Error: File "x" not found.' }))
+  s.key('left')
+  expect(s.posts).toEqual([{ back: true }])
+})
+
+test('left on a list row moves the cursor and posts nothing', () => {
+  const s = board(list())
+  s.key('down')
+  s.key('left')
+  expect(s.posts).toEqual([])
+  expect(counter(s.tree)).toBe('1/14')
+})

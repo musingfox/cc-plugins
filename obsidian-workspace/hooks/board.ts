@@ -70,7 +70,10 @@ export default function Board(props: Props, surface: ClientSurface<State>) {
 
   if (props.card) {
     const card = props.card
-    if (card.kind !== 'shown') surface.onKey(() => {})
+    const toList = ({ key }: { key: string }) => {
+      if (key === 'left') surface.post({ back: true })
+    }
+    if (card.kind !== 'shown') surface.onKey(toList)
     const back = Text({ dimColor: true, children: ['← list'] })
     if (card.kind === 'loading') return column([back, Text({ dimColor: true, children: [`Reading ${card.name}…`] })])
     if (card.kind === 'error') return column([back, Text({ color: RED, children: [card.message] })])
@@ -89,6 +92,7 @@ export default function Board(props: Props, surface: ClientSurface<State>) {
       else if (key === 'up') scrollTo(scroll - 1)
       else if (key === 'pagedown') scrollTo(scroll + window)
       else if (key === 'pageup') scrollTo(scroll - window)
+      else toList({ key })
     })
     return column([
       Text({ dimColor: true, children: [`↑↓ scroll  ← list  ${lines.length ? scroll + 1 : 0}/${lines.length}`] }),
