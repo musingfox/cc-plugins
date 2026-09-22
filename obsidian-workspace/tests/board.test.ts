@@ -135,3 +135,25 @@ test('right on an unfolded heading changes nothing', () => {
   expect(s.setStateCalls).toBe(0)
   expect(counter(s.tree)).toBe('1/14')
 })
+
+test('return on a row asks to open its card', () => {
+  const s = board(list())
+  s.key('down')
+  const calls = s.setStateCalls
+  s.key('return')
+  expect(s.posts).toEqual([{ open: 'pm/cc-plugins/tasks/b.md' }])
+  expect(s.setStateCalls).toBe(calls)
+})
+
+test('right on a row asks to open its card', () => {
+  const s = board(list())
+  s.key('down')
+  s.key('right')
+  expect(s.posts).toEqual([{ open: 'pm/cc-plugins/tasks/b.md' }])
+})
+
+test('return on a heading opens nothing', () => {
+  const s = board(list())
+  s.key('return')
+  expect(s.posts).toEqual([])
+})

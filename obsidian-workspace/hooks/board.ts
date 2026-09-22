@@ -64,9 +64,10 @@ export default function Board(props: Props, surface: ClientSurface<State>) {
     else if (key === 'up') move(cursor - 1)
     else if (key === 'pagedown') move(cursor + window)
     else if (key === 'pageup') move(cursor - window)
-    else if (key === 'left' && item.kind === 'row') move(items.findLastIndex((it, i) => i < cursor && it.kind === 'heading'))
-    else if (item.kind !== 'heading') return
-    else if ((key === 'right' || key === 'return') && !item.open) fold(st.collapsed.filter((status) => status !== statusKey(item.group)))
+    else if (item.kind === 'row') {
+      if (key === 'left') move(items.findLastIndex((it, i) => i < cursor && it.kind === 'heading'))
+      else if (key === 'right' || key === 'return') surface.post({ open: item.row.path })
+    } else if ((key === 'right' || key === 'return') && !item.open) fold(st.collapsed.filter((status) => status !== statusKey(item.group)))
     else if (key === 'left' && item.open) fold([...st.collapsed, statusKey(item.group)])
   })
 
