@@ -36,6 +36,8 @@ export const expectDrawn = (tree: any) => expect(stringsIn(tree)).not.toContain(
 // The pane draws the view picker first and the card picker second; either may be absent.
 export const viewSelect = (tree: any) => nodesOf(tree, 'Select').find((node: any) => node.props.key === 'views')
 export const cardSelect = (tree: any) => nodesOf(tree, 'Select').find((node: any) => node.props.key === 'cards')
+// The All Tasks list region; an unmounted render leaves it unexpanded, its props readable.
+export const clientNode = (tree: any) => nodesOf(tree, 'Client').find((node: any) => node.props.key === 'board')
 
 // Runs by their verb, so an added obsidian call cannot shift an assertion off its target.
 export const runsOf = (w: any, verb: string) => w.runs.filter((run: any) => run.argv[0] === 'obsidian' && kindOf(run.argv) === verb)
@@ -43,7 +45,8 @@ export const uvxRuns = (w: any) => w.runs.filter((run: any) => run.argv[0] === '
 export const renderRuns = (w: any) => w.runs.filter((run: any) => run.argv[0] === 'bash')
 
 // The pane mounted: $.ui.render only draws, a mounted pane also takes the picks and presses a user makes.
-export const mounted = ($: any) => $.ui.mount({ plugin: 'obw', surface: 'terminal', component: 'Pane', props: PANE.props, requestId: PANE.requestId, viewport: PANE.viewport })
+export const mounted = ($: any, { surface = 'terminal', props = PANE.props }: { surface?: string; props?: any } = {}) =>
+  $.ui.mount({ plugin: 'obw', surface, component: 'Pane', props, requestId: PANE.requestId, viewport: PANE.viewport })
 
 export async function issue($: any, args: string) {
   await $.session.start(SESSION)

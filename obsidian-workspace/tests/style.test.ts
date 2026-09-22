@@ -236,12 +236,12 @@ describe('error messages', () => {
 })
 
 describe('the view picker', () => {
-  test('the view picker is drawn above the card picker with the chosen view selected', async ($, on) => {
+  test('the view picker is drawn above the list with the chosen view selected', async ($, on) => {
     const w = world(on)
     const tree = await drawn($, w, '')
     expect(viewSelect(tree).props.value).toBe('All Tasks')
     expect(viewSelect(tree).props.options).toEqual(VIEW_NAMES.map((name) => ({ value: name, label: name })))
     const flat = JSON.stringify(tree)
-    expect(flat.indexOf('"key":"views"')).toBeLessThan(flat.indexOf('"key":"cards"'))
+    expect(flat.indexOf('"key":"views"')).toBeLessThan(flat.indexOf('"key":"board"'))
   })
 })

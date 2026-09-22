@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { PANE, cardSelect, elementsIn, expectDrawn, nodesOf, press, runsOf, shown, stringsIn, uvxRuns, vizWorld } from './fixtures/pane.ts'
+import { PANE, clientNode, elementsIn, expectDrawn, nodesOf, press, runsOf, shown, stringsIn, uvxRuns, vizWorld } from './fixtures/pane.ts'
 import { AB, CARD, DIAGRAM, MERMAID_CARD, SESSION, world } from './fixtures/world.ts'
 
 const MERMAID_BODY = '# m\n\n```mermaid\ngraph LR\nA-->B\n```\n\ntail\n'
@@ -275,7 +275,7 @@ describe('a diagram after a newer read', () => {
     let tree = await $.ui.render(PANE)
     expect(nodesOf(tree, 'Code').length).toBe(0)
     expect(stringsIn(tree)).not.toContain('DIAGRAM-A')
-    expect(cardSelect(tree).props.value).toBe('pm/cc-plugins/tasks/b.md')
+    expect(clientNode(tree)).toBeDefined()
     w.release(7, 'DIAGRAM-B')
     await w.clock.settle()
     tree = await $.ui.render(PANE)

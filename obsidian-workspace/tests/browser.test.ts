@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { CONFIG_PATH, HOME_MANIFEST, PANE, PRESS, ROOT, cardSelect, expectDrawn, issue, mounted, nodesOf, press, renderRuns, runsOf, stringsIn, vizWorld } from './fixtures/pane.ts'
+import { CONFIG_PATH, HOME_MANIFEST, PANE, PRESS, ROOT, clientNode, expectDrawn, issue, mounted, nodesOf, press, renderRuns, runsOf, stringsIn, vizWorld } from './fixtures/pane.ts'
 import { AB, CONFIG, manifest, world } from './fixtures/world.ts'
 
 const MOD = 'mod-obw-issue-pane'
@@ -139,7 +139,7 @@ describe('pressing Open in browser', () => {
 
   test('the temp file and page carry the folder the card was read from', async ($, on) => {
     const w = vizWorld(on, { query: '[{"path":"pm/cc-plugins/docs/a.md"}]' })
-    await issue($, '')
+    await issue($, 'Active')
     const pane = await mounted($)
     await pane.select({ key: 'cards', value: 'pm/cc-plugins/docs/a.md' })
     await w.clock.settle()
@@ -302,7 +302,7 @@ describe('a press result after a newer read', () => {
     await w.clock.settle()
     const tree = await $.ui.render(PANE)
     expect(stringsIn(tree).filter((text) => OUTCOME.test(text))).toEqual([])
-    expect(cardSelect(tree).props.value).toBe('pm/cc-plugins/tasks/b.md')
+    expect(clientNode(tree)).toBeDefined()
     expect(nodesOf(tree, 'Markdown').length).toBe(1)
   })
 })

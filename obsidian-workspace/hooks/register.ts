@@ -8,7 +8,8 @@ import { baseQueryOutput, viewsOutput, readOutput, OBSIDIAN_TIMEOUT_MS } from '.
 import type { Run } from './cli-output.ts'
 import { cardName, listRows, resolveArgument, rowNamed, rowSlug, rowsOutside } from './rows.ts'
 import { COUNT_VIEW, missingViewHint, missingViewText } from './counts.ts'
-import { groupedOptions } from './grouped.ts'
+import { listGroups } from './list.ts'
+import { boardSize } from './board-size.ts'
 import { acLabel, headerOf } from './card.ts'
 import type { CardHeader } from './card.ts'
 import { vizManifestPath, vizInstallPath, renderTarget, renderArgv, renderOutcome, RENDER_TIMEOUT_MS } from './viz.ts'
@@ -50,7 +51,7 @@ type PaneState = {
   views: string[]
   chosen: string | null
   cards: ReturnType<typeof listRows>
-  grouped: { value: string; label: string }[] | null
+  groups: ReturnType<typeof listGroups> | null
   selected: string | null
   card: CardRegion | null
 }
@@ -64,7 +65,7 @@ const LOADING: PaneState = {
   views: [],
   chosen: null,
   cards: [],
-  grouped: null,
+  groups: null,
   selected: null,
   card: null,
 }
@@ -294,7 +295,7 @@ async function openView($: any, scope: Scope, views: string[], chosen: string, n
     views,
     chosen,
     cards,
-    grouped: chosen === COUNT_VIEW && result.kind === 'rows' ? groupedOptions(scope.project, result.rows) : null,
+    groups: chosen === COUNT_VIEW && result.kind === 'rows' ? listGroups(scope.project, result.rows) : null,
     selected: null,
     card: null,
   }
@@ -366,7 +367,7 @@ function clipNotice(clipped: { text: string; clippedFrom: number | null }) {
 }
 
 async function drawPane($: any, e: any) {
-  const { Box, Text, Select, Markdown, Button, Code } = await $.ui.resolve(e)
+  const { Box, Text, Select, Markdown, Button, Code, Client } = await $.ui.resolve(e)
   const safe = (text: string) => bounded(text).text
   const dim = (text: string) => Text({ dimColor: true, children: [safe(text)] })
   const red = (text: string) => Text({ color: RED, children: [safe(text)] })
@@ -384,15 +385,22 @@ async function drawPane($: any, e: any) {
       }),
     )
   }
-  const options = state.grouped ?? state.cards.map(card => ({ value: safe(card.path), label: safe(card.label) }))
-  if (options.length) {
+  const board = state.groups && state.groups.groups.length ? state.groups : null
+  if (board) {
+    const { rows, columns } = boardSize({
+      bodyRows: e.props?.scroll?.bodyRows,
+      bodyColumns: e.props?.bodyColumns,
+      siblings: [state.listing, state.message].flatMap((line) => (line ? [safe(line.text)] : [])),
+      argumentCard: false,
+    })
+    children.push(Client({ key: 'board', module: './board.ts', width: columns, height: rows, props: { rows, columns, groups: board.groups, hidden: board.hidden, card: null } }))
+  } else if (state.cards.length) {
     children.push(
       Select({
         key: 'cards',
-        options,
+        options: state.cards.map(card => ({ value: safe(card.path), label: safe(card.label) })),
         ...(state.selected ? { value: safe(state.selected) } : {}),
         onSelect: (path: string) => {
-          if (path.startsWith('#')) return
           void show($, path).catch(() => {})
         },
       }),

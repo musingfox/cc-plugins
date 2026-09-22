@@ -1,10 +1,9 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { PANE, cardSelect, expectDrawn, headerIn, issue, nodesOf, pick, runsOf, stringsIn, viewSelect } from './fixtures/pane.ts'
+import { PANE, cardSelect, clientNode, expectDrawn, issue, nodesOf, pick, runsOf, stringsIn, viewSelect } from './fixtures/pane.ts'
 import { ALL_TASKS_ARGV, CARD, DASHBOARD_ARGV, VIEW_NAMES, VIEW_STRINGS, world } from './fixtures/world.ts'
-import { GROUPED_MIX, MIX } from './grouped.test.ts'
+import { MIX, P } from './fixtures/rows.ts'
 import { RED } from '../hooks/style.ts'
 
-const P = (name: string) => `pm/cc-plugins/tasks/${name}.md`
 const readArgv = (path: string) => ['obsidian', 'vault=obsidian', 'read', `path=${path}`]
 
 describe('default view', () => {
@@ -31,35 +30,41 @@ describe('default view', () => {
   })
 })
 
-describe('grouped All Tasks', () => {
-  test('the default list is grouped', async ($, on) => {
+describe('All Tasks list', () => {
+  const pathsIn = (tree: any) => clientNode(tree).props.props.groups.flatMap((group: any) => group.rows.map((row: any) => row.path))
+
+  test('the default list is drawn in the Client', async ($, on) => {
     world(on, { query: JSON.stringify(MIX) })
     await issue($, '')
     const tree = await $.ui.render(PANE)
-    expect(cardSelect(tree).props.options).toEqual(GROUPED_MIX)
-    expect(stringsIn(tree)).toEqual([
-      ...VIEW_STRINGS,
-      ...GROUPED_MIX.flatMap((option) => [option.value, option.label]),
-      '1 row of the All Tasks view is not a card under pm/cc-plugins and was left out.',
+    expect(clientNode(tree).props.props.groups.map((group: any) => [group.status, group.count])).toEqual([
+      ['todo', 4],
+      ['in-progress', 1],
+      ['blocked', 1],
+      ['done', 2],
+      ['waiting', 1],
+      [null, 1],
     ])
+    expect(stringsIn(tree)).toEqual([...VIEW_STRINGS, '1 row of the All Tasks view is not a card under pm/cc-plugins and was left out.'])
   })
 
-  test('/issue All Tasks is grouped', async ($, on) => {
+  test('/issue All Tasks draws the list', async ($, on) => {
     world(on, { query: JSON.stringify(MIX) })
     await issue($, 'All Tasks')
-    expect(cardSelect(await $.ui.render(PANE)).props.options).toEqual(GROUPED_MIX)
+    expect(pathsIn(await $.ui.render(PANE))).toEqual([P('b'), P('a'), P('i'), P('j'), P('c'), P('d'), P('f'), P('e'), P('g'), P('h')])
   })
 
-  test('picking All Tasks groups the list', async ($, on) => {
+  test('picking All Tasks draws the list', async ($, on) => {
     const w = world(on, { query: JSON.stringify(MIX) })
     await issue($, 'Docs')
     await pick($, w, 'views', 'All Tasks')
     const tree = await $.ui.render(PANE)
-    expect(cardSelect(tree).props.options).toEqual(GROUPED_MIX)
+    expect(clientNode(tree)).toBeDefined()
+    expect(cardSelect(tree)).toBe(undefined)
     expect(viewSelect(tree).props.value).toBe('All Tasks')
   })
 
-  test('the grouped list waits on the same loading screen', async ($, on) => {
+  test('the list waits on the same loading screen', async ($, on) => {
     const w = world(on, { query: 'hang' })
     await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
     const done = $.command.run({ command: 'issue', args: '' })
@@ -69,29 +74,27 @@ describe('grouped All Tasks', () => {
     expect(nodesOf(loading, 'Select')).toHaveLength(0)
     await w.clock.advance(60000)
     await done
-    expect(cardSelect(await $.ui.render(PANE)).props.options).toEqual([
-      { value: '#0', label: 'todo (1)' },
-      { value: '#p0.0', label: '  —' },
-      { value: P('a'), label: '    a' },
-    ])
+    expect(pathsIn(await $.ui.render(PANE))).toEqual([P('a')])
   })
 
-  test('an empty All Tasks view has no cards Select', async ($, on) => {
+  test('an empty All Tasks view has no list', async ($, on) => {
     world(on, { query: '[]' })
     await issue($, '')
     const tree = await $.ui.render(PANE)
     expect(cardSelect(tree)).toBe(undefined)
+    expect(clientNode(tree)).toBe(undefined)
     expect(stringsIn(tree)).toContain('No cards in the All Tasks view of pm/cc-plugins.')
     const notice = nodesOf(tree, 'Text').find((node: any) => stringsIn(node).includes('No cards in the All Tasks view of pm/cc-plugins.'))
     expect(notice.props.dimColor).toBe(true)
     expect(nodesOf(tree, 'Text').some((node: any) => node.props?.color === RED)).toBe(false)
   })
 
-  test('a listing of only done cards is the heading', async ($, on) => {
+  test('a listing of only done cards is a list, not an empty view', async ($, on) => {
     world(on, { query: '[{"path":"pm/cc-plugins/tasks/e.md","status":"done"}]' })
     await issue($, '')
-    expect(cardSelect(await $.ui.render(PANE)).props.options).toEqual([{ value: '#0', label: 'done (1)' }])
-    expect(stringsIn(await $.ui.render(PANE)).some((text: string) => text.includes('No cards'))).toBe(false)
+    const tree = await $.ui.render(PANE)
+    expect(clientNode(tree).props.props.groups.map((group: any) => [group.status, group.count])).toEqual([['done', 1]])
+    expect(stringsIn(tree).some((text: string) => text.includes('No cards'))).toBe(false)
   })
 
   test('a stale All Tasks query never replaces the newer list', async ($, on) => {
@@ -106,11 +109,7 @@ describe('grouped All Tasks', () => {
     w.release(1, '[{"path":"pm/cc-plugins/tasks/a.md","status":"todo"}]')
     await first
     await w.clock.settle()
-    expect(cardSelect(await $.ui.render(PANE)).props.options).toEqual([
-      { value: '#0', label: 'todo (1)' },
-      { value: '#p0.0', label: '  —' },
-      { value: P('b'), label: '    b' },
-    ])
+    expect(pathsIn(await $.ui.render(PANE))).toEqual([P('b')])
   })
 })
 
@@ -140,51 +139,15 @@ describe('other views', () => {
   })
 })
 
-describe('opening a grouped card', () => {
-  test('picking a grouped card reads it under the list', async ($, on) => {
-    const w = world(on, { query: JSON.stringify(MIX), read: CARD })
-    await issue($, '')
-    await pick($, w, 'cards', P('b'))
-    const tree = await $.ui.render(PANE)
-    expect(runsOf(w, 'read')[0].argv[3]).toBe('path=pm/cc-plugins/tasks/b.md')
-    expect(cardSelect(tree).props.value).toBe(P('b'))
-    expect(nodesOf(tree, 'Markdown')).toHaveLength(1)
-    expect(stringsIn(headerIn(tree)).join('')).toBe('status: todo · priority: medium · AC 0/1')
-    expect(cardSelect(tree).props.options).toEqual(GROUPED_MIX)
-  })
-})
-
 describe('done cards', () => {
-  test('/issue still opens a done card that the list hides', async ($, on) => {
+  test('/issue still opens a done card that the list folds', async ($, on) => {
     const w = world(on, { query: JSON.stringify(MIX), read: CARD })
     await issue($, 'e')
     const tree = await $.ui.render(PANE)
     expect(runsOf(w, 'read')[0].argv[3]).toBe('path=pm/cc-plugins/tasks/e.md')
     expect(nodesOf(tree, 'Markdown')).toHaveLength(1)
-    expect(cardSelect(tree).props.options.map((option: any) => option.value)).not.toContain(P('e'))
+    expect(clientNode(tree)).toBeDefined()
     expectDrawn(tree)
-  })
-})
-
-describe('heading picks', () => {
-  test('picking a status heading changes nothing', async ($, on) => {
-    const w = world(on, { query: JSON.stringify(MIX) })
-    await issue($, '')
-    const before = stringsIn(await $.ui.render(PANE))
-    await pick($, w, 'cards', '#0')
-    expect(w.runs.length).toBe(2)
-    expect(stringsIn(await $.ui.render(PANE))).toEqual(before)
-    expect(nodesOf(await $.ui.render(PANE), 'Box').some((node: any) => node.props?.marginTop === 1)).toBe(false)
-  })
-
-  test('picking a priority sub-heading changes nothing', async ($, on) => {
-    const w = world(on, { query: JSON.stringify(MIX) })
-    await issue($, '')
-    const before = stringsIn(await $.ui.render(PANE))
-    await pick($, w, 'cards', '#p0.0')
-    expect(w.runs.length).toBe(2)
-    expect(stringsIn(await $.ui.render(PANE))).toEqual(before)
-    expect(nodesOf(await $.ui.render(PANE), 'Box').some((node: any) => node.props?.marginTop === 1)).toBe(false)
   })
 })
 
@@ -277,34 +240,32 @@ describe('query errors', () => {
 })
 
 describe('command result', () => {
-  test('the grouped list never enters the command result', async ($, on) => {
+  test('the list never enters the command result', async ($, on) => {
     world(on, { query: '[{"path":"pm/cc-plugins/tasks/a.md","status":"zz-marker"}]' })
     const result = await issue($, '')
     expect(result).toEqual({})
-    expect(stringsIn(await $.ui.render(PANE))).toContain('zz-marker (1)')
+    expect(JSON.stringify(clientNode(await $.ui.render(PANE)).props.props)).toContain('zz-marker')
     expect(JSON.stringify(result).includes('zz-marker')).toBe(false)
-    expect(JSON.stringify(result).includes('(1)')).toBe(false)
   })
 })
 
-describe('bounded grouped text', () => {
-  test('vault values in grouped options stay within draw bounds', async ($, on) => {
+describe('bounded list text', () => {
+  test('vault values in the list props stay within draw bounds', async ($, on) => {
     const CR = String.fromCharCode(13)
     world(on, {
       query: JSON.stringify([
         { path: P('a'), status: 'x'.repeat(11000) },
-        { path: P('b'), status: `a${CR}b`, priority: `c${CR}d` },
+        { path: P('b'), status: `a${CR}b`, priority: `c${CR}d`, title: `t${CR}u` },
       ]),
     })
     await issue($, '')
     const tree = await $.ui.render(PANE)
     expectDrawn(tree)
-    const strings = stringsIn(tree)
-    for (const text of strings) expect(text.length).toBeLessThanOrEqual(10000)
-    expect(strings).toContain('x'.repeat(10000))
-    expect(strings).toContain('ab (1)')
-    expect(strings).toContain('  cd')
-    expect(strings).toContain('    b')
-    expect(strings.some((text) => text.includes(CR))).toBe(false)
+    const props = clientNode(tree).props.props
+    const flat = JSON.stringify(props)
+    expect(flat.includes(CR)).toBe(false)
+    expect(flat.includes('x'.repeat(33))).toBe(false)
+    expect(props.groups.map((group: any) => group.status)).toEqual(['x'.repeat(32), 'ab'])
+    expect(props.groups[1].rows[0].title).toBe('tu')
   })
 })
