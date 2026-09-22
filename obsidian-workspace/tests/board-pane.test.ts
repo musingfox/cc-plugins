@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { PANE, cardSelect, clientNode, issue, mounted, nodesOf, pick, stringsIn, viewSelect } from './fixtures/pane.ts'
+import { PANE, cardSelect, clientNode, expectDrawn, issue, mounted, nodesOf, pick, stringsIn, viewSelect } from './fixtures/pane.ts'
 import { SESSION, world } from './fixtures/world.ts'
 import { MIX, P } from './fixtures/rows.ts'
 
@@ -71,5 +71,37 @@ describe('All Tasks list', () => {
     expect(nodesOf(tree, 'Client')).toHaveLength(0)
     expect(cardSelect(tree).props.options.some((option: any) => option.value.startsWith('#'))).toBe(false)
     expect(cardSelect(tree).props.options[0]).toEqual({ value: P('g'), label: 'waiting · g' })
+  })
+})
+
+describe('surfaces without Client', () => {
+  const FLAT = [{ value: 'pm/cc-plugins/tasks/a.md', label: 'todo · a' }]
+
+  test('vscode draws All Tasks as the flat card list', async ($, on) => {
+    world(on)
+    await issue($, '')
+    const tree = await $.ui.render({ ...PANE, surface: 'vscode' })
+    expect(cardSelect(tree).props.options).toEqual(FLAT)
+    expect(nodesOf(tree, 'Client')).toHaveLength(0)
+  })
+
+  // mobile has no Select either, so its All Tasks can only match what a flat view draws there.
+  test('mobile draws All Tasks as it draws a flat view', async ($, on) => {
+    world(on)
+    await issue($, '')
+    const tree = await $.ui.render({ ...PANE, surface: 'mobile' })
+    expectDrawn(tree)
+    expect(nodesOf(tree, 'Client')).toHaveLength(0)
+    await issue($, 'Active')
+    expect(await $.ui.render({ ...PANE, surface: 'mobile' })).toEqual(tree)
+  })
+
+  test('terminal and desktop draw the Client', async ($, on) => {
+    world(on)
+    await issue($, '')
+    const terminal = await $.ui.render({ ...PANE, surface: 'terminal' })
+    expect(nodesOf(terminal, 'Client')).toHaveLength(1)
+    expect(cardSelect(terminal)).toBe(undefined)
+    expect(nodesOf(await $.ui.render({ ...PANE, surface: 'desktop' }), 'Client')).toHaveLength(1)
   })
 })

@@ -385,7 +385,9 @@ async function drawPane($: any, e: any) {
       }),
     )
   }
-  const board = state.groups && state.groups.groups.length ? state.groups : null
+  // vscode and mobile draw a Client as an empty Box without complaint, so only the surface can say whether it will show.
+  const hasClient = e.surface === 'terminal' || e.surface === 'desktop'
+  const board = hasClient && state.groups && state.groups.groups.length ? state.groups : null
   if (board) {
     const { rows, columns } = boardSize({
       bodyRows: e.props?.scroll?.bodyRows,
