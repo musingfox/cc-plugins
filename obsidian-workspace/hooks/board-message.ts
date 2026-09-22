@@ -1,9 +1,12 @@
+export const PANE_ID = 'obw-issue'
+export const BOARD_KEY = 'board'
+
 export type BoardMessage = { kind: 'open'; path: string } | { kind: 'back' }
 
 // A post is code's word, not the engine's: only the exact open or back shape from the pane's own list is acted on.
 export function boardMessage(e: { requestId: string; element: string; data: unknown }, listed: string[] | null): BoardMessage | null {
-  if (e.requestId !== 'obw-issue') return null
-  if (e.element !== 'board') return null
+  if (e.requestId !== PANE_ID) return null
+  if (e.element !== BOARD_KEY) return null
   const data = e.data
   if (typeof data !== 'object' || data === null) return null
   const keys = Object.keys(data)

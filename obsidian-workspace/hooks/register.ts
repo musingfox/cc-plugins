@@ -10,7 +10,7 @@ import { cardName, listRows, resolveArgument, rowNamed, rowSlug, rowsOutside } f
 import { COUNT_VIEW, missingViewHint, missingViewText } from './counts.ts'
 import { listGroups } from './list.ts'
 import { boardSize } from './board-size.ts'
-import { boardMessage } from './board-message.ts'
+import { BOARD_KEY, PANE_ID, boardMessage } from './board-message.ts'
 import type { Card } from './board.ts'
 import { acLabel, headerOf } from './card.ts'
 import type { CardHeader } from './card.ts'
@@ -19,7 +19,7 @@ import { splitFences, termaidHeaderAllowed, diagramOutcome, TERMAID_ARGV, TERMAI
 import type { Segment } from './mermaid.ts'
 import { priorityColor, statusColor, RED } from './style.ts'
 
-const PANE = { id: 'obw-issue', title: 'obw issue', focus: true, closeOnEscape: true }
+const PANE = { id: PANE_ID, title: 'obw issue', focus: true, closeOnEscape: true }
 
 type Browser = { kind: 'rendering' } | ReturnType<typeof renderOutcome>
 
@@ -429,7 +429,7 @@ async function drawPane($: any, e: any) {
     })
     const listCard = state.card && state.origin === 'list' ? boardCard(state.card) : null
     const shown = listCard ? { groups: [], hidden: 0, card: listCard } : { groups: board.groups, hidden: board.hidden, card: null }
-    children.push(Client({ key: 'board', module: './board.ts', width: columns, height: rows, props: { rows, columns, ...shown } }))
+    children.push(Client({ key: BOARD_KEY, module: './board.ts', width: columns, height: rows, props: { rows, columns, ...shown } }))
   } else if (state.cards.length) {
     children.push(
       Select({
