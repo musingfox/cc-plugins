@@ -1,4 +1,5 @@
 import type { ClientSurface } from 'claude-code'
+import { clamp } from './board-size.ts'
 import { RED } from './style.ts'
 import { displayWidth, fitWidth } from './width.ts'
 import type { BoardGroup as Group, BoardRow } from './list.ts'
@@ -17,6 +18,11 @@ const START: State = { cursor: 0, top: 0, collapsed: ['done'], scroll: 0, scroll
 
 // The first line drawn: the stored one, moved just enough to keep the cursor in the window.
 const topFor = (cursor: number, top: number, window: number) => Math.min(Math.max(top, cursor - window + 1), cursor)
+
+// How far a key moves the list cursor or the card body; null for a key that moves neither.
+function step(key: string, window: number) {
+  return key === 'down' ? 1 : key === 'up' ? -1 : key === 'pagedown' ? window : key === 'pageup' ? -window : null
+}
 
 // A fold is kept under its heading's key. A bounded status never holds \0, so neither the missing-status
 // group nor a status that reads the same as an earlier one once capped shares a key with another group.
@@ -98,12 +104,10 @@ export default function Board(props: Props, surface: ClientSurface<State>) {
     const window = Math.max(1, props.rows - 1 - header.length)
     const last = Math.max(0, lines.length - window)
     const scroll = st.scrollPath === card.path ? Math.min(st.scroll, last) : 0
-    const scrollTo = (to: number) => surface.setState({ ...st, scroll: Math.min(Math.max(to, 0), last), scrollPath: card.path })
+    const scrollTo = (to: number) => surface.setState({ ...st, scroll: clamp(to, 0, last), scrollPath: card.path })
     surface.onKey(({ key }) => {
-      if (key === 'down') scrollTo(scroll + 1)
-      else if (key === 'up') scrollTo(scroll - 1)
-      else if (key === 'pagedown') scrollTo(scroll + window)
-      else if (key === 'pageup') scrollTo(scroll - window)
+      const by = step(key, window)
+      if (by !== null) scrollTo(scroll + by)
       else toList({ key })
     })
     return column([
@@ -123,16 +127,14 @@ export default function Board(props: Props, surface: ClientSurface<State>) {
   const cursor = Math.min(st.cursor, items.length - 1)
   const top = topFor(cursor, st.top, window)
   const move = (to: number) => {
-    const next = Math.min(Math.max(to, 0), items.length - 1)
+    const next = clamp(to, 0, items.length - 1)
     surface.setState({ ...st, cursor: next, top: topFor(next, top, window) })
   }
   const fold = (collapsed: string[]) => surface.setState({ ...st, cursor, top, collapsed })
   surface.onKey(({ key }) => {
     const item = items[cursor]
-    if (key === 'down') move(cursor + 1)
-    else if (key === 'up') move(cursor - 1)
-    else if (key === 'pagedown') move(cursor + window)
-    else if (key === 'pageup') move(cursor - window)
+    const by = step(key, window)
+    if (by !== null) move(cursor + by)
     else if (item.kind === 'row') {
       if (key === 'left') move(items.findLastIndex((it, i) => i < cursor && it.kind === 'heading'))
       else if (key === 'right' || key === 'return') surface.post({ open: item.row.path })

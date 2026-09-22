@@ -1,6 +1,6 @@
 import { displayWidth } from './width.ts'
 
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
+export const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 const positive = (value: unknown, fallback: number) => (Number.isInteger(value) && (value as number) > 0 ? (value as number) : fallback)
 
 // The one row reserved is the collapsed views Select, assumed to draw on a single line.
