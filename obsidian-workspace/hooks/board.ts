@@ -57,6 +57,7 @@ export default function Board(props: Props, surface: ClientSurface<State>) {
     const next = Math.min(Math.max(to, 0), items.length - 1)
     surface.setState({ ...st, cursor: next, top: topFor(next, top, window) })
   }
+  const fold = (collapsed: string[]) => surface.setState({ ...st, cursor, top, collapsed })
   surface.onKey(({ key }) => {
     const item = items[cursor]
     if (key === 'down') move(cursor + 1)
@@ -64,6 +65,9 @@ export default function Board(props: Props, surface: ClientSurface<State>) {
     else if (key === 'pagedown') move(cursor + window)
     else if (key === 'pageup') move(cursor - window)
     else if (key === 'left' && item.kind === 'row') move(items.findLastIndex((it, i) => i < cursor && it.kind === 'heading'))
+    else if (item.kind !== 'heading') return
+    else if ((key === 'right' || key === 'return') && !item.open) fold(st.collapsed.filter((status) => status !== statusKey(item.group)))
+    else if (key === 'left' && item.open) fold([...st.collapsed, statusKey(item.group)])
   })
 
   const line = rowLine(props.columns, props.groups)

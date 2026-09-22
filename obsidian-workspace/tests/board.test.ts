@@ -103,3 +103,35 @@ test('clamps a stored cursor past the end of new props without setting state', (
   expect(counter(s.tree)).toBe('5/5')
   expect(s.setStateCalls).toBe(calls)
 })
+
+const downTo = (s: any, index: number) => {
+  for (let i = 0; i < index; i++) s.key('down')
+}
+
+test('starts with done folded and unfolds it under right', () => {
+  const s = board(list())
+  downTo(s, 9)
+  s.key('right')
+  const lines = linesOf(s.tree)
+  expect(counter(s.tree)).toBe('10/16')
+  expect(lines.slice(11, 13)).toEqual(['  [H] f', '  [L] e'])
+  s.key('left')
+  expect(counter(s.tree)).toBe('10/14')
+})
+
+test('folds a heading under left and unfolds it under return', () => {
+  const s = board(list())
+  s.key('left')
+  expect(counter(s.tree)).toBe('1/10')
+  expect(linesOf(s.tree)).toContain('▸ todo  4')
+  s.key('return')
+  expect(counter(s.tree)).toBe('1/14')
+})
+
+test('right on an unfolded heading changes nothing', () => {
+  const s = board(list())
+  s.key('right')
+  expect(s.posts).toEqual([])
+  expect(s.setStateCalls).toBe(0)
+  expect(counter(s.tree)).toBe('1/14')
+})
