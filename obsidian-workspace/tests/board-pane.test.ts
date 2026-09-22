@@ -236,3 +236,45 @@ describe('a card opened from the list', () => {
     }
   })
 })
+
+describe('back to the list', () => {
+  async function openAndGoBack($: any, w: any) {
+    await issue($, '')
+    const m = await mounted($)
+    await m.key({ key: 'down', in: 'board' })
+    await m.key({ key: 'return', in: 'board' })
+    await w.clock.settle()
+    await m.redraw()
+    await m.key({ key: 'left', in: 'board' })
+    await w.clock.settle()
+    await m.redraw()
+    return m
+  }
+
+  test('left on an opened card returns to the list where it was left', async ($, on) => {
+    const w = world(on)
+    const m = await openAndGoBack($, w)
+    const props = clientNode(await $.ui.render(PANE)).props.props
+    expect(props.card).toBe(null)
+    expect(props.groups[0].status).toBe('todo')
+    const texts = await m.findAll({ type: 'Text', in: 'board' })
+    expect(texts.some((text: any) => text.text.endsWith('  2/2'))).toBe(true)
+  })
+
+  test('a read still running when left arrives never lands', async ($, on) => {
+    const w = world(on, { read: 'defer' })
+    await openAndGoBack($, w)
+    w.release(2, CARD)
+    await w.clock.settle()
+    expect(clientNode(await $.ui.render(PANE)).props.props.card).toBe(null)
+  })
+
+  test('back leaves a card /issue asked for in place', async ($, on) => {
+    const w = world(on, { read: CARD })
+    await issue($, 'a')
+    const m = await mounted($)
+    await m.post({ back: true }, { in: 'board' })
+    await w.clock.settle()
+    expect(nodesOf(await $.ui.render(PANE), 'Markdown')).toHaveLength(1)
+  })
+})

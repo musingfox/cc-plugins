@@ -528,6 +528,12 @@ export function register(on: On) {
     const message = boardMessage(e, listed)
     if (!message) return next(e)
     if (message.kind === 'open') void show($, message.path, 'list').catch(() => {})
+    else if (state.card && state.origin === 'list') {
+      // A read still running for the card left behind must not bring it back.
+      ++requests
+      state = { ...state, selected: null, card: null, origin: 'argument' }
+      invalidate($)
+    }
     return {}
   })
 
