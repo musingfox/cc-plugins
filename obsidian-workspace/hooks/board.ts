@@ -1,10 +1,9 @@
 import type { ClientSurface } from 'claude-code'
 import { RED } from './style.ts'
 import { displayWidth, fitWidth } from './width.ts'
+import type { BoardGroup as Group, BoardRow } from './list.ts'
 
-type BoardRow = { path: string; badge: 'H' | 'M' | 'L' | ' '; title: string; due: string; tags: string }
-type Group = { status: string | null; count: number; rows: BoardRow[] }
-type Card =
+export type Card =
   | { kind: 'loading'; name: string }
   | { kind: 'error'; message: string }
   | { kind: 'shown'; path: string; title: string; status: string; priority: string; ac: string | null; clip: string | null; body: string }

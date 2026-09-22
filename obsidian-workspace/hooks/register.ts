@@ -11,6 +11,7 @@ import { COUNT_VIEW, missingViewHint, missingViewText } from './counts.ts'
 import { listGroups } from './list.ts'
 import { boardSize } from './board-size.ts'
 import { boardMessage } from './board-message.ts'
+import type { Card } from './board.ts'
 import { acLabel, headerOf } from './card.ts'
 import type { CardHeader } from './card.ts'
 import { vizManifestPath, vizInstallPath, renderTarget, renderArgv, renderOutcome, RENDER_TIMEOUT_MS } from './viz.ts'
@@ -376,7 +377,7 @@ function clipNotice(clipped: { text: string; clippedFrom: number | null }) {
 }
 
 // The Client module draws its props as given, so every vault string is bounded here.
-function boardCard(card: CardRegion) {
+function boardCard(card: CardRegion): Card {
   const safe = (text: string) => bounded(text).text
   if (card.kind === 'loading') return { kind: 'loading', name: safe(cardName(card.path)) }
   if (card.kind === 'error') return { kind: 'error', message: safe(card.message) }
