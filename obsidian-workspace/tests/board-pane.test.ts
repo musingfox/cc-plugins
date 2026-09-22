@@ -2,6 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 import { PANE, cardSelect, clientNode, expectDrawn, issue, mounted, nodesOf, pick, stringsIn, viewSelect } from './fixtures/pane.ts'
 import { SESSION, world } from './fixtures/world.ts'
 import { MIX, P } from './fixtures/rows.ts'
+import { RED } from '../hooks/style.ts'
 
 const OUTSIDE = '1 row of the All Tasks view is not a card under pm/cc-plugins and was left out.'
 
@@ -103,5 +104,49 @@ describe('surfaces without Client', () => {
     expect(nodesOf(terminal, 'Client')).toHaveLength(1)
     expect(cardSelect(terminal)).toBe(undefined)
     expect(nodesOf(await $.ui.render({ ...PANE, surface: 'desktop' }), 'Client')).toHaveLength(1)
+  })
+})
+
+describe('All Tasks without a list', () => {
+  const HINT =
+    'pm/cc-plugins/dashboard.base has no All Tasks view. Run /obw:pm refresh dashboard to regenerate it from the plugin template; hand edits to that file are overwritten.'
+
+  test('a failed query draws its error with the picker and no list', async ($, on) => {
+    world(on, { query: { deny: 'spawn failed' } })
+    await issue($, '')
+    const tree = await $.ui.render(PANE)
+    expect(nodesOf(tree, 'Client')).toHaveLength(0)
+    const message = 'The obsidian CLI did not run: it is not on PATH, or it did not answer within 10 s.'
+    expect(nodesOf(tree, 'Text').find((node: any) => stringsIn(node).includes(message)).props.color).toBe(RED)
+    expect(viewSelect(tree).props.value).toBe('All Tasks')
+  })
+
+  test('a view Obsidian cannot find draws the refresh hint after the error and no list', async ($, on) => {
+    world(on, { query: 'Error: View not found: All Tasks\nAvailable views: Active\n' })
+    await issue($, '')
+    const tree = await $.ui.render(PANE)
+    expect(nodesOf(tree, 'Client')).toHaveLength(0)
+    const strings = stringsIn(tree)
+    expect(strings[strings.indexOf('Error: View not found: All Tasks\nAvailable views: Active') + 1]).toBe(HINT)
+  })
+
+  test('a dashboard without All Tasks opens Active flat, hint first, no list', async ($, on) => {
+    world(on, {
+      views: 'views:\n  - type: table\n    name: "Active"\n  - type: table\n    name: "Docs"\n',
+      query: '[{"path":"pm/cc-plugins/tasks/a.md","status":"todo"}]',
+    })
+    await issue($, '')
+    const tree = await $.ui.render(PANE)
+    expect(nodesOf(tree, 'Client')).toHaveLength(0)
+    expect(stringsIn(tree)[0]).toBe(HINT)
+    expect(cardSelect(tree).props.options).toEqual([{ value: P('a'), label: 'todo · a' }])
+  })
+
+  test('an empty All Tasks view draws its notice and no list', async ($, on) => {
+    world(on, { query: '[]' })
+    await issue($, '')
+    const tree = await $.ui.render(PANE)
+    expect(nodesOf(tree, 'Client')).toHaveLength(0)
+    expect(stringsIn(tree)).toContain('No cards in the All Tasks view of pm/cc-plugins.')
   })
 })
