@@ -1,3 +1,4 @@
+import { bounded } from './bounds.ts'
 import { countRows, isMissing } from './counts.ts'
 import { cardName, keptRows } from './rows.ts'
 import { PRIORITY_ORDER, STATUS_ORDER } from './style.ts'
@@ -8,6 +9,13 @@ export type BoardRow = { path: string; badge: 'H' | 'M' | 'L' | ' '; title: stri
 export type BoardGroup = { status: string | null; count: number; rows: BoardRow[] }
 
 const BADGES: Record<string, BoardRow['badge']> = { high: 'H', medium: 'M', low: 'L' }
+// Caps chosen so the worst-case list, every character JSON-escaped, serializes under the engine's 100,000-character props bound.
+const MAX_SHOWN = 100
+const MAX_PATH = 200
+const MAX_TITLE = 80
+const MAX_TAGS = 48
+const MAX_DUE = 16
+const MAX_STATUS = 32
 
 function statusCount(counted: ReturnType<typeof countRows>, status: string | null) {
   return status === null ? counted.status.missing : counted.status.values.find((entry) => entry.value === status)!.count
@@ -33,9 +41,9 @@ function boardRow(row: Row): BoardRow {
   return {
     path: row.path,
     badge: (typeof row.priority === 'string' && BADGES[row.priority]) || ' ',
-    title: isMissing(row.title) ? cardName(row.path) : row.title,
-    due: row.due ?? '',
-    tags: row.tags ?? '',
+    title: bounded(row.title ?? '', MAX_TITLE).text || bounded(cardName(row.path), MAX_TITLE).text,
+    due: bounded(row.due ?? '', MAX_DUE).text,
+    tags: bounded(row.tags ?? '', MAX_TAGS).text,
   }
 }
 
@@ -48,10 +56,22 @@ export function listGroups(project: string, rows: Row[]): { groups: BoardGroup[]
     ...named.filter((status) => !STATUS_ORDER.includes(status)),
     ...(counted.status.missing > 0 ? [null] : []),
   ]
-  const groups = statuses.map((status) => ({
-    status,
-    count: statusCount(counted, status),
-    rows: byPriority(kept.filter((row) => (status === null ? isMissing(row.status) : row.status === status))).map(boardRow),
-  }))
-  return { groups, hidden: 0 }
+  const groups: BoardGroup[] = []
+  let shown = 0
+  let hidden = 0
+  for (const status of statuses) {
+    const ofStatus = byPriority(kept.filter((row) => (status === null ? isMissing(row.status) : row.status === status)))
+    const drawn: BoardRow[] = []
+    for (const row of ofStatus) {
+      if (row.path.length > MAX_PATH || shown >= MAX_SHOWN) hidden++
+      else {
+        drawn.push(boardRow(row))
+        shown++
+      }
+    }
+    if (drawn.length) {
+      groups.push({ status: status === null ? null : bounded(status, MAX_STATUS).text, count: statusCount(counted, status), rows: drawn })
+    }
+  }
+  return { groups, hidden }
 }
