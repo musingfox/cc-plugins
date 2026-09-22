@@ -9,12 +9,12 @@ type Card =
   | { kind: 'error'; message: string }
   | { kind: 'shown'; path: string; title: string; status: string; priority: string; ac: string | null; clip: string | null; body: string }
 type Props = { rows: number; columns: number; groups: Group[]; hidden: number; card: Card | null }
-type State = { cursor: number; top: number; collapsed: string[] }
+type State = { cursor: number; top: number; collapsed: string[]; scroll: number; scrollPath: string | null }
 type Item = { kind: 'heading'; group: Group; open: boolean } | { kind: 'row'; row: BoardRow }
 
 const MISSING = '—'
 const TAGS_MAX = 24
-const START: State = { cursor: 0, top: 0, collapsed: ['done'] }
+const START: State = { cursor: 0, top: 0, collapsed: ['done'], scroll: 0, scrollPath: null }
 
 // The first line drawn: the stored one, moved just enough to keep the cursor in the window.
 const topFor = (cursor: number, top: number, window: number) => Math.min(Math.max(top, cursor - window + 1), cursor)
@@ -70,7 +70,7 @@ export default function Board(props: Props, surface: ClientSurface<State>) {
 
   if (props.card) {
     const card = props.card
-    surface.onKey(() => {})
+    if (card.kind !== 'shown') surface.onKey(() => {})
     const back = Text({ dimColor: true, children: ['← list'] })
     if (card.kind === 'loading') return column([back, Text({ dimColor: true, children: [`Reading ${card.name}…`] })])
     if (card.kind === 'error') return column([back, Text({ color: RED, children: [card.message] })])
@@ -81,7 +81,15 @@ export default function Board(props: Props, surface: ClientSurface<State>) {
     ]
     const lines = wrapped(card.body, props.columns)
     const window = Math.max(1, props.rows - 1 - header.length)
-    const scroll = 0
+    const last = Math.max(0, lines.length - window)
+    const scroll = st.scrollPath === card.path ? Math.min(st.scroll, last) : 0
+    const scrollTo = (to: number) => surface.setState({ ...st, scroll: Math.min(Math.max(to, 0), last), scrollPath: card.path })
+    surface.onKey(({ key }) => {
+      if (key === 'down') scrollTo(scroll + 1)
+      else if (key === 'up') scrollTo(scroll - 1)
+      else if (key === 'pagedown') scrollTo(scroll + window)
+      else if (key === 'pageup') scrollTo(scroll - window)
+    })
     return column([
       Text({ dimColor: true, children: [`↑↓ scroll  ← list  ${lines.length ? scroll + 1 : 0}/${lines.length}`] }),
       ...header,

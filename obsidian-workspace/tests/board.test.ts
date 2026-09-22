@@ -192,3 +192,33 @@ test('keeps the list cursor while a card is shown', () => {
   s.render(list())
   expect(counter(s.tree)).toBe('4/14')
 })
+
+const bodyOf = (tree: any) => linesOf(tree).slice(3)
+
+test('scrolls the card body by a line and by a page', () => {
+  const s = board(cardProps(shown()))
+  s.key('down')
+  expect(bodyOf(s.tree)).toEqual(['l2', 'l3', 'l4'])
+  expect(counter(s.tree)).toBe('2/20')
+  s.key('pagedown')
+  expect(bodyOf(s.tree)).toEqual(['l5', 'l6', 'l7'])
+  for (let i = 0; i < 10; i++) s.key('pagedown')
+  expect(bodyOf(s.tree)).toEqual(['l18', 'l19', 'l20'])
+  expect(counter(s.tree)).toBe('18/20')
+})
+
+test('stays at the top of a fresh card', () => {
+  const s = board(cardProps(shown()))
+  s.key('up')
+  expect(counter(s.tree)).toBe('1/20')
+})
+
+test('starts another card from the top without setting state', () => {
+  const s = board(cardProps(shown()))
+  downTo(s, 4)
+  expect(counter(s.tree)).toBe('5/20')
+  const calls = s.setStateCalls
+  s.render(cardProps(shown({ path: P('a') })))
+  expect(counter(s.tree)).toBe('1/20')
+  expect(s.setStateCalls).toBe(calls)
+})
