@@ -421,7 +421,7 @@ async function drawPane($: any, e: any) {
       bodyRows: e.props?.scroll?.bodyRows,
       bodyColumns: e.props?.bodyColumns,
       siblings: [state.listing, state.message].flatMap((line) => (line ? [safe(line.text)] : [])),
-      argumentCard: false,
+      argumentCard: state.card !== null && state.origin === 'argument',
     })
     const listCard = state.card && state.origin === 'list' ? boardCard(state.card) : null
     const shown = listCard ? { groups: [], hidden: 0, card: listCard } : { groups: board.groups, hidden: board.hidden, card: null }

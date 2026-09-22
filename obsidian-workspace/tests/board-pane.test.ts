@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { PANE, cardSelect, clientNode, expectDrawn, issue, mounted, nodesOf, runsOf, stringsIn, uvxRuns, viewSelect } from './fixtures/pane.ts'
+import { PANE, cardSelect, clientNode, expectDrawn, headerIn, issue, mounted, nodesOf, runsOf, stringsIn, uvxRuns, viewSelect, vizWorld } from './fixtures/pane.ts'
 import { CARD, MERMAID_CARD, SESSION, world } from './fixtures/world.ts'
 import { MIX, P } from './fixtures/rows.ts'
 import { RED } from '../hooks/style.ts'
@@ -276,5 +276,45 @@ describe('back to the list', () => {
     await m.post({ back: true }, { in: 'board' })
     await w.clock.settle()
     expect(nodesOf(await $.ui.render(PANE), 'Markdown')).toHaveLength(1)
+  })
+})
+
+describe('a card /issue asked for', () => {
+  const MOD = 'mod-obw-issue-pane'
+  const MOD_PATH = `pm/cc-plugins/tasks/${MOD}.md`
+  const ROWS = JSON.stringify([MOD_PATH, P('other')].map((path) => ({ path, status: 'todo' })))
+
+  test('draws below a compact list', async ($, on) => {
+    world(on, { query: ROWS, read: CARD })
+    await issue($, MOD)
+    const tree = await $.ui.render(PANE)
+    expect(clientNode(tree).props.height).toBe(8)
+    expect(clientNode(tree).props.props.rows).toBe(8)
+    expect(stringsIn(headerIn(tree)).join('')).toBe('status: todo · priority: medium · AC 0/1')
+    const flat = JSON.stringify(tree)
+    expect(flat.indexOf('"type":"Client"')).toBeLessThan(flat.indexOf('"type":"Markdown"'))
+  })
+
+  test('opening a row moves the card into a full-height list region', async ($, on) => {
+    const w = world(on, { query: ROWS, read: CARD })
+    await issue($, MOD)
+    const m = await mounted($)
+    await m.key({ key: 'down', in: 'board' })
+    await m.key({ key: 'down', in: 'board' })
+    await m.key({ key: 'return', in: 'board' })
+    await w.clock.settle()
+    const tree = await $.ui.render(PANE)
+    expect(runsOf(w, 'read').map((run: any) => run.argv[3])).toEqual([`path=${MOD_PATH}`, `path=${P('other')}`])
+    expect(nodesOf(tree, 'Markdown')).toHaveLength(0)
+    expect(clientNode(tree).props.height).toBe(29)
+    expect(clientNode(tree).props.props.card.kind).toBe('shown')
+  })
+
+  test('desktop draws the card with no Button', async ($, on) => {
+    vizWorld(on, { query: ROWS, read: CARD })
+    await issue($, MOD)
+    const tree = await $.ui.render({ ...PANE, surface: 'desktop' })
+    expect(nodesOf(tree, 'Button')).toHaveLength(0)
+    expect(nodesOf(tree, 'Markdown')).toHaveLength(1)
   })
 })
