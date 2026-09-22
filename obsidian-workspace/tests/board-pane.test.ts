@@ -223,7 +223,7 @@ describe('a card opened from the list', () => {
 
   test('card text stays within draw bounds', async ($, on) => {
     const CR = String.fromCharCode(13)
-    const w = world(on, { read: `---\ntitle: "a${CR}b"\n---\n${'x'.repeat(11000)}` })
+    const w = world(on, { read: `---\ntitle: "a${CR}b"\nstatus: ${'s'.repeat(11000)}\n---\n${'x'.repeat(11000)}` })
     const m = await openFirstRow($, w)
     const card = clientNode(await $.ui.render(PANE)).props.props.card
     expect(card.body.length).toBe(10000)

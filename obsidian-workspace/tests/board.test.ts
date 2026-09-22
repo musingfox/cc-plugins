@@ -167,6 +167,12 @@ test('draws a shown card in place of the list', () => {
   expect(linesOf(board(cardProps(shown())).tree)).toEqual(['↑↓ scroll  ← list  1/20', 'T', 'todo · high · AC 0/1', 'l1', 'l2', 'l3'])
 })
 
+test('fits each card header line to the width, keeping the body window', () => {
+  const lines = linesOf(board(cardProps(shown({ title: 'x'.repeat(100), status: 's'.repeat(100), clip: 'c'.repeat(100) }))).tree)
+  expect(lines.slice(1, 4)).toEqual(['x'.repeat(39) + '…', 's'.repeat(39) + '…', 'c'.repeat(39) + '…'])
+  expect(lines.slice(4)).toEqual(['l1', 'l2'])
+})
+
 test('wraps a wide body line at the width', () => {
   expect(linesOf(board(cardProps(shown({ body: '中'.repeat(25) }))).tree).slice(3)).toEqual(['中'.repeat(20), '中'.repeat(5)])
 })

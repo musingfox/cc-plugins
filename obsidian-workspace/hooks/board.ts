@@ -77,10 +77,12 @@ export default function Board(props: Props, surface: ClientSurface<State>) {
     const back = Text({ dimColor: true, children: ['← list'] })
     if (card.kind === 'loading') return column([back, Text({ dimColor: true, children: [`Reading ${card.name}…`] })])
     if (card.kind === 'error') return column([back, Text({ color: RED, children: [card.message] })])
+    // One line each, so the body window below them is exactly what the counter says.
+    const fitted = (text: string) => fitWidth(text, props.columns).trimEnd()
     const header = [
-      Text({ bold: true, children: [card.title] }),
-      Text({ children: [[card.status, card.priority, ...(card.ac ? [card.ac] : [])].join(' · ')] }),
-      ...(card.clip ? [Text({ dimColor: true, children: [card.clip] })] : []),
+      Text({ bold: true, children: [fitted(card.title)] }),
+      Text({ children: [fitted([card.status, card.priority, ...(card.ac ? [card.ac] : [])].join(' · '))] }),
+      ...(card.clip ? [Text({ dimColor: true, children: [fitted(card.clip)] })] : []),
     ]
     const lines = wrapped(card.body, props.columns)
     const window = Math.max(1, props.rows - 1 - header.length)
