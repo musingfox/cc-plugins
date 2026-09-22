@@ -48,7 +48,7 @@ function byPriority<R extends Row>(rows: R[]) {
 function boardRow(row: Row): BoardRow {
   return {
     path: row.path,
-    badge: (typeof row.priority === 'string' && BADGES[row.priority]) || ' ',
+    badge: (typeof row.priority === 'string' && Object.hasOwn(BADGES, row.priority) && BADGES[row.priority]) || ' ',
     title: oneLine(row.title ?? '', MAX_TITLE) || oneLine(cardName(row.path), MAX_TITLE),
     due: oneLine(row.due ?? '', MAX_DUE),
     tags: oneLine(row.tags ?? '', MAX_TAGS),

@@ -12,6 +12,12 @@ test('groups rows by status in schema order, each sorted by priority', () => {
   expect(groups[3].rows.map((row) => row.path)).toEqual([P('f'), P('e')])
 })
 
+test('gives a priority named after an Object prototype key a blank badge', () => {
+  const rows = ['constructor', 'toString', '__proto__'].map((priority, i) => ({ path: P(`p${i}`), status: 'todo', priority }))
+  const { groups } = listGroups('cc-plugins', rows)
+  expect(groups[0].rows.map((row) => row.badge)).toEqual([' ', ' ', ' '])
+})
+
 test('group counts match countRows over the same rows', () => {
   const counted = countRows('cc-plugins', MIX)
   const { groups } = listGroups('cc-plugins', MIX)
