@@ -25,6 +25,7 @@ test('ignores a non-string open', () => expect(boardMessage(post({ open: 123 }),
 test('ignores an escaping path', () => expect(boardMessage(post({ open: 'pm/cc-plugins/../x.md' }), [P('a')])).toBe(null))
 
 test('goes back on back:true', () => expect(boardMessage(post({ back: true }), [P('a')])).toEqual({ kind: 'back' }))
+test('goes back with no list drawn', () => expect(boardMessage(post({ back: true }), null)).toEqual({ kind: 'back' }))
 test('ignores a truthy non-true back', () => expect(boardMessage(post({ back: 1 }), [P('a')])).toBe(null))
 test('ignores open and back together', () => expect(boardMessage(post({ open: P('a'), back: true }), [P('a')])).toBe(null))
 test('ignores null data', () => expect(boardMessage(post(null), [P('a')])).toBe(null))

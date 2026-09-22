@@ -221,6 +221,14 @@ describe('a card opened from the list', () => {
     expect(runsOf(w, 'read')).toHaveLength(1)
   })
 
+  test('an open posted while the card is shown reads nothing more', async ($, on) => {
+    const w = world(on)
+    const m = await openFirstRow($, w)
+    await m.post({ open: P('a') }, { in: 'board' })
+    await w.clock.settle()
+    expect(runsOf(w, 'read')).toHaveLength(1)
+  })
+
   test('card text stays within draw bounds', async ($, on) => {
     const CR = String.fromCharCode(13)
     const w = world(on, { read: `---\ntitle: "a${CR}b"\nstatus: ${'s'.repeat(11000)}\n---\n${'x'.repeat(11000)}` })

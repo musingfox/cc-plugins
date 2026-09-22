@@ -394,6 +394,11 @@ function boardCard(card: CardRegion) {
   }
 }
 
+// vscode and mobile draw a Client as an empty Box without complaint, so only the surface can say whether it will show.
+function hasClient(surface: string) {
+  return surface === 'terminal' || surface === 'desktop'
+}
+
 async function drawPane($: any, e: any) {
   const { Box, Text, Select, Markdown, Button, Code, Client } = await $.ui.resolve(e)
   const safe = (text: string) => bounded(text).text
@@ -413,9 +418,7 @@ async function drawPane($: any, e: any) {
       }),
     )
   }
-  // vscode and mobile draw a Client as an empty Box without complaint, so only the surface can say whether it will show.
-  const hasClient = e.surface === 'terminal' || e.surface === 'desktop'
-  const board = hasClient && state.groups && state.groups.groups.length ? state.groups : null
+  const board = hasClient(e.surface) && state.groups && state.groups.groups.length ? state.groups : null
   if (board) {
     const { rows, columns } = boardSize({
       bodyRows: e.props?.scroll?.bodyRows,
@@ -524,7 +527,8 @@ export function register(on: On) {
   })
 
   on('ui.message', async ($, e, next) => {
-    const listed = state.groups && state.chosen === COUNT_VIEW ? state.groups.groups.flatMap((group) => group.rows.map((row) => row.path)) : null
+    const listDrawn = hasClient(e.surface) && state.groups && state.chosen === COUNT_VIEW && !(state.card && state.origin === 'list')
+    const listed = listDrawn ? state.groups!.groups.flatMap((group) => group.rows.map((row) => row.path)) : null
     const message = boardMessage(e, listed)
     if (!message) return next(e)
     if (message.kind === 'open') void show($, message.path, 'list').catch(() => {})
