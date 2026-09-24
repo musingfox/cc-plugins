@@ -45,7 +45,9 @@ Protocol:
    kebab-case NAME. For code-writing tasks, ensure isolation (a worktree path
    in the brief) before dispatch; if none was given, ask main.
 2. `PI_WRITABLE_FILES="$VERDICT" pi-agent.sh start NAME BRIEF_FILE` (set
-   `PI_DISPATCH_CMD` only if the brief says to). The sandbox already
+   `PI_DISPATCH_CMD` only if the brief says to; if `start` exits 2 saying
+   it is not set or a variable is retired, write `STATUS=BLOCKED <that line>`
+   to your verdict and SendMessage main: setting it up needs the human). The sandbox already
    allows TMPDIR, but the fence refuses a write outside the worktree unless the
    file is declared. A `send` replays the declared file; do not declare it
    again. SendMessage main: one line per worker — NAME + what it's doing.

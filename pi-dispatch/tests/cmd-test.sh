@@ -48,19 +48,32 @@ launch() { # ARGS... -> stdout of the launch in $TMP/out, echoes RUNDIR once rc 
 }
 reset_logs() { : > "$ARGVLOG"; : > "$ENVLOG"; }
 
-# --- default: plain `pi` from PATH ------------------------------------------
+# --- unset: refused, never a guessed default ----------------------------------
+# The caller must choose the agent and model; the refusal names the variable
+# so main can ask the human and set it.
+before="$(ls "$PI_RUNS_DIR/pi-dispatch" 2>/dev/null | wc -l | tr -d ' ')"
+PATH="$TMP/bin:$PATH" bash "$DISPATCH" "brief zero" > /dev/null 2> "$TMP/err"; rc=$?
+after="$(ls "$PI_RUNS_DIR/pi-dispatch" 2>/dev/null | wc -l | tr -d ' ')"
+if [ "$rc" = 2 ] && grep -q 'PI_DISPATCH_CMD is not set' "$TMP/err" && [ ! -s "$ARGVLOG" ] && [ "$before" = "$after" ]; then
+  ok "unset PI_DISPATCH_CMD exits 2 naming it, launches nothing, leaves no run dir"
+else
+  bad "unset refusal" "rc=$rc $(cat "$TMP/err")"
+fi
+PI_DISPATCH_CMD= PI_DISPATCH_CHECK=1 bash "$DISPATCH" > /dev/null 2> "$TMP/err"; rc=$?
+[ "$rc" = 2 ] && grep -q 'PI_DISPATCH_CMD is not set' "$TMP/err" && ok "the check seam refuses an empty command too" || bad "check seam unset" "rc=$rc"
+
 reset_logs
-R0="$(PATH="$TMP/bin:$PATH" launch "brief zero")"
+R0="$(PI_DISPATCH_CMD=pi PATH="$TMP/bin:$PATH" launch "brief zero")"
 got="$(cat "$ARGVLOG")"
 case "$got" in
-  "-p --mode json "*) ok "unset PI_DISPATCH_CMD runs pi from PATH with the dispatch flags" ;;
-  *) bad "default command" "$got" ;;
+  "-p --mode json "*) ok "PI_DISPATCH_CMD=pi runs pi from PATH with the dispatch flags" ;;
+  *) bad "bare pi command" "$got" ;;
 esac
 case "$got" in
   *--session\ *) bad "fresh dispatch must not pass a session id" "$got" ;;
   *) ok "fresh dispatch passes no session id" ;;
 esac
-grep -qx 'CMD=pi' "$R0/routing" && ok "the default is recorded as CMD=pi" || bad "default record" "$(tr '\n' ' ' < "$R0/routing")"
+grep -qx 'CMD=pi' "$R0/routing" && ok "the command is recorded as CMD=pi" || bad "record" "$(tr '\n' ' ' < "$R0/routing")"
 
 # --- a full prefix: env assignment, binary path, routing flags --------------
 reset_logs
@@ -189,6 +202,14 @@ esac
 case "$got" in
   *"--session-dir $R1/sessions"*) ok "resume points --session-dir at the PRIOR run's sessions" ;;
   *) bad "resume session-dir" "$got" ;;
+esac
+
+reset_logs
+env -u PI_DISPATCH_CMD bash "$DISPATCH" "follow-up unset" "$PI_RUNS_DIR/pi-dispatch" "$R1" > /dev/null 2> "$TMP/err"
+for _ in $(seq 1 50); do [ -s "$ARGVLOG" ] && break; sleep 0.1; done
+case "$(cat "$ARGVLOG")" in
+  "--model prov/model-x "*) ok "a resume needs no PI_DISPATCH_CMD: the record carries it" ;;
+  *) bad "resume with env unset" "$(cat "$ARGVLOG") $(cat "$TMP/err")" ;;
 esac
 
 # A run recorded before CMD= existed carries PROVIDER=/MODEL= instead. The

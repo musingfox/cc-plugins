@@ -156,11 +156,33 @@ PI_DISPATCH_CMD='pi --model openai-codex/gpt-5.6-terra' pi-agent.sh start NAME B
 PI_DISPATCH_CMD='env PI_CODING_AGENT_DIR=$HOME/.omp/agent omp --model cursor/grok-4.7-medium' pi-agent.sh start NAME BRIEF
 ```
 
-Unset, it is `pi` and pi's own `settings.json` (in `$PI_CODING_AGENT_DIR`,
-else `~/.pi/agent`) chooses the model. The agent must speak
-pi's CLI and json stream (pi and omp do). The retired `PI_BIN`, `PI_PROVIDER`,
-`PI_MODEL` and `PI_EXTRA_ARGS` are refused with exit 2 when set. The launch
-prints the command as `CMD=<command>`; check it before assuming a model.
+It is required: unset, a fresh dispatch exits 2. A command without `--model`
+runs on the agent's own `settings.json` (pi: `$PI_CODING_AGENT_DIR`, else
+`~/.pi/agent`). The agent must speak pi's CLI and json stream (pi and omp do).
+The retired `PI_BIN`, `PI_PROVIDER`, `PI_MODEL` and `PI_EXTRA_ARGS` are refused
+with exit 2 when set. The launch prints the command as `CMD=<command>`; check
+it before assuming a model.
+
+### When it is missing: set it up with the human
+
+When `pi-probe.sh` prints `ERROR:PI_DISPATCH_CMD is not set`, or an `ERROR:`
+naming a retired variable, do not dispatch and do not fall back silently:
+
+1. See what is installed: `command -v pi omp`. Use the absolute paths it
+   prints; a subagent's PATH is not guaranteed.
+2. Ask with `AskUserQuestion` which agent and model workers run on. Offer
+   only installed agents, for example `<pi path> --model openai-codex/gpt-5.6-terra`,
+   or `env PI_CODING_AGENT_DIR=$HOME/.omp/agent <omp path> --model cursor/grok-4.7-medium`
+   for omp (its own agent dir, under `~/.omp` so the sandbox admits it).
+   When a retired variable is set, offer its translation first
+   (`PI_PROVIDER=a PI_MODEL=b` → `--model a/b`, `PI_BIN` → the binary).
+3. Probe the chosen command inline: `PI_DISPATCH_CMD='<choice>' pi-probe.sh`.
+   Not `OK` → show the line and ask again.
+4. Ask whether to keep it. On yes, edit `~/.claude/settings.json`: set
+   `env.PI_DISPATCH_CMD` to the choice and delete the retired keys. Write
+   `$HOME` literally; bash expands it at launch. It takes effect in the next
+   session, so for this one prefix `PI_DISPATCH_CMD='<choice>'` on every
+   `pi-agent.sh` and `pi-probe.sh` call.
 
 The command is recorded per run and replayed on resume, so `send` keeps the
 worker on the binary it started with, and the session keeps its model.

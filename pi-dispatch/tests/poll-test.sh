@@ -304,7 +304,7 @@ resume_via_shim() {
   local brief="$TMP/resume-brief-$RANDOM.md"; printf 'resume prompt\n' > "$brief"
   local outdir="$TMP/resume-out-$RANDOM"
   : > "$RESUME_CAPTURE"
-  ( PATH="$RESUME_SHIMDIR:$PATH" bash "$DISPATCH" "$brief" "$outdir" "$prior" ) >/dev/null 2>"$errfile"
+  ( PATH="$RESUME_SHIMDIR:$PATH" PI_DISPATCH_CMD=pi bash "$DISPATCH" "$brief" "$outdir" "$prior" ) >/dev/null 2>"$errfile"
   local _
   for _ in $(seq 1 50); do [ -s "$RESUME_CAPTURE" ] && break; sleep 0.1; done
   cat "$RESUME_CAPTURE" 2>/dev/null

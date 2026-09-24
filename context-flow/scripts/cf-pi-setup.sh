@@ -29,7 +29,7 @@ mkdir -p "$SESSION"
 CF_SLUG="${1:-$SESSION_BASENAME}"
 
 PI_DISPATCH_CMD="${PI_DISPATCH_CMD:-}"
-PI_DESC="${PI_DISPATCH_CMD:-pi on its own settings.json}"
+PI_DESC="${PI_DISPATCH_CMD:-<PI_DISPATCH_CMD not set>}"
 
 # Availability gate via the canonical probe — cf owns no agent-binary handling.
 # shellcheck source=cf-pi-env.sh

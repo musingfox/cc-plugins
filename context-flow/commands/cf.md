@@ -53,7 +53,8 @@ to breaking-change-only.` — then apply these deltas:
 After setup, read `$PI_AVAILABLE` from env.sh:
 
 - `PI_AVAILABLE=1` → Phase 3 uses OMP (default).
-- `PI_AVAILABLE=0` → Phase 3 falls back to Claude `cf:implement` agent. Log the `cf-pi-setup: pi-probe:` line setup printed on stderr and `Phase 3 will use Claude implement agent.` A `NO_BIN` line means the agent binary is missing (install pi: `npm i -g @earendil-works/pi-coding-agent`); an `ERROR:` line naming a retired variable means the human must move that routing into `PI_DISPATCH_CMD`. Do NOT abort.
+- `PI_AVAILABLE=0` → Phase 3 falls back to Claude `cf:implement` agent. Log the `cf-pi-setup: pi-probe:` line setup printed on stderr and `Phase 3 will use Claude implement agent.` A `NO_BIN` line means the agent binary is missing (install pi: `npm i -g @earendil-works/pi-coding-agent`). Do NOT abort.
+- `PI_AVAILABLE=0` with `ERROR:PI_DISPATCH_CMD is not set`, or an `ERROR:` naming a retired variable → do not fall back silently. Ask via `AskUserQuestion`: set up pi routing now (recommended) or run Phase 3 on the Claude fallback. On set-up, follow the pi-dispatch skill's "When it is missing" steps to choose and probe a command, then re-run setup with it inline (`SESSION=$(PI_DISPATCH_CMD='<choice>' "$SCRIPTS/cf-pi-setup.sh" "<slug>")`) and re-read env.sh; the flow records the command there.
 
 The fallback path is also reachable mid-flow (a shard's `Status: FAIL` with unrecoverable probe error or with Reason `QUOTA` or `QUOTA-WINDOW` — §3.4, or the human selects "Fall back to Claude implement agent" at a recovery prompt). Procedure: §3.6.
 

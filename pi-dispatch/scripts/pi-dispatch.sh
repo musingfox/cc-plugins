@@ -32,7 +32,8 @@
 #   CMD=<agent command>                        on its own line: it holds spaces
 #
 # Routing:
-#   PI_DISPATCH_CMD  the agent command prefix (default: pi), expanded by bash
+#   PI_DISPATCH_CMD  the agent command prefix (required; unset exits 2 unless a
+#                resume replays a recorded one), expanded by bash
 #                the way a shell line is: env assignments, a binary on PATH or by
 #                absolute path, and its routing flags, e.g.
 #                  env PI_CODING_AGENT_DIR=$HOME/.omp/agent omp --model cursor/grok-4.7-medium
@@ -112,7 +113,7 @@ for v in PI_BIN PI_PROVIDER PI_MODEL PI_EXTRA_ARGS; do
   fi
 done
 
-CMD="${PI_DISPATCH_CMD:-pi}"
+CMD="${PI_DISPATCH_CMD:-}"
 
 # The binary the command runs: its words expanded as the launch expands them
 # (no globbing), past leading assignments and `env`. Prints "!<reason>" for a
@@ -158,7 +159,16 @@ validate_cmd() { # sets BIN, or refuses with exit 2
   esac
 }
 
-validate_cmd
+# No default: which agent and model a worker runs on is the caller's choice.
+# A resume carries its own command in the record, so only it may leave this unset.
+if [ -z "$CMD" ]; then
+  if [ "${PI_DISPATCH_CHECK:-}" = 1 ] || [ -z "${3:-}" ]; then
+    echo "pi-dispatch: PI_DISPATCH_CMD is not set. Set it to the agent command and its model, e.g. PI_DISPATCH_CMD='pi --model openai-codex/gpt-5.6-terra', in ~/.claude/settings.json env or inline." >&2
+    exit 2
+  fi
+else
+  validate_cmd
+fi
 # Check seam (no launch): pi-probe.sh asks here, so the probe and the dispatch
 # can never disagree on what they accept or which binary runs.
 if [ "${PI_DISPATCH_CHECK:-}" = 1 ]; then
@@ -282,8 +292,12 @@ if [ -n "$PRIOR_RUNDIR" ] && [ -f "$PRIOR_RUNDIR/routing" ]; then
   if grep -q '^CMD=' "$PRIOR_RUNDIR/routing"; then
     CMD="$(sed -n 's/^CMD=//p' "$PRIOR_RUNDIR/routing" | head -n 1)"
   else
+    [ -n "$CMD" ] || { echo "pi-dispatch: PI_DISPATCH_CMD is not set and prior run $PRIOR_RUNDIR recorded no CMD to resume with." >&2; exit 2; }
     echo "pi-dispatch: warning: prior run recorded no CMD; resuming with $CMD" >&2
   fi
+elif [ -z "$CMD" ]; then
+  echo "pi-dispatch: PI_DISPATCH_CMD is not set and $PRIOR_RUNDIR has no routing record to resume with." >&2
+  exit 2
 fi
 validate_cmd
 

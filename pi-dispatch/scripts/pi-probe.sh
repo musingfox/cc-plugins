@@ -25,7 +25,7 @@
 # it — for cf that meant a shard stuck behind the orchestrator's one-hour
 # Monitor with no sign anything was wrong.
 #
-# Env: PI_DISPATCH_CMD (default pi, expanded exactly as pi-dispatch.sh does),
+# Env: PI_DISPATCH_CMD (required, expanded exactly as pi-dispatch.sh does),
 #      PI_PROBE_DEADLINE_S (default 60).
 #
 # Full-probe side effects in PROBE_DIR: probe-stdout.log, probe-stderr.log,
@@ -34,7 +34,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CMD="${PI_DISPATCH_CMD:-pi}"
+CMD="${PI_DISPATCH_CMD:-}"
 
 # The dispatch decides what it accepts and which binary runs; asking it keeps
 # the probe from ever passing a command the dispatch refuses, or the reverse.

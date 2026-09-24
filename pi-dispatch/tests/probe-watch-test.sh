@@ -38,6 +38,9 @@ case "$got" in ERROR:*relative*) [ "$rc" = 1 ] && ok "probe refuses what the dis
 got="$(PI_DISPATCH_CMD='env X=$NO_SUCH_VAR_XYZ sh' bash "$PROBE" --bin-only)"; rc=$?
 [ "$got" = "OK" ] && ok "probe --bin-only tolerates an unset variable, as bash -c does" || bad "probe unset var" "$got rc=$rc"
 
+got="$(bash "$PROBE" --bin-only)"; rc=$?
+case "$got" in "ERROR:PI_DISPATCH_CMD is not set"*) [ "$rc" = 1 ] && ok "probe with PI_DISPATCH_CMD unset -> ERROR naming it" || bad "probe unset rc" "rc=$rc";; *) bad "probe unset" "$got";; esac
+
 # --- probe: --bin-only NO_BIN path (missing binary, rc=1) ---
 got="$(PI_DISPATCH_CMD="env A=1 definitely-not-a-binary-xyz" bash "$PROBE" --bin-only)"; rc=$?
 case "$got" in NO_BIN*) [ "$rc" -eq 1 ] && ok "probe --bin-only NO_BIN (rc=1)" || bad "probe NO_BIN rc" "rc=$rc";; *) bad "probe NO_BIN" "$got";; esac
