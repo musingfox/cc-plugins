@@ -35,7 +35,8 @@ case "${STUB_MODE:-ok}" in
 esac
 EOF
 chmod +x "$TMP/bin/pi"
-export PI_BIN="$TMP/bin/pi"
+unset PI_BIN PI_PROVIDER PI_MODEL PI_EXTRA_ARGS
+export PI_DISPATCH_CMD="$TMP/bin/pi"
 
 # --- T1: clean run ---
 OUT="$(STUB_MODE=ok "$SCRIPTS/pi-run.sh" "say hi" "$TMP/t1")"

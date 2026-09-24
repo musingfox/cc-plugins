@@ -163,7 +163,7 @@ watch)
     # with; the caller sees one QUOTA line per worker and falls back to a Claude
     # self-do builder for the lot.
     # ponytail: assumes the batch shares the provider/quota (true for one
-    # settings.json default); compare RUNDIR/routing if mixed routing appears.
+    # PI_DISPATCH_CMD); compare RUNDIR/routing CMD= if mixed routing appears.
     if [ "${QUOTA_SEEN:-0}" = 1 ]; then
       for name in "${NAMES[@]}"; do
         dir="$(readlink "$REG/$name" 2>/dev/null || true)"

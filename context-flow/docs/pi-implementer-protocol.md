@@ -15,7 +15,7 @@ Core stance: the orchestrator never trusts the worker's stdout or report. The wo
 - **Brief goes in via `@file`, never `"$(cat brief)"`** — shell substitution expands backticks/dollars inside the brief and corrupts the prompt (empirically verified).
 - **Exit codes carry NO signal** — the worker exits 0 even on API errors. Outcome = the JSONL stream's terminal `agent_end` event: `stopReason: "stop"` is clean, `error`/`aborted` failed (with `errorMessage` inline).
 - **Success = `agent_end stopReason:"stop"` AND `$REPORT_FILE` exists and parses.** The `DONE` sentinel in stdout is a hint, not a contract.
-- Provider/model: `$PI_PROVIDER`/`$PI_MODEL` env → flags; unset → the worker resolves from its own config (host-dependent — set both for cross-machine reproducibility).
+- Provider/model: `$PI_DISPATCH_CMD` env, the agent command with its `--model` flag; unset → the worker resolves from its own config (host-dependent — pin `--model` for cross-machine reproducibility).
 
 ### Liveness channel
 

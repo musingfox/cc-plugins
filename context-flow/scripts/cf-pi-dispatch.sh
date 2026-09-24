@@ -66,12 +66,11 @@ fi
 # the first concrete tool call.
 export PI_PROMPT="${PI_PROMPT:-Read the brief and execute it. Act now: make your first tool call (read/edit/bash) before ending your turn — do not end a turn on planning alone. When finished, print exactly DONE and nothing else.}"
 
-# Pass cf's env vars to the canonical dispatch. PI_PROVIDER/PI_MODEL route the
-# worker (pi --model provider/model); unset, pi's own settings.json decides.
+# Pass cf's env vars to the canonical dispatch. PI_DISPATCH_CMD routes the
+# worker (the agent command and its --model); unset, pi's own settings.json decides.
 # Pick the builder's model with the reviewer in mind: the doctrine's
 # reviewer >= builder rule still holds, and nothing enforces it for you.
-export PI_PROVIDER="${PI_PROVIDER:-}"
-export PI_MODEL="${PI_MODEL:-}"
+export PI_DISPATCH_CMD="${PI_DISPATCH_CMD:-}"
 # The worker starts inside its worktree. Without this it inherited cf's own
 # directory — the human's checkout — and a bare `git commit` landed there.
 export PI_CWD="$WORK"

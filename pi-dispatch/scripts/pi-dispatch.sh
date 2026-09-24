@@ -28,20 +28,25 @@
 #   OUTPUT=<absolute path to result file>     <- the handle the caller reads later
 #   PID=<background wrapper pid (== PGID)>     <- the perl setsid wrapper's pid
 #   RUNDIR=<per-run dir holding result/stderr/pid/pgid/rc/start>
-#   ROUTING=<provider>/<model> CWD=<dir> WRITABLE=<list>   what the run actually resolved to
+#   CWD=<dir> WRITABLE=<list>                  what the run resolved to
+#   CMD=<agent command>                        on its own line: it holds spaces
 #
-# Routing (nothing set = pi's own settings.json decides, read from
-#   ${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/settings.json; a missing file warns on stderr):
-#   PI_BIN       agent binary to invoke (default: pi)
-#   PI_PROVIDER  optional; with PI_MODEL it is passed as --model PROVIDER/MODEL.
-#                Alone it is refused (exit 2): pi resolves the model first, so
-#                --provider on its own does not route.
-#   PI_MODEL     optional model (pi fuzzy-matches model names)
-#   PI_RESOLVE_ROUTING_ONLY=1     print resolved "PROVIDER=… MODEL=…" and exit
+# Routing:
+#   PI_DISPATCH_CMD  the agent command prefix (default: pi), expanded by bash
+#                the way a shell line is: env assignments, a binary on PATH or by
+#                absolute path, and its routing flags, e.g.
+#                  env PI_CODING_AGENT_DIR=$HOME/.omp/agent omp --model cursor/grok-4.7-medium
+#                The agent must speak pi's CLI: the dispatch appends -p --mode json,
+#                -e, --session-dir, --session and @brief. Nothing in the command =
+#                the agent's own settings choose the model. A newline, #, ;, &, |,
+#                < or > is refused: it would cut off the flags the dispatch appends.
+#                The command is printed and recorded, so keep secrets out of it.
+#                PI_BIN, PI_PROVIDER, PI_MODEL and PI_EXTRA_ARGS are its retired
+#                predecessors; any of them set is refused (exit 2).
 #
-# Routing is RECORDED to RUNDIR/routing and REPLAYED on resume: a follow-up turn
-# that passes PRIOR_RUNDIR always inherits the prior run's routing, so a resumed
-# session never silently changes model mid-conversation.
+# The command is RECORDED to RUNDIR/routing and REPLAYED on resume: a follow-up
+# turn that passes PRIOR_RUNDIR always runs on the binary and agent dir that wrote
+# the session, and the session itself carries the model.
 #
 # Pi prompt (env-overridable):
 #   PI_PROMPT    default: "Read the brief above and complete it. Output only the result."
@@ -92,22 +97,72 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-PROVIDER="${PI_PROVIDER:-}"
-MODEL="${PI_MODEL:-}"
-
 # Migration guard: PI_CONFIG_FILES was the omp-era routing knob. pi has no
 # --config, so a leftover export would silently route to pi's default model.
 if [ -n "${PI_CONFIG_FILES:-}" ]; then
-  echo "pi-dispatch: warning: PI_CONFIG_FILES is ignored (an omp-era routing knob); route with PI_PROVIDER/PI_MODEL instead." >&2
+  echo "pi-dispatch: warning: PI_CONFIG_FILES is ignored (an omp-era routing knob); route with PI_DISPATCH_CMD instead." >&2
 fi
 
-# The agent binary. Default: pi. Override with PI_BIN for a pi-compatible fork.
-PI_BIN="${PI_BIN:-pi}"
+# Refused rather than ignored: a leftover PI_MODEL would otherwise run the batch
+# on a model nobody chose.
+for v in PI_BIN PI_PROVIDER PI_MODEL PI_EXTRA_ARGS; do
+  if [ -n "${!v:-}" ]; then
+    echo "pi-dispatch: $v is retired; put the binary, routing and flags in one PI_DISPATCH_CMD (e.g. PI_DISPATCH_CMD='pi --model openai-codex/gpt-5.6-terra') and unset $v." >&2
+    exit 2
+  fi
+done
 
-# Introspection seam (no launch): print the resolved routing and exit. Lets callers
-# and tests verify routing without invoking the binary.
-if [ "${PI_RESOLVE_ROUTING_ONLY:-}" = "1" ]; then
-  echo "PROVIDER=$PROVIDER MODEL=$MODEL"
+CMD="${PI_DISPATCH_CMD:-pi}"
+
+# The binary the command runs: its words expanded as the launch expands them
+# (no globbing), past leading assignments and `env`. Prints "!<reason>" for a
+# command the dispatch cannot fence: one that sets a variable the fence
+# carries, passes env an option (-i, -u) that could clear them, or names a
+# relative binary, which would resolve inside PI_CWD rather than here.
+cmd_binary() {
+  set +u -f
+  eval "set -- $CMD" 2>/dev/null || { echo "!its quoting does not parse"; return; }
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -*) echo "!it passes env the option $1, which could clear the fence's variables"; return ;;
+      PI_CWD=*|PI_WRITABLE_FILES=*|PI_REAL_GIT=*|PATH=*) echo "!it sets ${1%%=*}, which the fence owns"; return ;;
+      *=*|env) shift; continue ;;
+    esac
+    case "$1" in /*) ;; */*) echo "!its binary $1 is relative; give it on PATH or by absolute path"; return ;; esac
+    printf '%s\n' "$1"
+    return
+  done
+  echo "!it names no binary"
+}
+
+validate_cmd() { # sets BIN, or refuses with exit 2
+  # The dispatch's own flags are appended to the command, so anything that ends
+  # or garbles it (a comment, ;, &, a pipe, a redirect, a subshell, a trailing
+  # backslash) would start the agent without -p, the brief or the fence extension.
+  case "$CMD" in *$'\n'*|*[\;\&\|\<\>\#\(\)\`]*|*\\)
+    echo "pi-dispatch: PI_DISPATCH_CMD must be one simple command (no newline, #, ;, &, |, <, >, parentheses, backquotes or a trailing backslash): $CMD" >&2
+    exit 2 ;;
+  esac
+  # Measured against pi 2026-09-15: pi resolves the model first and the provider
+  # follows it, so --provider alone lands on pi's default while looking pinned.
+  case " $CMD " in *" --provider "*|*" --provider="*)
+    case " $CMD " in *" --model "*|*" --model="*) ;; *)
+      echo "pi-dispatch: PI_DISPATCH_CMD has --provider without --model; pi would run on its default provider. Pin both as --model PROVIDER/MODEL: $CMD" >&2
+      exit 2 ;;
+    esac ;;
+  esac
+  BIN="$(cmd_binary)"
+  case "$BIN" in '!'*)
+    echo "pi-dispatch: PI_DISPATCH_CMD is refused because ${BIN#!}: $CMD" >&2
+    exit 2 ;;
+  esac
+}
+
+validate_cmd
+# Check seam (no launch): pi-probe.sh asks here, so the probe and the dispatch
+# can never disagree on what they accept or which binary runs.
+if [ "${PI_DISPATCH_CHECK:-}" = 1 ]; then
+  echo "BIN=$BIN"
   exit 0
 fi
 
@@ -123,7 +178,6 @@ abs() { # physical absolute path of an existing directory, or of a file in one
 # (below), and the paths handed to pi must survive that cd.
 [ -f "$BRIEF" ] && BRIEF="$(abs "$BRIEF")"
 mkdir -p "$OUTDIR"; OUTDIR="$(abs "$OUTDIR")"
-case "$PI_BIN" in */*) PI_BIN="$(abs "$PI_BIN")" ;; esac
 [ -n "$PRIOR_RUNDIR" ] && [ -d "$PRIOR_RUNDIR" ] && PRIOR_RUNDIR="$(abs "$PRIOR_RUNDIR")"
 
 # PI_CWD: the directory pi is launched in. pi has no --cwd flag and takes
@@ -214,47 +268,24 @@ if [ "${PI_SANDBOX:-1}" != "0" ] && [ "$(uname -s)" = Darwin ] && command -v san
   common="$(git -C "$PI_CWD" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
   [ -n "$common" ] && sb_paths+=("$(abs "$common")")
   for d in "${TMPDIR:-}" "$(getconf DARWIN_USER_TEMP_DIR 2>/dev/null || true)" "$(getconf DARWIN_USER_CACHE_DIR 2>/dev/null || true)" \
-           "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}" "$HOME/.pi" "$HOME/.cache" "$HOME/.npm" "$HOME/.bun/install/cache" "$HOME/Library/Caches"; do
+           "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}" "$HOME/.pi" "$HOME/.omp" "$HOME/.cache" "$HOME/.npm" "$HOME/.bun/install/cache" "$HOME/Library/Caches"; do
     [ -n "$d" ] && [ -d "$d" ] && sb_paths+=("$(abs "$d")")
   done
   SANDBOX_PROFILE_PATHS=("${sb_paths[@]}")
   SANDBOX=(pending)
 fi
 
-# A resume inherits the prior run's routing. The recorded routing beats the env
-# (a shell that says grok must not hijack a session started on codex). Without
-# this a follow-up turn silently changes model mid-session.
-ROUTING_SOURCE="PI_PROVIDER"
+# A resume replays the prior run's command. The record beats the env: the
+# session belongs to the binary and agent dir that wrote it. A run recorded
+# before CMD= existed resumes on the env command; its session names its model.
 if [ -n "$PRIOR_RUNDIR" ] && [ -f "$PRIOR_RUNDIR/routing" ]; then
-  PROVIDER="$(sed -n 's/^PROVIDER=//p' "$PRIOR_RUNDIR/routing")"
-  MODEL="$(sed -n 's/^MODEL=//p' "$PRIOR_RUNDIR/routing")"
-  ROUTING_SOURCE="$PRIOR_RUNDIR/routing"
+  if grep -q '^CMD=' "$PRIOR_RUNDIR/routing"; then
+    CMD="$(sed -n 's/^CMD=//p' "$PRIOR_RUNDIR/routing" | head -n 1)"
+  else
+    echo "pi-dispatch: warning: prior run recorded no CMD; resuming with $CMD" >&2
+  fi
 fi
-
-# Routing gate. Measured against pi 2026-09-15: `--provider X` on its own does
-# NOT route to X. pi resolves the MODEL first and the provider follows from it,
-# so a provider-only invocation lands on pi's default model and default provider
-# while looking like it was pinned — a whole ticket once ran on the wrong
-# provider that way. There is no flag that expresses "this provider, its own
-# default model", so refuse instead of pretending. Placed before the run dir
-# exists so an abort leaves nothing behind.
-#
-# The message names where the value came from. A resume inherits the prior run's
-# routing, and runs launched before this gate existed were allowed to record a
-# provider with no model — blaming PI_PROVIDER there would send the reader to an
-# environment variable they never set.
-if [ -z "$MODEL" ] && [ -n "$PROVIDER" ]; then
-  echo "pi-dispatch: provider $PROVIDER is pinned without a model (from $ROUTING_SOURCE). pi resolves the model first and the provider follows it, so this would silently run on pi's default provider, not $PROVIDER. Routing is one --model $PROVIDER/<model> spec: supply the model too, or drop the provider to use pi's own default deliberately." >&2
-  exit 2
-fi
-
-# Unpinned routing leaves the choice to pi's settings.json. When that file is
-# missing, pi falls back to its built-in default without a word, so say it here.
-# A warning, not a refusal: running on pi's default can be deliberate.
-if [ -z "$MODEL" ]; then
-  settings="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/settings.json"
-  [ -f "$settings" ] || echo "pi-dispatch: warning: no routing pinned and $settings does not exist; pi will run on its built-in default model. Pin PI_PROVIDER/PI_MODEL or create that file." >&2
-fi
+validate_cmd
 
 PROMPT="${PI_PROMPT:-Read the brief above and complete it. Output only the result.}"
 
@@ -270,7 +301,7 @@ START_FILE="$RUNDIR/pi-start.ts"
 mkdir -p "$SESSION_DIR"
 
 # Record the resolved routing so a later resume can replay it (see the inherit above).
-printf 'PROVIDER=%s\nMODEL=%s\nCWD=%s\nWRITABLE=%s\n' "$PROVIDER" "$MODEL" "$PI_CWD" "$WRITABLE" > "$RUNDIR/routing"
+printf 'CMD=%s\nCWD=%s\nWRITABLE=%s\n' "$CMD" "$PI_CWD" "$WRITABLE" > "$RUNDIR/routing"
 
 if [ ${#SANDBOX[@]} -gt 0 ]; then
   {
@@ -348,13 +379,8 @@ fi
 # readable text from agent_end on terminal OK and saves the raw stream as
 # pi.stream.jsonl.
 
-# Build the pi argv. With neither set, no routing flag appears at all and pi
-# resolves from its own config. A provider without a model is refused earlier,
-# before the run dir exists — see the routing gate above.
+# The dispatch's own flags, appended after the command's.
 PI_ARGS=(-p --mode json)
-if [ -n "$MODEL" ]; then
-  PI_ARGS+=(--model "${PROVIDER:+$PROVIDER/}$MODEL")
-fi
 if [ -n "$PRIOR_SESSION_ID" ]; then
   # --session <id> (NOT --resume: in pi that is the interactive picker and would
   # hang a -p worker). pi resolves the id against --session-dir, so point it at
@@ -362,11 +388,6 @@ if [ -n "$PRIOR_SESSION_ID" ]; then
   SESSION_DIR="$PRIOR_RUNDIR/sessions"
   PI_ARGS+=(--session "$PRIOR_SESSION_ID")
 fi
-# PI_EXTRA_ARGS: optional extra pi flags, word-split on purpose (e.g. a lean
-# worker: "-nc -ns -np --tools read,bash,edit,write" cuts the per-turn prompt
-# ~40%, at the price of the dispatch AGENTS.md and extension tools).
-# shellcheck disable=SC2206
-[ -n "${PI_EXTRA_ARGS:-}" ] && PI_ARGS+=(${PI_EXTRA_ARGS})
 PI_ARGS+=(-e "$SCRIPT_DIR/../extensions/worktree-fence.ts")
 PI_ARGS+=(--session-dir "$SESSION_DIR" @"$BRIEF_FILE" "$PROMPT")
 
@@ -384,7 +405,7 @@ perl -MPOSIX -e '
   open(my $fh, ">", $rcfile) or exit 255;
   print $fh "$rc\n";
   close($fh);
-' "$RC_FILE" ${SANDBOX[@]+"${SANDBOX[@]}"} "$PI_BIN" "${PI_ARGS[@]}" \
+' "$RC_FILE" ${SANDBOX[@]+"${SANDBOX[@]}"} bash -fc "exec env $CMD \"\$@\"" pi-dispatch "${PI_ARGS[@]}" \
   < /dev/null > "$OUTPUT_FILE" 2> "$STDERR_FILE" &
 
 WRAP_PID=$!
@@ -396,10 +417,11 @@ printf '%s\n' "$WRAP_PID" > "$PGID_FILE"
 disown
 
 # Return the handle immediately — do NOT block on Pi.
-# ROUTING= states what the run actually resolved to. It is the only place the
+# CMD= states what the run actually resolved to. It is the only place the
 # caller sees the routing before a terminal poll, so a run on the wrong provider
 # is visible at launch instead of a ticket later.
-echo "ROUTING=${PROVIDER:-<pi-default>}/${MODEL:-<pi-default>} CWD=$PI_CWD WRITABLE=$WRITABLE"
+echo "CWD=$PI_CWD WRITABLE=$WRITABLE"
+echo "CMD=$CMD"
 echo "OUTPUT=$OUTPUT_FILE"
 echo "PID=$WRAP_PID"
 echo "RUNDIR=$RUNDIR"

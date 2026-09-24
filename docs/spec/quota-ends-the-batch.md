@@ -21,11 +21,12 @@ sibling checks that record on every poll round. Every sibling stopped this way
 carries the tag of the wall that stopped it.
 
 The batch is the unit, not the session or the machine. A new batch may dispatch
-again after the human changes `PI_PROVIDER`/`PI_MODEL`, or after a
+again after the human changes `PI_DISPATCH_CMD`, or after a
 `QUOTA-WINDOW` has cleared. A 429 or rate limit is not quota: it stays out of
 both patterns and never stops a batch. The rule assumes a batch shares one
 routing. If routings are ever mixed within a batch, a sibling is stopped only
-when its `RUNDIR/routing` names the same provider.
+when it runs on the same provider as the worker that hit the wall; the
+`--model` in its recorded `CMD=`, or the model its stream reports, names it.
 
 A violation costs money without anyone noticing. A quota line that falls
 through to a generic error branch is retried under the normal retry budget,

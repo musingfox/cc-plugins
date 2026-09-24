@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests for cf-pi-run.sh step 1b: prerequisite checkpoints merged into a
 # dependent shard's worktree base before the brief is assembled.
-# Pure-local: the run is cut short at the probe (bogus PI_BIN), which is late
+# Pure-local: the run is cut short at the probe (bogus PI_DISPATCH_CMD), which is late
 # enough — worktree, prereq merge, and brief all happen before the probe.
 # NO set -e
 
@@ -12,7 +12,7 @@ TMP="$(mktemp -d)"
 REPO="$TMP/repo"
 FLOW="$TMP/flow"
 export PI_RUNS_DIR="$TMP/runs"   # keep write_outcome's index off the real ledger
-export PI_BIN="$TMP/no-such-omp" # probe fails fast, after the parts under test
+export PI_DISPATCH_CMD="$TMP/no-such-omp" # probe fails fast, after the parts under test
 
 # --- repo: main with a base commit -------------------------------------------
 mkdir -p "$REPO"
@@ -40,8 +40,6 @@ PLUGIN_ROOT="$CF_TESTS_DIR/.."
 SCRIPTS="$SCRIPTS"
 PI_PROTOCOL="$CF_TESTS_DIR/../docs/pi-implementer-protocol.md"
 CLEANUP_SCRIPT="$FLOW/cleanup.sh"
-PI_PROVIDER=""
-PI_MODEL=""
 PI_DESC="test"
 PI_STALL_THRESHOLD_S="180"
 PI_WALL_CLOCK_S="1800"

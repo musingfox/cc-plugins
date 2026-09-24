@@ -7,15 +7,16 @@
 #
 # Usage:
 #   pi-probe.sh --bin-only            fast gate: is the agent binary on PATH?
-#   pi-probe.sh [PROBE_DIR]           full probe: run "say ok" on the SAME routing
-#                                     pi-dispatch.sh would resolve, sessions + logs
+#   pi-probe.sh [PROBE_DIR]           full probe: run "say ok" on the SAME command
+#                                     pi-dispatch.sh would run, sessions + logs
 #                                     land in PROBE_DIR (default: a fresh mktemp -d).
 #
 # Stdout (exactly one line):
 #   OK                 binary present; (full probe) model answered
-#   NO_BIN (<bin>)     agent binary not on PATH
+#   NO_BIN (<bin>)     agent binary not on PATH (or could not be executed)
 #   NO_JSONL           binary ran but produced no stdout AND no session jsonl
-#   ERROR:<excerpt>    session jsonl contains "errorMessage" (auth/quota/model)
+#   ERROR:<excerpt>    session jsonl contains "errorMessage" (auth/quota/model),
+#                      or pi-dispatch.sh refuses PI_DISPATCH_CMD (its reason follows)
 #   STALLED (<n>s)     the round trip outran the deadline and was killed
 # Exit code: 0 iff OK (gate-friendly).
 #
@@ -24,8 +25,7 @@
 # it — for cf that meant a shard stuck behind the orchestrator's one-hour
 # Monitor with no sign anything was wrong.
 #
-# Env: PI_BIN (default pi), PI_PROVIDER/PI_MODEL (routing, resolved
-#      via pi-dispatch.sh's PI_RESOLVE_ROUTING_ONLY seam),
+# Env: PI_DISPATCH_CMD (default pi, expanded exactly as pi-dispatch.sh does),
 #      PI_PROBE_DEADLINE_S (default 60).
 #
 # Full-probe side effects in PROBE_DIR: probe-stdout.log, probe-stderr.log,
@@ -34,7 +34,19 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BIN="${PI_BIN:-pi}"
+CMD="${PI_DISPATCH_CMD:-pi}"
+
+# The dispatch decides what it accepts and which binary runs; asking it keeps
+# the probe from ever passing a command the dispatch refuses, or the reverse.
+_check_err="$(mktemp)"
+if ! _check="$(PI_DISPATCH_CHECK=1 bash "$SCRIPT_DIR/pi-dispatch.sh" 2>"$_check_err")"; then
+  _msg="$(grep -v '^pi-dispatch: warning:' "$_check_err" | head -n 1)"
+  rm -f "$_check_err"
+  echo "ERROR:${_msg#pi-dispatch: }"
+  exit 1
+fi
+rm -f "$_check_err"
+BIN="${_check#BIN=}"
 
 BIN_ONLY=0
 if [ "${1:-}" = "--bin-only" ]; then
@@ -42,7 +54,7 @@ if [ "${1:-}" = "--bin-only" ]; then
   shift
 fi
 
-if ! command -v "$BIN" >/dev/null 2>&1; then
+if [ -z "$BIN" ] || ! command -v "$BIN" >/dev/null 2>&1; then
   echo "NO_BIN ($BIN)"
   exit 1
 fi
@@ -53,24 +65,6 @@ fi
 
 PROBE_DIR="${1:-$(mktemp -d)}"
 mkdir -p "$PROBE_DIR"
-
-# Resolve the exact routing pi-dispatch.sh would use.
-_resolved="$(PI_RESOLVE_ROUTING_ONLY=1 "$SCRIPT_DIR/pi-dispatch.sh" 2>/dev/null)"
-PROVIDER="$(printf '%s' "$_resolved" | sed -n 's/^PROVIDER=\([^ ]*\).*/\1/p')"
-MODEL="$(printf '%s' "$_resolved" | sed -n 's/.* MODEL=//p')"
-
-# Same routing rule as pi-dispatch.sh, or the probe would prove a provider the
-# dispatch will not use. A provider without a model cannot be routed at all
-# (pi resolves the model first), so report it here rather than probe pi's
-# default and call it OK.
-if [ -z "$MODEL" ] && [ -n "$PROVIDER" ]; then
-  echo "ERROR:PI_PROVIDER=$PROVIDER without PI_MODEL does not route"
-  exit 1
-fi
-PROBE_ARGS=(-p)
-if [ -n "$MODEL" ]; then
-  PROBE_ARGS+=(--model "${PROVIDER:+$PROVIDER/}$MODEL")
-fi
 
 # -p (print mode) is load-bearing: without it pi opens its interactive TUI on a
 # non-tty stdin and hangs. The deadline covers the rest: a provider that accepts
@@ -104,7 +98,7 @@ PI_PROBE_STALL_MARK="$STALL_MARK" perl -MPOSIX -e '
   }
   my $st = $?;
   exit($st & 127 ? 128 + ($st & 127) : $st >> 8);
-' "$DEADLINE" "$BIN" "${PROBE_ARGS[@]}" \
+' "$DEADLINE" bash -fc "exec env $CMD \"\$@\"" pi-probe -p \
   --session-dir "$PROBE_DIR" \
   --no-tools "say ok" < /dev/null > "$PROBE_DIR/probe-stdout.log" 2> "$PROBE_DIR/probe-stderr.log"
 PROBE_RC=$?
@@ -113,6 +107,10 @@ PROBE_RC=$?
 # own, and a probe that answered is not a stalled one.
 if [ -f "$STALL_MARK" ]; then
   echo "STALLED (${DEADLINE}s)"
+  exit 1
+fi
+if [ "$PROBE_RC" = 127 ]; then
+  echo "NO_BIN ($BIN)"
   exit 1
 fi
 

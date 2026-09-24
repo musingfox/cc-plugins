@@ -3,7 +3,7 @@
 # Usage:   cf-pi-setup.sh [SLUG]   (SLUG = task short name for the branch, kebab-case)
 # Stdin:   none
 # Stdout:  SESSION path (single line)
-# Env in:  PI_PROVIDER, PI_MODEL, PI_STALL_THRESHOLD_S, PI_WALL_CLOCK_S (all optional)
+# Env in:  PI_DISPATCH_CMD, PI_STALL_THRESHOLD_S, PI_WALL_CLOCK_S (all optional)
 # Side effects:
 #   - creates $SESSION (under /tmp)
 #   - writes $SESSION/env.sh (sourced by sibling scripts — session-wide vars only;
@@ -28,20 +28,8 @@ mkdir -p "$SESSION"
 # branch name cf/<slug>[-shard-X]. Falls back to the session basename.
 CF_SLUG="${1:-$SESSION_BASENAME}"
 
-PI_PROVIDER="${PI_PROVIDER:-}"
-PI_MODEL="${PI_MODEL:-}"
-if [ -n "$PI_PROVIDER" ] || [ -n "$PI_MODEL" ]; then
-  # A provider without a model is not a routing spec — pi resolves the model
-  # first — so name that here instead of printing a plausible-looking pair the
-  # dispatch will refuse.
-  if [ -n "$PI_PROVIDER" ] && [ -z "$PI_MODEL" ]; then
-    PI_DESC="$PI_PROVIDER/<unroutable: PI_MODEL unset>"
-  else
-    PI_DESC="${PI_PROVIDER:-<pi-default-provider>}/$PI_MODEL"
-  fi
-else
-  PI_DESC="OMP default config"
-fi
+PI_DISPATCH_CMD="${PI_DISPATCH_CMD:-}"
+PI_DESC="${PI_DISPATCH_CMD:-pi on its own settings.json}"
 
 # Availability gate via the canonical probe — cf owns no agent-binary handling.
 # shellcheck source=cf-pi-env.sh
@@ -49,7 +37,8 @@ fi
 PI_AVAILABLE=0
 _canon="$(resolve_canon_dispatch)"
 if [ -n "${_canon:-}" ] && [ -f "$_canon" ]; then
-  "$(dirname "$_canon")/pi-probe.sh" --bin-only >/dev/null 2>&1 && PI_AVAILABLE=1
+  # Not OK is also a retired routing variable, not only a missing binary: say which.
+  _probe="$("$(dirname "$_canon")/pi-probe.sh" --bin-only 2>&1)" && PI_AVAILABLE=1 || echo "cf-pi-setup: pi-probe: $_probe" >&2
 fi
 
 cat > "$SESSION/env.sh" <<EOF
@@ -60,9 +49,8 @@ PLUGIN_ROOT="$PLUGIN_ROOT"
 SCRIPTS="$PLUGIN_ROOT/scripts"
 PI_PROTOCOL="$PLUGIN_ROOT/docs/pi-implementer-protocol.md"
 CLEANUP_SCRIPT="$SESSION/cleanup.sh"
-PI_PROVIDER="$PI_PROVIDER"
-PI_MODEL="$PI_MODEL"
-PI_DESC="$PI_DESC"
+PI_DISPATCH_CMD=$(printf '%q' "$PI_DISPATCH_CMD")
+PI_DESC=$(printf '%q' "$PI_DESC")
 PI_STALL_THRESHOLD_S="${PI_STALL_THRESHOLD_S:-180}"
 PI_WALL_CLOCK_S="${PI_WALL_CLOCK_S:-1800}"
 PI_AVAILABLE=$PI_AVAILABLE
@@ -77,7 +65,7 @@ cat > "$SESSION/README.md" <<EOF
 OMP-driven implement session. Files are flat under this directory.
 
 ## Key files
-- \`env.sh\` — session-wide env (provider/model, thresholds, paths)
+- \`env.sh\` — session-wide env (agent command, thresholds, paths)
 - \`implement-brief.md\` — brief OMP was given
 - \`implement-report.md\` — OMP's final report (present on DONE)
 - \`implement.diff\` — captured diff of OMP's work

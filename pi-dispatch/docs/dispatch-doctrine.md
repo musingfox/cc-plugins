@@ -63,8 +63,8 @@ Outsource when the contractor is the better fit, not merely cheaper:
 
 - **Capability fit**: the work suits the worker's model or environment —
   bulk web reading, multimedia generation, long-document summarization,
-  massive parallel fan-out. `PI_PROVIDER`/`PI_MODEL` is the routing
-  unit — two env vars passed to pi as one `--model provider/model` spec, so
+  massive parallel fan-out. `PI_DISPATCH_CMD` is the routing
+  unit — one env var holding the agent command and its `--model` flag, so
   the model a worker runs on is its capability profile.
 - **Cost fit**: mechanical work with a clear spec, where Claude tokens and
   latency buy nothing.

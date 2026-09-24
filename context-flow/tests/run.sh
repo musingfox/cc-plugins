@@ -27,6 +27,10 @@ CF_TEST_TMP="$(mktemp -d)"
 export PI_RUNS_DIR="$CF_TEST_TMP/pi-runs"
 trap 'rm -rf "$CF_TEST_TMP"' EXIT
 
+# The operator's real routing must not reach the fixtures' stand-in agents, and
+# the retired variables make the real pi-dispatch.sh refuse outright.
+unset PI_DISPATCH_CMD PI_BIN PI_PROVIDER PI_MODEL PI_EXTRA_ARGS
+
 shopt -s nullglob
 total=0
 failed=0

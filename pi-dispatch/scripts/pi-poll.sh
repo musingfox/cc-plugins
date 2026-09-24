@@ -52,8 +52,7 @@
 #     …resetting usage window    QUOTA-WINDOW STATUS=FAIL  (same, but a later batch may retry)
 #
 # Terminal lines carry " model=<provider/model> cost=$<sum over all turns> turns=<n>"
-# when the stream has usage, and back-fill a blank RUNDIR/routing with the model
-# actually used so a resume replays it.
+# when the stream has usage.
 #
 # On terminal OK, pi-poll.sh distills the assistant text from the agent_end event
 # and writes it as the canonical human-readable result.md, preserving the raw stream
@@ -169,9 +168,7 @@ quota_class() {
 # Spend + routing tail for terminal lines: " model=<provider/model> cost=$<sum> turns=<n>"
 # summed over EVERY assistant message_end in the stream (agent_end carries only the
 # last message's usage, which understates a multi-turn run several-fold). Empty when
-# the stream carries no usage. Also back-fills RUNDIR/routing when it was recorded
-# blank (routing came from pi's settings, not env), so a resume replays the model
-# the run actually used instead of whatever the settings say by then.
+# the stream carries no usage.
 usage_tail() {
   [ -f "$OUTPUT_FILE" ] || return 0
   local t
@@ -182,21 +179,6 @@ usage_tail() {
     (if $m != "" then " model=\($p)/\($m)" else "" end)
     + (if ($am | length) > 0 then " cost=$\($am | map(.usage.cost.total // 0) | add | . * 10000 | round / 10000) turns=\($am | length)" else "" end)' \
     "$OUTPUT_FILE" 2>/dev/null || true)"
-  case "$t" in *model=*)
-    if [ -f "$RUNDIR/routing" ] && ! grep -q '^MODEL=.' "$RUNDIR/routing"; then
-      local pm="${t#* model=}"; pm="${pm%% *}"
-      # Carry every other recorded key through. CWD= is load-bearing: a resume
-      # reads it to put the worker back in its worktree, and dropping it sends
-      # the resume down the session-header recovery path instead.
-      local keep
-      keep="$(grep -v '^PROVIDER=' "$RUNDIR/routing" 2>/dev/null | grep -v '^MODEL=' || true)"
-      { printf 'PROVIDER=%s\nMODEL=%s\n' "${pm%%/*}" "${pm#*/}"
-        [ -n "$keep" ] && printf '%s\n' "$keep"
-        true
-      } > "$RUNDIR/routing.tmp" 2>/dev/null &&
-        mv "$RUNDIR/routing.tmp" "$RUNDIR/routing" 2>/dev/null || true
-    fi ;;
-  esac
   printf '%s' "$t"
 }
 

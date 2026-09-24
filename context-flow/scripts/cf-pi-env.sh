@@ -11,7 +11,7 @@
 #   After return, in scope:
 #     Session-wide (from $session/env.sh):
 #       SESSION, SESSION_BASENAME, PLUGIN_ROOT, SCRIPTS,
-#       PI_PROTOCOL, CLEANUP_SCRIPT, PI_PROVIDER, PI_MODEL, PI_DESC,
+#       PI_PROTOCOL, CLEANUP_SCRIPT, PI_DISPATCH_CMD, PI_DESC,
 #       PI_STALL_THRESHOLD_S, PI_WALL_CLOCK_S, PI_AVAILABLE,
 #       REPO_ROOT, BASE_BRANCH, BASE_HEAD (after cf-pi-worktree.sh has run).
 #     Session-scoped paths (all directly under $session/):

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # cwd-test.sh — committed behavior test for PI_CWD in pi-dispatch.sh.
-# Pure-local, NO pi, NO network: PI_BIN is a shim that records its cwd, the
+# Pure-local, NO pi, NO network: PI_DISPATCH_CMD is a shim that records its cwd, the
 # brief it was handed, the head of its PATH, and any -e extension.
 #
 #   PI_CWD unset      -> a fresh dispatch is refused: exit 2, no RUNDIR created
@@ -13,7 +13,6 @@
 #   resume            -> the recorded CWD beats the env, like routing; a prior run
 #                        without CWD= resumes in its session-header cwd; a missing
 #                        prior rundir degrades to a fresh dispatch
-#   relative PI_BIN   -> resolved before the cd
 #
 # Returns 0 iff every assertion holds.
 
@@ -29,7 +28,7 @@ SHIMS="$(cd "$SCRIPT_DIR/../shims" && pwd -P)"
 
 # The developer's own shell exports these for real dispatches; inherited here they
 # would make the "default routing" cases run on a pinned model.
-unset PI_PROVIDER PI_MODEL PI_CONFIG_FILES
+unset PI_BIN PI_PROVIDER PI_MODEL PI_EXTRA_ARGS PI_CONFIG_FILES
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -68,7 +67,7 @@ field() { sed -n "s/^$2=//p" "$1/result.md"; }
 
 # --- Case 1: PI_CWD unset -> a fresh dispatch is refused, nothing created ---
 before="$(ls "$OUT" | wc -l | tr -d ' ')"
-if (cd "$CALLER" && PI_BIN="$SHIM" "$DISPATCH" "$CALLER/brief.md" "$OUT" >/dev/null 2>"$TMP/err"); then
+if (cd "$CALLER" && PI_DISPATCH_CMD="$SHIM" "$DISPATCH" "$CALLER/brief.md" "$OUT" >/dev/null 2>"$TMP/err"); then
   bad "unset -> should exit non-zero"
 else
   rc=$?
@@ -77,7 +76,7 @@ fi
 if [ "$before" = "$(ls "$OUT" | wc -l | tr -d ' ')" ]; then ok "unset -> no RUNDIR created"; else bad "unset -> RUNDIR created"; fi
 
 # --- Case 2: PI_CWD absolute -> worker runs there, recorded, fenced ---
-RD="$(launch PI_BIN="$SHIM" PI_CWD="$WORK" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
+RD="$(launch PI_DISPATCH_CMD="$SHIM" PI_CWD="$WORK" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
 if [ "$(field "$RD" CWD)" = "$WORK" ]; then ok "PI_CWD -> worker cwd is PI_CWD"; else bad "PI_CWD -> $(field "$RD" CWD)"; fi
 if grep -q "^CWD=$WORK$" "$RD/routing"; then ok "PI_CWD -> routing records CWD="; else bad "PI_CWD -> routing: $(cat "$RD/routing" | tr '\n' ' ')"; fi
 if [ "$(field "$RD" PATH_HEAD)" = "$SHIMS" ] && [ -x "$SHIMS/git" ]; then ok "PI_CWD -> shims/git first on PATH"; else bad "PI_CWD -> PATH head $(field "$RD" PATH_HEAD)"; fi
@@ -86,14 +85,14 @@ case "$(field "$RD" EXT)" in */extensions/worktree-fence.ts) ok "PI_CWD -> fence
 
 # --- Case 3: relative PI_CWD + relative brief + relative OUTDIR ---
 mkdir -p "$CALLER/rel-out"
-RD="$(launch PI_BIN="$SHIM" PI_CWD="../work" "$DISPATCH" "brief.md" "rel-out")"
+RD="$(launch PI_DISPATCH_CMD="$SHIM" PI_CWD="../work" "$DISPATCH" "brief.md" "rel-out")"
 if [ "$(field "$RD" CWD)" = "$WORK" ]; then ok "relative PI_CWD resolves against the caller"; else bad "relative PI_CWD -> $(field "$RD" CWD)"; fi
 if [ "$(field "$RD" BRIEF_EXISTS)" = "yes" ]; then ok "relative brief path survives the cd"; else bad "relative brief path lost after cd"; fi
 case "$RD" in "$CALLER/rel-out/"*) ok "relative OUTDIR resolves against the caller";; *) bad "relative OUTDIR -> $RD";; esac
 
 # --- Case 4: PI_CWD not a directory -> exit 2, nothing created ---
 before="$(ls "$OUT" | wc -l | tr -d ' ')"
-if (cd "$CALLER" && PI_BIN="$SHIM" PI_CWD="$TMP/nope" "$DISPATCH" "$CALLER/brief.md" "$OUT" >/dev/null 2>"$TMP/err"); then
+if (cd "$CALLER" && PI_DISPATCH_CMD="$SHIM" PI_CWD="$TMP/nope" "$DISPATCH" "$CALLER/brief.md" "$OUT" >/dev/null 2>"$TMP/err"); then
   bad "bad PI_CWD -> should exit non-zero"
 else
   rc=$?
@@ -103,18 +102,18 @@ after="$(ls "$OUT" | wc -l | tr -d ' ')"
 if [ "$before" = "$after" ]; then ok "bad PI_CWD -> no RUNDIR created"; else bad "bad PI_CWD -> RUNDIR created"; fi
 
 # --- Case 5: resume replays the recorded cwd and it beats the env; a missing prior degrades ---
-PRIOR="$(launch PI_BIN="$SHIM" PI_CWD="$WORK" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
-RD="$(launch PI_BIN="$SHIM" "$DISPATCH" "$CALLER/brief.md" "$OUT" "$PRIOR")"
+PRIOR="$(launch PI_DISPATCH_CMD="$SHIM" PI_CWD="$WORK" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
+RD="$(launch PI_DISPATCH_CMD="$SHIM" "$DISPATCH" "$CALLER/brief.md" "$OUT" "$PRIOR")"
 if [ "$(field "$RD" CWD)" = "$WORK" ] && grep -q "^CWD=$WORK$" "$RD/routing"; then ok "resume without PI_CWD -> recorded cwd replayed"; else bad "resume -> $(field "$RD" CWD)"; fi
-RD="$(launch PI_BIN="$SHIM" PI_CWD="$WORK2" "$DISPATCH" "$CALLER/brief.md" "$OUT" "$PRIOR")"
+RD="$(launch PI_DISPATCH_CMD="$SHIM" PI_CWD="$WORK2" "$DISPATCH" "$CALLER/brief.md" "$OUT" "$PRIOR")"
 if [ "$(field "$RD" CWD)" = "$WORK" ]; then ok "resume with a different PI_CWD in env -> the record wins"; else bad "resume precedence -> $(field "$RD" CWD)"; fi
-out="$(cd "$CALLER" && PI_BIN="$SHIM" PI_CWD="$WORK" "$DISPATCH" "$CALLER/brief.md" "$OUT" "$TMP/gone-rundir" 2>"$TMP/err")"; rc=$?
+out="$(cd "$CALLER" && PI_DISPATCH_CMD="$SHIM" PI_CWD="$WORK" "$DISPATCH" "$CALLER/brief.md" "$OUT" "$TMP/gone-rundir" 2>"$TMP/err")"; rc=$?
 if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q '^RUNDIR=' && grep -q 'starting a FRESH dispatch' "$TMP/err"; then ok "missing PRIOR_RUNDIR under PI_CWD -> warns, dispatches fresh"; else bad "missing PRIOR_RUNDIR -> rc=$rc $(cat "$TMP/err")"; fi
 
 # --- Case 5b: a prior run without CWD= (pre-fix) resumes in its session-header cwd ---
 sed -i '' '/^CWD=/d' "$PRIOR/routing"
 printf '{"type":"session","id":"sess-old","cwd":"%s"}\n' "$WORK2" > "$PRIOR/pi.stream.jsonl"
-RD="$(launch PI_BIN="$SHIM" PI_CWD="$WORK" "$DISPATCH" "$CALLER/brief.md" "$OUT" "$PRIOR")"
+RD="$(launch PI_DISPATCH_CMD="$SHIM" PI_CWD="$WORK" "$DISPATCH" "$CALLER/brief.md" "$OUT" "$PRIOR")"
 if [ "$(field "$RD" CWD)" = "$WORK2" ] && grep -q "^CWD=$WORK2$" "$RD/routing"; then ok "resume of a pre-CWD run -> session header cwd, now recorded"; else bad "pre-CWD resume -> $(field "$RD" CWD)"; fi
 
 # --- Case 5c: on macOS the worker's process tree cannot write outside the worktree ---
@@ -130,17 +129,16 @@ EOF2
   # The "outside" dir must not be under the per-user temp dir: that is the
   # sandbox's own escape hatch for test scaffolding.
   OUTSIDE="$(mktemp -d /tmp/cwd-test-outside.XXXXXX)"; trap 'rm -rf "$TMP" "$OUTSIDE"' EXIT
-  RD="$(launch PI_BIN="$TMP/pi-writer" PI_CWD="$WORK" PI_PROMPT="$OUTSIDE" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
+  RD="$(launch PI_DISPATCH_CMD="$TMP/pi-writer" PI_CWD="$WORK" PI_PROMPT="$OUTSIDE" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
   if [ -f "$RD/sandbox.sb" ] && grep -q "(subpath \"$WORK\")" "$RD/sandbox.sb"; then ok "sandbox profile written with the worktree"; else bad "sandbox profile missing"; fi
   if [ "$(field "$RD" OUTSIDE)" = denied ] && [ "$(field "$RD" INSIDE)" = written ] && [ "$(field "$RD" TMP)" = written ]; then ok "sandbox: outside denied, worktree and mktemp allowed"; else bad "sandbox enforcement -> $(grep -E '^(OUTSIDE|INSIDE|TMP)=' "$RD/result.md" | tr '\n' ' ')"; fi
-  RD2="$(launch PI_BIN="$TMP/pi-writer" PI_CWD="$WORK" PI_SANDBOX=0 PI_PROMPT="$OUTSIDE" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
+  RD2="$(launch PI_DISPATCH_CMD="$TMP/pi-writer" PI_CWD="$WORK" PI_SANDBOX=0 PI_PROMPT="$OUTSIDE" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
   if [ ! -f "$RD2/sandbox.sb" ] && [ "$(field "$RD2" OUTSIDE)" = written ]; then ok "PI_SANDBOX=0 -> no sandbox"; else bad "PI_SANDBOX=0 -> $(grep OUTSIDE= "$RD2/result.md")"; fi
 fi
 
-# --- Case 5d: a terminal poll back-fills the model without dropping CWD= ---
-# Default routing records MODEL= empty, which is exactly when pi-poll.sh fills the
-# model in from the stream. That rewrite used to truncate the routing file to two
-# lines, so the NEXT resume found no CWD= and fell back to the session header.
+# --- Case 5d: a terminal poll leaves CWD= in the record ---
+# pi-poll.sh once rewrote the routing file on a terminal poll and truncated it to
+# two lines, so the NEXT resume found no CWD= and fell back to the session header.
 POLL="$SCRIPT_DIR/../scripts/pi-poll.sh"
 JSHIM="$TMP/pi-json-shim"
 cat > "$JSHIM" <<'EOF3'
@@ -148,19 +146,14 @@ cat > "$JSHIM" <<'EOF3'
 printf '{"type":"session","id":"sess-new","cwd":"%s"}\n' "$(pwd -P)"
 echo '{"type":"message_end","message":{"role":"assistant","usage":{"cost":{"total":0.01}}}}'
 echo '{"type":"agent_end","messages":[{"role":"assistant","stopReason":"stop","text":"done","provider":"openai-codex","model":"gpt-5.6-terra"}]}'
+printf 'CWD=%s\n' "$(pwd -P)"
 EOF3
 chmod +x "$JSHIM"
-RD="$(launch PI_BIN="$JSHIM" PI_CWD="$WORK" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
-if grep -q "^CWD=$WORK$" "$RD/routing" && ! grep -q '^MODEL=.' "$RD/routing"; then ok "default routing -> MODEL empty, CWD recorded"; else bad "default routing -> $(tr '\n' ' ' < "$RD/routing")"; fi
+RD="$(launch PI_DISPATCH_CMD="$JSHIM" PI_CWD="$WORK" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
 bash "$POLL" "$RD" >/dev/null 2>&1
-if grep -q '^MODEL=gpt-5.6-terra$' "$RD/routing"; then ok "terminal poll back-fills MODEL"; else bad "back-fill MODEL -> $(tr '\n' ' ' < "$RD/routing")"; fi
-if grep -q "^CWD=$WORK$" "$RD/routing"; then ok "terminal poll keeps CWD="; else bad "back-fill dropped CWD -> $(tr '\n' ' ' < "$RD/routing")"; fi
-RD2="$(launch PI_BIN="$SHIM" "$DISPATCH" "$CALLER/brief.md" "$OUT" "$RD" 2>"$TMP/err")"
+if grep -q "^CWD=$WORK$" "$RD/routing"; then ok "terminal poll keeps CWD="; else bad "poll dropped CWD -> $(tr '\n' ' ' < "$RD/routing")"; fi
+RD2="$(launch PI_DISPATCH_CMD="$SHIM" "$DISPATCH" "$CALLER/brief.md" "$OUT" "$RD" 2>"$TMP/err")"
 if [ "$(field "$RD2" CWD)" = "$WORK" ] && ! grep -q 'recorded no CWD' "$TMP/err"; then ok "resume after a terminal poll -> still the recorded worktree"; else bad "resume after poll -> $(field "$RD2" CWD) $(cat "$TMP/err")"; fi
-
-# --- Case 6: a relative PI_BIN survives the cd ---
-RD="$(launch PI_BIN="../pi-shim" PI_CWD="$WORK" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
-if [ "$(field "$RD" CWD)" = "$WORK" ] && [ "$(cat "$RD/rc")" = "0" ]; then ok "relative PI_BIN resolves before the cd"; else bad "relative PI_BIN -> rc=$(cat "$RD/rc" 2>/dev/null || echo MISSING)"; fi
 
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

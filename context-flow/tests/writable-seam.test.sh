@@ -42,8 +42,6 @@ PLUGIN_ROOT="$CF_ROOT"
 SCRIPTS="$CF_ROOT/scripts"
 FLOW_SESSION="$SHARD"
 SHARD_ID="A"
-PI_PROVIDER="stub"
-PI_MODEL="stub"
 PI_STALL_THRESHOLD_S=180
 PI_WALL_CLOCK_S=1800
 REPO_ROOT="$SHARD"
@@ -64,7 +62,7 @@ chmod +x "$SCRATCH/pi-writer"
 
 dispatch() { # usage: dispatch [RESUME_PROMPT_FILE] -> prints the run's RUNDIR
   local rundir
-  PI_BIN="$SCRATCH/pi-writer" CLAUDE_PLUGIN_ROOT="$CF_ROOT" \
+  PI_DISPATCH_CMD="$SCRATCH/pi-writer" CLAUDE_PLUGIN_ROOT="$CF_ROOT" \
     bash "$CF_ROOT/scripts/cf-pi-dispatch.sh" "$SHARD" "$@" >/dev/null 2>>"$SCRATCH/dispatch.err" || return 1
   rundir="$(cat "$SHARD/pi-rundir")"
   for _ in $(seq 1 50); do [ -s "$rundir/rc" ] && break; sleep 0.1; done

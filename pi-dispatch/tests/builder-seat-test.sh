@@ -14,7 +14,7 @@
 # Returns 0 iff every assertion holds.
 
 set -uo pipefail
-unset PI_PROVIDER PI_MODEL PI_CONFIG_FILES PI_WRITABLE_FILES
+unset PI_BIN PI_PROVIDER PI_MODEL PI_EXTRA_ARGS PI_CONFIG_FILES PI_WRITABLE_FILES
 
 PASS=0; FAIL=0
 ok()  { PASS=$((PASS+1)); echo "ok   - $1"; }
@@ -55,7 +55,7 @@ printf 'WRITABLE_ENV=%s\n' "${PI_WRITABLE_FILES-<unset>}"
 echo '{"type":"agent_end","messages":[{"stopReason":"stop","content":[{"type":"text","text":"done"}]}]}'
 STANDIN
 chmod +x "$TMP/pi-stand-in"
-export PI_BIN="$TMP/pi-stand-in"
+export PI_DISPATCH_CMD="$TMP/pi-stand-in"
 printf 'do nothing\n' > "$TMP/brief.md"
 printf 'and once more\n' > "$TMP/more.md"
 

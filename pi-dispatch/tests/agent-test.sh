@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # agent-test.sh — committed behavior test for pi-agent.sh (the unified,
-# name-addressed entry point). Pure-local: PI_BIN is a stub that emits a
+# name-addressed entry point). Pure-local: PI_DISPATCH_CMD is a stub that emits a
 # canned json event stream, so no real model, no network, deterministic.
 #
 # Pins:
@@ -48,7 +48,8 @@ fi
 echo "{\"type\":\"agent_end\",\"messages\":[{\"stopReason\":\"stop\",\"content\":[{\"type\":\"text\",\"text\":\"$txt\"}]}]}"
 EOF
 chmod +x "$TMP/bin/pi"
-export PI_BIN="$TMP/bin/pi"
+unset PI_BIN PI_PROVIDER PI_MODEL PI_EXTRA_ARGS
+export PI_DISPATCH_CMD="$TMP/bin/pi"
 
 wait_terminal() { # NAME -> echoes final poll line
   local line

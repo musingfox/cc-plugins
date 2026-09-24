@@ -189,10 +189,10 @@ Offload heavy work to [pi](https://github.com/earendil-works/pi) cheap/fast mode
 - **`agents/builder.md`**: brief-driven executor — when the brief embeds `pi-agent.sh` offload usage, builder operates it as a pure operator (`pi-agent.sh start` per task, `pi-agent.sh watch` as the main loop, run acceptance check, distill report); when the brief carries no offload usage, builder does the work itself. Builder does NOT choose the mode — the brief does.
 - **`agents/reviewer.md`**: independent contract judge — given ONLY the contract, the deliverable paths, and the check output, returns an evidence-backed PASS/FAIL per clause; never sees the builder transcript, never runs offload verbs. Main dispatches builder and reviewer directly (no intermediary coordinator).
 - **`pi-agent.sh`**: name-addressed unified verbs (`start/send/poll/peek/ls/stop/watch`) mirroring native sub-agent UX; `send` resumes a finished worker's session, `watch` feeds the Monitor tool for push notifications
-- **`pi-dispatch.sh`**: launches one brief on a cheap/fast pi model in the background (routed by `PI_PROVIDER`/`PI_MODEL`), returns a run handle instantly — dispatch N briefs for parallel fan-out
+- **`pi-dispatch.sh`**: launches one brief on a cheap/fast pi model in the background (routed by one `PI_DISPATCH_CMD`), returns a run handle instantly — dispatch N briefs for parallel fan-out
 - **`pi-poll.sh` / `pi-stop.sh`**: idempotent one-line status polls and group-kill cancel; `pi-worktree.sh` isolates parallel code-writing tasks in git worktrees
 - **Claude reviews, workers write**: main thread issues briefs, collects diffs/summaries, and does the final review — all reading/reasoning/generation happens inside pi, off Claude's context
-- **Prerequisite**: `pi` CLI installed and authenticated (`PI_BIN` selects another pi-compatible binary)
+- **Prerequisite**: `pi` CLI installed and authenticated (`PI_DISPATCH_CMD` selects another pi-compatible binary such as omp)
 
 **Installation:**
 ```bash

@@ -65,7 +65,7 @@ case "$section" in
 esac
 
 # --- every env var read has a README row ---
-for v in PI_PROMPT PI_RESOLVE_ROUTING_ONLY PI_WALL_CLOCK_S PI_STALL_THRESHOLD_S PI_NO_MARKER_GRACE_S PI_RUN_DEADLINE_S PI_POLL_INTERVAL_S PI_WRITABLE_FILES; do
+for v in PI_PROMPT PI_WALL_CLOCK_S PI_STALL_THRESHOLD_S PI_NO_MARKER_GRACE_S PI_RUN_DEADLINE_S PI_POLL_INTERVAL_S PI_WRITABLE_FILES; do
   n="$(grep -c "^| \`$v\`" "$README")"
   [ "$n" = 1 ] && ok "README has one row for $v" || bad "README has $n rows for $v"
 done

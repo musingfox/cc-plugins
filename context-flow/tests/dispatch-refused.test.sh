@@ -34,8 +34,7 @@ PLUGIN_ROOT="$FLOW"
 SCRIPTS="$STUBS"
 FLOW_SESSION="$FLOW"
 SHARD_ID="A"
-PI_PROVIDER=""
-PI_MODEL=""
+PI_DISPATCH_CMD=""
 PI_STALL_THRESHOLD_S=180
 PI_WALL_CLOCK_S=1800
 REPO_ROOT="$FLOW"
@@ -73,19 +72,19 @@ section() { sed -n "/^## $1\$/{n;p;q;}" "$SHARD/outcome.md" 2>/dev/null; }
 
 count_of() { wc -l < "$1" 2>/dev/null | tr -d ' ' || echo 0; }
 
-REFUSAL='pi-dispatch: provider openai is pinned without a model (from PI_PROVIDER). Set PI_MODEL too.'
+REFUSAL="pi-dispatch: PI_MODEL is retired; put the binary, routing and flags in one PI_DISPATCH_CMD (e.g. PI_DISPATCH_CMD='pi --model openai-codex/gpt-5.6-terra') and unset PI_MODEL."
 
 # ---- T1: the first dispatch is refused -> FAIL naming the refusal, rc 1 ----
 
-build_fixture "echo 'some banner' >&2; echo '$REFUSAL' >&2; exit 2"
+build_fixture "echo 'some banner' >&2; echo \"$REFUSAL\" >&2; exit 2"
 run_shard; rc=$?
 assert_eq "1" "$rc" "T1: a refusal exits 1, not the NEEDS_REPLAN code 2"
 assert_eq "FAIL" "$(section Status)" "T1: Status is FAIL"
 assert_eq "dispatch-refused" "$(section Reason)" "T1: Reason is dispatch-refused"
-assert_contains "$(section Cause)" "pi-dispatch: provider openai is pinned without a model" \
+assert_contains "$(section Cause)" "pi-dispatch: PI_MODEL is retired" \
   "T1: Cause is the pi-dispatch refusal line"
 case "$(section Cause)" in
-  "pi-dispatch: provider openai is pinned without a model"*) _assert_pass ;;
+  "pi-dispatch: PI_MODEL is retired"*) _assert_pass ;;
   *) _assert_fail "T1: Cause does not start with the refusal line: [$(section Cause)]" ;;
 esac
 assert_contains "$(cat "$SHARD/outcome.md")" "(all): dispatch refused (rc=2)" \
@@ -96,7 +95,7 @@ rm -rf "$FLOW"
 
 # ---- T2: the gate-1 re-brief is refused -> same FAIL after 2 dispatches ----
 
-build_fixture "if [ \"\$n\" -ge 2 ]; then echo '$REFUSAL' >&2; exit 2; fi; echo 12345"
+build_fixture "if [ \"\$n\" -ge 2 ]; then echo \"$REFUSAL\" >&2; exit 2; fi; echo 12345"
 run_shard; rc=$?
 assert_eq "1" "$rc" "T2: a refused re-brief exits 1"
 assert_eq "dispatch-refused" "$(section Reason)" "T2: Reason is dispatch-refused"
@@ -122,10 +121,10 @@ rm -rf "$FLOW"
 
 # ---- T5: a warning printed before the refusal is not the Cause ----
 
-build_fixture "echo 'pi-dispatch: warning: PI_CONFIG_FILES is ignored' >&2; echo '$REFUSAL' >&2; exit 2"
+build_fixture "echo 'pi-dispatch: warning: PI_CONFIG_FILES is ignored' >&2; echo \"$REFUSAL\" >&2; exit 2"
 run_shard
 case "$(section Cause)" in
-  "pi-dispatch: provider openai is pinned without a model"*) _assert_pass ;;
+  "pi-dispatch: PI_MODEL is retired"*) _assert_pass ;;
   *) _assert_fail "T5: Cause is not the refusal line after a warning: [$(section Cause)]" ;;
 esac
 rm -rf "$FLOW"

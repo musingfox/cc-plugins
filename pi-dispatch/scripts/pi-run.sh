@@ -27,7 +27,7 @@
 #   caller — safety no longer depends on the caller passing the right timeout.
 #
 # Env: PI_RUN_DEADLINE_S (default 480), PI_POLL_INTERVAL_S (default 5),
-#      everything pi-dispatch.sh/pi-poll.sh honor (PI_BIN, PI_PROVIDER, PI_MODEL…).
+#      everything pi-dispatch.sh/pi-poll.sh honor (PI_DISPATCH_CMD, PI_CWD…).
 #      PI_WALL_CLOCK_S defaults to the deadline so pi-poll's own liveness guard
 #      agrees with the watchdog instead of racing past it.
 

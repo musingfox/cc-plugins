@@ -115,8 +115,8 @@ A terminal line from a run whose stream carries usage includes
 `model=<provider/model> cost=$<sum> turns=<n>` summed over the whole run; the
 `empty`, `no-rc`, `handle=broken` and `no-pid` lines carry none. Read it: a small task that shows 4 turns at ~20K
 input each is paying the full prompt every tool call (no cache on some
-providers). Trim with `PI_EXTRA_ARGS="-nc -ns -np --tools read,bash,edit,write"`
-(measured 21.4K → 12.8K input/turn) — at the price of the dispatch-dir
+providers). Trim by appending `-nc -ns -np --tools read,bash,edit,write` to
+`PI_DISPATCH_CMD` (measured 21.4K → 12.8K input/turn) — at the price of the dispatch-dir
 AGENTS.md and extension tools, so it is opt-in.
 
 ## The provider wall → abort early, roll back, fall back to Claude
@@ -148,28 +148,22 @@ reported with — they share the wall. On either tag:
 
 ## Routing
 
-Routing is `PI_PROVIDER` + `PI_MODEL` in the environment, passed to pi as one
-`--model provider/model` spec:
+Routing is one environment variable, `PI_DISPATCH_CMD`: the agent command,
+expanded by bash like a shell line, ahead of the dispatch's own flags:
 
 ```bash
-PI_PROVIDER=openai-codex PI_MODEL=gpt-5.4-mini pi-agent.sh start NAME BRIEF
+PI_DISPATCH_CMD='pi --model openai-codex/gpt-5.6-terra' pi-agent.sh start NAME BRIEF
+PI_DISPATCH_CMD='env PI_CODING_AGENT_DIR=$HOME/.omp/agent omp --model cursor/grok-4.7-medium' pi-agent.sh start NAME BRIEF
 ```
 
-Both or neither. `PI_PROVIDER` on its own is refused with exit 2: pi resolves
-the model first and the provider follows it, so `--provider X` alone lands on
-pi's default provider while looking pinned (measured 2026-09-15). Set `PI_MODEL`
-alone and pi matches the model pattern across providers.
+Unset, it is `pi` and pi's own `settings.json` (in `$PI_CODING_AGENT_DIR`,
+else `~/.pi/agent`) chooses the model. The agent must speak
+pi's CLI and json stream (pi and omp do). The retired `PI_BIN`, `PI_PROVIDER`,
+`PI_MODEL` and `PI_EXTRA_ARGS` are refused with exit 2 when set. The launch
+prints the command as `CMD=<command>`; check it before assuming a model.
 
-Give none and pi resolves from its own settings — `$PI_CODING_AGENT_DIR/settings.json`
-when that variable is exported (a dedicated worker profile), else
-`~/.pi/agent/settings.json`, reading `defaultProvider` and `defaultModel`. When
-that file is missing, the launch warns on stderr and names it. Check which one
-binds before assuming a model: the launch prints the routing it
-resolved as `ROUTING=<provider>/<model> CWD=<dir>`.
-
-Routing is recorded per run and replayed on resume, so `send` keeps the worker
-on the model it started with; when nothing was set, the first terminal poll
-back-fills the record with the model actually observed in the stream.
+The command is recorded per run and replayed on resume, so `send` keeps the
+worker on the binary it started with, and the session keeps its model.
 
 Pick the reviewer's model to be at least as capable as the builder's — there
 is no ranked list to defer to, so that judgement is the dispatcher's.

@@ -37,6 +37,7 @@ bad() { FAIL=$((FAIL+1)); echo "FAIL - $1"; }
 
 TMP="$(mktemp -d)"
 export PI_CWD="$TMP/work"; mkdir -p "$PI_CWD"
+unset PI_DISPATCH_CMD PI_BIN PI_PROVIDER PI_MODEL PI_EXTRA_ARGS
 trap 'rm -rf "$TMP"' EXIT
 
 # A guaranteed-dead pid: spawn a subshell, wait for it to be reaped, reuse its pid.
@@ -252,19 +253,15 @@ quota_branch_case norc-window  '' 'usage limit'                         'no-rc Q
 quota_branch_case norc-429     '' 'rate limit 429'                      'no-rc '                  'QUOTA'
 
 # --- (cost) OK line sums usage over EVERY assistant message_end (not just the last
-#     one agent_end carries), names the model, and back-fills a blank routing ---
+#     one agent_end carries) and names the model ---
 COST_STREAM="$SESSION_LINE
 {\"type\":\"message_end\",\"message\":{\"role\":\"assistant\",\"usage\":{\"cost\":{\"total\":0.01}}}}
 {\"type\":\"message_end\",\"message\":{\"role\":\"user\",\"usage\":{\"cost\":{\"total\":9}}}}
 {\"type\":\"message_end\",\"message\":{\"role\":\"assistant\",\"usage\":{\"cost\":{\"total\":0.02}}}}
 {\"type\":\"agent_end\",\"messages\":[{\"role\":\"assistant\",\"provider\":\"cursor\",\"model\":\"cursor-grok-4.6\",\"stopReason\":\"stop\",\"text\":\"done\",\"usage\":{\"cost\":{\"total\":0.02}}}]}"
 DC="$TMP/c-cost"; make_run "$DC" "$DEAD" 100 "0" "$COST_STREAM"
-printf 'PROVIDER=\nMODEL=\n' > "$DC/routing"
 OUT="$(bash "$POLL" "$DC")"
 case "$OUT" in STATUS=OK*"model=cursor/cursor-grok-4.6 cost=\$0.03 turns=2"*) ok "(cost) summed spend + model on OK line -> $OUT";; *) bad "(cost) expected model=cursor/cursor-grok-4.6 cost=\$0.03 turns=2, got: $OUT";; esac
-grep -qx 'MODEL=cursor-grok-4.6' "$DC/routing" && grep -qx 'PROVIDER=cursor' "$DC/routing" \
-  && ok "(cost-routing) blank routing back-filled with observed model" \
-  || bad "(cost-routing) routing not back-filled: $(tr '\n' ' ' < "$DC/routing")"
 
 # --- (5) alive pid within thresholds -> RUNNING ---
 D6="$TMP/c6"

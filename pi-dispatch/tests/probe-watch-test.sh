@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # probe-watch-test.sh — committed behavior test for pi-probe.sh (gate grammar)
 # and pi-watch.sh (snapshot fields). Pure-local, NO agent binary, NO network:
-# probe is exercised only via --bin-only / NO_BIN (no model call); watch runs
+# probe runs against a stub command (no model call); watch runs
 # on fixture streams, including a partial trailing line (live mid-write).
 
 set -uo pipefail
@@ -17,49 +17,68 @@ bad() { FAIL=$((FAIL+1)); echo "FAIL - $1 (got: $2)"; }
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-# --- probe: --bin-only OK path (use a guaranteed-present binary as PI_BIN) ---
-got="$(PI_BIN=sh bash "$PROBE" --bin-only)"; rc=$?
+unset PI_DISPATCH_CMD PI_BIN PI_PROVIDER PI_MODEL PI_EXTRA_ARGS PI_CONFIG_FILES
+
+# --- probe: --bin-only OK path (a guaranteed-present binary as the command) ---
+got="$(PI_DISPATCH_CMD=sh bash "$PROBE" --bin-only)"; rc=$?
 [ "$got" = "OK" ] && [ "$rc" -eq 0 ] && ok "probe --bin-only OK (rc=0)" || bad "probe --bin-only OK" "$got rc=$rc"
+got="$(PI_DISPATCH_CMD="env A=1 sh -x" bash "$PROBE" --bin-only)"; rc=$?
+[ "$got" = "OK" ] && [ "$rc" -eq 0 ] && ok "probe --bin-only looks past env and assignments to the binary" || bad "probe --bin-only env prefix" "$got rc=$rc"
+
+# The binary is found the way bash will run it: variables expand, and a leading
+# assignment or env's own options are not the binary.
+mkdir -p "$TMP/home/bin"; ln -s "$(command -v sh)" "$TMP/home/bin/agent"
+got="$(HOME="$TMP/home" PI_DISPATCH_CMD='$HOME/bin/agent --model x' bash "$PROBE" --bin-only)"; rc=$?
+[ "$got" = "OK" ] && ok "probe --bin-only expands \$HOME in the binary path" || bad "probe \$HOME" "$got rc=$rc"
+got="$(PI_DISPATCH_CMD='A=1 env C=2 sh' bash "$PROBE" --bin-only)"; rc=$?
+[ "$got" = "OK" ] && ok "probe --bin-only skips a leading assignment and env" || bad "probe env prefix" "$got rc=$rc"
+got="$(PI_DISPATCH_CMD='./bin/pi' bash "$PROBE" --bin-only)"; rc=$?
+case "$got" in ERROR:*relative*) [ "$rc" = 1 ] && ok "probe refuses what the dispatch refuses (relative binary)" || bad "probe relative rc" "rc=$rc";; *) bad "probe relative" "$got";; esac
+
+got="$(PI_DISPATCH_CMD='env X=$NO_SUCH_VAR_XYZ sh' bash "$PROBE" --bin-only)"; rc=$?
+[ "$got" = "OK" ] && ok "probe --bin-only tolerates an unset variable, as bash -c does" || bad "probe unset var" "$got rc=$rc"
 
 # --- probe: --bin-only NO_BIN path (missing binary, rc=1) ---
-got="$(PI_BIN=definitely-not-a-binary-xyz bash "$PROBE" --bin-only)"; rc=$?
+got="$(PI_DISPATCH_CMD="env A=1 definitely-not-a-binary-xyz" bash "$PROBE" --bin-only)"; rc=$?
 case "$got" in NO_BIN*) [ "$rc" -eq 1 ] && ok "probe --bin-only NO_BIN (rc=1)" || bad "probe NO_BIN rc" "rc=$rc";; *) bad "probe NO_BIN" "$got";; esac
 
-# --- probe: the full probe routes exactly as a dispatch would -----------------
-# A probe that proves a different provider than the dispatch will use is worse
-# than no probe, so the model/provider rule is shared, not re-invented here.
-unset PI_PROVIDER PI_MODEL PI_CONFIG_FILES
+# --- probe: the full probe runs the same command a dispatch would -----------
+# A probe that proves a different agent than the dispatch will use is worse
+# than no probe.
 PARGV="$TMP/probe-argv.log"
 PSTUB="$TMP/pi-probe-stub"
 cat > "$PSTUB" <<EOF
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> "$PARGV"
+echo ok
 EOF
 chmod +x "$PSTUB"
 
 : > "$PARGV"
-got="$(PI_BIN="$PSTUB" PI_PROVIDER=cursor bash "$PROBE" "$TMP/probe-p" 2>/dev/null)"; rc=$?
-case "$got" in
-  ERROR:*does\ not\ route*) [ "$rc" -eq 1 ] && ok "probe: provider without model is reported, not probed" || bad "probe provider-only rc" "rc=$rc" ;;
-  *) bad "probe provider-only" "$got" ;;
-esac
-[ -z "$(cat "$PARGV")" ] && ok "probe: provider-only never reaches the binary" || bad "probe provider-only argv" "$(cat "$PARGV")"
-
-: > "$PARGV"
-PI_BIN="$PSTUB" PI_PROVIDER=openai-codex PI_MODEL=gpt-5.5 bash "$PROBE" "$TMP/probe-pm" >/dev/null 2>&1
+PI_DISPATCH_CMD="$PSTUB --model openai-codex/gpt-5.5" bash "$PROBE" "$TMP/probe-pm" >/dev/null 2>&1
 got="$(cat "$PARGV")"
 case "$got" in
-  *"--model openai-codex/gpt-5.5"*) ok "probe: provider and model use --model provider/model" ;;
-  *) bad "probe provider+model" "$got" ;;
+  "--model openai-codex/gpt-5.5 -p "*) ok "probe: the command's routing flags come first" ;;
+  *) bad "probe command" "$got" ;;
 esac
 
 : > "$PARGV"
-PI_BIN="$PSTUB" bash "$PROBE" "$TMP/probe-none" >/dev/null 2>&1
+PI_DISPATCH_CMD="$PSTUB" bash "$PROBE" "$TMP/probe-none" >/dev/null 2>&1
 got="$(cat "$PARGV")"
 case "$got" in
-  *--model*|*--provider*) bad "probe with nothing pinned must pass no routing flag" "$got" ;;
-  *) ok "probe: nothing pinned passes no routing flag" ;;
+  *--model*) bad "probe with nothing in the command must pass no routing flag" "$got" ;;
+  "-p "*) ok "probe: a bare command passes no routing flag" ;;
+  *) bad "probe bare command" "$got" ;;
 esac
+
+got="$(PI_DISPATCH_CMD="A=1 $PSTUB" bash "$PROBE" "$TMP/probe-lead")"; rc=$?
+[ "$got" = "OK" ] && ok "full probe: a leading assignment still runs the agent" || bad "full probe leading assignment" "$got rc=$rc"
+
+got="$(PI_DISPATCH_CMD="env A=1 definitely-not-a-binary-xyz" bash "$PROBE" "$TMP/probe-missing")"; rc=$?
+case "$got" in NO_BIN*) [ "$rc" -eq 1 ] && ok "full probe of a missing binary -> NO_BIN" || bad "full NO_BIN rc" "rc=$rc";; *) bad "full probe NO_BIN" "$got";; esac
+
+got="$(PI_MODEL=x PI_DISPATCH_CMD="$PSTUB" bash "$PROBE" "$TMP/probe-legacy")"; rc=$?
+case "$got" in ERROR:*PI_MODEL*PI_DISPATCH_CMD*) [ "$rc" -eq 1 ] && ok "probe: a retired variable is an ERROR" || bad "legacy rc" "rc=$rc";; *) bad "probe legacy" "$got";; esac
 
 # --- watch: fixture stream with tools, usage, text, and a PARTIAL trailing line ---
 D="$TMP/run-w1"; mkdir -p "$D"

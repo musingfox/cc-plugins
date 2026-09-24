@@ -22,8 +22,6 @@ PLUGIN_ROOT="$CF_ROOT"
 SCRIPTS="$CF_ROOT/scripts"
 FLOW_SESSION="$FLOW"
 SHARD_ID="A"
-PI_PROVIDER=""
-PI_MODEL=""
 PI_STALL_THRESHOLD_S=180
 PI_WALL_CLOCK_S=1800
 REPO_ROOT="$FLOW"
@@ -40,7 +38,7 @@ chmod +x "$FLOW/pi-shim"
 
 # cf's own cwd is the "human's checkout"; the worker must not start there.
 CHECKOUT="$FLOW/checkout"; mkdir -p "$CHECKOUT"
-pid="$(cd "$CHECKOUT" && PI_BIN="$FLOW/pi-shim" CLAUDE_PLUGIN_ROOT="$CF_ROOT" bash "$CF_ROOT/scripts/cf-pi-dispatch.sh" "$SHARD")"
+pid="$(cd "$CHECKOUT" && PI_DISPATCH_CMD="$FLOW/pi-shim" CLAUDE_PLUGIN_ROOT="$CF_ROOT" bash "$CF_ROOT/scripts/cf-pi-dispatch.sh" "$SHARD")"
 rundir="$(cat "$SHARD/pi-rundir")"
 for _ in $(seq 1 50); do [ -s "$rundir/rc" ] && break; sleep 0.1; done
 
