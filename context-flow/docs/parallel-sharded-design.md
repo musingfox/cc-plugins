@@ -97,7 +97,7 @@ Three layers, all fed by `cf-pi-run.sh` mirroring its latest progress line to `$
 ## 9. Open Risks
 
 - **Escalation discipline**: the worker must use `$ESCALATE_FILE` instead of silently giving up or claiming success; the gates are the defense in depth.
-- **`touches_files` underset**: understated file lists let shards collide at runtime. `cf-pi-run.sh` post-validates `actual ⊆ declared` (root build/lock manifests allowlisted as warnings) and NEEDS_REPLANs on violation. Verified real in early dogfooding (N=1 plan trial omitted doc cross-references).
+- **`touches_files` underset**: understated file lists let shards collide at runtime. `cf-pi-run.sh` post-validates `actual ⊆ declared` (root build/lock manifests and version-only plugin.json bumps allowlisted as warnings) and NEEDS_REPLANs on violation. Verified real in early dogfooding (N=1 plan trial omitted doc cross-references).
 - **Cross-shard semantic regressions**: different-file edits can still break shared invariants; the integration gate's full suite is the only net.
 - **Disk pressure**: cap fan-out at N ≤ 6 by default; worktrees are removed after integration.
 

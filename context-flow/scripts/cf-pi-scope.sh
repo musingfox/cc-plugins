@@ -9,7 +9,8 @@
 # anything already committed.
 #
 # Usage:   cf-pi-scope.sh SHARD_SESSION
-# Stdout:  ALLOWLISTED <csv>   (only when non-empty — benign build/lock touches)
+# Stdout:  ALLOWLISTED <csv>   (only when non-empty — benign build/lock touches and
+#                                hook-made plugin version bumps)
 #          UNDECLARED  <csv>   (only when non-empty — scope violation)
 # Exit:    0 = clean (allowlisted touches still exit 0)
 #          2 = undeclared files present
@@ -62,6 +63,30 @@ allowlisted=""
 if [ -n "$undeclared" ]; then
   allowlisted=$(printf '%s\n' "$undeclared" | grep -E "$BUILD_LOCK_ALLOWLIST" || true)
   undeclared=$(printf '%s\n' "$undeclared" | grep -vE "$BUILD_LOCK_ALLOWLIST" || true)
+fi
+
+# .githooks/pre-commit bumps <plugin>/.claude-plugin/plugin.json inside the
+# shard's first commit that touches the plugin. That edit is the hook's, so a
+# manifest whose every changed line, in every commit, is its "version" line is
+# allowlisted; any other line in it is still the shard's undeclared touch.
+version_only_bump() {
+  local changed
+  # shellcheck disable=SC2046
+  changed=$(git -C "$WORK" log -p --no-color --no-ext-diff --pretty=format: "$BASE_HEAD..HEAD" \
+              --not $(cat "$SHARD_SESSION/prereq-refs" 2>/dev/null) -- "$1" 2>/dev/null \
+            | grep -E '^[+-]' | grep -vE '^(\+\+\+|---) ' || true)
+  [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qvE '^[+-][[:space:]]*"version"[[:space:]]*:'
+}
+if [ -n "$undeclared" ]; then
+  rest=""
+  while IFS= read -r f; do
+    if [[ "$f" =~ (^|/)\.claude-plugin/plugin\.json$ ]] && version_only_bump "$f"; then
+      allowlisted=$(printf '%s\n%s' "$allowlisted" "$f" | sed '/^$/d')
+    else
+      rest=$(printf '%s\n%s' "$rest" "$f" | sed '/^$/d')
+    fi
+  done <<< "$undeclared"
+  undeclared="$rest"
 fi
 
 csv() { printf '%s' "$1" | tr '\n' ',' | sed 's/,$//'; }
