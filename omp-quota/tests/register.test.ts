@@ -18,18 +18,17 @@ function linesOf(tree: any): string[] {
   return (tree.props?.children ?? tree.children).map((line: any) => stringsIn(line).join(''))
 }
 
-// Each provider's name and share: the part of a band line that does not move with the clock.
+// A band line without its reset times and padding: the part that does not move with the clock.
 function sharesOf(lines: string[]) {
-  return lines.map((line) => line.split('  ')[0])
+  return lines.map((line) => line.replace(/\d+[dh] \d+[hm]|\d+m|now/g, '').replace(/\s+/g, ' ').trim())
 }
 
 const BAND_LINES = [
-  'openai-codex 6%  7 days 6% warning  resets 1d 11h',
-  'ollama-cloud —  no limits reported',
-  'google-antigravity 100%  Gemini · Weekly 100% ok  resets 6d 23h',
-  'xai-oauth 100%  SuperGrok Weekly Credits · Weekly 100% ok  resets 6d 5h',
-  'cursor 0%  Cursor Models · Monthly 0% exhausted  resets 11h 25m',
-  'anthropic 86%  Claude 5 Hour · 5 Hour 86% ok  resets 1h 44m',
+  'cursor              Monthly   0% 11h 25m exhausted',
+  'openai-codex        5 hours 100% 4h 59m  7 days    6% 1d 11h warning',
+  'anthropic           5 Hour   86% 1h 44m  7 Day    94% 5d 15h',
+  'google-antigravity  5 Hour  100% 4h 59m  Weekly  100% 6d 23h',
+  'xai-oauth           Weekly  100% 6d 5h',
 ]
 
 test('session start passes through to the engine', async ($, on) => {
@@ -222,10 +221,10 @@ describe('overlapping fetches', () => {
     await w.clock.advance(300000)
     expect(await $.command.run({ command: 'quota', args: 'refresh' })).toEqual({ text: 'omp quota refreshed' })
     const refreshed = linesOf(await $.ui.render(BAND))
-    expect(refreshed[0]).toStartWith('openai-codex 50%  7 days 50% warning')
+    expect(refreshed[1]).toBe('openai-codex        5 hours 100% 4h 54m  7 days   50% 1d 11h warning')
     const invalidates = w.invalidates
     await w.clock.advance(60000)
-    expect(linesOf(await $.ui.render(BAND))[0]).toBe(refreshed[0])
+    expect(sharesOf(linesOf(await $.ui.render(BAND)))).toEqual(sharesOf(refreshed))
     expect(w.invalidates).toBe(invalidates)
   })
 
@@ -375,7 +374,7 @@ describe('quota band', () => {
     expect(await $.ui.render({ ...BAND, props: { ...BAND.props, hasSurvey: true } })).toEqual(BENEATH)
   })
 
-  test('draws one truncating line per provider in omp order, under a dim stale notice', async ($, on) => {
+  test('draws one truncating line per provider with limits, least left first, under a dim stale notice', async ($, on) => {
     const w = world(on, { store: { band: true } })
     w.omp(FIXTURE, { exitCode: 1 })
     await $.session.start(SESSION)
@@ -384,11 +383,11 @@ describe('quota band', () => {
     const tree: any = await $.ui.render(BAND)
     expect(linesOf(tree)).toEqual(['Stale: omp exited 1; showing data from 0m ago', ...BAND_LINES])
     const lines = tree.props?.children ?? tree.children
-    expect(lines.map((line: any) => line.props.wrap)).toEqual(Array(7).fill('truncate-end'))
+    expect(lines.map((line: any) => line.props.wrap)).toEqual(Array(6).fill('truncate-end'))
     expect(lines[0].props.dimColor).toBe(true)
   })
 
-  test('colors each share by how much is left, leaving a missing share plain', async ($, on) => {
+  test('colors each share by how much is left', async ($, on) => {
     const w = world(on, { store: { band: true } })
     await $.session.start(SESSION)
     await w.clock.settle()
@@ -398,24 +397,23 @@ describe('quota band', () => {
       (line.props?.children ?? line.children)
         .filter((span: any) => span?.props?.color)
         .map((span: any) => [stringsIn(span).join(''), span.props.color])
-    expect(colored(lines[0])).toEqual([
-      ['6%', '#e5484d'],
+    expect(colored(lines[1])).toEqual([
+      ['100%', '#46a758'],
       ['6%', '#e5484d'],
     ])
-    expect(colored(lines[1])).toEqual([])
-    expect(colored(lines[5])).toEqual([
+    expect(colored(lines[2])).toEqual([
       ['86%', '#46a758'],
-      ['86%', '#46a758'],
+      ['94%', '#46a758'],
     ])
-    expect(lines.map((line: any) => line.props.wrap)).toEqual(Array(6).fill('truncate-end'))
+    expect(lines.map((line: any) => line.props.wrap)).toEqual(Array(5).fill('truncate-end'))
   })
 
-  test('a lowest limit without a status shows a dash in its place', async ($, on) => {
+  test('a window without a warning or exhausted status names none', async ($, on) => {
     const w = world(on, { store: { band: true } })
     w.omp(fixtureWith({ 'openai-codex:secondary': undefined }))
     await $.session.start(SESSION)
     await w.clock.settle()
-    expect(linesOf(await $.ui.render(BAND))[0]).toBe('openai-codex 6%  7 days 6% —  resets 1d 11h')
+    expect(linesOf(await $.ui.render(BAND))[1]).toBe('openai-codex        5 hours 100% 4h 59m  7 days    6% 1d 11h')
   })
 
   test('says it is fetching while omp has not answered', async ($, on) => {

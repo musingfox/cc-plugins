@@ -1,6 +1,6 @@
 import type { On } from 'claude-code'
 import { quotaModelOf } from './quota-model.ts'
-import type { QuotaView } from './quota-model.ts'
+import type { QuotaView, WindowCell } from './quota-model.ts'
 import { readUsage, worsenedProviders } from './usage.ts'
 import type { OmpOutcome, UsageReading } from './usage.ts'
 
@@ -89,19 +89,31 @@ async function toggleBand($: any) {
   return {}
 }
 
+// Every window cell is padded to the widest one in its column, so windows line up across
+// providers; a line's last cell is left unpadded so no line ends in spaces.
 async function renderBand($: any, e: any) {
   const { Box, Text } = await $.ui.resolve(e)
   const model = quotaModelOf(view, await $.clock.now())
-  const share = (text: string, color: string | undefined) => (color ? Text({ color, children: [text] }) : text)
+  const cells = model.providers.flatMap((p) => p.windows)
+  const nameWidth = Math.max(0, ...model.providers.map((p) => p.provider.length))
+  const windowWidth = Math.max(0, ...cells.map((c) => c.window.length))
+  const cellText = (c: WindowCell) =>
+    `${c.window.padEnd(windowWidth)} ${c.share.padStart(4)} ${c.resets}${c.status ? ` ${c.status}` : ''}`
+  const columnWidths: number[] = []
+  for (const { windows } of model.providers) {
+    windows.slice(0, -1).forEach((c, i) => (columnWidths[i] = Math.max(columnWidths[i] ?? 0, cellText(c).length)))
+  }
+  const cellSpans = (c: WindowCell, i: number, last: boolean) => {
+    const padded = last ? cellText(c) : cellText(c).padEnd(columnWidths[i]!)
+    const at = windowWidth + 1 + 4 - c.share.length
+    const share = c.shareColor ? Text({ color: c.shareColor, children: [c.share] }) : c.share
+    return ['  ', padded.slice(0, at), share, padded.slice(at + c.share.length)]
+  }
   const lines = []
   if (model.notice) lines.push(Text({ dimColor: true, wrap: 'truncate-end', children: [model.notice] }))
-  for (const section of model.providers) {
-    const limit = section.lowest
-    const summary = limit
-      ? [limit.name, ' ', share(limit.share, limit.shareColor), ' ', limit.status, '  resets ', limit.resets]
-      : [section.empty]
-    const provider = [section.provider, ' ', share(section.share, section.shareColor), '  ']
-    lines.push(Text({ wrap: 'truncate-end', children: [...provider, ...summary] }))
+  for (const { provider, windows } of model.providers) {
+    const spans = windows.flatMap((c, i) => cellSpans(c, i, i === windows.length - 1))
+    lines.push(Text({ wrap: 'truncate-end', children: [provider.padEnd(nameWidth), ...spans] }))
   }
   return Box({ flexDirection: 'column', children: lines })
 }

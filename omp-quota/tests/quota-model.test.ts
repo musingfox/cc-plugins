@@ -21,56 +21,46 @@ function limit(id: string, over: Partial<LimitQuota> = {}): LimitQuota {
   return { id, label: 'L', windowLabel: 'W', resetsAt: null, share: null, status: null, ...over }
 }
 
-function rowsOf(limits: LimitQuota[]) {
+function windowsOf(limits: LimitQuota[]) {
   const usage = { providers: [{ provider: 'p', limits, share: null, status: null }] }
-  return quotaModelOf({ usage, failure: null, lastGoodAt: NOW }, NOW).providers[0]!.rows
+  return quotaModelOf({ usage, failure: null, lastGoodAt: NOW }, NOW).providers[0]!.windows
 }
 
 describe('quotaModelOf', () => {
-  test('lists each codex limit with share, status, and time to reset', () => {
-    const codex = sectionOf('openai-codex')
-    expect([codex.provider, codex.share, codex.shareColor]).toEqual(['openai-codex', '6%', '#e5484d'])
-    expect(codex.rows).toEqual([
-      { name: '5 hours', share: '100%', shareColor: '#46a758', status: 'ok', resets: '4h 59m' },
-      { name: '7 days', share: '6%', shareColor: '#e5484d', status: 'warning', resets: '1d 11h' },
+  test('lists providers from least share left to most, dropping those without limits', () => {
+    const model = quotaModelOf({ usage: fixtureUsage(), failure: null, lastGoodAt: NOW }, NOW)
+    expect(model.providers.map((p) => p.provider)).toEqual([
+      'cursor',
+      'openai-codex',
+      'anthropic',
+      'google-antigravity',
+      'xai-oauth',
     ])
   })
 
-  test('tells repeated antigravity labels apart by their ids', () => {
-    const antigravity = sectionOf('google-antigravity')
-    expect(antigravity.rows.map((r) => r.name)).toEqual([
-      'Gemini · Weekly',
-      'Gemini · 5 Hour',
-      'Claude & GPT (shared) · Weekly [anthropic]',
-      'Claude & GPT (shared) · Weekly [openai]',
-      'Claude & GPT (shared) · 5 Hour [anthropic]',
-      'Claude & GPT (shared) · 5 Hour [openai]',
+  test('one window per distinct window label, soonest reset first', () => {
+    expect(sectionOf('openai-codex').windows).toEqual([
+      { window: '5 hours', share: '100%', shareColor: '#46a758', status: null, resets: '4h 59m' },
+      { window: '7 days', share: '6%', shareColor: '#e5484d', status: 'warning', resets: '1d 11h' },
     ])
-    expect(antigravity.rows[0]!.resets).toBe('6d 23h')
   })
 
-  test('a limit without share or status shows dashes', () => {
-    const cursor = sectionOf('cursor')
-    expect(cursor.rows[0]).toEqual({ name: 'gpt-4 requests · Monthly', share: '—', status: '—', resets: '11h 25m' })
-    expect(cursor.rows[1]!.share).toBe('0%')
-    expect(cursor.rows[1]!.status).toBe('exhausted')
+  test('a window shows the least share among its limits', () => {
+    expect(sectionOf('anthropic').windows.map((w) => [w.window, w.share, w.resets])).toEqual([
+      ['5 Hour', '86%', '1h 44m'],
+      ['7 Day', '94%', '5d 15h'],
+    ])
+    expect(sectionOf('google-antigravity').windows.map((w) => [w.window, w.share])).toEqual([
+      ['5 Hour', '100%'],
+      ['Weekly', '100%'],
+    ])
   })
 
-  test('anthropic share and reset times', () => {
-    const anthropic = sectionOf('anthropic')
-    expect(anthropic.share).toBe('86%')
-    expect(anthropic.rows[0]!.resets).toBe('1h 44m')
-    expect(anthropic.rows[1]!.resets).toBe('5d 15h')
-  })
-
-  test('a provider with no limits says so', () => {
-    expect(sectionOf('ollama-cloud')).toEqual({
-      provider: 'ollama-cloud',
-      share: '—',
-      rows: [],
-      empty: 'no limits reported',
-      lowest: null,
-    })
+  test('a window names its worst status only when it is warning or exhausted', () => {
+    expect(sectionOf('cursor').windows).toEqual([
+      { window: 'Monthly', share: '0%', shareColor: '#e5484d', status: 'exhausted', resets: '11h 25m' },
+    ])
+    expect(sectionOf('anthropic').windows.map((w) => w.status)).toEqual([null, null])
   })
 
   test('before any fetch settles the model says it is fetching', () => {
@@ -90,30 +80,24 @@ describe('quotaModelOf', () => {
   test('a failure after good data keeps the data and says how old it is', () => {
     const model = quotaModelOf({ usage: fixtureUsage(), failure: 'omp did not answer', lastGoodAt: NOW - 720000 }, NOW)
     expect(model.notice).toBe('Stale: omp did not answer; showing data from 12m ago')
-    expect(model.providers).toHaveLength(6)
+    expect(model.providers).toHaveLength(5)
   })
 
-  test('the lowest limit is the first with the least share, skipping limits without one', () => {
-    expect(sectionOf('openai-codex').lowest!.name).toBe('7 days')
-    expect(sectionOf('cursor').lowest!.name).toBe('Cursor Models · Monthly')
-    expect(sectionOf('google-antigravity').lowest!.name).toBe('Gemini · Weekly')
+  test('a window with no share anywhere shows a dash and the first limit\'s reset', () => {
+    const windows = windowsOf([limit('a', { resetsAt: NOW + 60000 }), limit('b')])
+    expect(windows).toEqual([{ window: 'W', share: '—', shareColor: undefined, status: null, resets: '1m' }])
   })
 
-  test('with no share anywhere the lowest limit is the first', () => {
-    const limits = [limit('a', { label: 'A' }), limit('b', { label: 'B' })]
-    const usage = { providers: [{ provider: 'p', limits, share: null, status: null }] }
-    expect(quotaModelOf({ usage, failure: null, lastGoodAt: NOW }, NOW).providers[0]!.lowest!.name).toBe('A · W')
+  test('a limit without a window label is grouped under its own label', () => {
+    expect(windowsOf([limit('a', { label: 'A', windowLabel: '' })]).map((w) => w.window)).toEqual(['A'])
   })
 
-  test('a due reset reads now and a missing one reads a dash', () => {
-    const rows = rowsOf([limit('a', { label: 'A', resetsAt: NOW - 1 }), limit('b', { label: 'B' })])
-    expect(rows[0]!.resets).toBe('now')
-    expect(rows[1]!.resets).toBe('—')
-  })
-
-  test('tags keep every id segment that differs within the repeat group', () => {
-    const rows = rowsOf([limit('p:x:1'), limit('p:y:1'), limit('p:y:2')])
-    expect(rows.map((r) => r.name)).toEqual(['L · W [x:1]', 'L · W [y:1]', 'L · W [y:2]'])
+  test('a due reset reads now and a missing one reads a dash, listed last', () => {
+    const windows = windowsOf([limit('a', { windowLabel: 'X' }), limit('b', { windowLabel: 'Y', resetsAt: NOW - 1 })])
+    expect(windows.map((w) => [w.window, w.resets])).toEqual([
+      ['Y', 'now'],
+      ['X', '—'],
+    ])
   })
 })
 

@@ -2,16 +2,9 @@ import type { LimitQuota, Usage } from './usage.ts'
 
 export type QuotaView = { usage: Usage | null; failure: string | null; lastGoodAt: number | null }
 
-export type LimitRow = { name: string; share: string; shareColor?: string; status: string; resets: string }
+export type WindowCell = { window: string; share: string; shareColor?: string; status: string | null; resets: string }
 
-export type ProviderSection = {
-  provider: string
-  share: string
-  shareColor?: string
-  rows: LimitRow[]
-  empty: string | null
-  lowest: LimitRow | null
-}
+export type ProviderSection = { provider: string; windows: WindowCell[] }
 
 export type QuotaModel = { notice: string | null; providers: ProviderSection[] }
 
@@ -44,66 +37,47 @@ function resetsOf(resetsAt: number | null, nowMs: number): string {
   return resetsAt <= nowMs ? 'now' : durationOf(resetsAt - nowMs)
 }
 
-function baseNameOf(limit: LimitQuota): string {
-  return limit.windowLabel && limit.windowLabel !== limit.label ? `${limit.label} · ${limit.windowLabel}` : limit.label
-}
-
-function sharedCount(lists: string[][], at: (list: string[], i: number) => string | undefined): number {
-  let n = 0
-  while (lists.every((list) => at(list, n) !== undefined && at(list, n) === at(lists[0]!, n))) n += 1
-  return n
-}
-
-// Only the id is unique among limits whose label and window repeat; the tag keeps the id
-// segments that differ inside the group, and never shrinks an id to nothing.
-function tagsOf(ids: string[]): string[] {
-  const segments = ids.map((id) => id.split(':'))
-  const shortest = Math.min(...segments.map((s) => s.length))
-  const prefix = Math.min(sharedCount(segments, (s, i) => s[i]), shortest - 1)
-  const suffix = Math.min(sharedCount(segments, (s, i) => s[s.length - 1 - i]), shortest - 1 - prefix)
-  return segments.map((s) => s.slice(prefix, s.length - suffix).join(':'))
-}
-
-function rowNamesOf(limits: LimitQuota[]): string[] {
-  const names = limits.map(baseNameOf)
-  const groups = new Map<string, number[]>()
-  names.forEach((name, i) => groups.set(name, [...(groups.get(name) ?? []), i]))
-  for (const members of groups.values()) {
-    if (members.length < 2) continue
-    const tags = tagsOf(members.map((i) => limits[i]!.id))
-    members.forEach((i, k) => (names[i] = `${names[i]} [${tags[k]}]`))
-  }
-  return names
-}
-
-function lowestIndexOf(limits: LimitQuota[]): number {
-  let lowest = 0
+function leastIndexOf(limits: LimitQuota[]): number {
+  let least = 0
   limits.forEach((limit, i) => {
-    const least = limits[lowest]!.share
-    if (limit.share !== null && (least === null || limit.share < least)) lowest = i
+    const share = limits[least]!.share
+    if (limit.share !== null && (share === null || limit.share < share)) least = i
   })
-  return lowest
+  return least
+}
+
+function worstBadStatusOf(limits: LimitQuota[]): string | null {
+  if (limits.some((l) => l.status === 'exhausted')) return 'exhausted'
+  return limits.some((l) => l.status === 'warning') ? 'warning' : null
+}
+
+function byNullLast(a: number | null, b: number | null): number {
+  return (a ?? Infinity) - (b ?? Infinity)
+}
+
+function windowsOf(limits: LimitQuota[], nowMs: number): WindowCell[] {
+  const groups = new Map<string, LimitQuota[]>()
+  for (const limit of limits) {
+    const key = limit.windowLabel || limit.label
+    groups.set(key, [...(groups.get(key) ?? []), limit])
+  }
+  return [...groups]
+    .map(([window, members]) => ({ window, members, least: members[leastIndexOf(members)]! }))
+    .sort((a, b) => byNullLast(a.least.resetsAt, b.least.resetsAt))
+    .map(({ window, members, least }) => ({
+      window,
+      share: percentOf(least.share),
+      shareColor: shareColorOf(least.share),
+      status: worstBadStatusOf(members),
+      resets: resetsOf(least.resetsAt, nowMs),
+    }))
 }
 
 function sectionsOf(usage: Usage, nowMs: number): ProviderSection[] {
-  return usage.providers.map((provider) => {
-    const names = rowNamesOf(provider.limits)
-    const rows = provider.limits.map((limit, i) => ({
-      name: names[i]!,
-      share: percentOf(limit.share),
-      shareColor: shareColorOf(limit.share),
-      status: limit.status ?? '—',
-      resets: resetsOf(limit.resetsAt, nowMs),
-    }))
-    return {
-      provider: provider.provider,
-      share: percentOf(provider.share),
-      shareColor: shareColorOf(provider.share),
-      rows,
-      empty: provider.limits.length ? null : 'no limits reported',
-      lowest: rows[lowestIndexOf(provider.limits)] ?? null,
-    }
-  })
+  return usage.providers
+    .filter((provider) => provider.limits.length)
+    .sort((a, b) => byNullLast(a.share, b.share))
+    .map((provider) => ({ provider: provider.provider, windows: windowsOf(provider.limits, nowMs) }))
 }
 
 export function quotaModelOf(view: QuotaView, nowMs: number): QuotaModel {

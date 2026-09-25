@@ -75,19 +75,25 @@ you are in another window shows in the band, if it is on, when you return.
 The band is the strip directly above the prompt input. While `/quota` has it on, it shows
 a dim notice line while fetching (`Fetching omp usage`), when no fetch has succeeded
 (`Unavailable: <reason>`), or when the latest fetch failed
-(`Stale: <reason>; showing data from <age> ago`). Then one line per provider, in omp's
-order: `<provider> <share>`, then the provider's lowest limit as
-`<name> <share> <status>  resets <time>`, for example
-`openai-codex 6%  7 days 6% warning  resets 1d 11h`. The lowest limit is the first one with
-the least share left, or the first limit when none has a share. Status reads `—` when omp
-gives none; time to reset reads `Xd Yh`, `Xh Ym`, or `Ym`, `now` when due, and `—` when
-omp gives none. A provider without limits shows `no limits reported`. Each share is colored
-by the percentage shown: red for 0–30%, orange for 31–60%, green for 61–100%; `—` stays
-uncolored.
+(`Stale: <reason>; showing data from <age> ago`). Then one line per provider that reports
+limits, from the least share left to the most, for example:
 
-A limit's name is its label, plus `· <window>` when the window label differs. When the same
-name repeats inside a provider, each gets a tag in brackets: the parts of the limit id that
-differ within the group (antigravity's shared pools read `[anthropic]` and `[openai]`).
+```
+cursor              Monthly   0% 11h 25m exhausted
+openai-codex        5 hours 100% 4h 59m  7 days    6% 1d 11h warning
+anthropic           5 Hour   86% 1h 44m  7 Day    94% 5d 15h
+```
+
+Each line holds one cell per window (omp's window label, or the limit label when it has
+none), soonest reset first: `<window> <share> <time to reset>`, plus the window's status
+only when it is `warning` or `exhausted`. A window's share and reset come from its limit
+with the least share left (the first one when none has a share), so repeated pools such as
+antigravity's shared Claude & GPT limits collapse into one cell. Cells are padded so the
+windows line up across providers. A provider's order uses its lowest share across all
+limits; providers without a share go last, and one reporting no limits (such as
+`ollama-cloud`) is left out. Time to reset reads `Xd Yh`, `Xh Ym`, or `Ym`, `now` when due,
+and `—` when omp gives none. Each share is colored by the percentage shown: red for
+0–30%, orange for 31–60%, green for 61–100%; `—` stays uncolored.
 
 Every line is cut at the band's width with an ellipsis rather than wrapped. The band yields
 to a survey while one holds it, and redraws after every settled fetch, failed ones
