@@ -120,7 +120,9 @@ into a single pass:
   probes run at once.
 - **Prototype** — what a probe escalates to when the collision cannot be *read*. Some questions
   have no answer until the thing exists and runs: the probe reports that it cannot get there by
-  reading, and a prototype builds the smallest thing that produces a red/green signal, runs it,
+  reading, or — without any probe — the decision-maker asks to see the candidates built, or the
+  widening itself can tell the candidates apart only by how they look or feel once they exist
+  (two layouts, two interactions, which text cannot separate). Either way a prototype builds the smallest thing that produces a red/green signal, runs it,
   and reports what happened. Its output is that observation, never a plan and never a
   recommendation, and its code is evidence rather than a deliverable — throwaway in the same
   sense a probe is. **Running it is det; deciding what would count as red is not** — that line is

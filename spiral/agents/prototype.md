@@ -1,6 +1,6 @@
 ---
 name: prototype
-description: "Prototype role — builds and runs ONE throwaway thing to answer a design question the reasoning could not settle, then reports the verdict. Never a plan, never a recommendation; the code is evidence and lives on a branch nobody merges. Invoked by the /spiral orchestrator when a probe cannot reach the answer by reading."
+description: "Prototype role — builds and runs ONE throwaway thing to answer a design question the reasoning could not settle, then reports the verdict. Never a plan, never a recommendation; the code is evidence and lives on a branch nobody merges. Invoked by the /spiral orchestrator when a probe cannot reach the answer by reading, or when only a built thing can tell the candidates apart."
 color: yellow
 tools: Read, Grep, Glob, Bash, Write, Edit
 ---
@@ -32,6 +32,10 @@ BRANCH="spiral/prototype-<slug>"        # the name your task gave you
 WORK="$REPO/.spiral/${BRANCH##*/}"      # the branch name has a slash in it; the path must not
 git -C "$REPO" worktree add -b "$BRANCH" "$WORK" HEAD
 ```
+
+**No branch name in your task, or a task that tells you not to branch or to write somewhere
+else, is a broken dispatch.** Stop before building and say so: the branch is the only evidence
+that outlives the run, and your worktree never touches the user's tree or its uncommitted changes.
 
 Check the ignore line rather than assuming it — you may be the first thing to run in this
 repository. The worktree dies with the run; the **branch survives**, and is where the evidence

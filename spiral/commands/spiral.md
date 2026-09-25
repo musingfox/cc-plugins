@@ -1,5 +1,5 @@
 ---
-description: "Spiral — narrow a vague question into an implementation-sized goal, one layer at a time: diverge into the decisions a layer can settle, you answer a round of them, probes walk what you left open, converge into a plan or milestone, a prototype builds one throwaway thing when a walk cannot answer it, then dig another layer, go back up, or stop. Produces a goal to hand to /cf; ships no code."
+description: "Spiral — narrow a vague question into an implementation-sized goal, one layer at a time: diverge into the decisions a layer can settle, you answer a round of them, probes walk what you left open, converge into a plan or milestone, a prototype builds one throwaway thing when only a built thing can answer it, then dig another layer, go back up, or stop. Produces a goal to hand to /cf; ships no code."
 argument-hint: "<the question or vague goal>"
 allowed-tools: [Agent, Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion]
 ---
@@ -201,7 +201,10 @@ Then take one of five exits:
 ### When reading is not enough — the Prototype
 
 A probe stops at the first hard thing it can *read*. Where the answer only exists once the thing
-runs, that is what a prototype is for — the oscillation's fourth part (`concept.md` §5):
+runs, that is what a prototype is for — the oscillation's fourth part (`concept.md` §5). It has
+two ways in: a probe comes back saying reading cannot answer it, or no probe is needed because the
+human asks to see the candidates built, or the candidates differ only in how they look or feel
+once they exist (two layouts, two interactions) and no description can separate them:
 
 > `Agent(subagent_type: "spiral:prototype", model: "sonnet")` with the **question the build must
 > answer**, **what would count as red and what as green**, the candidate or design at stake, the
@@ -213,9 +216,18 @@ what result would settle the question is a threshold seam (`concept.md` §2), an
 prototype draws for itself is one it can move until the answer is whatever it built. Say it in
 the dispatch, concretely enough that the run either meets it or does not.
 
-One prototype, for one question. You send it on your own say-so, the way you send probes: both
-walk a direction the round already chose (`concept.md` §5), and this one simply walks it past
-what reading can reach. What it costs is model time, and that is bought by the tier it runs on.
+One question per prototype. When the question is which of several candidates to take and only
+building each one will show it, send one prototype per candidate, in parallel, each with its own
+branch `spiral/prototype-<question-slug>-<candidate-slug>`. You send them on your own say-so, the
+way you send probes: both walk a direction the round already chose (`concept.md` §5), and this one
+simply walks it past what reading can reach. What it costs is model time, and that is bought by
+the tier it runs on.
+
+**Every dispatch names the prototype's branch, and none forbids it.** Do not tell a prototype to
+write to a scratch directory or to stay off git, not even to protect the human's uncommitted
+changes: its worktree is cut from `HEAD` in a directory of its own, so the human's working tree
+and its uncommitted changes are never touched. A prototype told not to branch leaves its evidence
+in a place that dies with the session.
 
 Fold its verdict into `.spiral/L<N>-a<M>-probe.md` beside the probe reports, then re-sort and take
 one of the five exits with the verdict in hand.
