@@ -35,7 +35,8 @@ so no tool call or prompt is ever held up by a slow omp.
   limits' shares. Shown as a rounded percentage, or `—` when none is computable.
 - **Status** of a provider: the worst status among its limits (`exhausted` > `warning` >
   `ok`); limits without one are ignored, and a provider with none has no status. Reports
-  with the same provider name merge into one provider.
+  with the same provider name merge into one provider; a report without one is listed as
+  `(unnamed)`.
 - **Worsened provider**: one whose status was `ok` in the previous good fetch and is
   `warning` or `exhausted` now. The first good fetch has no previous; `warning` →
   `exhausted`, a provider without a status on either side, and a newly appearing provider

@@ -125,6 +125,13 @@ describe('readUsage', () => {
     expect(providers[0]!.limits.map((l) => l.id)).toEqual(['a', 'b'])
   })
 
+  test('a report without a provider name is listed as (unnamed), never as a blank name', () => {
+    const stdout = JSON.stringify({ reports: [{ limits: [{ id: 'a' }] }, { provider: '', limits: [{ id: 'b' }] }] })
+    const providers = usageOf(stdout).providers
+    expect(providers.map((p) => p.provider)).toEqual(['(unnamed)'])
+    expect(providers[0]!.limits.map((l) => l.id)).toEqual(['a', 'b'])
+  })
+
   test('an unknown status reads as no status', () => {
     const provider = usageOf(reportsWith([[{ id: 'a', status: 'bogus' }]])).providers[0]!
     expect(provider.limits[0]!.status).toBe(null)

@@ -87,7 +87,7 @@ export function readUsage(outcome: OmpOutcome): UsageReading {
   if (reports.length === 0) return { ok: false, reason: 'omp reported no providers' }
   const grouped = new Map<string, LimitQuota[]>()
   for (const report of reports) {
-    const provider = stringOf(field(report, 'provider'))
+    const provider = stringOf(field(report, 'provider')) || '(unnamed)'
     const rawLimits = field(report, 'limits')
     const limits = (Array.isArray(rawLimits) ? rawLimits : []).map(limitOf).filter((l): l is LimitQuota => l !== null)
     grouped.set(provider, [...(grouped.get(provider) ?? []), ...limits])
