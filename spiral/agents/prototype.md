@@ -55,11 +55,21 @@ remove the worktree **from the repository root**:
 
 ```bash
 git -C "$WORK" add -A && git -C "$WORK" commit -m "<message>"
-git -C "$REPO" worktree remove --force "$WORK"
+git -C "$REPO" worktree remove "$WORK"
 ```
 
-`--force` is deliberate: a run leaves logs and scratch output behind, and a plain `remove` refuses
-while any untracked file is present. Everything worth keeping is in the commit you just made.
+`add -A` leaves nothing untracked except what the project ignores, and ignored files do not stop
+`worktree remove`, so it needs no `--force`.
+
+**The commit goes through the project's hooks like any other; never skip them.** When a hook
+rejects it, read why:
+
+- **It is your own files** — a screenshot over the large-file limit, trailing whitespace, a lint
+  error in what you wrote. Fix the evidence, not the hook: scale or recompress the image until it
+  fits, clean the text, and commit again.
+- **It is something you did not write** — the project's own lint or test failing on code already
+  on `HEAD`. Stop there. Report the hook's output and leave the worktree in place, uncommitted, for
+  the orchestrator to decide.
 
 Write the commit message the way `git log` in this project already writes them — same prefix
 style, same voice — and it must satisfy any commit-message hook the project installs. **Never put
