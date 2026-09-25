@@ -32,19 +32,24 @@ that in mind.
 One line per event, soonest first, in the machine's time zone (`TZ` when set):
 
 ```
-09/25 週五  14:00–15:00        Dentist  @Clinic
-09/26 週六  全天               中秋節
-09/27 週日  22:00–09/28 01:30  Trip
+今天      14:00–15:00        Dentist  @Clinic  還有 4h
+明天      全天               中秋節
+09/27 日  22:00–09/28 01:30  Trip
+09/28 一  18:00–21:00        Dinner  @Home
 ```
 
+- The day reads `今天`, `明天`, or `MM/DD <weekday>`, in blue.
 - An all-day event reads `全天`; a timed one its start and end, with the end's date when it
   ends on another day.
-- `@<location>` follows the title when the event has one.
+- The first timed event (the one under way, or the next to start) has its title in bold
+  green. Today's timed events end in a green countdown, `還有 3h 45m`, or `進行中` once
+  started; the band redraws every minute so it keeps moving.
+- `@<location>` follows the title, dimmed, when the event has one.
 - Cancelled events are left out, and an event shared into several calendars shows once.
 - A dim notice line says `Fetching calendar events`, `Unavailable: <reason>` before any
   fetch succeeded, `Stale: <reason>; showing data from <age> ago` after a failed one, or
   `No events in the next N days`.
-- More events than the band holds end in `… N more`. Every line is cut at the band's width.
+- More events than the band holds end in a dim `… N more`. Every line is cut at the band's width.
 
 The band's on/off state and N are kept in the plugin's store and read at session start.
 

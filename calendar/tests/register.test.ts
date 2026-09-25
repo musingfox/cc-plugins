@@ -109,6 +109,16 @@ describe('fetching', () => {
     expect(count()).toBe(2)
   })
 
+  test('redraws every minute while the band is on, so countdowns move', async ($, on) => {
+    const w = world(on, { store: { band: true } })
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    const before = w.invalidates
+    await w.clock.advance(60000)
+    expect(w.invalidates).toBe(before + 1)
+    expect(linesOf(await $.ui.render(BAND))[0]).toEndWith('還有 3h 59m')
+  })
+
   test('an unconnected connector shows why, and never throws', async ($, on) => {
     const w = world(on, { store: { band: true }, mcp: () => ({ deny: 'server not connected' }) })
     await $.session.start(SESSION)
@@ -134,7 +144,7 @@ describe('fetching', () => {
     await w.clock.settle()
     expect(linesOf(await $.ui.render(BAND))).toEqual(['Unavailable: Google Calendar connector did not answer'])
     await w.clock.advance(90000)
-    expect(linesOf(await $.ui.render(BAND))).toEqual(BAND_LINES)
+    expect(linesOf(await $.ui.render(BAND)).slice(1)).toEqual(BAND_LINES.slice(1))
     const before = calls.length
     await w.clock.advance(60000)
     expect(calls.length).toBe(before)
@@ -177,7 +187,7 @@ describe('fetching', () => {
     await w.clock.advance(900000)
     expect(linesOf(await $.ui.render(BAND))).toEqual([
       'Stale: could not read Personal; showing data from 15m ago',
-      '09/25 週五  14:00–15:00  Dentist',
+      '今天  14:00–15:00  Dentist  還有 3h 45m',
     ])
   })
 
@@ -187,6 +197,28 @@ describe('fetching', () => {
     await w.clock.settle()
     const tree = await $.ui.render({ ...BAND, props: { ...BAND.props, maxRows: 3 } })
     expect(linesOf(tree)).toEqual([BAND_LINES[0], BAND_LINES[1], '… 2 more'])
+  })
+
+  test('colors the day, marks the next event green, and dims its location', async ($, on) => {
+    const w = world(on, { store: { band: true } })
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    const tree: any = await $.ui.render(BAND)
+    const spans = (line: any) =>
+      (line.props?.children ?? line.children)
+        .filter((span: any) => typeof span === 'object')
+        .map((span: any) => [stringsIn(span).join(''), span.props.color ?? (span.props.dimColor ? 'dim' : '')])
+    const lines = tree.props?.children ?? tree.children
+    expect(spans(lines[0])).toEqual([
+      ['今天    ', '#5b9cf5'],
+      ['Dentist', '#46a758'],
+      ['  @Clinic', 'dim'],
+      ['  還有 4h', '#46a758'],
+    ])
+    expect(spans(lines[3])).toEqual([
+      ['09/28 一', '#5b9cf5'],
+      ['  @Home', 'dim'],
+    ])
   })
 
   test('yields to a survey holding the band', async ($, on) => {

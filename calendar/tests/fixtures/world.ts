@@ -74,10 +74,10 @@ export const EVENTS: Record<string, object> = {
 }
 
 export const BAND_LINES = [
-  '09/25 週五  14:00–15:00        Dentist  @Clinic',
-  '09/26 週六  全天               中秋節',
-  '09/27 週日  22:00–09/28 01:30  Trip',
-  '09/28 週一  18:00–21:00        Dinner  @Home',
+  '今天      14:00–15:00        Dentist  @Clinic  還有 4h',
+  '明天      全天               中秋節',
+  '09/27 日  22:00–09/28 01:30  Trip',
+  '09/28 一  18:00–21:00        Dinner  @Home',
 ]
 
 export function answer(payload: unknown) {

@@ -2,11 +2,15 @@ import type { CalEvent, CalTime } from './events.ts'
 
 export type CalView = { events: CalEvent[] | null; failure: string | null; lastGoodAt: number | null; days: number }
 
-export type CalModel = { notice: string | null; rows: string[] }
+// `day` and `span` arrive padded to their column; `note` is today's countdown.
+export type CalRow = { day: string; span: string; title: string; location: string; note: string; isNext: boolean }
+
+export type CalModel = { notice: string | null; rows: CalRow[] }
 
 const MINUTE = 60_000
 const HOUR = 60 * MINUTE
-const WEEKDAYS = ['週日', '週一', '週二', '週三', '週四', '週五', '週六']
+const DAY_MS = 24 * HOUR
+const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 const ALL_DAY = '全天'
 
 type Local = { date: string; time: string }
@@ -25,9 +29,15 @@ function localOf(ms: number, tz: string): Local {
   return { date: `${part('year')}-${part('month')}-${part('day')}`, time: `${part('hour')}:${part('minute')}` }
 }
 
-function dayLabelOf(date: string): string {
+function monthDayOf(date: string): string {
+  return `${date.slice(5, 7)}/${date.slice(8, 10)}`
+}
+
+function dayLabelOf(date: string, today: string, tomorrow: string): string {
+  if (date === today) return '今天'
+  if (date === tomorrow) return '明天'
   const [y, m, d] = date.split('-').map(Number)
-  return `${date.slice(5, 7)}/${date.slice(8, 10)} ${WEEKDAYS[new Date(Date.UTC(y!, m! - 1, d!)).getUTCDay()]}`
+  return `${monthDayOf(date)} ${WEEKDAYS[new Date(Date.UTC(y!, m! - 1, d!)).getUTCDay()]}`
 }
 
 function startOf(time: CalTime, tz: string): Local {
@@ -38,7 +48,7 @@ function spanOf(event: CalEvent, start: Local, tz: string): string {
   if (event.start.kind === 'date') return ALL_DAY
   if (!event.end || event.end.kind === 'date') return start.time
   const end = localOf(event.end.ms, tz)
-  return end.date === start.date ? `${start.time}–${end.time}` : `${start.time}–${dayLabelOf(end.date).slice(0, 5)} ${end.time}`
+  return end.date === start.date ? `${start.time}–${end.time}` : `${start.time}–${monthDayOf(end.date)} ${end.time}`
 }
 
 // Terminal cells: a CJK character takes two.
@@ -53,11 +63,23 @@ function padCells(text: string, width: number): string {
 }
 
 function durationOf(ms: number): string {
-  if (ms >= HOUR) return `${Math.floor(ms / HOUR)}h ${Math.floor((ms % HOUR) / MINUTE)}m`
-  return `${Math.floor(ms / MINUTE)}m`
+  const h = Math.floor(ms / HOUR)
+  const m = Math.floor((ms % HOUR) / MINUTE)
+  return h && m ? `${h}h ${m}m` : h ? `${h}h` : `${m}m`
 }
 
-function rowsOf(events: CalEvent[], tz: string): string[] {
+function noteOf(event: CalEvent, start: Local, today: string, nowMs: number): string {
+  if (event.start.kind !== 'time' || start.date !== today) return ''
+  return event.start.ms <= nowMs ? '進行中' : `還有 ${durationOf(event.start.ms - nowMs)}`
+}
+
+export function lineOf(row: CalRow): string {
+  return [row.day, row.span, row.title, row.location && `@${row.location}`, row.note].filter(Boolean).join('  ')
+}
+
+function rowsOf(events: CalEvent[], nowMs: number, tz: string): CalRow[] {
+  const today = localOf(nowMs, tz).date
+  const tomorrow = localOf(nowMs + DAY_MS, tz).date
   const seen = new Set<string>()
   const lines = events
     .map((event) => ({ event, start: startOf(event.start, tz) }))
@@ -68,11 +90,23 @@ function rowsOf(events: CalEvent[], tz: string): string[] {
       return true
     })
     .sort((a, b) => `${a.start.date} ${a.start.time}`.localeCompare(`${b.start.date} ${b.start.time}`))
-    .map(({ event, start }) => ({ day: dayLabelOf(start.date), span: spanOf(event, start, tz), event }))
+    .map(({ event, start }) => ({
+      day: dayLabelOf(start.date, today, tomorrow),
+      span: spanOf(event, start, tz),
+      event,
+      note: noteOf(event, start, today, nowMs),
+    }))
+  const dayWidth = Math.max(0, ...lines.map((l) => cellsOf(l.day)))
   const spanWidth = Math.max(0, ...lines.map((l) => cellsOf(l.span)))
-  return lines.map(({ day, span, event }) =>
-    [day, padCells(span, spanWidth), event.title + (event.location ? `  @${event.location}` : '')].join('  '),
-  )
+  const next = lines.findIndex((l) => l.event.start.kind === 'time')
+  return lines.map(({ day, span, event, note }, i) => ({
+    day: padCells(day, dayWidth),
+    span: padCells(span, spanWidth),
+    title: event.title,
+    location: event.location,
+    note,
+    isNext: i === next,
+  }))
 }
 
 export function calModelOf(view: CalView, nowMs: number, tz: string): CalModel {
@@ -82,7 +116,7 @@ export function calModelOf(view: CalView, nowMs: number, tz: string): CalModel {
   const stale = view.failure
     ? `Stale: ${view.failure}; showing data from ${durationOf(nowMs - (view.lastGoodAt ?? nowMs))} ago`
     : null
-  const rows = rowsOf(view.events, tz)
+  const rows = rowsOf(view.events, nowMs, tz)
   const empty = rows.length ? null : `No events in the next ${view.days} days`
   return { notice: stale ?? empty, rows }
 }

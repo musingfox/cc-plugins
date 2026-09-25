@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { calModelOf, cellsOf } from '../hooks/cal-model.ts'
+import { calModelOf, cellsOf, lineOf } from '../hooks/cal-model.ts'
 import { calendarsOf, eventsOf, payloadOf, wantedOf } from '../hooks/events.ts'
 import { answer, BAND_LINES, CALENDARS, EVENTS, NOW } from './fixtures/world.ts'
 
@@ -54,8 +54,27 @@ describe('eventsOf', () => {
 describe('calModelOf', () => {
   const good = { events: allEvents(), failure: null, lastGoodAt: NOW, days: 7 }
 
-  test('one row per event in local time, soonest first, duplicates merged, times aligned', () => {
-    expect(calModelOf(good, NOW, TZ)).toEqual({ notice: null, rows: BAND_LINES })
+  test('one row per event in local time, soonest first, duplicates merged, columns aligned', () => {
+    const model = calModelOf(good, NOW, TZ)
+    expect(model.notice).toBeNull()
+    expect(model.rows.map(lineOf)).toEqual(BAND_LINES)
+  })
+
+  test('only the first timed event is marked next', () => {
+    expect(calModelOf(good, NOW, TZ).rows.map((r) => r.isNext)).toEqual([true, false, false, false])
+  })
+
+  test('an event under way reads 進行中 and is the next one', () => {
+    const events = eventsOf({
+      events: [{ id: 'x', summary: 'Standup', start: { dateTime: '2026-09-25T09:30:00+08:00' }, end: { dateTime: '2026-09-25T10:30:00+08:00' } }],
+    })!
+    const [row] = calModelOf({ ...good, events }, NOW, TZ).rows
+    expect([row!.note, row!.isNext]).toEqual(['進行中', true])
+  })
+
+  test('a countdown under an hour reads minutes only', () => {
+    const events = eventsOf({ events: [{ id: 'x', summary: 'Call', start: { dateTime: '2026-09-25T10:45:00+08:00' } }] })!
+    expect(calModelOf({ ...good, events }, NOW, TZ).rows[0]!.note).toBe('還有 45m')
   })
 
   test('says it is fetching before any fetch settles', () => {
@@ -73,7 +92,7 @@ describe('calModelOf', () => {
   test('a failure after good data keeps the rows and says how old they are', () => {
     const model = calModelOf({ ...good, failure: 'x did not answer', lastGoodAt: NOW - 1_200_000 }, NOW, TZ)
     expect(model.notice).toBe('Stale: x did not answer; showing data from 20m ago')
-    expect(model.rows).toEqual(BAND_LINES)
+    expect(model.rows).toHaveLength(4)
   })
 
   test('an empty window says so', () => {

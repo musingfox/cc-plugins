@@ -20,6 +20,7 @@ let view: CalView = { events: null, failure: null, lastGoodAt: null, days: DEFAU
 let bandOn = false
 let excluded: string[] = []
 let poll: { cancel(): void } | null = null
+let tick: { cancel(): void } | null = null
 let fetchesStarted = 0
 let lastPublished = 0
 let retries = 0
@@ -96,15 +97,28 @@ async function showBand($: any, on: boolean) {
   return {}
 }
 
+const DAY_COLOR = '#5b9cf5'
+const NEXT_COLOR = '#46a758'
+
 async function renderBand($: any, e: any) {
   const { Box, Text } = await $.ui.resolve(e)
   const tz = (await $.env.get('TZ')) || Intl.DateTimeFormat().resolvedOptions().timeZone
   const model = calModelOf(view, await $.clock.now(), tz)
   const room = Math.max(1, (e.props.maxRows ?? 10) - (model.notice ? 1 : 0))
-  const shown = model.rows.length > room ? [...model.rows.slice(0, room - 1), `… ${model.rows.length - room + 1} more`] : model.rows
+  const hidden = model.rows.length > room ? model.rows.length - room + 1 : 0
   const lines = []
   if (model.notice) lines.push(Text({ dimColor: true, wrap: 'truncate-end', children: [model.notice] }))
-  for (const row of shown) lines.push(Text({ wrap: 'truncate-end', children: [row] }))
+  for (const row of hidden ? model.rows.slice(0, room - 1) : model.rows) {
+    const children = [
+      Text({ color: DAY_COLOR, children: [row.day] }),
+      `  ${row.span}  `,
+      row.isNext ? Text({ color: NEXT_COLOR, bold: true, children: [row.title] }) : row.title,
+    ]
+    if (row.location) children.push(Text({ dimColor: true, children: [`  @${row.location}`] }))
+    if (row.note) children.push(Text({ color: NEXT_COLOR, children: [`  ${row.note}`] }))
+    lines.push(Text({ wrap: 'truncate-end', children }))
+  }
+  if (hidden) lines.push(Text({ dimColor: true, children: [`… ${hidden} more`] }))
   return Box({ flexDirection: 'column', children: lines })
 }
 
@@ -128,6 +142,10 @@ export function register(on: On, options: { exclude_calendars?: string[] } = {})
     poll?.cancel()
     poll = $.clock.every(POLL_MS, () => {
       if (bandOn) void fetchAndPublish($).catch(() => {})
+    })
+    tick?.cancel()
+    tick = $.clock.every(60_000, () => {
+      if (bandOn) $.ui.invalidate('ui.render')
     })
     return next(e)
   })
