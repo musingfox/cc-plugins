@@ -39,9 +39,9 @@ test_gate: true
 | `file_size_limit` | string | `500KB` | Max file size for large file check. Supports KB/MB suffixes. |
 | `no_commit_markers` | string[] | see above | Patterns to detect in staged files. Pipe-joined for grep. |
 | `checks.*` | boolean | see above | Enable/disable individual pre-commit checks. |
-| `lint` | boolean | `true` | Enable lint in pre-commit (skipped when CLAUDECODE=1). |
-| `format` | boolean | `true` | Enable format check in pre-commit (skipped when CLAUDECODE=1). |
-| `test_gate` | boolean | `true` | Enable test in pre-commit (skipped when CLAUDECODE=1). Also controls PreToolUse test gate in Claude Code hooks. |
+| `lint` | boolean | `true` | Enable lint in pre-commit. |
+| `format` | boolean | `true` | Enable format check in pre-commit. |
+| `test_gate` | boolean | `true` | Enable test in pre-commit. |
 
 ## Applying Overrides
 

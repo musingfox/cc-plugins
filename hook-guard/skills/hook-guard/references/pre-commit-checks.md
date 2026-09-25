@@ -10,11 +10,6 @@ set -euo pipefail
 
 # Hook Guard Pre-commit (generated)
 
-# --- CLAUDECODE skip ---
-SKIP_LINT="${CLAUDECODE:+1}"
-SKIP_FORMAT="${CLAUDECODE:+1}"
-SKIP_TEST="${CLAUDECODE:+1}"
-
 # --- Config ---
 FILE_SIZE_LIMIT=512000  # 500KB
 NO_COMMIT_MARKERS="DO NOT COMMIT|FIXME: remove|XXX|HACK"
@@ -44,7 +39,7 @@ echo "hook-guard: all checks passed ($WARNINGS warning(s))"
 exit 0
 ```
 
-## Always-run checks (never skipped by CLAUDECODE)
+## Security, integrity, and structure checks
 
 ### Security
 
@@ -244,25 +239,22 @@ check_lock_sync() {
 }
 ```
 
-## Skippable checks (CLAUDECODE=1 skips)
+## Quality checks
 
 Substitute the detected tool command. If no tool detected for a category, omit the function — do not generate a no-op.
 
 ```bash
 check_lint() {
-  [ "${SKIP_LINT:-}" = "1" ] && { pass "Lint (skipped — CLAUDECODE)"; return; }
   echo "Running lint..."
   # [LINT_COMMAND]
 }
 
 check_format() {
-  [ "${SKIP_FORMAT:-}" = "1" ] && { pass "Format (skipped — CLAUDECODE)"; return; }
   echo "Checking format..."
   # [FORMAT_CHECK_COMMAND]  (check mode, not write)
 }
 
 check_test() {
-  [ "${SKIP_TEST:-}" = "1" ] && { pass "Test (skipped — CLAUDECODE)"; return; }
   echo "Running tests..."
   # [TEST_COMMAND]
 }

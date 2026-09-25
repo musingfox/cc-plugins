@@ -57,7 +57,6 @@ git config core.hooksPath 2>/dev/null && echo "FOUND: core.hooksPath"
 [ -d .githooks ] && echo "FOUND: .githooks/"
 [ -f .pre-commit-config.yaml ] && echo "FOUND: pre-commit framework"
 [ -d .husky ] && echo "FOUND: Husky"
-[ -f .claude/settings.local.json ] && echo "FOUND: CC settings (check hooks key)"
 { [ -f lefthook.yml ] || [ -f lefthook.yaml ]; } && echo "FOUND: Lefthook"
 ```
 

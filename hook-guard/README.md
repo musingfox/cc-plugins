@@ -1,18 +1,12 @@
 # Hook Guard
 
-One-stop hook setup assistant for Claude Code projects. Detects your project environment, generates Claude Code hooks and git pre-commit scripts with security checks, code quality gates, and CLAUDECODE skip logic.
+One-stop hook setup assistant for Claude Code projects. Detects your project environment and generates git pre-commit and commit-msg scripts with security checks and code quality gates.
 
 ## Features
 
-### Claude Code Hooks (`.claude/settings.local.json`)
-
-- **PostToolUse — Lint & Format**: Auto-runs after every Edit/Write (soft feedback)
-- **PreToolUse — Test Gate**: Blocks `git commit` / `jj commit` if tests fail (hard gate)
-- **CLAUDECODE env var**: Signals pre-commit hooks to skip redundant checks
-
 ### Pre-commit Hooks (`.githooks/`)
 
-**Always run** (security & integrity):
+**Security & integrity**:
 - Secrets detection (gitleaks or regex fallback)
 - Private key file detection (.pem, .key, .p12)
 - Sensitive file path detection (.env, credentials.json)
@@ -26,7 +20,7 @@ One-stop hook setup assistant for Claude Code projects. Detects your project env
 - JSON / YAML / TOML syntax validation
 - Lock file & manifest sync (package-lock.json ↔ package.json, etc.)
 
-**Skip when CLAUDECODE=1** (already handled by CC hooks):
+**Quality**:
 - Lint
 - Format
 - Test
@@ -97,9 +91,11 @@ Hook scripts are stored in `.githooks/` (committed to the repo) instead of `.git
 git config core.hooksPath .githooks
 ```
 
-### CLAUDECODE Skip Logic
+### One Gate for Every Committer
 
-When Claude Code runs, it sets `CLAUDECODE=1` via `.claude/settings.local.json`. The pre-commit hook detects this and skips lint/format/test checks that Claude Code hooks have already handled. Security and integrity checks always run.
+Every check runs in pre-commit, for a person and for Claude Code alike. hook-guard writes no Claude Code hooks: linting each edit as it lands rarely changes the outcome, and a commit is the one point every change passes.
+
+Installs from before 0.2.0 skip lint, format, and test when `CLAUDECODE` is set and rely on `.claude/settings.local.json` hooks that read `$CLAUDE_TOOL_ARG_*`, a variable Claude Code never sets, so Claude's commits go unchecked. Doctor flags this.
 
 ## Configuration
 

@@ -143,9 +143,8 @@ Browser automation and Playwright test authoring:
 
 One-stop hook setup assistant for Claude Code projects:
 - **Auto-Detection**: Detects project language, toolchain (ruff/eslint/clippy/prettier/rustfmt/pytest/vitest...), VCS type, and existing hooks
-- **Claude Code Hooks**: Generates PostToolUse lint/format (soft feedback) and PreToolUse test gate (hard gate) into `.claude/settings.local.json`
 - **Pre-commit Scripts**: Generates `.githooks/pre-commit` with security checks (secrets, private keys, sensitive files), file integrity checks (large files, merge conflicts, line endings), and structure checks (no-commit markers, syntax validation, lock sync)
-- **CLAUDECODE Skip Logic**: Pre-commit skips lint/format/test when Claude Code is running (already handled by CC hooks)
+- **One Gate for Every Committer**: Lint, format, and test run in pre-commit for Claude Code too; no Claude Code hooks are generated
 - **Conventional Commits**: Optional `.githooks/commit-msg` validation
 - **Team-Shareable**: Uses `core.hooksPath` pointing to `.githooks/` (committed to repo)
 - **3 Skills**: `setup` (detect + generate), `doctor` (health check), `update` (diff + refresh)
