@@ -33,6 +33,7 @@ const DENTIST = {
   id: 'e1',
   summary: 'Dentist',
   location: 'Clinic',
+  htmlLink: 'https://www.google.com/calendar/event?eid=ZTE',
   status: 'confirmed',
   start: { dateTime: '2026-09-25T14:00:00+08:00' },
   end: { dateTime: '2026-09-25T15:00:00+08:00' },

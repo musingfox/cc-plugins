@@ -45,6 +45,9 @@ One line per event, soonest first, in the machine's time zone (`TZ` when set):
   green. Today's timed events end in a green countdown, `還有 3h 45m`, or `進行中` once
   started; the band redraws every minute so it keeps moving.
 - `@<location>` follows the title, dimmed, when the event has one.
+- Three parts are links (OSC 8 on the terminal; a terminal without it prints the URL dimmed
+  after the text): the day opens that day in Google Calendar, the title opens the event,
+  and the location opens a Google Maps search for it.
 - Cancelled events are left out, and an event shared into several calendars shows once.
 - A dim notice line says `Fetching calendar events`, `Unavailable: <reason>` before any
   fetch succeeded, `Stale: <reason>; showing data from <age> ago` after a failed one, or

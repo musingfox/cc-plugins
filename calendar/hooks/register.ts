@@ -101,7 +101,8 @@ const DAY_COLOR = '#5b9cf5'
 const NEXT_COLOR = '#46a758'
 
 async function renderBand($: any, e: any) {
-  const { Box, Text } = await $.ui.resolve(e)
+  const { Box, Text, Link } = await $.ui.resolve(e)
+  const linked = (text: string, href: string | null) => (href ? Link({ href, children: [text] }) : text)
   const tz = (await $.env.get('TZ')) || Intl.DateTimeFormat().resolvedOptions().timeZone
   const model = calModelOf(view, await $.clock.now(), tz)
   const room = Math.max(1, (e.props.maxRows ?? 10) - (model.notice ? 1 : 0))
@@ -109,12 +110,13 @@ async function renderBand($: any, e: any) {
   const lines = []
   if (model.notice) lines.push(Text({ dimColor: true, wrap: 'truncate-end', children: [model.notice] }))
   for (const row of hidden ? model.rows.slice(0, room - 1) : model.rows) {
+    const title = linked(row.title, row.eventHref)
     const children = [
-      Text({ color: DAY_COLOR, children: [row.day] }),
+      Text({ color: DAY_COLOR, children: [linked(row.day, row.dayHref)] }),
       `  ${row.span}  `,
-      row.isNext ? Text({ color: NEXT_COLOR, bold: true, children: [row.title] }) : row.title,
+      row.isNext ? Text({ color: NEXT_COLOR, bold: true, children: [title] }) : title,
     ]
-    if (row.location) children.push(Text({ dimColor: true, children: [`  @${row.location}`] }))
+    if (row.location) children.push(Text({ dimColor: true, children: ['  ', linked(`@${row.location}`, row.locationHref)] }))
     if (row.note) children.push(Text({ color: NEXT_COLOR, children: [`  ${row.note}`] }))
     lines.push(Text({ wrap: 'truncate-end', children }))
   }

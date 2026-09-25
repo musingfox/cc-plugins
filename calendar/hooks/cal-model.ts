@@ -3,7 +3,17 @@ import type { CalEvent, CalTime } from './events.ts'
 export type CalView = { events: CalEvent[] | null; failure: string | null; lastGoodAt: number | null; days: number }
 
 // `day` and `span` arrive padded to their column; `note` is today's countdown.
-export type CalRow = { day: string; span: string; title: string; location: string; note: string; isNext: boolean }
+export type CalRow = {
+  day: string
+  span: string
+  title: string
+  location: string
+  note: string
+  isNext: boolean
+  dayHref: string
+  eventHref: string | null
+  locationHref: string | null
+}
 
 export type CalModel = { notice: string | null; rows: CalRow[] }
 
@@ -62,6 +72,26 @@ function padCells(text: string, width: number): string {
   return text + ' '.repeat(Math.max(0, width - cellsOf(text)))
 }
 
+// A Link refuses anything but an https URL spelled as the URL parser spells it.
+function httpsHref(text: string): string | null {
+  try {
+    const url = new URL(text)
+    return url.protocol === 'https:' ? url.href : null
+  } catch {
+    return null
+  }
+}
+
+function dayHrefOf(date: string): string {
+  const [y, m, d] = date.split('-').map(Number)
+  return `https://calendar.google.com/calendar/r/day/${y}/${m}/${d}`
+}
+
+function mapHrefOf(location: string): string | null {
+  if (!location) return null
+  return httpsHref(`https://www.google.com/maps/search/?${new URLSearchParams({ api: '1', query: location })}`)
+}
+
 function durationOf(ms: number): string {
   const h = Math.floor(ms / HOUR)
   const m = Math.floor((ms % HOUR) / MINUTE)
@@ -91,6 +121,7 @@ function rowsOf(events: CalEvent[], nowMs: number, tz: string): CalRow[] {
     })
     .sort((a, b) => `${a.start.date} ${a.start.time}`.localeCompare(`${b.start.date} ${b.start.time}`))
     .map(({ event, start }) => ({
+      date: start.date,
       day: dayLabelOf(start.date, today, tomorrow),
       span: spanOf(event, start, tz),
       event,
@@ -99,13 +130,16 @@ function rowsOf(events: CalEvent[], nowMs: number, tz: string): CalRow[] {
   const dayWidth = Math.max(0, ...lines.map((l) => cellsOf(l.day)))
   const spanWidth = Math.max(0, ...lines.map((l) => cellsOf(l.span)))
   const next = lines.findIndex((l) => l.event.start.kind === 'time')
-  return lines.map(({ day, span, event, note }, i) => ({
+  return lines.map(({ date, day, span, event, note }, i) => ({
     day: padCells(day, dayWidth),
     span: padCells(span, spanWidth),
     title: event.title,
     location: event.location,
     note,
     isNext: i === next,
+    dayHref: dayHrefOf(date),
+    eventHref: event.link ? httpsHref(event.link) : null,
+    locationHref: mapHrefOf(event.location),
   }))
 }
 

@@ -1,6 +1,6 @@
 export type CalTime = { kind: 'date'; date: string } | { kind: 'time'; ms: number }
 
-export type CalEvent = { id: string; title: string; location: string; start: CalTime; end: CalTime | null }
+export type CalEvent = { id: string; title: string; location: string; link: string; start: CalTime; end: CalTime | null }
 
 export type Calendar = { id: string; name: string }
 
@@ -57,6 +57,7 @@ export function eventsOf(payload: unknown): CalEvent[] | null {
         id: stringOf(field(raw, 'id')),
         title: stringOf(field(raw, 'summary')) || '(no title)',
         location: stringOf(field(raw, 'location')),
+        link: stringOf(field(raw, 'htmlLink')),
         start,
         end: timeOf(field(raw, 'end')),
       },

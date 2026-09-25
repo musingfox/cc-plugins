@@ -221,6 +221,25 @@ describe('fetching', () => {
     ])
   })
 
+  test('the day, the title, and the location are links', async ($, on) => {
+    const w = world(on, { store: { band: true } })
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    const tree: any = await $.ui.render(BAND)
+    const links = (node: any): string[][] =>
+      !node || typeof node !== 'object'
+        ? []
+        : [
+            ...(node.type === 'Link' ? [[stringsIn(node).join(''), node.props.href]] : []),
+            ...[...(node.children ?? []), ...(node.props?.children ?? [])].flatMap(links),
+          ]
+    expect(links((tree.props?.children ?? tree.children)[0])).toEqual([
+      ['今天    ', 'https://calendar.google.com/calendar/r/day/2026/9/25'],
+      ['Dentist', 'https://www.google.com/calendar/event?eid=ZTE'],
+      ['@Clinic', 'https://www.google.com/maps/search/?api=1&query=Clinic'],
+    ])
+  })
+
   test('yields to a survey holding the band', async ($, on) => {
     const w = world(on, { store: { band: true } })
     beneath(on)

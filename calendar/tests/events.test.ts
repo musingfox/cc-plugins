@@ -77,6 +77,26 @@ describe('calModelOf', () => {
     expect(calModelOf({ ...good, events }, NOW, TZ).rows[0]!.note).toBe('還有 45m')
   })
 
+  test('links the day to its day view, the title to the event, and the location to a map search', () => {
+    const [dentist, holiday, trip] = calModelOf(good, NOW, TZ).rows
+    expect(dentist!.dayHref).toBe('https://calendar.google.com/calendar/r/day/2026/9/25')
+    expect(dentist!.eventHref).toBe('https://www.google.com/calendar/event?eid=ZTE')
+    expect(dentist!.locationHref).toBe('https://www.google.com/maps/search/?api=1&query=Clinic')
+    expect(holiday!.dayHref).toBe('https://calendar.google.com/calendar/r/day/2026/9/26')
+    expect([trip!.eventHref, trip!.locationHref]).toEqual([null, null])
+  })
+
+  test('a location is encoded into the map link, and a link that is not https is dropped', () => {
+    const events = eventsOf({
+      events: [
+        { id: 'x', summary: 'A', location: '怡 家 @1', htmlLink: 'javascript:alert(1)', start: { dateTime: '2026-09-25T12:00:00+08:00' } },
+      ],
+    })!
+    const [row] = calModelOf({ ...good, events }, NOW, TZ).rows
+    expect(row!.locationHref).toBe('https://www.google.com/maps/search/?api=1&query=%E6%80%A1+%E5%AE%B6+%401')
+    expect(row!.eventHref).toBeNull()
+  })
+
   test('says it is fetching before any fetch settles', () => {
     expect(calModelOf({ events: null, failure: null, lastGoodAt: null, days: 7 }, NOW, TZ)).toEqual({
       notice: 'Fetching calendar events',
