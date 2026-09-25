@@ -12,7 +12,7 @@ Built and tested against Claude Code 2.1.276.
 ## How omp is run
 
 Each fetch runs `omp usage --json` with `PI_CODING_AGENT_DIR` set to `$HOME/.omp/agent`
-and a 10 s limit. The override matters: Claude Code may pass down a
+and a 30 s limit (a cold fetch across all providers took about 10 s on 2026-09-25). The override matters: Claude Code may pass down a
 `PI_CODING_AGENT_DIR` of its own (pi-dispatch sets one), and omp reading that home answers
 with exit 0 and no providers. `omp` is found on Claude Code's `PATH` (it usually lives in
 `~/.bun/bin`). With `HOME` unset, omp is not run, the band reads
@@ -40,7 +40,7 @@ so no tool call or prompt is ever held up by a slow omp.
   `warning` or `exhausted` now. The first good fetch has no previous; `warning` →
   `exhausted`, a provider without a status on either side, and a newly appearing provider
   do not count.
-- **Failed fetch**: omp did not answer (could not start, or still running after 10 s),
+- **Failed fetch**: omp did not answer (could not start, or still running after 30 s),
   exited non-zero, printed something that is not a JSON report list, or reported no
   providers — the last is how omp answers when it reads the wrong home, so it never wipes
   the display. omp's error output is never shown.

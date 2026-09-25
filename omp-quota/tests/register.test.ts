@@ -48,13 +48,13 @@ test('never draws a status line, through a good fetch, a failed one, and a refre
 })
 
 describe('omp invocation', () => {
-  test("runs omp against the user's own omp home with a 10 s limit", async ($, on) => {
+  test("runs omp against the user's own omp home with a 30 s limit", async ($, on) => {
     const w = world(on, { env: { HOME: '/home/u', PI_CODING_AGENT_DIR: '/home/u/.pi/dispatch' } })
     await $.session.start(SESSION)
     await w.clock.settle()
     expect(w.runs[0].argv).toEqual(['omp', 'usage', '--json'])
     expect(w.runs[0].init.env).toEqual({ PI_CODING_AGENT_DIR: '/home/u/.omp/agent' })
-    expect(w.runs[0].init.timeoutMs).toBe(10000)
+    expect(w.runs[0].init.timeoutMs).toBe(30000)
   })
 
   test('without HOME, omp is not run and the band says why', async ($, on) => {

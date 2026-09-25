@@ -6,7 +6,7 @@ import type { OmpOutcome, UsageReading } from './usage.ts'
 
 const FETCH_ARGV = ['omp', 'usage', '--json']
 const INVALIDATE_ARGV = ['omp', 'usage', 'invalidate']
-const OMP_TIMEOUT_MS = 10_000
+const OMP_TIMEOUT_MS = 30_000
 const POLL_MS = 300_000
 const BAND_KEY = 'band'
 
