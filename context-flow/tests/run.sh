@@ -27,9 +27,15 @@ CF_TEST_TMP="$(mktemp -d)"
 export PI_RUNS_DIR="$CF_TEST_TMP/pi-runs"
 trap 'rm -rf "$CF_TEST_TMP"' EXIT
 
-# The operator's real routing must not reach the fixtures' stand-in agents, and
-# the retired variables make the real pi-dispatch.sh refuse outright.
-unset PI_DISPATCH_CMD PI_BIN PI_PROVIDER PI_MODEL PI_EXTRA_ARGS
+# Each test runs with a scrubbed environment. As a gate's TEST_RUNNER this
+# script inherits the flow env (cf-pi-env.sh exports it with set -a), and the
+# scripts under test default to CF_SLUG/SESSION/FLOW_SESSION when set, so a
+# fixture would land on the live shard's branch. The operator's PI_DISPATCH_CMD
+# routing must not reach the fixtures' stand-in agents either.
+KEEP=("CF_TESTS_DIR=$CF_TESTS_DIR" "PI_RUNS_DIR=$PI_RUNS_DIR")
+for v in PATH HOME TMPDIR USER LOGNAME SHELL TERM LANG $(compgen -e | grep '^LC_'); do
+  [ -n "${!v+x}" ] && KEEP+=("$v=${!v}")
+done
 
 shopt -s nullglob
 total=0
@@ -38,7 +44,7 @@ failed=0
 for f in "$CF_TESTS_DIR"/*.test.sh; do
   total=$((total + 1))
   name="$(basename "$f")"
-  if bash "$f"; then
+  if env -i "${KEEP[@]}" bash "$f"; then
     echo "ok   - $name"
   else
     echo "not ok - $name"
