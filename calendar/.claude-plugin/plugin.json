@@ -1,0 +1,26 @@
+{
+  "name": "calendar",
+  "version": "0.1.0",
+  "description": "[Experimental] Upcoming Google Calendar events in-session — /cal toggles a band above the prompt with the next 7 days, /cal N for N days (Claude Mod; needs CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 and the claude.ai Google Calendar connector)",
+  "author": {
+    "name": "Nick Huang",
+    "email": "nick12703990@gmail.com"
+  },
+  "repository": "https://github.com/musingfox/cc-plugins",
+  "homepage": "https://github.com/musingfox/cc-plugins/tree/main/calendar",
+  "keywords": [
+    "calendar",
+    "google-calendar",
+    "claude-mod"
+  ],
+  "license": "MIT",
+  "userConfig": {
+    "exclude_calendars": {
+      "type": "string",
+      "title": "Calendars to leave out",
+      "description": "Calendar names or ids /cal skips; every other calendar you can see is listed",
+      "multiple": true,
+      "default": []
+    }
+  }
+}

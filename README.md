@@ -241,13 +241,25 @@ Survey a codebase for deepening opportunities — shallow modules, leaking seams
 ### omp-quota
 
 Every omp provider's remaining quota inside the session, as a Claude Mod (needs `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`, which enables every installed plugin's modules):
-- **`/quota`**: toggles a compact table above the prompt with each provider's share and its lowest limit
+- **`/quota`**: toggles a compact table above the prompt, one line per provider with every window's share and time to reset
 - **`/quota refresh`**: runs `omp usage invalidate`, then fetches fresh quota without a model turn
 - **Toast**: one in-session toast when a provider's status worsens from `ok`
 
 **Installation:**
 ```bash
 /plugin install omp-quota
+```
+
+### calendar
+
+Upcoming Google Calendar events inside the session, as a Claude Mod (needs `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` and the claude.ai Google Calendar connector):
+- **`/cal`**: toggles a band above the prompt listing the next 7 days of events from every calendar you can see
+- **`/cal N`**: lists the next N days (1–31) and remembers the choice
+- **`exclude_calendars`**: plugin option naming calendars to leave out
+
+**Installation:**
+```bash
+/plugin install calendar
 ```
 
 ## Plugin Development
@@ -270,6 +282,7 @@ cc-plugins/
 ├── adr/                skills: adr
 ├── agent-browser/      skills: agent-browser, playwright, web-test
 ├── apple-podcasts/     skills: apple-podcasts-fetch
+├── calendar/          hooks: register (Claude Mod) · tests
 ├── context-flow/       commands: cf  · agents: research, plan, implement, review · scripts, tests
 ├── deepen/             skills: survey · agents: explorer · scripts, docs, tests
 ├── diagnose/           skills: diagnose, diagnose-now · docs, scripts, tests

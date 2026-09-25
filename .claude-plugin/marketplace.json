@@ -87,6 +87,11 @@
       "name": "omp-quota",
       "source": "./omp-quota",
       "description": "[Experimental] Every omp provider's remaining quota in-session — a /quota band above the prompt, /quota refresh, and a toast when a provider worsens from ok (Claude Mod; needs CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1)"
+    },
+    {
+      "name": "calendar",
+      "source": "./calendar",
+      "description": "[Experimental] Upcoming Google Calendar events in-session — /cal toggles a band above the prompt with the next 7 days, /cal N for N days (Claude Mod; needs CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 and the claude.ai Google Calendar connector)"
     }
   ]
 }

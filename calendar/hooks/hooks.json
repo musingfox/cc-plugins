@@ -1,0 +1,4 @@
+{
+  "description": "Shows upcoming Google Calendar events: a /cal band above the prompt",
+  "modules": ["./register.ts"]
+}
