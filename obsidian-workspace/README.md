@@ -29,6 +29,8 @@ Mermaid blocks in the card body are drawn in the pane as text diagrams by `uvx t
 
 A shown card has an **Open in browser** Button that renders the card body, Mermaid included, through the [viz](../viz) plugin's `render.sh`. The Button appears only when viz is installed, found through `installed_plugins.json` under `$CLAUDE_CONFIG_DIR` or `~/.claude`, and only in the terminal. Opening the browser uses macOS `open`; over SSH the pane shows the page's URL instead. The pane reports where the card was rendered, or why it was not. The page opens on the machine running Claude Code: when you reach the session through a terminal multiplexer or relay that does not set the SSH variables (herdr, for example), the browser opens on that host, not on the device you are looking at.
 
+To read the page from another device on your tailnet, proxy viz's port once with `tailscale serve --bg --https=18090 18090`. After each render the pane reads `tailscale serve status --json` and, when a mapping covers the page's port, adds a `Tailnet: https://<machine>.<tailnet>.ts.net:18090/…` line. The pane never creates a mapping itself; without one it shows only the opened page.
+
 Enable Claude Mods globally before using the pane:
 
 ```bash

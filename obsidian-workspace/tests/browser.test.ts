@@ -259,6 +259,36 @@ describe('the press outcome', () => {
     expect(strings.filter((text) => text.startsWith('Opened in the browser'))).toEqual([])
   })
 
+  test('a local render shows the opened page and, when tailscale serves its port, the tailnet URL', async ($, on) => {
+    const status = JSON.stringify({
+      TCP: { '18090': { HTTPS: true } },
+      Web: { 'mac.tail0.ts.net:18090': { Handlers: { '/': { Proxy: 'http://127.0.0.1:18090' } } } },
+    })
+    const w = vizWorld(on, { render: '/tmp/viz/work/x.html\nURL: http://127.0.0.1:18090/work/x.html\n', serve: status })
+    await issue($, MOD)
+    await press($, w)
+    const strings = stringsIn(await $.ui.render(PANE))
+    expect(strings).toContain('Opened in the browser: /tmp/viz/work/x.html')
+    expect(strings).toContain('Tailnet: https://mac.tail0.ts.net:18090/work/x.html')
+    expect(w.runs.filter((run: any) => run.argv[0] === 'tailscale').map((run: any) => run.argv)).toEqual([['tailscale', 'serve', 'status', '--json']])
+  })
+
+  test('a local render without tailscale shows only the opened page', async ($, on) => {
+    const w = vizWorld(on, { render: '/tmp/viz/work/x.html\nURL: http://127.0.0.1:18090/work/x.html\n' })
+    await issue($, MOD)
+    await press($, w)
+    const strings = stringsIn(await $.ui.render(PANE))
+    expect(strings).toContain('Opened in the browser: /tmp/viz/work/x.html')
+    expect(strings.filter((text) => text.startsWith('Tailnet') || text.startsWith('URL'))).toEqual([])
+  })
+
+  test('a render over SSH asks tailscale nothing', async ($, on) => {
+    const w = vizWorld(on, { render: '/tmp/viz/work/x.html\nURL: http://100.64.0.1:18090/work/x.html\n', serve: '{}' })
+    await issue($, MOD)
+    await press($, w)
+    expect(w.runs.filter((run: any) => run.argv[0] === 'tailscale')).toEqual([])
+  })
+
   test('a failed render shows its error under the card', async ($, on) => {
     const w = vizWorld(on, { render: { exitCode: 1, stderr: `Error: File not found: ${TEMP}\n` } })
     await issue($, MOD)

@@ -56,10 +56,12 @@ export type WorldOptions = {
   write?: { deny: string }
   render?: CliAnswer
   termaid?: CliAnswer
+  serve?: CliAnswer
 }
 
 export function kindOf(argv: string[]) {
   if (argv[0] === 'uvx') return 'termaid'
+  if (argv[0] === 'tailscale') return 'serve'
   if (argv[0] !== 'obsidian') return 'render'
   if (argv[2] === 'read' && argv[3]?.startsWith('path=') && argv[3].endsWith('/dashboard.base')) return 'views'
   return argv[2]
@@ -74,10 +76,10 @@ function readAnswer(reads: Record<string, CliAnswer>, argv: string[]): CliAnswer
 
 // A stub world beneath the plugin: every $ call it makes is answered and recorded here.
 // A dashboard `read` of `…/dashboard.base` is answered by `views` (before `reads`), `base:query` by `query`,
-// other `read` runs by `read`/`reads`, `uvx` by `termaid`, any other run by `render`.
+// other `read` runs by `read`/`reads`, `uvx` by `termaid`, `tailscale` by `serve` (denied unless given), any other run by `render`.
 // `$.env.get` is answered only when `env` is given; without it the call rejects.
 export function world(on: any, options: WorldOptions = {}) {
-  for (const key of Object.keys(options)) if (!['cwd', 'files', 'exists', 'views', 'query', 'read', 'reads', 'register', 'open', 'env', 'write', 'render', 'termaid'].includes(key)) throw new Error(`stale world option: ${key}`)
+  for (const key of Object.keys(options)) if (!['cwd', 'files', 'exists', 'views', 'query', 'read', 'reads', 'register', 'open', 'env', 'write', 'render', 'termaid', 'serve'].includes(key)) throw new Error(`stale world option: ${key}`)
   const runs: any[] = []
   const existsCalls: string[] = []
   const readCalls: string[] = []
@@ -93,6 +95,7 @@ export function world(on: any, options: WorldOptions = {}) {
     read: options.read ?? CARD,
     render: options.render ?? RENDERED,
     termaid: options.termaid ?? DIAGRAM,
+    ...(options.serve === undefined ? {} : { serve: options.serve }),
   }
   const defaults: Record<string, string> = { views: VIEWS, 'base:query': LIST, read: CARD, render: RENDERED, termaid: DIAGRAM }
 

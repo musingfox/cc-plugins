@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { renderArgv, renderOutcome, renderTarget, vizInstallPath, vizManifestPath } from '../hooks/viz.ts'
+import { isLoopbackUrl, renderArgv, renderOutcome, renderTarget, tailnetUrl, vizInstallPath, vizManifestPath } from '../hooks/viz.ts'
 
 test('reads the manifest under an absolute CLAUDE_CONFIG_DIR', () => {
   expect(vizManifestPath('/cfg', '/home/u')).toBe('/cfg/plugins/installed_plugins.json')
@@ -182,4 +182,41 @@ test('reports a render.sh that did not start or finish', () => {
     kind: 'error',
     message: 'viz did not render: render.sh could not start, or it did not finish within 15 s.',
   })
+})
+
+const HOST = 'mac.tail0.ts.net'
+const serveStatus = (web: Record<string, string>, https: Record<string, boolean> = {}) =>
+  JSON.stringify({
+    TCP: Object.fromEntries(Object.keys(web).map((hostPort) => {
+      const port = hostPort.split(':')[1]
+      return [port, { HTTPS: https[port] ?? true }]
+    })),
+    Web: Object.fromEntries(Object.entries(web).map(([hostPort, proxy]) => [hostPort, { Handlers: { '/': { Proxy: proxy } } }])),
+  })
+const LOCAL = 'http://127.0.0.1:18090/work/obw-a.html'
+
+test('a loopback URL whose port tailscale serve proxies over HTTPS reads as the tailnet URL', () => {
+  expect(tailnetUrl(LOCAL, serveStatus({ [`${HOST}:443`]: 'http://127.0.0.1:7701', [`${HOST}:18090`]: 'http://127.0.0.1:18090' }))).toBe(
+    `https://${HOST}:18090/work/obw-a.html`,
+  )
+})
+
+test('a port served on 443 needs no port in the tailnet URL, and localhost counts as loopback', () => {
+  expect(tailnetUrl('http://localhost:7701/a?b=1', serveStatus({ [`${HOST}:443`]: 'http://localhost:7701' }))).toBe(`https://${HOST}/a?b=1`)
+})
+
+test('an unmapped port, a plain-HTTP mapping or a proxy with a path gives no tailnet URL', () => {
+  expect(tailnetUrl(LOCAL, serveStatus({ [`${HOST}:8443`]: 'http://127.0.0.1:5173' }))).toBeNull()
+  expect(tailnetUrl(LOCAL, serveStatus({ [`${HOST}:18090`]: 'http://127.0.0.1:18090' }, { '18090': false }))).toBeNull()
+  expect(tailnetUrl(LOCAL, serveStatus({ [`${HOST}:18090`]: 'http://127.0.0.1:18090/sub' }))).toBeNull()
+})
+
+test('a non-loopback URL or unreadable status gives no tailnet URL', () => {
+  expect(tailnetUrl('http://100.64.0.1:18090/work/obw-a.html', serveStatus({ [`${HOST}:18090`]: 'http://127.0.0.1:18090' }))).toBeNull()
+  expect(tailnetUrl(LOCAL, 'not json')).toBeNull()
+  expect(tailnetUrl(LOCAL, '{}')).toBeNull()
+})
+
+test('only a local http URL counts as loopback', () => {
+  expect([LOCAL, 'http://localhost:1/', 'http://100.64.0.1:18090/', 'nope'].map(isLoopbackUrl)).toEqual([true, true, false, false])
 })

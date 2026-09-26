@@ -65,3 +65,43 @@ export function renderOutcome(
   const urlLine = rest.find((line) => line.startsWith('URL: '))
   return { kind: 'opened', path, url: urlLine ? urlLine.slice('URL: '.length).trim() : null }
 }
+
+export const SERVE_STATUS_ARGV = ['tailscale', 'serve', 'status', '--json']
+export const SERVE_TIMEOUT_MS = 5_000
+
+const LOOPBACK = new Set(['127.0.0.1', 'localhost'])
+
+function httpUrl(text: string): URL | null {
+  try {
+    const url = new URL(text)
+    return url.protocol === 'http:' ? url : null
+  } catch {
+    return null
+  }
+}
+
+export function isLoopbackUrl(text: string): boolean {
+  const url = httpUrl(text)
+  return url !== null && LOOPBACK.has(url.hostname)
+}
+
+// Only a port tailscale serve already proxies over HTTPS counts: reading the status never maps one.
+export function tailnetUrl(localUrl: string, statusJson: string): string | null {
+  const local = httpUrl(localUrl)
+  const status = parsed(statusJson)
+  if (!local || !LOOPBACK.has(local.hostname) || !isRecord(status) || !isRecord(status.Web)) return null
+  const tcp = isRecord(status.TCP) ? status.TCP : {}
+  for (const [hostPort, web] of Object.entries(status.Web)) {
+    const root = isRecord(web) && isRecord(web.Handlers) ? web.Handlers['/'] : null
+    const proxy = isRecord(root) && typeof root.Proxy === 'string' ? httpUrl(root.Proxy) : null
+    if (!proxy || !LOOPBACK.has(proxy.hostname) || proxy.port !== local.port || proxy.pathname !== '/') continue
+    const listener = tcp[hostPort.slice(hostPort.lastIndexOf(':') + 1)]
+    if (!isRecord(listener) || listener.HTTPS !== true) continue
+    try {
+      return new URL(`${local.pathname}${local.search}`, `https://${hostPort}`).href
+    } catch {
+      continue
+    }
+  }
+  return null
+}

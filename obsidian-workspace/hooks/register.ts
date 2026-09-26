@@ -14,14 +14,14 @@ import { BOARD_KEY, PANE_ID, boardMessage } from './board-message.ts'
 import type { Card } from './board.ts'
 import { acLabel, headerOf } from './card.ts'
 import type { CardHeader } from './card.ts'
-import { vizManifestPath, vizInstallPath, renderTarget, renderArgv, renderOutcome, RENDER_TIMEOUT_MS } from './viz.ts'
+import { vizManifestPath, vizInstallPath, renderTarget, renderArgv, renderOutcome, RENDER_TIMEOUT_MS, isLoopbackUrl, tailnetUrl, SERVE_STATUS_ARGV, SERVE_TIMEOUT_MS } from './viz.ts'
 import { splitFences, termaidHeaderAllowed, diagramOutcome, TERMAID_ARGV, TERMAID_TIMEOUT_MS } from './mermaid.ts'
 import type { Segment } from './mermaid.ts'
 import { priorityColor, statusColor, RED } from './style.ts'
 
 const PANE = { id: PANE_ID, title: 'obw issue', focus: true, closeOnEscape: true }
 
-type Browser = { kind: 'rendering' } | ReturnType<typeof renderOutcome>
+type Browser = { kind: 'rendering' } | ReturnType<typeof renderOutcome> | (Extract<ReturnType<typeof renderOutcome>, { kind: 'opened' }> & { tailnet: string })
 
 // The card region under the list has its own state, so a card's outcome never replaces the list's message.
 // `segments` splits the clipped body once; `diagrams` is indexed by a mermaid block's position in `segments`.
@@ -179,7 +179,12 @@ async function openInBrowser($: any) {
   } catch (error) {
     return showBrowser($, request, { kind: 'error', message: `Could not write ${target.file}: ${reasonOf(error)}` })
   }
-  showBrowser($, request, renderOutcome(await runProcess($, renderArgv(card.vizRoot, target), RENDER_TIMEOUT_MS)))
+  const outcome = renderOutcome(await runProcess($, renderArgv(card.vizRoot, target), RENDER_TIMEOUT_MS))
+  showBrowser($, request, outcome)
+  if (outcome.kind !== 'opened' || !outcome.url || !isLoopbackUrl(outcome.url)) return
+  const status = await runProcess($, SERVE_STATUS_ARGV, SERVE_TIMEOUT_MS)
+  const tailnet = status.kind === 'exited' && status.exitCode === 0 ? tailnetUrl(outcome.url, status.stdout) : null
+  if (tailnet) showBrowser($, request, { ...outcome, tailnet })
 }
 
 // A block without a drawn diagram stays inside the markdown around it, so a pending or failed block reads as code.
@@ -205,8 +210,10 @@ function browserLines(browser: Browser | null): Line[] {
   if (browser?.kind === 'error') return [{ kind: 'error', text: browser.message }]
   if (browser?.kind === 'rendering') return [notice('Rendering in the browser…')]
   if (browser?.kind !== 'opened') return []
-  // Over SSH render.sh opens nothing and prints a URL instead.
-  return (browser.url ? [`Rendered: ${browser.path}`, `URL: ${browser.url}`] : [`Opened in the browser: ${browser.path}`]).map(notice)
+  // Over SSH render.sh opens nothing and prints a URL instead; a local render opens its loopback URL.
+  if (browser.url && !isLoopbackUrl(browser.url)) return [`Rendered: ${browser.path}`, `URL: ${browser.url}`].map(notice)
+  const tailnet = 'tailnet' in browser ? [`Tailnet: ${browser.tailnet}`] : []
+  return [`Opened in the browser: ${browser.path}`, ...tailnet].map(notice)
 }
 
 type Config = (Scope & { path: string }) | { error: string }
