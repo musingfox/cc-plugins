@@ -90,7 +90,13 @@ SERVE_PATH="/${PROJECT_NAME}/${OUTPUT_NAME}-${TIMESTAMP}.html"
 VIZ_PORT="${VIZ_PORT:-18090}"
 export VIZ_PORT
 
-# Start (or verify) the viz server. Used for SSH (always) and recipes (Save endpoint).
+# The PID that holds the port: python3 may be a launcher that runs the server as a
+# child, so `$!` is not the process to kill on restart.
+listener_pid() {
+    lsof -t -iTCP:"$1" -sTCP:LISTEN 2>/dev/null | head -n 1
+}
+
+# Start (or verify) the viz server on every render, so each page has an http:// URL.
 start_viz_server() {
     local bind_host="$1"
     local base_port="${VIZ_PORT:-18090}"
@@ -109,9 +115,14 @@ start_viz_server() {
     done
     [ -z "$chosen" ] && return 1
     VIZ_PORT="$chosen"; export VIZ_PORT
-    # Already healthy on the chosen port? Nothing to start.
+    # Already healthy on the chosen port? Nothing to start — unless SSH needs every
+    # interface and a local render left it listening on loopback only.
     if curl -sf "http://127.0.0.1:${VIZ_PORT}/api/health" >/dev/null 2>&1; then
-        return 0
+        if [ "$bind_host" != 0.0.0.0 ] || lsof -nP -iTCP:"$VIZ_PORT" -sTCP:LISTEN 2>/dev/null | grep -q "\*:${VIZ_PORT} "; then
+            return 0
+        fi
+        kill "$(listener_pid "$VIZ_PORT")" 2>/dev/null || true
+        sleep 0.2
     fi
     # Stale viz pid from a previous run? Kill it before re-binding.
     if [ -f /tmp/viz/.server.pid ]; then
@@ -121,19 +132,16 @@ start_viz_server() {
     fi
     if [ -f "$SERVER_SCRIPT" ]; then
         nohup python3 "$SERVER_SCRIPT" "$bind_host" >/tmp/viz/.server.log 2>&1 &
-        echo $! > /tmp/viz/.server.pid
     else
         # Fallback: read-only static server (no Save support)
         nohup python3 -m http.server "$VIZ_PORT" -d /tmp/viz/ -b "$bind_host" >/dev/null 2>&1 &
-        echo $! > /tmp/viz/.server.pid
     fi
     for _ in 1 2 3 4 5 6 7 8 9 10; do
         sleep 0.1
-        if curl -sf "http://127.0.0.1:${VIZ_PORT}/api/health" >/dev/null 2>&1; then
-            return 0
-        fi
         # If fallback server is running, /api/health 404s but the port is up
-        if lsof -i :"$VIZ_PORT" -sTCP:LISTEN &>/dev/null; then
+        if curl -sf "http://127.0.0.1:${VIZ_PORT}/api/health" >/dev/null 2>&1 \
+            || lsof -i :"$VIZ_PORT" -sTCP:LISTEN &>/dev/null; then
+            listener_pid "$VIZ_PORT" > /tmp/viz/.server.pid
             return 0
         fi
     done
@@ -145,20 +153,17 @@ if [ -n "${SSH_CLIENT:-}" ] || [ -n "${SSH_CONNECTION:-}" ]; then
     TS_IP=$(tailscale ip -4 2>/dev/null || echo "localhost")
     echo "$OUTPUT_FILE"
     echo "URL: http://${TS_IP}:${VIZ_PORT}${SERVE_PATH}"
-elif [ -n "$RECIPE" ]; then
-    # Recipes need the Save endpoint — open via http:// so fetch() works
-    if start_viz_server 127.0.0.1; then
-        open "http://127.0.0.1:${VIZ_PORT}${SERVE_PATH}" 2>/dev/null || true
-        echo "$OUTPUT_FILE"
-        echo "URL: http://127.0.0.1:${VIZ_PORT}${SERVE_PATH}"
-    else
-        # Server failed (port held by other process) — fall back to file://;
-        # Save will fail gracefully and the recipe still works via Export.
-        open "$OUTPUT_FILE" 2>/dev/null || true
-        echo "$OUTPUT_FILE"
-        echo "Warning: viz server unavailable — Save disabled, use Export" >&2
-    fi
+# Over http:// a recipe's Save works, and tailscale serve can proxy the page to other devices.
+elif start_viz_server 127.0.0.1; then
+    open "http://127.0.0.1:${VIZ_PORT}${SERVE_PATH}" 2>/dev/null || true
+    echo "$OUTPUT_FILE"
+    echo "URL: http://127.0.0.1:${VIZ_PORT}${SERVE_PATH}"
 else
+    # Server failed (every candidate port held by another process) — fall back to
+    # file://; a recipe's Save fails gracefully and it still works via Export.
     open "$OUTPUT_FILE" 2>/dev/null || true
     echo "$OUTPUT_FILE"
+    if [ -n "$RECIPE" ]; then
+        echo "Warning: viz server unavailable — Save disabled, use Export" >&2
+    fi
 fi

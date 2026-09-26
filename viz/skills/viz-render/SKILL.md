@@ -97,8 +97,10 @@ When the user requests a diagram without providing the code:
 
 ## Output
 
-The render script prints the output HTML path (under `/tmp/viz/{project}/`)
-and opens it in the default browser. Report the path to the user.
+The render script prints the output HTML path (under `/tmp/viz/{project}/`),
+then a `URL:` line, and opens that URL in the default browser. Every render goes
+through the local viz server on `127.0.0.1`; only when no port is free does it
+fall back to opening the file and print no URL. Report the path to the user.
 
 ## Recipes (interactive HTML artifacts)
 
@@ -126,7 +128,7 @@ Workflow:
 Markdown without `viz:` frontmatter falls through to the generic viewer
 unchanged.
 
-The recipe Save endpoint listens on port `18090` by default. If that port is
+The viz server, and with it the recipe Save endpoint, listens on port `18090` by default. If that port is
 held by another process, render.sh auto-selects the next free port (trying
 up to 5 candidates) so the recipe still opens over `http://` — no manual
 override needed. Set `VIZ_PORT=<port>` only to pin a specific base port.
