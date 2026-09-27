@@ -2,6 +2,7 @@
 name: prototype
 description: "Prototype role — builds and runs ONE throwaway thing to answer a design question the reasoning could not settle, then reports the verdict. Never a plan, never a recommendation; the code is evidence and lives on a branch nobody merges. Invoked by the /spiral orchestrator when a probe cannot reach the answer by reading, or when only a built thing can tell the candidates apart."
 color: yellow
+effort: low
 tools: Read, Grep, Glob, Bash, Write, Edit
 ---
 

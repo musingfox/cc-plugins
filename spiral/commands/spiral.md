@@ -151,11 +151,11 @@ came back with more than one, skip straight to §4 — that is exactly the old b
 Where they kept several candidates alive, walk them. **One probe per live candidate, dispatched
 in parallel in a single message:**
 
-> `Agent(subagent_type: "spiral:probe", model: "sonnet")` with **one** candidate, what taking it
+> `Agent(subagent_type: "spiral:probe")` with **one** candidate, what taking it
 > would commit to, and the artifact this layer widens from. Nothing else — a probe that can see
 > the other candidates starts comparing, and comparing is not its job.
 
-Cheap models, as many as there are candidates. What a probe reports — what a path actually runs
+Cheap seats, as many as there are candidates. What a probe reports — what a path actually runs
 into — has a right answer, so it is mechanism work and deserves little judgment however many run
 at once (`concept.md` §2). Walking them at main-thread cost is what would make this unaffordable.
 
@@ -206,7 +206,7 @@ two ways in: a probe comes back saying reading cannot answer it, or no probe is 
 human asks to see the candidates built, or the candidates differ only in how they look or feel
 once they exist (two layouts, two interactions) and no description can separate them:
 
-> `Agent(subagent_type: "spiral:prototype", model: "sonnet")` with the **question the build must
+> `Agent(subagent_type: "spiral:prototype")` with the **question the build must
 > answer**, **what would count as red and what as green**, the candidate or design at stake, the
 > artifact this layer widens from, and the branch name `spiral/prototype-<slug>`. The slug comes
 > from the question, never from `L<N>`.
