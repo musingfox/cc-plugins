@@ -24,3 +24,18 @@ assert_exit 1 bash -c ". \"$CF_TESTS_DIR/lib/assert.sh\"; assert_eq 1 2" \
 # Meta: a clean test file must exit zero.
 assert_exit 0 bash -c ". \"$CF_TESTS_DIR/lib/assert.sh\"; assert_eq ok ok" \
   "a passing assertion yields zero exit"
+
+# Inside a pi worker PATH starts with the git shim, which refuses to run without
+# PI_REAL_GIT. The scrub keeps that one fence variable, so fixtures' git works, and
+# still drops PI_CWD, so no fixture sees the live worktree.
+sandbox="$(mktemp -d)"
+mkdir -p "$sandbox/tests/lib" "$sandbox/shim"
+cp "$CF_TESTS_DIR/run.sh" "$sandbox/tests/run.sh"
+cp "$CF_TESTS_DIR/lib/assert.sh" "$sandbox/tests/lib/assert.sh"
+printf '%s\n' '#!/usr/bin/env bash' '[ -n "${PI_REAL_GIT:-}" ] || exit 127' 'exec "$PI_REAL_GIT" "$@"' > "$sandbox/shim/git"
+printf '%s\n' '#!/usr/bin/env bash' 'git --version >/dev/null || exit 1' '[ -z "${PI_CWD:-}" ] || exit 2' > "$sandbox/tests/probe.test.sh"
+chmod +x "$sandbox/shim/git"
+real_git="${PI_REAL_GIT:-$(command -v git)}"
+out="$(PATH="$sandbox/shim:$PATH" PI_REAL_GIT="$real_git" PI_CWD="$sandbox" bash "$sandbox/tests/run.sh" 2>&1)"
+assert_contains "$out" "ok   - probe.test.sh" "the scrub keeps PI_REAL_GIT for a shimmed git and drops PI_CWD"
+rm -rf "$sandbox"
