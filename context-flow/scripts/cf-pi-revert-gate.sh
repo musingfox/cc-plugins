@@ -49,8 +49,8 @@ is_test_path() {
 # Porcelain status of the own paths only, as a csv. Whole-tree status would read
 # cf-pi-run.sh's intent-to-add entries and test artifacts as dirt.
 own_status() {
-  git -C "$WORK" -c core.quotePath=false --literal-pathspecs status --porcelain -- ${own[@]+"${own[@]}"} \
-    | cut -c4- | sed 's/.* -> //' | sort -u | paste -sd, -
+  git -C "$WORK" --literal-pathspecs status --porcelain -z --no-renames -- ${own[@]+"${own[@]}"} \
+    | while IFS= read -r -d '' rec; do printf '%s\n' "${rec:3}"; done | sort -u | paste -sd, -
 }
 
 # put_back REV PATH...: each path to its state at REV, deleted when REV lacks it.
@@ -118,13 +118,14 @@ git -C "$WORK" rev-parse --is-inside-work-tree >/dev/null 2>&1 || verdict "ERROR
 
 # The set cf-pi-scope.sh charges: the commit union, prerequisite checkpoints excluded.
 # --no-renames: rename detection lists only the new name, and the old one must be put back.
-# shellcheck disable=SC2046
-own_list=$(git -C "$WORK" -c core.quotePath=false log --no-renames --name-only --pretty=format: "$BASE_HEAD..HEAD" \
-  --not $(cat "$SHARD_SESSION/prereq-refs" 2>/dev/null) 2>/dev/null | sed '/^$/d' | sort -u || true)
+# -z: git C-quotes a name holding a quote, backslash or control character even with
+# core.quotePath=false, and a quoted name matches no file, so the run would keep it.
 own=()
-while IFS= read -r p; do
+# shellcheck disable=SC2046
+while IFS= read -r -d '' p; do
   if [ -n "$p" ]; then own+=("$p"); fi
-done <<<"$own_list"
+done < <(git -C "$WORK" log -z --no-renames --name-only --pretty=format: "$BASE_HEAD..HEAD" \
+  --not $(cat "$SHARD_SESSION/prereq-refs" 2>/dev/null) 2>/dev/null | sort -zu)
 
 # No own paths means an empty pathspec, which is the whole tree: skip the check.
 dirty=""

@@ -259,6 +259,19 @@ assert_eq "STAYS_GREEN C2" "$GATE_OUT" "R1 rename reverted: stdout"
 assert_eq "2" "$GATE_RC" "R1 rename reverted: exit"
 rm -rf "$FLOW"
 
+# R2: a name git C-quotes (a double quote) is still an own path, so C2's run drops it
+new_flow; write_runner; base_commit
+printf '%s\n' 'echo $(($1 + $2))' >"$WORK/src/add.sh"
+printf '%s\n' '[ "$(bash src/add.sh 2 3)" = 5 ]' >"$WORK/tests/add\"q.test.sh"
+commit_all c1
+add_vacuous
+set_docs '[{"name":"C1","touches_files":["src/add.sh","tests/add\"q.test.sh"]},{"name":"C2","touches_files":["src/mul.sh","tests/mul.test.sh"]}]' '["C1","C2"]'
+env_sh
+run_gate "$GATE" bash run-tests.sh
+assert_eq "STAYS_GREEN C2" "$GATE_OUT" "R2 quoted name reverted: stdout"
+assert_eq "2" "$GATE_RC" "R2 quoted name reverted: exit"
+rm -rf "$FLOW"
+
 # T13: red-first, each mutation breaks its case
 new_flow; write_runner; base_commit; add_effective; add_vacuous
 set_docs "$C1C2" '["C1","C2"]'; env_sh
