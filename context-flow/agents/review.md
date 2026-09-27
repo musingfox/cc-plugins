@@ -3,6 +3,7 @@ name: review
 description: "Verify implementation against contracts"
 color: purple
 model: opus
+effort: xhigh
 tools: Read, Write, Grep, Glob, Bash
 ---
 
@@ -116,7 +117,8 @@ Does the implementation satisfy each behavioral contract? This is a PASS/FAIL ju
 For each contract:
 - Read the contract's input/output/errors specification
 - Find the implementation in the diff
-- Run the test cases if they aren't already passing
+- Run the test cases
+- Probe the edges: run the implementation yourself and read what it actually does, then try inputs inside the contract's declared input/output/errors that no test case covers — empty, boundary, malformed, repeated. The test cases sample the contract; they do not bound it. Behaviour that contradicts the contract on such an input is an **implemented but wrong** FAIL: record the input and the command that reproduces it. Keep probe scripts in a `mktemp -d` directory, so the work tree stays exactly as the implementer left it.
 - Determine PASS or FAIL with specific evidence
 
 **Fuzzy criteria are binding too.** If a contract carries `fuzzy_criteria`
@@ -135,7 +137,7 @@ Categories:
 - **security**: injection risks, auth gaps, secret exposure, unsafe operations
 - **performance**: O(n²) where O(n) is possible, missing pagination, unbounded queries
 - **maintainability**: dead code, unclear naming, missing error handling, tight coupling, comments that restate the code or echo the plan (WHY-only comments are fine)
-- **correctness**: race conditions, edge cases not covered by tests, resource leaks
+- **correctness**: race conditions, edge cases outside the contract's declared domain, resource leaks
 
 Severities:
 - **critical**: likely to cause production incidents or security breaches

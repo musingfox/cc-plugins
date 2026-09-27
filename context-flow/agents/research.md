@@ -2,6 +2,7 @@
 name: research
 description: "Explore codebase and produce capability inventory"
 color: green
+effort: xhigh
 tools: Read, Write, Grep, Glob, Bash, WebFetch
 ---
 
