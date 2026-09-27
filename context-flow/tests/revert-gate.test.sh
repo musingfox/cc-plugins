@@ -246,6 +246,19 @@ assert_eq "STAYS_GREEN C1" "$GATE_OUT" "T12 empty own paths: stdout"
 assert_eq "2" "$GATE_RC" "T12 empty own paths: exit"
 rm -rf "$FLOW"
 
+# R1: a renamed file's old path is an own path too, so a run puts it back
+new_flow; write_runner; base_commit
+git -C "$WORK" mv src/base.sh src/core.sh
+printf '%s\n' '[ "$(bash src/core.sh)" = base ]' >"$WORK/tests/base.test.sh"
+commit_all c1
+add_vacuous
+set_docs '[{"name":"C1","touches_files":["src/base.sh","src/core.sh","tests/base.test.sh"]},{"name":"C2","touches_files":["src/mul.sh","tests/mul.test.sh"]}]' '["C1","C2"]'
+env_sh
+run_gate "$GATE" bash run-tests.sh
+assert_eq "STAYS_GREEN C2" "$GATE_OUT" "R1 rename reverted: stdout"
+assert_eq "2" "$GATE_RC" "R1 rename reverted: exit"
+rm -rf "$FLOW"
+
 # T13: red-first, each mutation breaks its case
 new_flow; write_runner; base_commit; add_effective; add_vacuous
 set_docs "$C1C2" '["C1","C2"]'; env_sh

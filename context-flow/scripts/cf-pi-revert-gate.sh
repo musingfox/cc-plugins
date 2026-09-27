@@ -117,8 +117,9 @@ git -C "$WORK" rev-parse --is-inside-work-tree >/dev/null 2>&1 || verdict "ERROR
   || verdict "ERROR base-head-unresolvable" 1
 
 # The set cf-pi-scope.sh charges: the commit union, prerequisite checkpoints excluded.
+# --no-renames: rename detection lists only the new name, and the old one must be put back.
 # shellcheck disable=SC2046
-own_list=$(git -C "$WORK" -c core.quotePath=false log --name-only --pretty=format: "$BASE_HEAD..HEAD" \
+own_list=$(git -C "$WORK" -c core.quotePath=false log --no-renames --name-only --pretty=format: "$BASE_HEAD..HEAD" \
   --not $(cat "$SHARD_SESSION/prereq-refs" 2>/dev/null) 2>/dev/null | sed '/^$/d' | sort -u || true)
 own=()
 while IFS= read -r p; do
