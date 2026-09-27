@@ -421,3 +421,52 @@ held=yes; [ -z "$(git -C "$WORK" status --porcelain -- src tests)" ] || held=no
 assert_eq "no" "$held" "restore T9 no restore breaks T1's status check"
 rm -rf "$FLOW"
 
+# ==== only non-git scratch mode passes unjudged ====
+
+# T1: REPO_ROOT empty skips without running anything
+new_flow; write_runner; base_commit; add_effective
+set_docs "$C1" '["C1"]'; env_sh ""
+printf ': >"%s/ran"\n' "$FLOW" >"$FLOW/mark.sh"
+run_gate "$GATE" bash "$FLOW/mark.sh"
+assert_eq "SKIPPED no-git" "$GATE_OUT" "scratch T1: stdout"
+assert_eq "0" "$GATE_RC" "scratch T1: exit"
+ran=absent; [ -e "$FLOW/ran" ] && ran=present
+assert_eq "absent" "$ran" "scratch T1: TEST_CMD never ran"
+rm -rf "$FLOW"
+
+# T2: an unresolvable BASE_HEAD
+new_flow; write_runner; base_commit; add_effective
+set_docs "$C1" '["C1"]'; env_sh "$WORK" deadbeef
+run_gate "$GATE" bash run-tests.sh
+assert_eq "ERROR base-head-unresolvable" "$GATE_OUT" "scratch T2: stdout"
+assert_eq "1" "$GATE_RC" "scratch T2: exit"
+rm -rf "$FLOW"
+
+# T3: no work tree
+new_flow; write_runner; base_commit; add_effective
+set_docs "$C1" '["C1"]'; env_sh
+rm -rf "$WORK"
+run_gate "$GATE" bash run-tests.sh
+assert_eq "ERROR work-tree-missing" "$GATE_OUT" "scratch T3: stdout"
+assert_eq "1" "$GATE_RC" "scratch T3: exit"
+rm -rf "$FLOW"
+
+# T4: a git that exits 0 and prints nothing is a clean repository
+FLOW="$(mktemp -d)"; SHARD="$FLOW/shards/A"; WORK="$SHARD/work"
+mkdir -p "$WORK" "$FLOW/bin"
+printf '#!/bin/sh\nexit 0\n' >"$FLOW/bin/git"
+chmod +x "$FLOW/bin/git"
+set_docs "$C1" '["C1"]'; env_sh "$WORK" abc123
+printf '[ -e "%s/flipped" ] && exit 1\n: >"%s/flipped"\n' "$FLOW" "$FLOW" >"$FLOW/flip.sh"
+PATH="$FLOW/bin:$PATH" run_gate "$GATE" bash "$FLOW/flip.sh"
+assert_eq "CLEAN 1" "$GATE_OUT" "scratch T4 stub git: stdout"
+assert_eq "0" "$GATE_RC" "scratch T4 stub git: exit"
+rm -rf "$FLOW"
+
+# T5: red-first, skipping whenever git fails turns T2 into a pass
+new_flow; write_runner; base_commit; add_effective
+set_docs "$C1" '["C1"]'; env_sh "$WORK" deadbeef
+mutant 's/^set -euo pipefail\n/set -euo pipefail\nexec 3>&1\ngit() { command git "\$@" || { echo "SKIPPED no-git" >&3; exit 0; }; }\n/m'
+run_gate "$MUT" bash run-tests.sh
+assert_eq "SKIPPED no-git" "$GATE_OUT" "scratch T5 skip-on-git-failure passes T2's case"
+rm -rf "$FLOW"

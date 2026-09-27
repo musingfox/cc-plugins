@@ -13,6 +13,7 @@
 # Stdout:  exactly one verdict line
 #            CLEAN <n>                 exit 0  all n contracts went red
 #            STAYS_GREEN <A>[,<B>...]  exit 2  these contracts' runs exited 0
+#            SKIPPED no-git            exit 0  REPO_ROOT is empty; TEST_CMD never runs
 #            ERROR <reason>            exit 1  no verdict
 # Log:     SHARD_SESSION/revert-gate.log, one `### <run>` section per run.
 #          Never $TEST_LOG: that is gate 3's evidence.
@@ -107,6 +108,13 @@ contracts=()
 while IFS= read -r name; do
   if [ -n "$name" ]; then contracts+=("$name"); fi
 done <<<"$(jq -r --arg s "$SHARD_ID" '.groups[$s].contracts[]' "$SHARDS_FILE")"
+
+# Non-git scratch mode is the only bypass; every other failure below is an ERROR.
+[ -n "${REPO_ROOT:-}" ] || verdict "SKIPPED no-git" 0
+# Exit status only: a git that exits 0 and prints nothing is a clean repository.
+git -C "$WORK" rev-parse --is-inside-work-tree >/dev/null 2>&1 || verdict "ERROR work-tree-missing" 1
+[ -n "${BASE_HEAD:-}" ] && git -C "$WORK" rev-parse --quiet --verify "$BASE_HEAD^{commit}" >/dev/null 2>&1 \
+  || verdict "ERROR base-head-unresolvable" 1
 
 # The set cf-pi-scope.sh charges: the commit union, prerequisite checkpoints excluded.
 # shellcheck disable=SC2046
