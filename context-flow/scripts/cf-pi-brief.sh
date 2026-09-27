@@ -92,6 +92,7 @@ render_contracts() {
         then "- **test_cases**:\n" +
           ((.test_cases // []) | map(
             "  - " + (.id // "") + ": given " + (.given // "") + " -> expect " + (.expect // "")
+            + (if .command then " (reproduce: `" + .command + "`)" else "" end)
           ) | join("\n")) + "\n"
         else "" end) +
       (if (.fuzzy_criteria // []) | length > 0
