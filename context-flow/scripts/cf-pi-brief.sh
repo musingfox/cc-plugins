@@ -146,6 +146,24 @@ render_attachments() {
   done <<< "$shard_contract_names"
 }
 
+# Rendered only when this shard's checkpoint tag is non-empty and another group
+# merged it (that group lists this shard in depends_on). One line; absent otherwise.
+render_checkpoint_rule() {
+  [ -f "${DISPATCH_STATE_FILE:-}" ] || return 0
+  local tag ids
+  tag=$(jq -r --arg sid "$SHARD_ID" '.checkpoints[$sid] // empty' "$DISPATCH_STATE_FILE" 2>/dev/null || true)
+  [ -n "$tag" ] || return 0
+  ids=$(jq -r --arg sid "$SHARD_ID" '
+    [ .groups | to_entries[]
+      | select(.key != $sid)
+      | select((.value.depends_on // []) | index($sid))
+      | .key ]
+    | sort | join(", ")
+  ' "$SHARDS_FILE" 2>/dev/null || true)
+  [ -n "$ids" ] || return 0
+  echo "- This branch already passed as \`$tag\`, and shard(s) $ids merged it: land every fix as a new commit on top. Never amend, rebase, reset or autosquash into a commit \`$tag\` contains — this overrides any later instruction to fold a fix into an existing commit."
+}
+
 shard_group="$SHARD_ID"
 
 {
@@ -181,6 +199,7 @@ shard_group="$SHARD_ID"
   echo "- Per-contract commit to CF_BRANCH (see Methodology). Write the subject in this repo's own commit convention — never put the contract name, shard id, or any other cf vocabulary in it."
   echo "- If a referenced file is missing, consult the contract's touches_files list. Do NOT invent locations under other paths."
   echo "- You will be measured against the contracts in this brief ONLY. Do not implement anything outside touches_files of these contracts."
+  render_checkpoint_rule
   echo
 
   # Architecture specs constraining the files this shard touches. Optional:
