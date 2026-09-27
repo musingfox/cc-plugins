@@ -122,12 +122,19 @@ git -C "$WORK" rev-parse --is-inside-work-tree >/dev/null 2>&1 || verdict "ERROR
 # --no-renames: rename detection lists only the new name, and the old one must be put back.
 # -z: git C-quotes a name holding a quote, backslash or control character even with
 # core.quotePath=false, and a quoted name matches no file, so the run would keep it.
+own_log() {
+  # shellcheck disable=SC2046
+  git -C "$WORK" log -z --no-renames --name-only --pretty=format: "$BASE_HEAD..HEAD" \
+    --not $(cat "$SHARD_SESSION/prereq-refs" 2>/dev/null)
+}
+# Run twice: a variable cannot hold NULs, and a process substitution's status is
+# lost. A failed lookup (a prerequisite ref gone) is not an empty set: that would
+# judge the unchanged tree and name every contract.
+own_log >/dev/null 2>&1 || verdict "ERROR own-paths-unresolvable" 1
 own=()
-# shellcheck disable=SC2046
 while IFS= read -r -d '' p; do
   if [ -n "$p" ]; then own+=("$p"); fi
-done < <(git -C "$WORK" log -z --no-renames --name-only --pretty=format: "$BASE_HEAD..HEAD" \
-  --not $(cat "$SHARD_SESSION/prereq-refs" 2>/dev/null) 2>/dev/null | sort -zu)
+done < <(own_log 2>/dev/null | sort -zu)
 
 # No own paths means an empty pathspec, which is the whole tree: skip the check.
 dirty=""

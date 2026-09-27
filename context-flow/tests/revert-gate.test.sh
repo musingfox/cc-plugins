@@ -506,6 +506,15 @@ assert_eq "ERROR work-tree-missing" "$GATE_OUT" "scratch T3: stdout"
 assert_eq "1" "$GATE_RC" "scratch T3: exit"
 rm -rf "$FLOW"
 
+# A prerequisite ref that no longer resolves leaves the own paths unknown, not empty
+new_flow; write_runner; base_commit; add_effective
+set_docs "$C1" '["C1"]'; env_sh
+printf '%s\n' 'refs/tags/gone' >"$SHARD/prereq-refs"
+run_gate "$GATE" bash run-tests.sh
+assert_eq "ERROR own-paths-unresolvable" "$GATE_OUT" "scratch dangling prereq ref: stdout"
+assert_eq "1" "$GATE_RC" "scratch dangling prereq ref: exit"
+rm -rf "$FLOW"
+
 # T4: a git that exits 0 and prints nothing is a clean repository
 FLOW="$(mktemp -d)"; SHARD="$FLOW/shards/A"; WORK="$SHARD/work"
 mkdir -p "$WORK" "$FLOW/bin"
