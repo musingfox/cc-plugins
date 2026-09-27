@@ -52,7 +52,7 @@ Worst case: flow aborts, all branches and tags remain; the user cherry-picks val
 |---|---|---|
 | `PASS` | all shard contracts survive gates + file-scope check | tag checkpoint, mark done |
 | `FAIL` | infrastructure failure (probe, dispatch, stall, missing outcome) | retry once; second FAIL → escalate |
-| `NEEDS_REPLAN` | escalate-file present; persistent test fail after one in-shard re-dispatch; undeclared file touched | coalesce, partial-replan the affected contracts |
+| `NEEDS_REPLAN` | escalate-file present; persistent test fail after one in-shard re-dispatch; undeclared file touched; a contract's tests stay green with its implementation reverted | coalesce, partial-replan the affected contracts |
 
 `outcome.md` is **bounded by construction**: every value is a short enum/id, a filesystem path, or the single `## Cause` line (≤300 chars, extracted from the artifact matching the failure reason) — never inlined content, so the read is bounded no matter what happened inside the shard.
 

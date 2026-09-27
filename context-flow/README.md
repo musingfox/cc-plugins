@@ -44,7 +44,7 @@ The default implementer is an OMP worker outside Claude Code. Its model and thin
 
 ## Key Features
 
-- **Parallel sharded implementation**: Contracts are grouped by the files they touch; each group runs as an OMP shard in its own worktree, passes deterministic gates (report, survivors, the orchestrator's own test run), and is integrated before review.
+- **Parallel sharded implementation**: Contracts are grouped by the files they touch; each group runs as an OMP shard in its own worktree, passes deterministic gates (report, survivors, the orchestrator's own test run, and a revert check that each contract's tests fail with its implementation reverted), and is integrated before review.
 - **Decision tiering**: Plan classifies decisions as High/Medium/Low impact. The human gate surfaces High decisions only; Medium and Low stay with the plan agent.
 - **Behavioral contracts**: Contracts define input/output/errors, not file paths. Implementation plan is separate guidance.
 - **Opinionated orchestrator**: At every human interaction, the orchestrator provides its own analysis and recommendation — not just a list to approve.

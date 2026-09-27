@@ -446,7 +446,9 @@ INT_STATUS=$(jq -r '.status' "$SESSION/integration-result.json")
 
 #### Any NEEDS_REPLAN (after FAIL resolution)
 
-Coalesce all NEEDS_REPLAN this round (worker-initiated escalate.md, persistent-test-fail, undeclared_file_touched, AND any integration-injected affected_contracts) into a single Plan partial-replan invocation. Already-PASS contracts (from this and prior rounds) are preserved — their checkpoints stay on shard branches.
+Coalesce all NEEDS_REPLAN this round (worker-initiated escalate.md, persistent-test-fail, undeclared_file_touched, tests-green-on-revert, AND any integration-injected affected_contracts) into a single Plan partial-replan invocation. Already-PASS contracts (from this and prior rounds) are preserved — their checkpoints stay on shard branches.
+
+`tests-green-on-revert` comes from the revert gate: the contracts it lists under `## Affected contracts` have tests that still pass with the shard's implementation put back to `$BASE_HEAD`, so those tests prove nothing. Say so for each of them in the request below, so Plan gives the contract a test case that fails without its implementation.
 
 Build the Partial Replan Request block per `agents/plan.md` §Partial Replan Request, then dispatch:
 
