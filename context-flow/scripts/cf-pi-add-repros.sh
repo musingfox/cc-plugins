@@ -110,7 +110,7 @@ if [ "$(jq -r '.added' "$work")" = "true" ]; then
 import json, sys
 
 src_path, plan_path, out_path = sys.argv[1:]
-src = open(src_path, encoding="utf-8").read()
+src = open(src_path, encoding="utf-8", newline="").read()
 plan = json.load(open(plan_path, encoding="utf-8"))
 
 class Parser:
@@ -266,7 +266,7 @@ edits.sort(key=lambda e: e[0], reverse=True)
 out = src
 for pos, text in edits:
     out = out[:pos] + text + out[pos:]
-open(out_path, "w", encoding="utf-8").write(out)
+open(out_path, "w", encoding="utf-8", newline="").write(out)
 PY
   ts=$(date +%Y%m%d%H%M%S)
   archive="$flow_session/contracts-prev-${ts}.json"

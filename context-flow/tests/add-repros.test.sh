@@ -217,3 +217,14 @@ FLOW="$(mktemp -d)"
 echo '{"schema_version":1,"contracts":[{"name":"C1"}]}' > "$FLOW/contracts.json"
 assert_exit 2 "$ADD" "$FLOW" "$FLOW/no-such-repros.json"
 rm -rf "$FLOW"
+
+# R1: a CRLF contracts.json keeps its line endings through an append.
+FLOW="$(mktemp -d)"
+printf '{\r\n"schema_version": 1,\r\n"contracts": [{"name": "C1"}]\r\n}\r\n' > "$FLOW/contracts.json"
+echo '{"repros":[{"contract":"C1","given":"g","expect":"e","command":"c"}]}' > "$FLOW/repros.json"
+out=$("$ADD" "$FLOW" "$FLOW/repros.json" 2>"$FLOW/err")
+rc=$?
+assert_eq "0" "$rc" "R1 exits 0"
+assert_eq "ADDED C1 R1" "$out" "R1 stdout"
+assert_eq "4" "$(tr -cd '\r' < "$FLOW/contracts.json" | wc -c | tr -d ' ')" "R1 the four CRs survive"
+rm -rf "$FLOW"
