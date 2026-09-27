@@ -118,7 +118,7 @@ For each contract:
 - Read the contract's input/output/errors specification
 - Find the implementation in the diff
 - Run the test cases
-- Probe the edges: run the implementation yourself and read what it actually does, then try inputs inside the contract's declared input/output/errors that no test case covers — empty, boundary, malformed, repeated. The test cases sample the contract; they do not bound it. Behaviour that contradicts the contract on such an input is an **implemented but wrong** FAIL: record the input and the command that reproduces it. Keep probe scripts in a `mktemp -d` directory, so the work tree stays exactly as the implementer left it.
+- Probe the edges: run the implementation yourself and read what it actually does, then try inputs inside the contract's declared input/output/errors that no test case covers — empty, boundary, malformed, repeated. The test cases sample the contract; they do not bound it. Behaviour that contradicts the contract on such an input is an **implemented but wrong** FAIL: record the input and the command that reproduces it in the repros file (§Repros File). Keep probe scripts in a `mktemp -d` directory, so the work tree stays exactly as the implementer left it.
 - Determine PASS or FAIL with specific evidence
 
 **Fuzzy criteria are binding too.** If a contract carries `fuzzy_criteria`
@@ -215,6 +215,23 @@ The "What Changed" section is the human's primary review surface. It must read l
 ## Verdict
 APPROVE | APPROVE-with-advisories | REQUEST_CHANGES
 ```
+
+### Repros File
+
+The dispatch names a second file on its `Repros path:` line. The orchestrator appends each entry to that contract's test cases, so the next builder and the next review both run it. Write one entry per Spec FAIL that came from probing an edge input:
+
+```json
+{"repros": [
+  {"contract": "<ContractName>",
+   "given": "<the concrete input you probed>",
+   "expect": "<the contract clause the behaviour violated, quoted — not the observed behaviour>",
+   "command": "<self-contained command that reproduces it, run from the reviewed tree's root>"}
+]}
+```
+
+- `command` must not use any file from your `mktemp -d` directory: it becomes a test case that later runs in another checkout, which does not carry your scratch files.
+- With no such FAIL, write `{"repros": []}`.
+- Write the file before replying. A missing repros file counts as a missing Spec report, and the axis is dispatched again.
 
 ### Return Format (Spec)
 

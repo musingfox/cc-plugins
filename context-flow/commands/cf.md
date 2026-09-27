@@ -547,6 +547,7 @@ Capture the review diff unconditionally on both implementer paths — never into
 
 ```bash
 . "$SESSION/env.sh"
+rm -f "$SESSION/review-repros.json"   # last round's repros must not pass for this round's
 if [ -n "${REPO_ROOT:-}" ]; then
   integration_branch=$(jq -r '.integration_branch // empty' "$SESSION/integration-result.json" 2>/dev/null)
   if [ -z "$integration_branch" ]; then
@@ -603,6 +604,7 @@ Agent(
   subagent_type: "cf:review",
   prompt: "
     Report path: $SESSION/review-spec.md
+    Repros path: $SESSION/review-repros.json
 
     ## Axis: Spec
 
@@ -621,7 +623,7 @@ Agent(
 
 **Do NOT pass**: research constraints (those should have been captured as test cases by plan). **Do NOT inline the git diff** — pass the file path so the diff bytes never pass through your context.
 
-If either report file is missing after both replies arrive, re-dispatch that axis only — the other axis's report stands.
+If either report file is missing after both replies arrive, re-dispatch that axis only — the other axis's report stands. A missing `$SESSION/review-repros.json` counts as a missing Spec report.
 
 ### Presenting Results to Human
 
