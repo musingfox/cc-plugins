@@ -330,6 +330,11 @@ SHARD_IDS=$(jq -r '.groups | keys[]' "$SESSION/shards.json")
   Must not need live services / shared ports / external daemons (parallel shards each run
   it in their own worktree — a shared resource makes every first run collide and fail).
   Missing from plan → fall back to `TEST_RUNNER` and warn the human in one line.
+  Record it the same way: the Claude fallback (§3.6) runs its shard gates in fresh shells.
+
+  ```bash
+  printf 'SHARD_TEST_RUNNER=%s\n' "$(printf '%q' '<resolved shard command>')" >> "$SESSION/env.sh"
+  ```
 
 ### 3.2 Fan-out
 
@@ -508,11 +513,29 @@ Replan budget = 2 attempts per contract (third NEEDS_REPLAN escalates). Rollback
 
 The fallback fills the SAME seat under the SAME contract — only the builder changes. Per shard, sequentially (Claude agents are not free fan-out):
 
-1. **Environment (same as OMP)**: shard branches/worktrees from 3.0-3.1 are already in place; the shard's brief is already assembled at `$SESSION/shards/<id>/implement-brief.md`.
+1. **Prepare (same as OMP)**: run the step `cf-pi-run.sh` starts with, from the host repo root (the shard worktree forks from the repository of the current directory), so a cold start gets the worktree, `$BASE_HEAD`, merged prerequisites and brief that the gates below rely on:
+
+   ```bash
+   . "$SESSION/env.sh"
+   "$SCRIPTS/cf-pi-prepare.sh" "$SESSION/shards/<id>" '<one-sentence goal>' '<short constraints>' "$SHARD_TEST_RUNNER"
+   ```
+
+   The last stdout line is `PREPARED <brief path>`. A `FAIL <reason> [<detail>]` line (`prereq-missing`, `prereq-merge-conflict`, `brief-assembly`) becomes a hand-written outcome `FAIL <reason>`; a non-zero exit with no FAIL line becomes `FAIL outcome-missing`. A rerun reuses the worktree and rebuilds the brief.
 2. **Dispatch**: `Agent(subagent_type: "cf:implement")` with the brief path + the shard worktree's absolute path; instruct it to work ONLY under that worktree, follow the brief's report format to `implement-report.md`, and never touch the gate/test files' expectations.
-3. **Gates (unchanged, non-negotiable)**: run the same deterministic gates the OMP path gets — from the shard session run `"$SCRIPTS/cf-pi-test.sh" "$SHARD_SESSION" $TEST_RUNNER` (bounded read of the tail), then the file-scope gate `"$SCRIPTS/cf-pi-scope.sh" "$SHARD_SESSION"` (exit 0 = clean; exit 2 + `UNDECLARED <csv>` on stdout = scope violation → `NEEDS_REPLAN undeclared_file_touched` with that csv as the outcome's undeclared_files; an `ALLOWLISTED <csv>` line is a warning only). Run the script — never approximate it with `git status --porcelain`, which is blind to the files the builder already committed. The builder's self-report is untrusted on this path too.
-4. **Outcome**: write the same `outcome.md` shape by hand (Status/Reason/Survived/Affected, paths only) so §3.3 Collect and §3.4 routing work identically; survivors == declared applies (missing contracts → NEEDS_REPLAN incomplete-contracts).
-5. **Reviewer seat**: unchanged — Phase-4 `cf:review` + integration gate. No step of this path lets the implement agent certify its own work.
+3. **Gates (unchanged, non-negotiable)**: run the same deterministic gates the OMP path gets — from the shard session run `"$SCRIPTS/cf-pi-test.sh" "$SHARD_SESSION" $SHARD_TEST_RUNNER` (bounded read of the tail), then the file-scope gate `"$SCRIPTS/cf-pi-scope.sh" "$SHARD_SESSION"` (exit 0 = clean; exit 2 + `UNDECLARED <csv>` on stdout = scope violation → `NEEDS_REPLAN undeclared_file_touched` with that csv as the outcome's undeclared_files; an `ALLOWLISTED <csv>` line is a warning only), then completeness (survivors == declared; missing contracts → NEEDS_REPLAN incomplete-contracts). Run the scripts — never approximate the scope gate with `git status --porcelain`, which is blind to the files the builder already committed. The builder's self-report is untrusted on this path too.
+4. **Revert gate**: once those pass, run the gate `cf-pi-run.sh` runs last. It makes one control run plus one run per contract, so launch it as a background task and end your turn until it completes:
+
+   ```
+   Bash(run_in_background: true, command:
+     ". $SESSION/env.sh && $SCRIPTS/cf-pi-revert-gate.sh $SESSION/shards/<id> $SHARD_TEST_RUNNER > $SESSION/shards/<id>/revert-gate.out")
+   ```
+
+   `$SHARD_TEST_RUNNER` stays unquoted so it splits into words, as on the OMP path. The gate refuses to run over uncommitted changes to the shard's own files, so the builder's work must be committed. Read `head -1 "$SESSION/shards/<id>/revert-gate.out"`, its one verdict line:
+   - `CLEAN <n>` → PASS. `SKIPPED no-git` → PASS; tell the human the gate was skipped in non-git scratch mode.
+   - `STAYS_GREEN <A>[,<B>...]` → NEEDS_REPLAN `tests-green-on-revert`: those contracts go under Affected as `<Name>: tests-green-on-revert` and out of Survived.
+   - `ERROR <reason>`, or an empty file → FAIL `revert-gate-error`, with the ERROR line (or the exit code) as the Cause.
+5. **Outcome**: write the same `outcome.md` shape by hand (Status/Reason/Survived/Affected, paths only) so §3.3 Collect and §3.4 routing work identically.
+6. **Reviewer seat**: unchanged — Phase-4 `cf:review` + integration gate. No step of this path lets the implement agent certify its own work.
 
 ---
 
