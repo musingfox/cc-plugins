@@ -16,9 +16,8 @@
 #   0. clear run artifacts   last round's outcome/report/escalate/diff must not
 #                            be read as this round's (a re-launched shard reuses
 #                            the same session directory)
-#   1. cf-pi-worktree.sh     create worktree + branch (BEFORE brief, so brief's
-#                            Environment block can include WORK/CF_BRANCH/BASE_HEAD)
-#   2. cf-pi-brief.sh        assemble brief
+#   1-2. cf-pi-prepare.sh    worktree + branch, prerequisite checkpoints merged,
+#                            brief assembled (shared with the Claude fallback)
 #   3. cf-pi-probe.sh        liveness probe
 #   4. cf-pi-dispatch.sh     background OMP
 #   5. poll loop             cf-pi-poll.sh once per ~30s, max 64 rounds at the default wall clock
@@ -66,7 +65,7 @@ START_TS=$(date +%s)
 # The worktree/branch is NOT touched -- committed work is the resume base.
 # Must stay out of dispatch_and_poll: the gate-3 and gate-1 re-briefs depend on
 # the worker rewriting these files, not on finding them emptied.
-# prereq-merged goes too (same rationale as prereq-refs below): it is rewritten
+# prereq-merged goes too (same rationale as prereq-refs in cf-pi-prepare.sh): it is rewritten
 # only when depends_on is non-empty, so a replan that drops depends_on would
 # otherwise leave last round's "these files are read-only context" block in the
 # brief, steering the worker off files this shard now owns.
@@ -325,65 +324,29 @@ on_exit() {
 }
 trap on_exit EXIT
 
-# -------- 1. worktree (MUST run before brief so BASE_HEAD/CF_BRANCH/WORK
-#               appear correctly in the brief's Environment block) -----
+# -------- 1-2. prepare: worktree, prerequisite checkpoints, brief -------
+# Shared with the Claude fallback (cf.md §3.6). Through $SCRIPT_DIR, not
+# $SCRIPTS: fixtures stub the worktree and brief scripts it calls via $SCRIPTS.
 
-say "setting up worktree"
-"$SCRIPTS/cf-pi-worktree.sh" "$SHARD_SESSION" >/dev/null
-
-# Worktree appended REPO_ROOT/BASE_BRANCH/BASE_HEAD to env.sh; re-source.
-load_cf_pi_env "$SHARD_SESSION"
-load_cf_flow_env "$FLOW_SESSION"
-
-# -------- 1b. prerequisite checkpoints ---------------------------------
-# A dependent shard forks from the user's HEAD, which lacks its prerequisites'
-# interfaces — without this merge the first round burns a guaranteed
-# escalation. depends_on comes from shards.json (cf-pi-shard.sh); refs come
-# from dispatch-state checkpoints, recorded on PASS. The orchestrator's wave
-# rule should never dispatch before prerequisites PASS; a missing checkpoint
-# here is therefore an infra FAIL, not a judgement call.
-PREREQ_MANIFEST="$SHARD_SESSION/prereq-merged"
-# Step 10 subtracts these refs from the shard's own work. Truncated
-# unconditionally so a replan that drops depends_on cannot leave last round's
-# refs behind and silently exempt files this shard now owns.
-PREREQ_REFS="$SHARD_SESSION/prereq-refs"
-: > "$PREREQ_REFS"
-prereq_deps=$(jq -r --arg sid "$SHARD_ID" '.groups[$sid].depends_on // [] | .[]' "$SHARDS_FILE" 2>/dev/null || true)
-if [ -n "$prereq_deps" ] && [ -n "${REPO_ROOT:-}" ]; then
-  : > "$PREREQ_MANIFEST.tmp"
-  for dep in $prereq_deps; do
-    ref=$(jq -r --arg d "$dep" '.checkpoints[$d] // empty' "$DISPATCH_STATE_FILE" 2>/dev/null || true)
-    if [ -z "$ref" ] || ! git -C "$WORK" rev-parse --verify --quiet "refs/tags/$ref" >/dev/null; then
-      rm -f "$PREREQ_MANIFEST.tmp"
-      write_outcome FAIL prereq-missing "" "" "-" "-"
-      say "FAIL prereq-missing (shard $dep has no PASS checkpoint)"
-      exit 1
-    fi
-    # Idempotent for round-2 reuse of the same worktree.
-    if ! git -C "$WORK" merge-base --is-ancestor "refs/tags/$ref" HEAD 2>/dev/null; then
-      if ! git -C "$WORK" merge --no-edit "refs/tags/$ref" >/dev/null 2>&1; then
-        git -C "$WORK" merge --abort >/dev/null 2>&1 || true
-        rm -f "$PREREQ_MANIFEST.tmp"
-        write_outcome FAIL prereq-merge-conflict "" "" "-" "-"
-        say "FAIL prereq-merge-conflict (shard $dep checkpoint vs $CF_BRANCH)"
-        exit 1
-      fi
-    fi
-    printf 'refs/tags/%s\n' "$ref" >> "$PREREQ_REFS"
-    dep_contracts=$(jq -r --arg d "$dep" '.groups[$d].contracts // [] | join(", ")' "$SHARDS_FILE" 2>/dev/null || true)
-    printf '%s\t%s\n' "$dep" "$dep_contracts" >> "$PREREQ_MANIFEST.tmp"
-  done
-  mv "$PREREQ_MANIFEST.tmp" "$PREREQ_MANIFEST"
-fi
-
-# -------- 2. brief ------------------------------------------------------
-
-say "assembling brief"
-if ! "$SCRIPTS/cf-pi-brief.sh" "$SHARD_SESSION" "$GOAL" "$CONSTRAINTS" "$TEST_RUNNER" >/dev/null; then
-  write_outcome FAIL brief-assembly "" "" "-" "-"
-  say "FAIL brief-assembly"
+say "preparing shard (worktree, prerequisites, brief)"
+prep_rc=0
+prep_out=$("$SCRIPT_DIR/cf-pi-prepare.sh" "$SHARD_SESSION" "$GOAL" "$CONSTRAINTS" "$TEST_RUNNER") || prep_rc=$?
+if [ "$prep_rc" -ne 0 ]; then
+  prep_last=$(printf '%s\n' "$prep_out" | tail -1)
+  case "$prep_last" in
+    "FAIL "*)
+      prep_reason="${prep_last#FAIL }"
+      write_outcome FAIL "${prep_reason%% *}" "" "" "-" "-"
+      say "$prep_last"
+      ;;
+  esac
+  # No FAIL line (worktree setup died): on_exit records outcome-missing.
   exit 1
 fi
+
+# Prepare appended REPO_ROOT/BASE_BRANCH/BASE_HEAD to env.sh; re-source.
+load_cf_pi_env "$SHARD_SESSION"
+load_cf_flow_env "$FLOW_SESSION"
 
 # -------- 3. probe ------------------------------------------------------
 
