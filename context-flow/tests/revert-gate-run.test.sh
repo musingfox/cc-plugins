@@ -188,3 +188,55 @@ mutant "$STEP13"
 run_shard "$MUT"
 assert_eq "0 PASS" "$RC $(section Status)" "T9 no step 13: T8 ends PASS"
 rm -rf "$FLOW"
+
+# ==== a gate that reaches no verdict fails the shard ====
+
+# T1: the suite is already red on the untouched tree
+build_fixture C1
+run_shard "$RUN" false
+assert_eq "1" "$RC" "error T1 control red: exit"
+assert_eq "FAIL" "$(section Status)" "error T1 control red: Status"
+assert_eq "revert-gate-error" "$(section Reason)" "error T1 control red: Reason"
+assert_eq "ERROR control-red" "$(section Cause)" "error T1 control red: Cause"
+assert_contains "$(list_of 'Affected contracts')" "(all): ERROR control-red" "error T1 control red: Affected"
+rm -rf "$FLOW"
+
+# A git failure mid-revert ends the gate under set -e before any verdict line.
+# The first read-tree fails; later git calls, the restore's included, work.
+build_fixture C1
+printf '%s\n' 'echo base' '# edited' >"$WORK/src/base.sh"
+git -C "$WORK" add -A && git -C "$WORK" commit -qm "touch a base file"
+jq '.groups.A.files += ["src/base.sh"]' "$FLOW/shards.json" >"$FLOW/shards.tmp" && mv "$FLOW/shards.tmp" "$FLOW/shards.json"
+mkdir -p "$FLOW/gitwrap"
+cat >"$FLOW/gitwrap/git" <<WRAP
+#!/bin/bash
+case " \$* " in
+  *" read-tree "*) [ -e "$FLOW/read-tree.failed" ] || { : >"$FLOW/read-tree.failed"; exit 128; } ;;
+esac
+exec "$(command -v git)" "\$@"
+WRAP
+chmod +x "$FLOW/gitwrap/git"
+PATH="$FLOW/gitwrap:$PATH" run_shard
+assert_eq "" "$(cat "$SHARD/revert-gate.out" 2>/dev/null)" "error no verdict (git): the gate printed nothing"
+assert_eq "1 FAIL revert-gate-error" "$RC $(section Status) $(section Reason)" "error no verdict (git): FAIL revert-gate-error"
+assert_contains "$(section Cause)" "without a verdict" "error no verdict (git): Cause"
+rm -rf "$FLOW"
+
+# Exit 2 without a STAYS_GREEN line names no contract (bash exits 2 on a syntax
+# error): not a verdict either. A copy of cf-pi-run.sh whose sibling gate does that.
+build_fixture C1
+mkdir -p "$FLOW/sd"
+for s in cf-pi-env.sh cf-pi-prepare.sh cf-pi-scope.sh; do ln -s "$REAL_SCRIPTS/$s" "$FLOW/sd/$s"; done
+cp "$RUN" "$FLOW/sd/cf-pi-run.sh"
+printf '#!/bin/bash\nexit 2\n' >"$FLOW/sd/cf-pi-revert-gate.sh"
+chmod +x "$FLOW/sd/cf-pi-revert-gate.sh"
+run_shard "$FLOW/sd/cf-pi-run.sh"
+assert_eq "1 FAIL revert-gate-error" "$RC $(section Status) $(section Reason)" "error no verdict (exit 2): FAIL revert-gate-error"
+rm -rf "$FLOW"
+
+# T3: red first, routing gate exit 1 to PASS lets T1 through
+build_fixture C1
+mutant 's/(case "\$GATE_RC:\$gate_line" in\n)/${1}  1:*) ;;\n/'
+run_shard "$MUT" false
+assert_eq "0 PASS" "$RC $(section Status)" "error T3 exit 1 routed to PASS: T1 ends PASS"
+rm -rf "$FLOW"

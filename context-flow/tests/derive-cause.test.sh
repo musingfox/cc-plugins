@@ -74,4 +74,10 @@ assert_eq "tests stay green with the implementation reverted: C2,C3" \
   "$(derive_cause NEEDS_REPLAN tests-green-on-revert)" \
   "T9: tests-green-on-revert cause names the flagged contracts"
 
+# T10: a revert gate with no verdict -> its own ERROR line, verbatim
+printf 'FAILED x\n' > "$TEST_LOG"
+printf 'ERROR dirty-own-paths src/a.sh\n' > "$SHARD_SESSION/revert-gate.out"
+assert_eq "ERROR dirty-own-paths src/a.sh" "$(derive_cause FAIL revert-gate-error)" \
+  "T10: revert-gate-error cause is the gate's ERROR line"
+
 rm -rf "$SHARD_SESSION"

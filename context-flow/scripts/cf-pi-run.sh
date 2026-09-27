@@ -133,6 +133,9 @@ derive_cause() {
       cause="scope violation — see undeclared_files below" ;;
     tests-green-on-revert)
       cause="tests stay green with the implementation reverted: $(sed -n 's/^STAYS_GREEN //p' "$SHARD_SESSION/revert-gate.out" 2>/dev/null | head -1)" ;;
+    revert-gate-error)
+      cause=$(grep -m1 '^ERROR ' "$SHARD_SESSION/revert-gate.out" 2>/dev/null) || true
+      [ -n "$cause" ] || cause="cf-pi-revert-gate exited ${GATE_RC:-?} without a verdict" ;;
     QUOTA|QUOTA-WINDOW)
       # A sibling stopped by the wall has no error of its own: name who hit it.
       # The shard that hit it keeps its own errorMessage.
@@ -745,12 +748,14 @@ GATE_RC=0
   > "$SHARD_SESSION/revert-gate.out" || GATE_RC=$?  # not $SCRIPTS: this gate is never stubbable
 gate_line=$(head -1 "$SHARD_SESSION/revert-gate.out" 2>/dev/null || true)
 
+# Exit code AND verdict line: a gate that dies under set -e (a git failure
+# mid-revert) prints no line at all, and bash exits 2 on a syntax error.
 case "$GATE_RC:$gate_line" in
-  0:SKIPPED*)
+  "0:SKIPPED no-git")
     say "WARN revert gate skipped (non-git scratch mode)" ;;
-  0:*)
+  "0:CLEAN "*)
     say "revert gate ok ($gate_line)" ;;
-  2:*)
+  "2:STAYS_GREEN "*)
     flagged=$(printf '%s\n' "${gate_line#STAYS_GREEN }" | tr ',' '\n')
     kept=$(printf '%s\n' "$survivors" | grep -vxF -f <(printf '%s\n' "$flagged") || true)
     affected=$(printf '%s\n' "$flagged" | awk 'NF {print $0 ": tests-green-on-revert"}')
@@ -758,6 +763,10 @@ case "$GATE_RC:$gate_line" in
     say "NEEDS_REPLAN tests-green-on-revert ($gate_line)"
     exit 2 ;;
   *)
+    gate_err=$(grep -m1 '^ERROR ' "$SHARD_SESSION/revert-gate.out" 2>/dev/null || true)
+    write_outcome FAIL revert-gate-error "$survivors" \
+      "(all): ${gate_err:-revert gate exited $GATE_RC without a verdict}" "-" "-"
+    say "FAIL revert-gate-error (${gate_err:-rc=$GATE_RC, no verdict})"
     exit 1 ;;
 esac
 
