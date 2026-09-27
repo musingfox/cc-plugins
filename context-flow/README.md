@@ -12,57 +12,25 @@ Agents are NOT defined by roles. Each agent is defined by what information it re
 
 ```
 /cf "Add CSV export for transaction history"
-/cf --deep "Redesign auth middleware for OAuth2"
-/cf --fast "Fix typo in README"
-/cf --fast --plan=pro "Quick fix but careful planning"
+/cf "Implement the contracts in docs/handoff-csv-export.md"
 ```
 
-### Mode Flags
+`/cf` takes one argument: the goal. There are no mode flags.
 
-| Flag | Behavior |
-|------|----------|
-| *(none)* | Default mode — balanced cost/quality |
-| `--fast` | Speed-optimized — uses lighter models, skips Agent Teams |
-| `--deep` | Maximum quality — uses strongest models throughout |
+A goal that points at a handoff document carrying explicit, human-approved contracts runs in **baton mode**: research shrinks to a gap-scan of what the handoff does not cover, plan consumes its contracts verbatim, and the human gate collapses to breaking changes only. A document that merely states a direction is an ordinary goal.
 
-### Per-Stage Overrides
+## Effort per Seat
 
-Override the model tier for any individual stage:
+Each agent pins its own `effort:` in frontmatter; the orchestrator sets neither model nor effort at dispatch. Effort rises with how much of the seat's work is still undecided: `cf:implement` executes pinned contracts at `low`, while `cf:research`, `cf:plan` and `cf:review` run at `xhigh`. `cf:review` also pins `model: opus`, so the judge sits at or above the builder.
 
-```
-/cf --fast --plan=pro "goal"       # fast mode, but plan uses Opus
-/cf --deep --implement=lite "goal" # deep mode, but implement uses Haiku
-```
-
-Valid stages: `research`, `plan`, `implement`, `review`
-Valid tiers: `lite`, `standard`, `pro`
-
-## Model Tier System
-
-Each stage has **a single agent**. The orchestrator selects which model that agent runs with at dispatch time, via the Agent tool's `model` parameter — there are no per-tier agent variants.
-
-| Tier | Model | Use Case |
-|------|-------|----------|
-| `lite` | Haiku | Speed-optimized, simple tasks |
-| `standard` | Sonnet | Balanced cost/quality (default) |
-| `pro` | Opus | Maximum reasoning depth |
-
-### Mode Presets
-
-| Stage | fast | default | deep |
-|-------|------|---------|------|
-| research | lite | standard | pro |
-| plan | standard | pro | pro |
-| implement | lite | standard | standard |
-| review | lite | standard | standard |
-
-Plan defaults to `pro` because design decision quality is the pipeline's bottleneck. Review caps at `standard` because verification is a mechanical check against contracts — expensive models add little value (ref: AgentOpt Critic-role findings). Implement caps at `standard` because faithful execution doesn't require deep reasoning.
+The default implementer is an OMP worker outside Claude Code. Its model and thinking level come from `PI_DISPATCH_CMD`, not from frontmatter.
 
 ## Pipeline
 
 ```
-[research — Agent Teams] → validate → [plan] → validate → HUMAN GATE
-    → [implement] → validate → [review — Agent Teams] → verdict
+[research] → validate → [plan] → validate → HUMAN GATE (High decisions only)
+    → [implement — OMP shards, Claude fallback] → gates
+    → [review — Standards + Spec] → verdict → spec upkeep → rebase
 ```
 
 ## Phases
@@ -70,21 +38,19 @@ Plan defaults to `pro` because design decision quality is the pipeline's bottlen
 | Phase | Purpose |
 |-------|---------|
 | **Research** | Explore codebase, produce capability inventory with constraints and evidence |
-| **Plan** | Design behavioral contracts with decision tiering (High/Medium/Low) |
-| **Implement** | Fulfill contracts, write code and tests; all tests must pass |
-| **Review** | Verify implementation satisfies contracts; flag advisories |
+| **Plan** | Design behavioral contracts with test cases; tier decisions High/Medium/Low |
+| **Implement** | OMP workers fulfil the contracts in parallel shards; the Claude `cf:implement` agent takes over when pi is unavailable or out of quota |
+| **Review** | Two read-only reviews in parallel: Standards (the repo's documented conventions and a fixed set of code smells) and Spec (every contract, its test cases, and probed edges inside its declared domain). Only Spec routes the verdict |
 
 ## Key Features
 
-- **Dynamic model selection**: Orchestrator selects agent model tier per stage based on mode, per-stage overrides, and complexity assessment.
-- **Agent Teams by default**: Research and Review use multi-perspective Agent Teams by default. `--deep` mode runs **native Agent Teams** (`TeamCreate` + `SendMessage`) where teammates cross-check and debate — **requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`**; without it, `/cf --deep` aborts with an actionable error (no silent fallback). `default` mode runs **parallel sub-agent dispatch**; `--fast` mode and trivial goals skip to single agent.
-- **Agent Teams model mixing**: Lead teammate uses the stage's resolved tier; additional analytical teammates use one tier lower (minimum `standard`). Mechanical-inventory teammates may use `haiku`.
-- **Parallel implementation**: When contracts are independent, the orchestrator dispatches multiple implement agents concurrently with worktree isolation.
-- **Decision tiering**: Plan classifies decisions as High/Medium/Low impact. Human gate only blocks on High/Medium. Structural minimum rules prevent under-classification.
+- **Parallel sharded implementation**: Contracts are grouped by the files they touch; each group runs as an OMP shard in its own worktree, passes deterministic gates (report, survivors, the orchestrator's own test run), and is integrated before review.
+- **Decision tiering**: Plan classifies decisions as High/Medium/Low impact. The human gate surfaces High decisions only; Medium and Low stay with the plan agent.
 - **Behavioral contracts**: Contracts define input/output/errors, not file paths. Implementation plan is separate guidance.
 - **Opinionated orchestrator**: At every human interaction, the orchestrator provides its own analysis and recommendation — not just a list to approve.
-- **Loop-back with budget**: Any phase can loop back. Phase re-runs: max 2 per phase. Cross-phase loops: max 2 total. Limits trigger escalation, not hard stops.
+- **Loop-back with budget**: Any phase can loop back. Every re-dispatch draws on one counter, max 4 retries per flow; reaching it forces a human check-in, not a hard stop.
 - **Graceful degradation**: Structured escalation with re-entry points. Agents provide decision support when stuck.
+- **Spec upkeep**: After a PASS, the orchestrator writes a `proposed` spec entry only when the flow left something the next flow must know — a deliberate non-goal, an interface to reuse, or a spec that proved stale. Most flows write none; the human promotes what they keep.
 - **Pluggable agents**: The flow defines contracts, not agents. Specialized agents can substitute defaults if they satisfy the same contract.
 
 ## Installation
@@ -95,16 +61,13 @@ Plan defaults to `pro` because design decision quality is the pipeline's bottlen
 
 ### Optional Dependencies
 
+- **pi** (`npm i -g @earendil-works/pi-coding-agent`) with `PI_DISPATCH_CMD` set — the default Phase 3 implementer. Without it, setup records `PI_AVAILABLE=0` and Phase 3 runs on the Claude `cf:implement` fallback. The pi-dispatch skill walks through choosing a command.
 - **`ctx7` CLI** (`npm i -g ctx7` then `ctx7 login`) — enables research and implement phases to verify third-party library / API behavior with version-specific docs. Falls back to `WebFetch` if not installed. Without either, agents report Unresolved when the goal hinges on external behavior they can't infer from the local codebase.
-
-### Required for `--deep` Mode
-
-- **`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`** — `/cf --deep` runs native Agent Teams where teammates cross-check findings via `SendMessage`. This Claude Code feature is experimental and must be enabled in your shell or `~/.claude/settings.json`. Without it, `/cf --deep` exits with an error and tells you to set the flag (or run without `--deep` to use parallel sub-agent dispatch). `default` and `--fast` modes do not need this flag.
 
 ### Direct Sub-agent Invocation Caveat
 
-Agents (`@cf:research`, `@cf:plan`, etc.) are designed to be dispatched by the `/cf` orchestrator, which selects the model tier per stage at dispatch time. **If you invoke a sub-agent directly** (e.g., `@cf:research <goal>`), no `model:` is set in frontmatter, so it inherits the active session's model — the orchestrator's mode/tier mapping is bypassed. This is intentional (model is dispatch-time configuration), but it means direct invocation gives less predictable cost/quality. Prefer `/cf` for full pipeline behavior.
+Agents (`@cf:research`, `@cf:plan`, etc.) are designed to be dispatched by the `/cf` orchestrator, which hands each one exactly the inputs its contract names. **If you invoke a sub-agent directly** (e.g., `@cf:research <goal>`), it still runs at its pinned effort and on the session's model (`cf:review` on `opus`), but without the orchestrator's transition validation, human gate, and loop budget. Prefer `/cf` for full pipeline behavior.
 
 ## Design Documentation
 
-See [docs/DESIGN-v2.md](docs/DESIGN-v2.md) for the full design rationale, contract structure, and detailed examples.
+See [docs/](docs/): `parallel-sharded-design.md` (Phase 3 sharding), `pi-implementer-protocol.md` (the OMP worker brief and gates), `human-gate-protocol.md`, and `escalation-protocol.md`.
