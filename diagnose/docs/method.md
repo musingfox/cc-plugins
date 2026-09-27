@@ -169,7 +169,7 @@ The neutralising change is a probe, not a repair: make it in the worktree, run t
 
 ## Phase 5: Failing test at the seam
 
-Turn the minimised repro into a failing test at the correct seam. Watch it fail. Commit it on the diagnose branch. Stop. The fix is `/cf`'s work; do not apply the fix.
+Turn the minimised repro into a failing test at the correct seam. Watch it fail, then flip it against the Phase 4 probe. Commit it on the diagnose branch. Stop. The fix is `/cf`'s work; do not apply the fix.
 
 A correct seam is one where the test exercises the **real bug pattern** as it occurs at the call site. If the only available seam is too shallow (single-caller test when the bug needs multiple callers, unit test that can't replicate the chain that triggered the bug), a regression test there gives false confidence.
 
@@ -179,8 +179,9 @@ If a correct seam exists:
 
 1. Turn the minimised repro into a failing test at that seam.
 2. Watch it fail.
-3. Commit the failing test on the diagnose branch.
-4. Stop. Leave the rest to `/cf`.
+3. Flip it: re-make the Phase 4 neutralising change, run the test, and see it go green; discard the change and see it red again. A test that stays red with the cause neutralised is catching some other failure — rework it at the seam before committing.
+4. Commit the failing test on the diagnose branch.
+5. Stop. Leave the rest to `/cf`.
 
 ## Phase 6: Cleanup
 
