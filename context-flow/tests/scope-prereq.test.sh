@@ -34,6 +34,12 @@ build_fixture() {
   "B": {"contracts": ["C2"], "files": ["src/app.py"], "depends_on": ["A"]}
 }}
 JSON
+  cat > "$FLOW/contracts.json" <<'JSON'
+{"schema_version": 1, "contracts": [
+  {"name": "C1", "touches_files": ["src/lib.py"]},
+  {"name": "C2", "touches_files": ["src/app.py"]}
+]}
+JSON
   cat > "$FLOW/dispatch-state.json" <<'JSON'
 {"checkpoints": {"A": "cf-checkpoint-A"}}
 JSON
@@ -95,13 +101,15 @@ EOF
   printf '#!/bin/bash\necho "STATUS=OK"\n'   > "$STUBS/cf-pi-poll.sh"
   printf '#!/bin/bash\necho "test_exit=0"\nexit 0\n' > "$STUBS/cf-pi-test.sh"
   printf '#!/bin/bash\nexit 0\n'             > "$STUBS/sleep"
+  # The suite the revert gate runs: red once src/app.py is reverted away.
+  printf '#!/bin/bash\n[ -f src/app.py ]\n'  > "$STUBS/runner"
   chmod +x "$STUBS"/*
   export PI_RUNS_DIR="$FLOW/runs"   # keep write_outcome off the real ledger
 }
 
 # T1: prerequisite files must not count as this shard's undeclared touches.
 build_fixture ""
-PATH="$STUBS:$PATH" bash "$REAL_SCRIPTS/cf-pi-run.sh" "$SHARD" goal none true \
+PATH="$STUBS:$PATH" bash "$REAL_SCRIPTS/cf-pi-run.sh" "$SHARD" goal none "$STUBS/runner" \
   > "$FLOW/run.log" 2>&1
 rc=$?
 assert_eq "yes" "$([ -f "$WORK/src/lib.py" ] && echo yes || echo no)" \
@@ -117,7 +125,7 @@ rm -rf "$FLOW"
 # T2: the shard's OWN undeclared file is still caught -- the fix narrows the
 # exclusion to prerequisites, it does not disarm the gate.
 build_fixture "src/rogue.py"
-PATH="$STUBS:$PATH" bash "$REAL_SCRIPTS/cf-pi-run.sh" "$SHARD" goal none true \
+PATH="$STUBS:$PATH" bash "$REAL_SCRIPTS/cf-pi-run.sh" "$SHARD" goal none "$STUBS/runner" \
   > "$FLOW/run.log" 2>&1
 rc=$?
 assert_eq "2" "$rc" "T2 own undeclared file still exits 2 (NEEDS_REPLAN)"

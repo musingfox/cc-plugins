@@ -29,7 +29,10 @@
 #  10. actual ⊆ declared     files this shard's own commits touched (prerequisite
 #                            checkpoints excluded) ⊆ shard's declared files
 #  11. capture diff          git diff $BASE_HEAD > $DIFF_FILE
-#  12. write OUTCOME_FILE    structured paths-only result main reads back
+#  12. completeness         survivors == declared
+#  13. revert gate          cf-pi-revert-gate.sh: each contract's tests go red with
+#                            the shard's own implementation reverted
+#      write OUTCOME_FILE    structured paths-only result main reads back
 
 set -euo pipefail
 
@@ -128,6 +131,8 @@ derive_cause() {
       [ -s "$TEST_LOG" ] && cause="last output before the deadline: $(tail -1 "$TEST_LOG" 2>/dev/null)" ;;
     undeclared_file_touched)
       cause="scope violation — see undeclared_files below" ;;
+    tests-green-on-revert)
+      cause="tests stay green with the implementation reverted: $(sed -n 's/^STAYS_GREEN //p' "$SHARD_SESSION/revert-gate.out" 2>/dev/null | head -1)" ;;
     QUOTA|QUOTA-WINDOW)
       # A sibling stopped by the wall has no error of its own: name who hit it.
       # The shard that hit it keeps its own errorMessage.
@@ -726,6 +731,35 @@ if [ -n "$missing" ]; then
   say "NEEDS_REPLAN incomplete-contracts"
   exit 2
 fi
+
+# -------- 13. revert gate: each contract's tests need its implementation --
+# Gate 3 proves the suite is green; it cannot see a test that stays green with
+# the code it claims to cover put back to BASE_HEAD, and neither can scope or
+# completeness. Runs after step 11, so the diff is the unreverted tree.
+
+declared_count=$(printf '%s\n' "$declared_names" | grep -c . || true)
+say "revert gate: $declared_count contract(s), $((declared_count + 1)) suite runs"
+GATE_RC=0
+# shellcheck disable=SC2086
+"$SCRIPT_DIR/cf-pi-revert-gate.sh" "$SHARD_SESSION" $TEST_RUNNER \
+  > "$SHARD_SESSION/revert-gate.out" || GATE_RC=$?  # not $SCRIPTS: this gate is never stubbable
+gate_line=$(head -1 "$SHARD_SESSION/revert-gate.out" 2>/dev/null || true)
+
+case "$GATE_RC:$gate_line" in
+  0:SKIPPED*)
+    say "WARN revert gate skipped (non-git scratch mode)" ;;
+  0:*)
+    say "revert gate ok ($gate_line)" ;;
+  2:*)
+    flagged=$(printf '%s\n' "${gate_line#STAYS_GREEN }" | tr ',' '\n')
+    kept=$(printf '%s\n' "$survivors" | grep -vxF -f <(printf '%s\n' "$flagged") || true)
+    affected=$(printf '%s\n' "$flagged" | awk 'NF {print $0 ": tests-green-on-revert"}')
+    write_outcome NEEDS_REPLAN tests-green-on-revert "$kept" "$affected" "-" "$allow_csv"
+    say "NEEDS_REPLAN tests-green-on-revert ($gate_line)"
+    exit 2 ;;
+  *)
+    exit 1 ;;
+esac
 
 # All contracts this shard declared + reported survived (gates 1+3 ok, scope ok).
 # Allowlisted build/lock touches (if any) surface in undeclared_files for review.

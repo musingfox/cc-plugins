@@ -25,10 +25,13 @@ build_fixture() {
   FLOW="$(mktemp -d)"
   SHARD="$FLOW/shards/A"
   STUBS="$FLOW/stubs"
-  mkdir -p "$SHARD" "$STUBS"
+  mkdir -p "$SHARD/work" "$STUBS"
 
   cat > "$FLOW/shards.json" <<'JSON'
 {"groups": {"A": {"contracts": ["C1"], "files": ["src/x.ts"]}}}
+JSON
+  cat > "$FLOW/contracts.json" <<'JSON'
+{"schema_version": 1, "contracts": [{"name": "C1", "touches_files": ["src/x.ts"]}]}
 JSON
 
   cat > "$SHARD/env.sh" <<EOF
@@ -96,6 +99,13 @@ exit 1
 EOF
   fi
 
+  # The suite the revert gate runs: green on its control run, red once the
+  # contract's implementation is reverted.
+  cat > "$STUBS/runner" <<EOF
+#!/bin/bash
+echo 1 >> "$FLOW/runner.count"
+[ "\$(wc -l < "$FLOW/runner.count")" -eq 1 ]
+EOF
   # PATH stubs so the poll loop's sleep is instant and git never fails the run.
   printf '#!/bin/bash\nexit 0\n' > "$STUBS/sleep"
   printf '#!/bin/bash\nexit 0\n' > "$STUBS/git"
@@ -107,7 +117,7 @@ count_of() { wc -l < "$1" 2>/dev/null | tr -d ' ' || echo 0; }
 # ---- scenario 1: transient failure -> retest passes -> PASS, no re-dispatch ----
 
 build_fixture transient
-PATH="$STUBS:$PATH" bash "$REAL_SCRIPTS/cf-pi-run.sh" "$SHARD" "goal" "none" "true" \
+PATH="$STUBS:$PATH" bash "$REAL_SCRIPTS/cf-pi-run.sh" "$SHARD" "goal" "none" "$STUBS/runner" \
   > "$FLOW/run.log" 2>&1
 rc=$?
 assert_eq "0" "$rc" "transient: cf-pi-run exits 0"

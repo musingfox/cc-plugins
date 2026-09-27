@@ -66,4 +66,12 @@ SHARD_ID=B
 assert_eq "QUOTA wall hit by shard A" "$(derive_cause FAIL QUOTA)" \
   "T8: a sibling's quota cause names the shard that hit the wall"
 
+# T9: contracts green on revert -> the names the revert gate flagged, never a
+# gate-3 failure line
+printf 'FAILED test_x\n' > "$TEST_LOG"
+printf 'STAYS_GREEN C2,C3\n' > "$SHARD_SESSION/revert-gate.out"
+assert_eq "tests stay green with the implementation reverted: C2,C3" \
+  "$(derive_cause NEEDS_REPLAN tests-green-on-revert)" \
+  "T9: tests-green-on-revert cause names the flagged contracts"
+
 rm -rf "$SHARD_SESSION"
