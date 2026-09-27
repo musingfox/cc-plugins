@@ -15,6 +15,11 @@ if [ "$(uname -s)" != Darwin ] || ! command -v sandbox-exec >/dev/null 2>&1; the
   echo "  skip - writable-seam needs macOS sandbox-exec"
   exit 0
 fi
+# Inside a pi worker the shell is already sandboxed, and macOS refuses to nest one.
+if ! sandbox-exec -p '(version 1)(allow default)' /usr/bin/true 2>/dev/null; then
+  echo "  skip - writable-seam cannot nest a sandbox inside the pi worker's"
+  exit 0
+fi
 
 CF_ROOT="$(cd "$CF_TESTS_DIR/.." && pwd -P)"
 SHARD="$(mktemp -d /tmp/cf-writable-XXXX)"

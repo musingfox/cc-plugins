@@ -84,12 +84,16 @@ rm -rf "$REPO_ROOT" "$FLOW_SESSION" "$WT_PARENT"
 # T4: given REPO_ROOT empty (non-git scratch mode) -> expect exit code 0, no tag attempted, .checkpoints unchanged (graceful degrade)
 FLOW_SESSION="$(mktemp -d)"
 export FLOW_SESSION
+# The cwd must exist (inside the pi worker sandbox a deleted cwd breaks
+# record-round's here-strings) and sit outside any repo (an empty REPO_ROOT
+# falls back to the cwd's toplevel, which would tag the repo under test).
+cd "$FLOW_SESSION"
 REPO_ROOT=""
 export REPO_ROOT
 mkdir -p "$FLOW_SESSION"
 "$CF_TESTS_DIR/../scripts/cf-pi-record-round.sh" --round 1 --result A=PASS
 assert_exit 0 "$CF_TESTS_DIR/../scripts/cf-pi-record-round.sh" --round 1 --result A=PASS
 # checkpoints may be empty or not have A since no git
-has_a=$(jq 'has("A")' "$FLOW_SESSION/dispatch-state.json" 2>/dev/null || echo false)
+has_a=$(jq '.checkpoints | has("A")' "$FLOW_SESSION/dispatch-state.json" 2>/dev/null || echo false)
 assert_eq "false" "$has_a" "T4 no checkpoints.A in non-git"
 rm -rf "$FLOW_SESSION"
