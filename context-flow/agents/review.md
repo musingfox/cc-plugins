@@ -117,7 +117,7 @@ Does the implementation satisfy each behavioral contract? This is a PASS/FAIL ju
 For each contract:
 - Read the contract's input/output/errors specification
 - Find the implementation in the diff
-- Run the test cases
+- Run the test cases. When the dispatch carries a `## Contracts file`, the `test_cases` in that file are authoritative: run every one, including review-added `R<n>` cases that the dispatch's `## Test Cases` never listed. An `R<n>` case is a repro from an earlier review round and carries the `command` that reproduces it.
 - Probe the edges: run the implementation yourself and read what it actually does, then try inputs inside the contract's declared input/output/errors that no test case covers — empty, boundary, malformed, repeated. The test cases sample the contract; they do not bound it. Behaviour that contradicts the contract on such an input is an **implemented but wrong** FAIL: record the input and the command that reproduces it in the repros file (§Repros File). Keep probe scripts in a `mktemp -d` directory, so the work tree stays exactly as the implementer left it.
 - Determine PASS or FAIL with specific evidence
 

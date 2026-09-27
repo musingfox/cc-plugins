@@ -614,6 +614,10 @@ Agent(
     ## Test Cases
     {same test cases from Phase 3}
 
+    ## Contracts file
+    $SESSION/contracts.json
+    (test_cases here are authoritative, including review-added R<n> repros — run every one)
+
     ## Diff path
     $SESSION/implement.diff
     (Read the diff directly from this file — do NOT inline the diff in the prompt.)
