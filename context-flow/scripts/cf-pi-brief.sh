@@ -83,6 +83,9 @@ render_contracts() {
       .contracts[] | select(.name == $n) |
       "### " + .name + "\n" +
       (if .summary then "- **summary**: " + .summary + "\n" else "" end) +
+      (if .input then "- **input**: " + .input + "\n" else "" end) +
+      (if .output then "- **output**: " + .output + "\n" else "" end) +
+      (if .errors then "- **errors**: " + .errors + "\n" else "" end) +
       "- **touches_files**:\n" +
       (.touches_files // [] | map("  - " + .) | join("\n")) + "\n" +
       (if (.test_cases // []) | length > 0
@@ -94,6 +97,12 @@ render_contracts() {
       (if (.fuzzy_criteria // []) | length > 0
         then "- **fuzzy_criteria** (binding; Review will judge these with evidence):\n" +
           ((.fuzzy_criteria // []) | map("  - " + .) | join("\n")) + "\n"
+        else "" end) +
+      (if (.implementation_plan // []) | length > 0
+        then "- **implementation_plan** (guidance — the contract binds):\n" +
+          ((.implementation_plan // []) | map(
+            "  - " + (.title // "") + " — target `" + (.target // "") + "`; approach: " + (.approach // "") + "; order: " + (.order // "")
+          ) | join("\n")) + "\n"
         else "" end) +
       (if (.attachments // []) | length > 0
         then "- **attachments**:\n" +
