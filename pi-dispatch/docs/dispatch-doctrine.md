@@ -18,7 +18,7 @@ The live topology is two nodes off main:
 
 - **builder** — executes the brief. Main either embeds `pi-agent.sh` offload
   usage (builder offloads to a pi worker) or omits it (builder does the work
-  itself as a sonnet). The mode is dictated by the brief, not by the builder.
+  itself). The mode is dictated by the brief, not by the builder.
 - **reviewer** — independent contract judge. Given only the contract +
   deliverable paths + check output; never sees the builder transcript.
 
@@ -111,7 +111,9 @@ model, not ranked by tier, so nothing in the tooling enforces this — the
 dispatcher picks the reviewer's routing and owns the judgement. A builder
 already on the strongest routing available gets a fresh session on that same
 routing, or main itself, as reviewer. The reviewer is just another dispatch —
-same primitives, a routing at least as capable.
+same primitives, a routing at least as capable. Between the two Claude seats
+the rule holds on effort: the frontmatter pins the builder at `low` and the
+reviewer at `xhigh`.
 
 Proportionality: deterministic checks always run; a separate reviewer is
 dispatched only when the deliverable is a code change or the contract has

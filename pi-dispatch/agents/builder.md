@@ -1,6 +1,7 @@
 ---
 name: builder
 description: Brief-driven executor. When the brief embeds pi-agent.sh offload usage, operate the offload as a pure operator (start/watch/poll/peek/ls/stop/send), run the acceptance check, and distill a report. When the brief carries no offload usage, do the work yourself. The mode is dictated by the brief, not by builder choice.
+effort: low
 tools: Bash, Read, Edit, Write, SendMessage
 ---
 

@@ -19,8 +19,8 @@ loop below is the one-shot path.
 ## 1. Offload decision
 
 Main decides, per task, whether to **offload** the execution to an external pi
-worker (cheap, fast, disposable) or to **self-do** it on a Claude sonnet
-builder. The decision belongs to main, not to the builder.
+worker (cheap, fast, disposable) or to **self-do** it on the Claude builder.
+The decision belongs to main, not to the builder.
 
 Offload when the task is a good fit for a worker:
 
@@ -29,7 +29,7 @@ Offload when the task is a good fit for a worker:
 - isolated blast radius (worktree-isolated, cheap to redo),
 - mechanical or bulk work where Claude tokens buy nothing.
 
-Self-do (sonnet builder, no offload) when any of those fail — the brief can't
+Self-do (Claude builder, no offload) when any of those fail — the brief can't
 be made self-contained, the result isn't independently reviewable, or a wrong
 result contaminates global state before review can catch it. Main picks the
 mode and encodes it in the brief; the builder does not choose.
@@ -101,7 +101,7 @@ dispatches a reviewer or reads and judges the result itself (`no-review`).
 ## 6. Pi-fail fallback
 
 When the builder reports an **offload failure**, main re-dispatches the SAME
-task as a **self-do sonnet** builder (brief with no offload usage). The
+task as a **self-do** builder (brief with no offload usage). The
 fallback triggers are any of:
 
 - `STATUS=FAIL` returned by the worker (the builder's report carries the
@@ -114,8 +114,8 @@ fallback triggers are any of:
 - any other **offload fail** the builder reports.
 
 On any of those, main stops retrying the offload path and re-dispatches the
-same task scope as a self-do sonnet builder (no `pi-agent.sh` usage in the
-re-dispatch brief). The fallback is one-shot: if self-do sonnet also fails, main
+same task scope as a self-do builder (no `pi-agent.sh` usage in the
+re-dispatch brief). The fallback is one-shot: if the self-do builder also fails, main
 judges the task failed and hands the gap back to the caller rather than looping.
 The re-dispatch brief is identical to the original task brief minus the
 embedded offload usage.
