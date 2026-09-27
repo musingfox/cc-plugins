@@ -83,6 +83,15 @@ if [ "$(field "$RD" PATH_HEAD)" = "$SHIMS" ] && [ -x "$SHIMS/git" ]; then ok "PI
 if [ -x "$(field "$RD" REAL_GIT)" ] && [ "$(field "$RD" REAL_GIT)" != "$SHIMS/git" ]; then ok "PI_CWD -> PI_REAL_GIT points at the real git"; else bad "PI_CWD -> PI_REAL_GIT=$(field "$RD" REAL_GIT)"; fi
 case "$(field "$RD" EXT)" in */extensions/worktree-fence.ts) ok "PI_CWD -> fence extension passed with -e";; *) bad "PI_CWD -> EXT=$(field "$RD" EXT)";; esac
 
+# --- Case 2b: dispatched from inside a worker -> PI_REAL_GIT is still the real git ---
+# A worker's test suite can dispatch again, with shims already leading its PATH —
+# this plugin's, or another installed copy's. Resolving git by PATH then named a
+# shim, which handed itself as PI_REAL_GIT and re-entered itself on every call.
+COPY="$TMP/other-shims"; mkdir -p "$COPY"; cp "$SHIMS/git" "$COPY/git"
+RD="$(launch PATH="$COPY:$SHIMS:$PATH" PI_REAL_GIT="$(command -v git)" PI_DISPATCH_CMD="$SHIM" PI_CWD="$WORK" "$DISPATCH" "$CALLER/brief.md" "$OUT")"
+rg="$(field "$RD" REAL_GIT)"
+if [ -x "$rg" ] && ! grep -q 'PI_REAL_GIT' "$rg"; then ok "nested dispatch -> PI_REAL_GIT skips every shim on PATH"; else bad "nested dispatch -> PI_REAL_GIT=$rg"; fi
+
 # --- Case 3: relative PI_CWD + relative brief + relative OUTDIR ---
 mkdir -p "$CALLER/rel-out"
 RD="$(launch PI_DISPATCH_CMD="$SHIM" PI_CWD="../work" "$DISPATCH" "brief.md" "rel-out")"

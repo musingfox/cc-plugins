@@ -262,7 +262,17 @@ export PI_WRITABLE_FILES
 # location, since it can no longer find it by scanning PATH) and the
 # write/edit extension via -e below.
 SHIMS="$(abs "$SCRIPT_DIR/../shims")"
-PI_REAL_GIT="$(command -v git)"
+# The real git is the first git on PATH that is not a shim. A dispatch from inside
+# a worker (a test suite that dispatches again) has shims leading PATH — this
+# copy's or another installed copy's — and `command -v git` would name one.
+PI_REAL_GIT=""
+IFS=: read -ra path_dirs <<< "$PATH"
+for d in "${path_dirs[@]}"; do
+  [ -n "$d" ] && [ -f "$d/git" ] && [ -x "$d/git" ] || continue
+  grep -q 'PI_REAL_GIT' "$d/git" 2>/dev/null && continue
+  PI_REAL_GIT="$(abs "$d/git")"; break
+done
+[ -n "$PI_REAL_GIT" ] || { echo "pi-dispatch: no git on PATH other than a shim" >&2; exit 2; }
 export PI_REAL_GIT
 PATH="$SHIMS:$PATH"
 export PATH

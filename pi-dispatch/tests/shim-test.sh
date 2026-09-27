@@ -120,5 +120,24 @@ if [ "$out" = "chore: free" ]; then ok "PI_CWD unset -> passthrough"; else bad "
 out="$(cd "$OTHER" && PATH="$SHIMS:$PATH" env -u PI_REAL_GIT bash -c 'git status' 2>&1)"; rc=$?
 if [ $rc -eq 127 ] && printf '%s' "$out" | grep -q 'PI_REAL_GIT'; then ok "PI_REAL_GIT unset -> exit 127, never execs itself"; else bad "PI_REAL_GIT unset -> rc=$rc $out"; fi
 
+# --- PI_REAL_GIT naming the shim itself is refused, never followed ---
+# Followed, every call re-enters the shim to expand `config --get alias.config`: a
+# fork bomb that outlives its worker (2026-09-27: 1200 chained shims filled the
+# per-user process table). Run under a process cap and a whole-group kill at 5s,
+# so a regression fails here instead of taking the machine down.
+bounded() { # bounded <secs> <cmd...>: own process group, killed whole at the deadline
+  perl -e '
+    my $secs = shift @ARGV; my $pid = fork; defined $pid or exit 125;
+    if (!$pid) { setpgrp(0, 0); exec @ARGV; exit 127 }
+    my $rc = 124;
+    eval { local $SIG{ALRM} = sub { die "deadline\n" }; alarm $secs; waitpid($pid, 0); alarm 0; $rc = $? >> 8 };
+    for (1 .. 50) { last unless kill 0, -$pid; kill "KILL", -$pid; select(undef, undef, undef, 0.1) }
+    exit $rc;
+  ' "$@"
+}
+cap=$(( $(ps -Ao pid -U "$(id -u)" | wc -l) + 200 ))
+out="$(cd "$WORK" && ulimit -u "$cap" 2>/dev/null; bounded 5 env PATH="$SHIMS:$PATH" PI_REAL_GIT="$SHIMS/git" PI_CWD="$WORK" bash -c 'git status' 2>&1)"; rc=$?
+if [ $rc -eq 127 ] && printf '%s' "$out" | grep -q 'points at this shim'; then ok "PI_REAL_GIT is the shim -> exit 127, never re-enters itself"; else bad "PI_REAL_GIT is the shim -> rc=$rc $(printf '%s' "$out" | head -1)"; fi
+
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

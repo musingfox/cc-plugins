@@ -31,6 +31,9 @@ set -u
 
 real="${PI_REAL_GIT:-}"
 [ -n "$real" ] || { echo "git shim: PI_REAL_GIT is not set; pi-dispatch.sh exports it alongside PI_CWD" >&2; exit 127; }
+# Followed, a PI_REAL_GIT that is this shim re-enters it on every call (the alias
+# lookup below is itself a git call): a fork bomb that outlives the worker.
+[ "$real" -ef "${BASH_SOURCE[0]}" ] && { echo "git shim: PI_REAL_GIT points at this shim ($real); pi-dispatch.sh must resolve the git behind it" >&2; exit 127; }
 [ -n "${PI_CWD:-}" ] || exec "$real" "$@"
 
 canon() {
