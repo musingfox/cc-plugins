@@ -90,7 +90,9 @@ run_suite() { # HEADER -> sets rc
 }
 
 [ $# -ge 2 ] || verdict "ERROR usage" 1
-SHARD_SESSION="$1"
+# Absolute, because git -C "$WORK" and the run inside $WORK would resolve a
+# relative scratch index or stall mark against $WORK, not the caller's cwd.
+SHARD_SESSION=$(cd "$1" 2>/dev/null && pwd) || verdict "ERROR session env.sh" 1
 shift
 CMD=("$@")
 LOG="$SHARD_SESSION/revert-gate.log"

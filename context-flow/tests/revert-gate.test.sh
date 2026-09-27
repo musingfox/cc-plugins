@@ -85,6 +85,13 @@ run_gate() {
   GATE_RC=$?
 }
 
+# run_gate_relative TEST_CMD [ARGS...]: run_gate with SHARD_SESSION given as
+# shards/A from $FLOW
+run_gate_relative() {
+  GATE_OUT="$(cd "$FLOW" && bash "$GATE" shards/A "$@" 2>"$FLOW/gate.err")"
+  GATE_RC=$?
+}
+
 # mutant PERL_SUBSTITUTION -> MUT, a copy of the gate with that one change.
 # It sits next to a link to the real cf-pi-env.sh, which the gate sources.
 mutant() {
@@ -445,6 +452,16 @@ gone=present; [ -f "$WORK/src/add.sh" ] || gone=missing
 assert_eq "missing" "$gone" "restore T9 no restore leaves src/add.sh missing"
 held=yes; [ -z "$(git -C "$WORK" status --porcelain -- src tests)" ] || held=no
 assert_eq "no" "$held" "restore T9 no restore breaks T1's status check"
+rm -rf "$FLOW"
+
+# R1: a relative SHARD_SESSION still restores every own path
+new_flow; write_runner; base_commit; add_effective; add_vacuous
+set_docs "$C1C2" '["C1","C2"]'; env_sh
+head=$(git -C "$WORK" rev-parse HEAD)
+run_gate_relative bash run-tests.sh
+assert_eq "STAYS_GREEN C2" "$GATE_OUT" "restore R1 relative session: stdout"
+assert_eq "2" "$GATE_RC" "restore R1 relative session: exit"
+assert_restored "restore R1 relative session" "$head"
 rm -rf "$FLOW"
 
 # ==== only non-git scratch mode passes unjudged ====
