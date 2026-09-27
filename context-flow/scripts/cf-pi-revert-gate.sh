@@ -78,7 +78,7 @@ restore() { [ ${#own[@]} -eq 0 ] || put_back HEAD "${own[@]}"; }
 run_suite() { # HEADER -> sets rc
   printf '### %s\n' "$1" >>"$LOG"
   rc=0
-  ( cd "$WORK" && run_bounded "$DEADLINE" "${CMD[@]}" ) >>"$LOG" 2>&1 || rc=$?
+  ( cd "$WORK" && CF_BOUNDED_STALL_MARK="$STALL_MARK" run_bounded "$DEADLINE" "${CMD[@]}" ) >>"$LOG" 2>&1 || rc=$?
   printf 'exit=%s\n' "$rc" >>"$LOG"
 }
 
@@ -87,6 +87,7 @@ SHARD_SESSION="$1"
 shift
 CMD=("$@")
 LOG="$SHARD_SESSION/revert-gate.log"
+STALL_MARK="$SHARD_SESSION/revert-gate-stalled.mark"
 DEADLINE="${CF_TEST_DEADLINE_S:-1800}"
 
 load_cf_pi_env "$SHARD_SESSION" 2>/dev/null || verdict "ERROR session env.sh" 1
@@ -117,6 +118,8 @@ dirty=""
 
 : >"$LOG"
 run_suite control
+[ ! -f "$STALL_MARK" ] || verdict "ERROR control-stalled ${DEADLINE}s" 1
+[ "$rc" -eq 0 ] || verdict "ERROR control-red" 1
 
 green=""
 for name in ${contracts[@]+"${contracts[@]}"}; do

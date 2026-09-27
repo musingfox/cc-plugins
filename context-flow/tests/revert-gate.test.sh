@@ -272,3 +272,35 @@ run_gate "$MUT" bash run-tests.sh
 assert_not_verdict "T13 dirty check on an empty path list breaks T12" "STAYS_GREEN C1" 2
 rm -rf "$FLOW"
 
+# ==== a red or hanging control run is an error, not a verdict ====
+
+# T1: already red on the untouched tree
+new_flow; write_runner; base_commit; add_effective
+set_docs "$C1" '["C1"]'; env_sh
+run_gate "$GATE" false
+assert_eq "ERROR control-red" "$GATE_OUT" "control T1 red: stdout"
+assert_eq "1" "$GATE_RC" "control T1 red: exit"
+c1_run=absent; grep -qx '### C1' "$SHARD/revert-gate.log" 2>/dev/null && c1_run=present
+assert_eq "absent" "$c1_run" "control T1 red: no contract run follows"
+rm -rf "$FLOW"
+
+# T2: hangs past the deadline
+new_flow; write_runner; base_commit; add_effective
+set_docs "$C1" '["C1"]'; env_sh
+start=$(date +%s)
+CF_TEST_DEADLINE_S=1 run_gate "$GATE" sleep 30
+elapsed=$(( $(date +%s) - start ))
+assert_eq "ERROR control-stalled 1s" "$GATE_OUT" "control T2 stalled: stdout"
+assert_eq "1" "$GATE_RC" "control T2 stalled: exit"
+pace=late; [ "$elapsed" -lt 15 ] && pace=prompt
+assert_eq "prompt" "$pace" "control T2 returned in ${elapsed}s"
+rm -rf "$FLOW"
+
+# T3: red-first, without the control run a red suite reads as CLEAN
+new_flow; write_runner; base_commit; add_effective
+set_docs "$C1" '["C1"]'; env_sh
+mutant 's/^run_suite control\n(\[.*ERROR control-.*\n)*//m'
+run_gate "$MUT" false
+assert_eq "CLEAN 1" "$GATE_OUT" "control T3 no control run passes a red suite"
+rm -rf "$FLOW"
+
