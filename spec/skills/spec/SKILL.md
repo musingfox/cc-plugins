@@ -117,7 +117,9 @@ Forward-looking interface contracts are born prose: the interface does not
 exist yet, so nothing can test it. Once it lands, fill the `verify` in.
 
 Before adding a check: run it against the current code. **A check that is red
-on day one is a wrong check, not wrong code.**
+on day one is a wrong check, not wrong code.** Then break the rule once in a
+scratch edit and run it again: it must go red. A check that stays green against
+a real violation guards nothing. Discard the scratch edit.
 
 ## Lifecycle
 
