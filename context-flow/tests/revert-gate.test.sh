@@ -337,6 +337,18 @@ run_gate "$MUT" false
 assert_eq "CLEAN 1" "$GATE_OUT" "control T3 no control run passes a red suite"
 rm -rf "$FLOW"
 
+# R1: a relative SHARD_SESSION still reports the hang as a stall, not a red suite
+new_flow; write_runner; base_commit; add_effective
+set_docs "$C1" '["C1"]'; env_sh
+start=$(date +%s)
+CF_TEST_DEADLINE_S=1 run_gate_relative sleep 30
+elapsed=$(( $(date +%s) - start ))
+assert_eq "ERROR control-stalled 1s" "$GATE_OUT" "control R1 relative session stalled: stdout"
+assert_eq "1" "$GATE_RC" "control R1 relative session stalled: exit"
+pace=late; [ "$elapsed" -lt 15 ] && pace=prompt
+assert_eq "prompt" "$pace" "control R1 returned in ${elapsed}s"
+rm -rf "$FLOW"
+
 # ==== the shard is left as the gate found it ====
 
 # assert_restored LABEL HEAD_BEFORE
