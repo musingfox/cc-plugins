@@ -304,3 +304,120 @@ run_gate "$MUT" false
 assert_eq "CLEAN 1" "$GATE_OUT" "control T3 no control run passes a red suite"
 rm -rf "$FLOW"
 
+# ==== the shard is left as the gate found it ====
+
+# assert_restored LABEL HEAD_BEFORE
+assert_restored() {
+  assert_eq "" "$(git -C "$WORK" status --porcelain -- src tests)" "$1: own-path status"
+  assert_eq "" "$(git -C "$WORK" diff HEAD --stat)" "$1: diff against HEAD"
+  assert_eq "$2" "$(git -C "$WORK" rev-parse HEAD)" "$1: HEAD"
+}
+
+# T1: after CLEAN
+new_flow; write_runner; base_commit; add_effective
+set_docs "$C1" '["C1"]'; env_sh
+head=$(git -C "$WORK" rev-parse HEAD)
+run_gate "$GATE" bash run-tests.sh
+assert_eq "CLEAN 1" "$GATE_OUT" "restore T1: stdout"
+assert_restored "restore T1 after CLEAN" "$head"
+rm -rf "$FLOW"
+
+# T2: after STAYS_GREEN
+new_flow; write_runner; base_commit; add_effective; add_vacuous
+set_docs "$C1C2" '["C1","C2"]'; env_sh
+head=$(git -C "$WORK" rev-parse HEAD)
+run_gate "$GATE" bash run-tests.sh
+assert_eq "STAYS_GREEN C2" "$GATE_OUT" "restore T2: stdout"
+assert_restored "restore T2 after STAYS_GREEN" "$head"
+rm -rf "$FLOW"
+
+# T3: after ERROR control-red
+new_flow; write_runner; base_commit; add_effective
+set_docs "$C1" '["C1"]'; env_sh
+head=$(git -C "$WORK" rev-parse HEAD)
+run_gate "$GATE" false
+assert_eq "ERROR control-red" "$GATE_OUT" "restore T3: stdout"
+assert_restored "restore T3 after ERROR" "$head"
+rm -rf "$FLOW"
+
+# T4: untracked and intent-to-add files outside the own paths are not its business
+new_flow; write_runner; base_commit; add_effective
+set_docs "$C1" '["C1"]'; env_sh
+mkdir -p "$WORK/node_modules"
+printf 'x\n' >"$WORK/node_modules/x"
+printf 'n\n' >"$WORK/notes.txt"
+git -C "$WORK" add -N notes.txt
+before=$(git -C "$WORK" status --porcelain -- node_modules notes.txt)
+run_gate "$GATE" bash run-tests.sh
+assert_eq "CLEAN 1" "$GATE_OUT" "restore T4: stdout"
+assert_eq "$before" "$(git -C "$WORK" status --porcelain -- node_modules notes.txt)" "restore T4: status of foreign files"
+assert_eq "x" "$(cat "$WORK/node_modules/x")" "restore T4: untracked file content"
+assert_eq "n" "$(cat "$WORK/notes.txt")" "restore T4: intent-to-add file content"
+rm -rf "$FLOW"
+
+# T5: an uncommitted edit to an own path is refused, untouched
+new_flow; write_runner; base_commit; add_effective
+set_docs "$C1" '["C1"]'; env_sh
+printf '%s\n' 'echo 99' >"$WORK/src/add.sh"
+run_gate "$GATE" bash run-tests.sh
+assert_eq "ERROR dirty-own-paths src/add.sh" "$GATE_OUT" "restore T5: stdout"
+assert_eq "1" "$GATE_RC" "restore T5: exit"
+assert_eq "echo 99" "$(cat "$WORK/src/add.sh")" "restore T5: the edit survives"
+rm -rf "$FLOW"
+
+# T6: gate 3's log is never written
+new_flow; write_runner; base_commit; add_effective
+set_docs "$C1" '["C1"]'; env_sh
+printf 'GATE3-EVIDENCE\n' >"$SHARD/test-output.log"
+cp "$SHARD/test-output.log" "$FLOW/evidence"
+run_gate "$GATE" bash run-tests.sh
+assert_eq "CLEAN 1" "$GATE_OUT" "restore T6: stdout"
+same=no; cmp -s "$FLOW/evidence" "$SHARD/test-output.log" && same=yes
+assert_eq "yes" "$same" "restore T6: test-output.log byte-identical"
+rm -rf "$FLOW"
+
+# T7: TERM mid-run restores, then says so
+new_flow; write_runner; base_commit
+printf '%s\n' 'echo $(($1 + $2))' >"$WORK/src/add.sh"
+printf '%s\n' 'sleep 3' '[ "$(bash src/add.sh 2 3)" = 5 ]' >"$WORK/tests/add.test.sh"
+commit_all c1
+set_docs "$C1" '["C1"]'; env_sh
+bash "$GATE" "$SHARD" bash run-tests.sh >"$FLOW/gate.out" 2>"$FLOW/gate.err" &
+pid=$!
+n=0
+while [ -f "$WORK/src/add.sh" ] && [ "$n" -lt 300 ]; do sleep 0.1; n=$((n + 1)); done
+saw=reverted; [ -f "$WORK/src/add.sh" ] && saw=never-reverted
+assert_eq "reverted" "$saw" "restore T7: the gate reverted src/add.sh"
+kill -TERM "$pid"
+wait "$pid"
+rc=$?
+assert_eq "1" "$rc" "restore T7: exit"
+assert_eq "ERROR interrupted" "$(tail -1 "$FLOW/gate.out")" "restore T7: last stdout line"
+assert_eq "echo \$((\$1 + \$2))" "$(cat "$WORK/src/add.sh" 2>/dev/null)" "restore T7: src/add.sh restored"
+assert_eq "" "$(git -C "$WORK" status --porcelain -- src tests)" "restore T7: own-path status"
+rm -rf "$FLOW"
+
+# T8: no git hook fires
+new_flow; write_runner; base_commit; add_effective
+set_docs "$C1" '["C1"]'; env_sh
+mkdir -p "$FLOW/hooks"
+printf '#!/bin/sh\necho fired >>"%s/hook.log"\n' "$FLOW" >"$FLOW/hooks/post-checkout"
+chmod +x "$FLOW/hooks/post-checkout"
+git -C "$WORK" config core.hooksPath "$FLOW/hooks"
+run_gate "$GATE" bash run-tests.sh
+assert_eq "CLEAN 1" "$GATE_OUT" "restore T8: stdout"
+hook=absent; [ -e "$FLOW/hook.log" ] && hook=present
+assert_eq "absent" "$hook" "restore T8: post-checkout never ran"
+rm -rf "$FLOW"
+
+# T9: red-first, without the restore src/add.sh stays reverted
+new_flow; write_runner; base_commit; add_effective
+set_docs "$C1" '["C1"]'; env_sh
+mutant 's/^restore\(\) \{.*\}$/restore() { :; }/m'
+run_gate "$MUT" bash run-tests.sh
+gone=present; [ -f "$WORK/src/add.sh" ] || gone=missing
+assert_eq "missing" "$gone" "restore T9 no restore leaves src/add.sh missing"
+held=yes; [ -z "$(git -C "$WORK" status --porcelain -- src tests)" ] || held=no
+assert_eq "no" "$held" "restore T9 no restore breaks T1's status check"
+rm -rf "$FLOW"
+

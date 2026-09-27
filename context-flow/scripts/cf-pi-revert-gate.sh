@@ -75,6 +75,12 @@ put_back() {
 
 restore() { [ ${#own[@]} -eq 0 ] || put_back HEAD "${own[@]}"; }
 
+on_signal() {
+  restore || true
+  printf '%s\n' "ERROR interrupted"
+  exit 1
+}
+
 run_suite() { # HEADER -> sets rc
   printf '### %s\n' "$1" >>"$LOG"
   rc=0
@@ -116,6 +122,11 @@ dirty=""
 [ ${#own[@]} -eq 0 ] || dirty=$(own_status)
 [ -z "$dirty" ] || verdict "ERROR dirty-own-paths $dirty" 1
 
+# From here on the tree changes. bash runs a signal trap once the current run
+# returns, so the restore happens before the exit rather than instantly.
+trap 'restore || true' EXIT
+trap on_signal INT TERM HUP
+
 : >"$LOG"
 run_suite control
 [ ! -f "$STALL_MARK" ] || verdict "ERROR control-stalled ${DEADLINE}s" 1
@@ -135,6 +146,10 @@ for name in ${contracts[@]+"${contracts[@]}"}; do
   restore || true
   [ "$rc" -ne 0 ] || green="${green:+$green,}$name"
 done
+
+dirty=""
+[ ${#own[@]} -eq 0 ] || dirty=$(own_status)
+[ -z "$dirty" ] || verdict "ERROR restore-failed $dirty" 1
 
 [ -z "$green" ] || verdict "STAYS_GREEN $green" 2
 verdict "CLEAN ${#contracts[@]}" 0
