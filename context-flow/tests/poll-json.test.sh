@@ -23,7 +23,6 @@ wait "$DEAD_PID" 2>/dev/null || true
 # The canonical RUNDIR is created at $S/run; fixtures write events to $S/run/result.md.
 # All fixtures live under one root so the sweep leaves no session dirs behind.
 FIXTURE_ROOT="$(mktemp -d)"
-trap 'rm -rf "$FIXTURE_ROOT"' EXIT
 
 new_session() {
   local pid="$1"
@@ -107,3 +106,4 @@ echo "0" > "$RUNDIR/rc"
 assert_contains "$(bash "$POLL" "$S")" "died-mid-stream" "dead with no events (rc=0) is died-mid-stream"
 
 kill "$ALIVE_PID" 2>/dev/null || true
+rm -rf "$FIXTURE_ROOT"

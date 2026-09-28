@@ -10,7 +10,6 @@
 
 CF_ROOT="$(cd "$CF_TESTS_DIR/.." && pwd -P)"
 FLOW="$(mktemp -d)"; FLOW="$(cd "$FLOW" && pwd -P)"
-trap 'rm -rf "$FLOW"' EXIT
 SHARD="$FLOW/shards/A"
 mkdir -p "$SHARD/work" "$FLOW/runs"
 export PI_RUNS_DIR="$FLOW/runs"
@@ -36,6 +35,11 @@ printf 'CWD=%s\nPATH_HEAD=%s\n' "$(pwd -P)" "${PATH%%:*}"
 EOF
 chmod +x "$FLOW/pi-shim"
 
+# Inside a pi worker the shell is already sandboxed and macOS refuses to nest
+# one, so the stand-in worker would never start. This test pins cwd and PATH,
+# not the fence (writable-seam does), so run the dispatch unsandboxed there.
+sandbox-exec -p '(version 1)(allow default)' /usr/bin/true 2>/dev/null || export PI_SANDBOX=0
+
 # cf's own cwd is the "human's checkout"; the worker must not start there.
 CHECKOUT="$FLOW/checkout"; mkdir -p "$CHECKOUT"
 pid="$(cd "$CHECKOUT" && PI_DISPATCH_CMD="$FLOW/pi-shim" CLAUDE_PLUGIN_ROOT="$CF_ROOT" bash "$CF_ROOT/scripts/cf-pi-dispatch.sh" "$SHARD")"
@@ -45,3 +49,4 @@ for _ in $(seq 1 50); do [ -s "$rundir/rc" ] && break; sleep 0.1; done
 assert_eq "$SHARD/work" "$(sed -n 's/^CWD=//p' "$rundir/result.md")" "worker starts inside the shard worktree, not cf's cwd"
 assert_contains "$(sed -n 's/^PATH_HEAD=//p' "$rundir/result.md")" "/shims" "worker's PATH leads with the git shim"
 assert_contains "$(cat "$rundir/routing")" "CWD=$SHARD/work" "routing records the worktree for resume"
+rm -rf "$FLOW"
