@@ -123,12 +123,40 @@ the flag carry both meanings and §3 can no longer tell whether it was handed wo
 
 The body exists to be read by someone who has not watched the layer being built:
 
-- Open with what is actually at stake in plain language — never "round 2" or role names.
+- Open with what is actually at stake in plain language, in one or two sentences — never
+  "round 2" or role names.
 - One section per decision, in the same order as the frontmatter, headed by the same question.
 - Carry each candidate's substance **inline**: what it is, what taking it commits to, how
   expensive it is to undo. Never "see file X" — refs go in a closing footnote.
 - Candidates are the real paths, not spiral's mechanics. No untranslated jargon.
 - Facts Divergence resolved go in as facts, not as things to decide.
+
+**Lay the body out to be scanned, not read through.** A page of paragraphs loses the reader
+before the second decision. The recipe opens on a card view it projects from this structure —
+side-by-side option cards, cost meters, expandable detail — and keeps the markdown one click
+away as 原文, so write the structure exactly; a section that does not match is shown as plain
+text, not lost:
+
+- **Compare candidates in one table**, a row per candidate and columns 好處 / 代價 / 改回成本.
+  The first cell of each row is the candidate's label **exactly as written in `dN.options`** —
+  that is how a row becomes its card, so no numbering and no shortening.
+  Cells are short phrases joined by `；`. 改回成本 is a single word (高 / 中高 / 中 / 中低 / 低);
+  when it is 高, bold it and add a clause after `：` naming what makes it one-way, because on a
+  one-way door that reason is the fact the reader decides on. Never give each candidate its own
+  paragraph of pros and cons.
+- **Move detail, never drop it.** A candidate's full account — what it is, the numbers, the
+  counter-examples that did not fit a cell — goes in a `### <label>` subsection after the
+  recommendation, headed by the same exact label; it becomes that card's 詳情. Evidence that
+  belongs to no single candidate goes in a short paragraph under the table or in the footnote.
+- **Put the recommendation in a blockquote after the table**: the pick in bold, then at most two
+  sentences of why, carrying the one number that decides it.
+- **Draw the candidates when they differ by where or when something happens** — a stage of a
+  pipeline, a step of a sequence, a layer of the stack. A small Mermaid flowchart with each
+  candidate hung on its spot, the recommended one styled with a `classDef`, shows at a glance
+  what the table has to spell out.
+- **Resolved facts go in a table too** (發現 / 證據 / 後果) when there are three or more; each
+  cell is one clause, with the number in the evidence column. A fact needing more than a cell
+  gets a `### <發現>` subsection under the table, headed by that row's first cell.
 
 Render it and read the answers back (§Rendering). Then:
 
