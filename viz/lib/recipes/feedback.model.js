@@ -144,8 +144,133 @@ function createFeedbackModel() {
         return out;
     }
 
+    // Card view: a read-only projection of the body's lexer tokens (marked's
+    // `lexer` output) onto the round's questions. It never feeds serialize —
+    // the body stays verbatim — so a section it cannot read is passed through
+    // as tokens, not dropped. `usable` is false when no h2 matches a question
+    // title; the page then keeps the plain markdown view.
+    var LEVELS = { '低': 1, '中低': 2, '中': 3, '中高': 4, '高': 5 };
+    var LEVEL_CELL = /^(中高|中低|高|中|低)(?:\s*[：:]\s*([\s\S]*))?$/;
+    var PROS = /好處|優點|pros?$/i;
+    var CONS = /代價|缺點|cons?$/i;
+
+    function plainCell(text) {
+        return String(text || '').replace(/\*\*/g, '').trim();
+    }
+
+    function splitPhrases(text) {
+        return String(text || '').split('；').map(function (s) { return s.trim(); }).filter(Boolean);
+    }
+
+    function asLevel(label, text) {
+        var m = plainCell(text).match(LEVEL_CELL);
+        return m ? { label: label, word: m[1], level: LEVELS[m[1]], why: (m[2] || '').trim() } : null;
+    }
+
+    // An h3 whose text equals one of `keys` owns the tokens up to the next
+    // heading of depth ≤ 3; every other token stays in the flow.
+    function pullDetails(tokens, keys) {
+        var flow = [], details = {}, cur = null;
+        tokens.forEach(function (t) {
+            if (t.type === 'heading' && t.depth <= 3) cur = null;
+            var key = t.type === 'heading' && t.depth === 3 ? t.text.trim() : null;
+            if (key !== null && keys.indexOf(key) !== -1 && !details[key]) {
+                cur = details[key] = [];
+                return;
+            }
+            (cur || flow).push(t);
+        });
+        return { flow: flow, details: details };
+    }
+
+    function card(q, label, header, row, details) {
+        var c = {
+            label: label, recommend: label === q.recommend,
+            pros: [], cons: [], extras: [], cost: null, detail: details[label] || null
+        };
+        (row || []).slice(1).forEach(function (cell, i) {
+            var head = plainCell(header[i + 1] && header[i + 1].text);
+            var level = !c.cost && asLevel(head, cell.text);
+            if (level) c.cost = level;
+            else if (PROS.test(head)) c.pros = c.pros.concat(splitPhrases(cell.text));
+            else if (CONS.test(head)) c.cons = c.cons.concat(splitPhrases(cell.text));
+            else c.extras.push({ label: head, text: cell.text.trim() });
+        });
+        return c;
+    }
+
+    function decisionBlocks(q, tokens) {
+        var pulled = pullDetails(tokens, q.options);
+        var optionTable = pulled.flow.filter(function (t) {
+            return t.type === 'table' && t.rows.some(function (r) {
+                return q.options.indexOf(plainCell(r[0].text)) !== -1;
+            });
+        })[0] || null;
+        var rowFor = {};
+        if (optionTable) optionTable.rows.forEach(function (r) { rowFor[plainCell(r[0].text)] = r; });
+        var cards = {
+            type: 'cards',
+            cards: q.options.map(function (label) {
+                return card(q, label, optionTable ? optionTable.header : [], rowFor[label], pulled.details);
+            })
+        };
+        var blocks = pulled.flow.map(function (t) {
+            if (t === optionTable) return cards;
+            if (t.type === 'blockquote') return { type: 'verdict', token: t };
+            return { type: 'token', token: t };
+        });
+        if (!optionTable) blocks.push(cards);
+        return blocks;
+    }
+
+    function sectionBlocks(tokens) {
+        var isTiles = function (t) {
+            return t.type === 'table' && t.header.length >= 2 && t.header.length <= 4;
+        };
+        var keys = [];
+        tokens.forEach(function (t) {
+            if (isTiles(t)) t.rows.forEach(function (r) { keys.push(plainCell(r[0].text)); });
+        });
+        var pulled = pullDetails(tokens, keys);
+        return pulled.flow.map(function (t) {
+            if (!isTiles(t)) return { type: 'token', token: t };
+            return {
+                type: 'tiles',
+                tiles: t.rows.map(function (r) {
+                    var title = plainCell(r[0].text);
+                    return {
+                        title: title,
+                        fields: r.slice(1).map(function (cell, i) {
+                            return { label: plainCell(t.header[i + 1].text), text: cell.text.trim() };
+                        }),
+                        detail: pulled.details[title] || null
+                    };
+                })
+            };
+        });
+    }
+
+    function project(tokens, qs) {
+        var hero = [], parts = [], cur = null;
+        (tokens || []).forEach(function (t) {
+            if (t.type === 'heading' && t.depth === 2) {
+                cur = { title: t.text.trim(), tokens: [] };
+                parts.push(cur);
+            } else (cur ? cur.tokens : hero).push(t);
+        });
+        var usable = false;
+        var sections = parts.map(function (p) {
+            var q = (qs || []).filter(function (x) { return x.title === p.title; })[0];
+            if (!q) return { kind: 'section', title: p.title, blocks: sectionBlocks(p.tokens) };
+            usable = true;
+            return { kind: 'decision', id: q.id, title: p.title, blocks: decisionBlocks(q, p.tokens) };
+        });
+        return { usable: usable, hero: hero, sections: sections };
+    }
+
     return {
         parse: parse,
+        project: project,
         options: options,
         questions: questions,
         toggle: toggle,

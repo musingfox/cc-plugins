@@ -169,6 +169,128 @@ main { max-width: 880px; margin: var(--space-6) auto var(--space-12); padding: 0
 }
 .mermaid-shell:hover { border-color: var(--accent); }
 
+/* -- View toggle (圖卡 / 原文) -- */
+.view-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-pill); overflow: hidden; }
+.view-toggle button {
+    font: inherit; font-size: var(--text-xs); background: none; color: var(--fg-2); border: 0;
+    padding: var(--space-1) var(--space-4); cursor: pointer;
+    transition: background var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard);
+}
+.view-toggle button.on { background: var(--accent); color: var(--accent-on); font-weight: 700; }
+
+/* -- Card view: a projection of the body; 原文 is the verbatim render -- */
+main.wide { max-width: 1080px; }
+.prose p { margin: var(--space-3) 0; color: var(--fg-2); }
+.prose ul, .prose ol { padding-left: var(--space-6); margin: var(--space-2) 0; color: var(--fg-2); }
+.prose li { margin: var(--space-1) 0; }
+.prose li::marker { color: var(--muted); }
+.prose a { color: var(--accent); text-decoration: none; }
+.prose h3, .prose h4 { font-family: var(--font-display); font-size: var(--text-base); margin: var(--space-5) 0 var(--space-2); }
+.prose table { border-collapse: collapse; width: 100%; }
+.prose th, .prose td { padding: var(--space-2) var(--space-3); text-align: left; font-size: var(--text-sm); border-bottom: 1px solid var(--border-soft); }
+.prose th { background: var(--surface-warm); }
+.prose pre { background: var(--surface-warm); padding: var(--space-4); border: 1px solid var(--border); overflow-x: auto; }
+.prose hr { border: none; border-top: 1px solid var(--border); margin: var(--space-6) 0; }
+.prose blockquote { border-left: 2px solid var(--accent); margin: var(--space-4) 0; padding: var(--space-2) var(--space-4); background: var(--surface-warm); }
+.prose code, .cv-card code, .cv-tile code, .cv-verdict code {
+    background: var(--surface-warm); padding: 1px var(--space-1);
+    border: 1px solid var(--border-soft); border-radius: var(--radius-sm);
+    font-family: var(--font-mono); font-size: .92em; color: var(--fg-2);
+}
+.cv-hero h1 { font-family: var(--font-display); font-size: var(--text-xl); letter-spacing: var(--tracking-display); margin: var(--space-2) 0; }
+.cv-hero p { font-size: var(--text-base); }
+.cv-kicker {
+    font-family: var(--font-display); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--muted); margin: var(--space-8) 0 var(--space-3); font-weight: 700;
+}
+.cv-tiles, .cv-cards { display: grid; gap: var(--space-3); }
+.cv-tiles { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.cv-cards { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-top: var(--space-4); }
+.cv-tile {
+    display: flex; flex-direction: column; gap: var(--space-1);
+    background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--muted);
+    border-radius: var(--radius-sm); padding: var(--space-3) var(--space-4); font-size: var(--text-sm);
+}
+.cv-tile b { margin-bottom: var(--space-1); }
+.cv-tile .kv { color: var(--fg-2); font-size: var(--text-xs); line-height: 1.6; }
+.cv-tile .kv span { color: var(--muted); margin-right: var(--space-2); }
+.cv-decision {
+    margin-top: var(--space-8); padding: var(--space-5);
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+}
+.cv-q { display: flex; align-items: baseline; gap: var(--space-3); }
+.cv-q .num { color: var(--accent); font-weight: 700; font-size: var(--text-sm); }
+.cv-q h2 { font-family: var(--font-display); font-size: var(--text-lg); margin: 0; flex: 1; }
+.cv-q .multi-tag {
+    font-size: var(--text-xs); color: var(--warn); border: 1px solid var(--warn);
+    padding: 1px var(--space-2); border-radius: var(--radius-pill);
+}
+.cv-card {
+    position: relative; display: flex; flex-direction: column; gap: var(--space-2);
+    text-align: left; font: inherit; color: inherit; background: var(--bg);
+    border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-4);
+    cursor: pointer;
+    transition: border-color var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard);
+}
+.cv-card:hover { border-color: var(--muted); transform: translateY(-1px); }
+.cv-card.rec { border-color: var(--accent); }
+.cv-card.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--surface-warm); }
+.cv-card .name { font-weight: 700; font-size: var(--text-sm); padding-right: 44px; }
+.cv-card .rec-tag {
+    position: absolute; top: var(--space-3); right: var(--space-3);
+    font-size: var(--text-xs); color: var(--success); border: 1px solid var(--success);
+    padding: 0 var(--space-2); border-radius: var(--radius-pill);
+}
+.cv-card ul { margin: 0; padding: 0; list-style: none; font-size: var(--text-xs); color: var(--fg-2); line-height: 1.6; }
+.cv-card li { position: relative; padding-left: var(--space-4); margin: 2px 0; }
+.cv-card li.pro::before { content: "+"; position: absolute; left: 0; color: var(--success); font-weight: 700; }
+.cv-card li.con::before { content: "−"; position: absolute; left: 0; color: var(--danger); font-weight: 700; }
+.cv-card .extra { font-size: var(--text-xs); color: var(--fg-2); }
+.cv-card .extra span { color: var(--muted); margin-right: var(--space-1); }
+.cv-meter { margin-top: auto; font-size: var(--text-xs); color: var(--muted); }
+.cv-meter .bar { display: flex; gap: 3px; margin: var(--space-1) 0; }
+.cv-meter .bar i { flex: 1; height: 6px; border-radius: 2px; background: var(--border); }
+.cv-meter[data-level="1"] .bar i.on, .cv-meter[data-level="2"] .bar i.on { background: var(--success); }
+.cv-meter[data-level="3"] .bar i.on { background: var(--warn); }
+.cv-meter[data-level="4"] .bar i.on { background: var(--accent); }
+.cv-meter[data-level="5"] .bar i.on { background: var(--danger); }
+.cv-meter .why { color: var(--fg-2); }
+.cv-pick { font-size: var(--text-xs); color: var(--muted); }
+.cv-card.selected .cv-pick { color: var(--accent); }
+.cv-more {
+    align-self: flex-start; font: inherit; font-size: var(--text-xs); color: var(--accent);
+    background: none; border: 1px solid var(--border); border-radius: var(--radius-pill);
+    padding: 1px var(--space-3); cursor: pointer;
+}
+.cv-more:hover { border-color: var(--accent); }
+.cv-tile.has-more { cursor: pointer; }
+.cv-tile.has-more:hover { border-left-color: var(--accent); }
+.cv-tile .cv-more { margin-top: var(--space-2); }
+.cv-open { border-color: var(--accent) !important; }
+.cv-drawer {
+    margin-top: var(--space-3); padding: var(--space-3) var(--space-5);
+    background: var(--surface-warm); border: 1px solid var(--accent); border-radius: var(--radius-sm);
+    font-size: var(--text-sm); animation: cv-drop var(--motion-base) var(--ease-standard);
+}
+.cv-drawer .head { display: flex; justify-content: space-between; gap: var(--space-3); font-weight: 700; }
+.cv-drawer .head button { font: inherit; font-size: var(--text-xs); background: none; border: 0; color: var(--muted); cursor: pointer; }
+@keyframes cv-drop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.cv-verdict {
+    margin-top: var(--space-4); padding: var(--space-3) var(--space-4);
+    border-left: 3px solid var(--accent); background: var(--surface-warm); border-radius: var(--radius-sm);
+    font-size: var(--text-sm); color: var(--fg-2);
+}
+.cv-verdict::before { content: "★ "; color: var(--accent); }
+.cv-verdict p { display: inline; margin: 0; }
+.cv-decision .notes-label { margin-top: var(--space-4); }
+.cv-decision textarea {
+    width: 100%; min-height: 56px; resize: vertical;
+    border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-3);
+    font-size: var(--text-sm); line-height: 1.6; color: var(--fg);
+    background: var(--bg); caret-color: var(--accent); outline: none;
+}
+.cv-decision textarea:focus { border-color: var(--accent); }
+
 /* -- Feedback panel -- */
 .decision {
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md);
@@ -290,6 +412,9 @@ main { max-width: 880px; margin: var(--space-6) auto var(--space-12); padding: 0
 <header class="topbar">
     <span class="pill" id="badge">回饋</span>
     <h1 id="title">載入中…</h1>
+    <div class="view-toggle hidden" id="view-toggle">
+        <button data-view="cards" title="把選項排成並排卡片">圖卡</button><button data-view="plain" title="照 markdown 原文呈現">原文</button>
+    </div>
     <div class="actions">
         <button id="save-btn" title="把你的回饋寫回原始 markdown">儲存回饋</button>
         <button id="export-btn" class="ghost" title="複製更新後的 markdown">複製</button>
@@ -298,6 +423,7 @@ main { max-width: 880px; margin: var(--space-6) auto var(--space-12); padding: 0
 </header>
 
 <main>
+    <div id="cards-view" class="hidden"></div>
     <article class="brief" id="brief"></article>
     <section class="decision" id="decision-panel"></section>
 </main>
@@ -362,21 +488,40 @@ window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
 
     function markDirty() { isDirty = true; }
 
-    function renderBody(body) {
-        var briefEl = document.getElementById('brief');
-        var html = DOMPurify.sanitize(marked.parse(body), {
+    function md(src) {
+        return DOMPurify.sanitize(marked.parse(src), {
             ADD_TAGS: ['pre', 'span'], ADD_ATTR: ['class', 'language']
         });
-        briefEl.innerHTML = html;
+    }
+    function mdInline(src) {
+        return DOMPurify.sanitize(marked.parseInline(String(src || '')));
+    }
+    function el(tag, cls, html) {
+        var e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (html != null) e.innerHTML = html;
+        return e;
+    }
+    function rawOf(tokens) {
+        return tokens.map(function (t) { return t.raw; }).join('');
+    }
+
+    function renderBody(body) {
+        var briefEl = document.getElementById('brief');
+        briefEl.innerHTML = md(body);
+        decorate(briefEl);
+    }
+
+    function decorate(root) {
         // Wrap tables for horizontal scroll
-        briefEl.querySelectorAll('table').forEach(function (t) {
+        root.querySelectorAll('table').forEach(function (t) {
             if (t.parentElement.classList.contains('table-wrap')) return;
             var w = document.createElement('div'); w.className = 'table-wrap';
             t.parentNode.insertBefore(w, t); w.appendChild(t);
         });
         // Convert ```mermaid blocks to shells
         var mermaidNodes = [];
-        briefEl.querySelectorAll('code.language-mermaid').forEach(function (code) {
+        root.querySelectorAll('code.language-mermaid').forEach(function (code) {
             var pre = code.parentElement;
             var shell = document.createElement('div'); shell.className = 'mermaid-shell';
             var div = document.createElement('div'); div.className = 'mermaid';
@@ -450,13 +595,185 @@ window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
         return frag;
     }
 
-    function renderPanel(model) {
+    // Answer state lives here, not in either view, so switching views keeps
+    // unsaved picks and notes.
+    function initAnswers(model) {
+        selected = (model.fm.choice || '').trim();
+        notesValue = M.getNotes(model);
+        answers = {};
+        M.questions(model).forEach(function (q) {
+            answers[q.id] = { choices: q.choice.slice(), notes: q.notes };
+        });
+    }
+
+    // One drawer per grid, opened under the whole row so a long detail never
+    // stretches the cards it sits beside. Opening the source again closes it.
+    function drawerFor(grid) {
+        var drawer = null, source = null;
+        function sync() {
+            grid.querySelectorAll('.cv-more').forEach(function (b) {
+                b.textContent = b.parentElement.classList.contains('cv-open') ? '收起 ▴' : '詳情 ▾';
+            });
+        }
+        return function (title, tokens, from) {
+            var reopen = source !== from;
+            if (drawer) { drawer.remove(); drawer = null; source.classList.remove('cv-open'); source = null; }
+            if (reopen) {
+                source = from; from.classList.add('cv-open');
+                drawer = el('div', 'cv-drawer');
+                var head = el('div', 'head', '<span>' + mdInline(title) + '</span>');
+                var close = el('button', null, '收起 ▴'); close.type = 'button';
+                close.addEventListener('click', function () { from.querySelector('.cv-more').click(); });
+                head.appendChild(close);
+                drawer.appendChild(head);
+                var body = el('div', 'prose', md(rawOf(tokens)));
+                decorate(body);
+                drawer.appendChild(body);
+                grid.after(drawer);
+            }
+            sync();
+        };
+    }
+    function moreButton(onOpen) {
+        var b = el('button', 'cv-more', '詳情 ▾'); b.type = 'button';
+        b.addEventListener('click', function (e) { e.stopPropagation(); onOpen(); });
+        return b;
+    }
+
+    function tilesNode(block) {
+        var grid = el('div', 'cv-tiles'), open = drawerFor(grid);
+        block.tiles.forEach(function (t) {
+            var tile = el('div', 'cv-tile');
+            tile.appendChild(el('b', null, mdInline(t.title)));
+            t.fields.forEach(function (f) {
+                tile.appendChild(el('div', 'kv', '<span>' + mdInline(f.label) + '</span>' + mdInline(f.text)));
+            });
+            if (t.detail) {
+                tile.classList.add('has-more');
+                tile.appendChild(moreButton(function () { open(t.title, t.detail, tile); }));
+                tile.addEventListener('click', function () { tile.querySelector('.cv-more').click(); });
+            }
+            grid.appendChild(tile);
+        });
+        return grid;
+    }
+
+    function cardsNode(q, block) {
+        var grid = el('div', 'cv-cards'), open = drawerFor(grid);
+        function paint() {
+            var cur = answers[q.id].choices;
+            grid.querySelectorAll('.cv-card').forEach(function (c) {
+                var on = cur.indexOf(c.dataset.label) !== -1;
+                c.classList.toggle('selected', on);
+                c.querySelector('.cv-pick').textContent = q.multi
+                    ? (on ? '☑ 保留' : '☐ 保留這個')
+                    : (on ? '● 已選' : '○ 選這個');
+            });
+        }
+        block.cards.forEach(function (c, i) {
+            var card = el('div', 'cv-card' + (c.recommend ? ' rec' : ''));
+            card.dataset.label = c.label;
+            card.setAttribute('role', 'button'); card.tabIndex = 0;
+            card.appendChild(el('div', 'name', (i < 20 ? String.fromCharCode(0x2460 + i) + ' ' : '') + mdInline(c.label)));
+            if (c.recommend) card.appendChild(el('span', 'rec-tag', '建議'));
+            if (c.pros.length || c.cons.length) {
+                var ul = el('ul');
+                c.pros.forEach(function (p) { ul.appendChild(el('li', 'pro', mdInline(p))); });
+                c.cons.forEach(function (p) { ul.appendChild(el('li', 'con', mdInline(p))); });
+                card.appendChild(ul);
+            }
+            c.extras.forEach(function (x) {
+                card.appendChild(el('div', 'extra', '<span>' + mdInline(x.label) + '</span>' + mdInline(x.text)));
+            });
+            if (c.cost) {
+                var meter = el('div', 'cv-meter');
+                meter.dataset.level = c.cost.level;
+                var bars = '';
+                for (var k = 1; k <= 5; k++) bars += '<i class="' + (k <= c.cost.level ? 'on' : '') + '"></i>';
+                meter.innerHTML = mdInline(c.cost.label) + ' ' + escapeHtml(c.cost.word)
+                    + '<div class="bar">' + bars + '</div>'
+                    + (c.cost.why ? '<div class="why">' + mdInline(c.cost.why) + '</div>' : '');
+                card.appendChild(meter);
+            }
+            if (c.detail) card.appendChild(moreButton(function () { open(c.label, c.detail, card); }));
+            card.appendChild(el('div', 'cv-pick'));
+            function pick() {
+                answers[q.id].choices = M.toggle(answers[q.id].choices, c.label, q.multi);
+                markDirty(); paint();
+            }
+            card.addEventListener('click', pick);
+            card.addEventListener('keydown', function (e) {
+                if (e.target === card && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pick(); }
+            });
+            grid.appendChild(card);
+        });
+        paint();
+        return grid;
+    }
+
+    function renderCards(model, projection) {
+        var root = document.getElementById('cards-view');
+        root.innerHTML = '';
+        var qs = {};
+        M.questions(model).forEach(function (q) { qs[q.id] = q; });
+        function flow(parent, blocks, q) {
+            blocks.forEach(function (b) {
+                if (b.type === 'cards') parent.appendChild(cardsNode(q, b));
+                else if (b.type === 'tiles') parent.appendChild(tilesNode(b));
+                else if (b.type === 'verdict') parent.appendChild(el('div', 'cv-verdict', md(b.token.text)));
+                else if (b.token.type !== 'space') parent.appendChild(el('div', 'prose', md(b.token.raw)));
+            });
+        }
+        root.appendChild(el('header', 'cv-hero prose', md(rawOf(projection.hero))));
+        projection.sections.forEach(function (s) {
+            if (s.kind === 'section') {
+                root.appendChild(el('h2', 'cv-kicker', mdInline(s.title)));
+                flow(root, s.blocks, null);
+                return;
+            }
+            var q = qs[s.id];
+            var box = el('section', 'cv-decision');
+            var head = el('div', 'cv-q', '<span class="num">' + escapeHtml(q.id.toUpperCase()) + '</span><h2>' + mdInline(s.title) + '</h2>');
+            if (q.multi) head.appendChild(el('span', 'multi-tag', '可複選'));
+            box.appendChild(head);
+            flow(box, s.blocks, q);
+            box.appendChild(notesBox('這題的理由（選填）', answers[q.id].notes,
+                function (v) { answers[q.id].notes = v; }));
+            root.appendChild(box);
+        });
+        decorate(root);
+    }
+
+    var VIEW_KEY = 'viz-feedback-view';
+    function preferredView() {
+        try { return localStorage.getItem(VIEW_KEY) === 'plain' ? 'plain' : 'cards'; } catch (e) { return 'cards'; }
+    }
+
+    // 圖卡 is the default whenever the body projects; 原文 is always one click
+    // away and is the only view when nothing in the body matches a question.
+    function renderView() {
+        var model = currentModel;
+        var qs = M.questions(model);
+        var projection = qs.length ? M.project(marked.lexer(model.body), qs) : { usable: false };
+        var cards = projection.usable && preferredView() === 'cards';
+        var toggle = document.getElementById('view-toggle');
+        toggle.classList.toggle('hidden', !projection.usable);
+        toggle.querySelectorAll('button').forEach(function (b) {
+            b.classList.toggle('on', (b.dataset.view === 'cards') === cards);
+        });
+        document.querySelector('main').classList.toggle('wide', cards);
+        document.getElementById('cards-view').classList.toggle('hidden', !cards);
+        document.getElementById('brief').classList.toggle('hidden', cards);
+        if (cards) renderCards(model, projection);
+        else renderBody(model.body);
+        renderPanel(model, cards);
+    }
+
+    function renderPanel(model, questionsInline) {
         var panel = document.getElementById('decision-panel');
         var qs = M.questions(model);
         var opts = M.options(model);
         var rec = (model.fm.recommend || '').trim();
-        selected = (model.fm.choice || '').trim();
-        notesValue = M.getNotes(model);
 
         panel.innerHTML = '';
         var h = document.createElement('h2'); h.textContent = cfg(model, 'panel');
@@ -465,10 +782,8 @@ window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
             || ((qs.length || opts.length) ? DEFAULTS.promptWithOptions : DEFAULTS.promptNotesOnly);
         panel.appendChild(h); panel.appendChild(sub);
 
-        answers = {};
-        if (qs.length) {
+        if (qs.length && !questionsInline) {
             qs.forEach(function (q) {
-                answers[q.id] = { choices: q.choice.slice(), notes: q.notes };
                 var block = document.createElement('div'); block.className = 'question';
                 var qh = document.createElement('h3'); qh.className = 'q-title';
                 qh.appendChild(document.createTextNode(q.title || q.id));
@@ -488,7 +803,7 @@ window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
                     function (v) { answers[q.id].notes = v; }));
                 panel.appendChild(block);
             });
-        } else if (opts.length) {
+        } else if (!qs.length && opts.length) {
             panel.appendChild(optionList(opts, rec, false,
                 function () { return selected ? [selected] : []; },
                 function (label) { selected = M.toggle(selected ? [selected] : [], label, false)[0] || ''; }));
@@ -511,8 +826,8 @@ window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
         document.getElementById('badge').textContent = cfg(currentModel, 'badge');
         document.getElementById('title').textContent = currentModel.fm.title || '回饋';
         document.title = currentModel.fm.title || (window.SRC_NAME || 'feedback');
-        renderBody(currentModel.body);
-        renderPanel(currentModel);
+        initAnswers(currentModel);
+        renderView();
         if (mtime != null) window.SRC_MTIME = String(mtime);
         isDirty = false; dismissedMtime = 0;
     }
@@ -612,6 +927,12 @@ window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
                 document.getElementById('save-btn').style.display = 'none';
             }
             document.getElementById('save-btn').addEventListener('click', saveToServer);
+            document.querySelectorAll('#view-toggle button').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    try { localStorage.setItem(VIEW_KEY, b.dataset.view); } catch (e) { /* view just won't persist */ }
+                    if (currentModel) renderView();
+                });
+            });
             document.getElementById('export-btn').addEventListener('click', function () {
                 if (!currentModel) return;
                 commitFeedback();

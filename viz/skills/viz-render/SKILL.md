@@ -117,6 +117,10 @@ Available recipes:
 - **pr-review** — severity-grouped finding cards with status badges,
   inline-editable metadata, and severity filters. See
   `references/recipes/pr-review.md` for the markdown structure spec.
+- **feedback** — renders any markdown read-only and collects a structured
+  answer (option pick + notes) written back into frontmatter; a round of
+  several decisions opens on a card view projected from the body, with the
+  verbatim markdown one click away. See `references/recipes/feedback.md`.
 
 Workflow:
 

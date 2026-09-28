@@ -90,6 +90,32 @@ notes:                                   # round-level free text, still availabl
 - **Put every genuinely independent decision in one round**; a question whose answer
   depends on another question in the same round belongs to the next round.
 
+## Card view — round mode only
+
+A round opens on **圖卡**, a read-only projection of the body; **原文** in the top
+bar switches to the verbatim markdown render and the choice is remembered per
+browser. Answers live outside both views, so switching never loses a pick or a
+note. The projection never writes: the body on disk stays byte-for-byte.
+
+The projection reads this structure (`project()` in `lib/recipes/feedback.model.js`):
+
+| Markdown | Card view |
+|---|---|
+| Everything before the first `##` | Hero |
+| `## <text>` equal to a question's `title` | That question's decision box, answered in place |
+| First table in it whose first-column cell equals an option label | One card per option, in `options` order |
+| Header matching 好處 / 優點 / pros, 代價 / 缺點 / cons | + and − lines, split on `；` |
+| Cell opening with 高 / 中高 / 中 / 中低 / 低 | Five-step meter; text after `：` is the reason |
+| Any other column | Labelled line on the card |
+| Blockquote in a decision | ★ verdict line |
+| `### <text>` equal to a card or tile title | That card's 詳情 drawer, taken out of the flow |
+| Other `##` sections: table of 2–4 columns | One tile per row, fields labelled by header |
+| Anything else | Rendered as ordinary markdown in place |
+
+If no `##` matches a question title the toggle is hidden and the page shows only
+原文. Covered by `viz/tests/feedback.project.test.js` against
+`tests/fixtures/feedback/cards.md`.
+
 ## Bidirectional flow
 
 1. Agent writes the markdown file (canonical source), the answer keys empty.
