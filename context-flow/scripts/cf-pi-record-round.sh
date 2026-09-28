@@ -84,15 +84,17 @@ if [ -n "$repo_root" ] && [ -d "$repo_root/.git" ]; then
     key="${res%%=*}"
     val="${res#*=}"
     if [ "$val" = "PASS" ]; then
-      # Determine branch: assume current or cf/*-shard-$key
-      branch=$(git -C "$repo_root" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-      if [ -z "$branch" ] || [[ "$branch" != *"shard-$key"* ]]; then
-        # for-each-ref emits clean names; `branch --list` prefixes '+' when the
-        # branch is checked out in a linked worktree — which a live shard
-        # branch always is — and plain rev-parse echoes an unresolvable arg to
-        # stdout, so the old pipeline recorded phantom refs like `@+cf/...`.
-        branch=$(git -C "$repo_root" for-each-ref --format='%(refname:short)' \
-          "refs/heads/cf/*shard-$key" | head -1)
+      # The shard's own env.sh names its branch, as in cf-pi-rollback.sh. A glob
+      # over cf/*shard-$key tagged whichever flow's shard branch sorted first,
+      # and a bare test FLOW_SESSION tagged the leftovers in the host repo.
+      shard_env="$FLOW_SESSION/shards/$key/env.sh"
+      branch=""
+      if [ -f "$shard_env" ]; then
+        slug=$(grep -E '^CF_SLUG=' "$shard_env" | tail -1 | sed 's/^CF_SLUG="\(.*\)"$/\1/' || true)
+        if [ -z "$slug" ]; then
+          slug=$(grep -E '^SESSION_BASENAME=' "$shard_env" | head -1 | sed 's/^SESSION_BASENAME="\(.*\)"$/\1/' || true)
+        fi
+        if [ -n "$slug" ]; then branch="cf/$slug"; fi
       fi
       if [ -n "$branch" ]; then
         sha=$(git -C "$repo_root" rev-parse --verify --quiet "refs/heads/$branch" 2>/dev/null || echo "")

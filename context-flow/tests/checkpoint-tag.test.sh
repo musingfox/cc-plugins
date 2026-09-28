@@ -11,6 +11,7 @@ export REPO_ROOT
 FLOW_SESSION="$(mktemp -d)"
 export FLOW_SESSION
 mkdir -p "$FLOW_SESSION"
+mkdir -p "$FLOW_SESSION/shards/A" && echo 'CF_SLUG="myflow-shard-A"' > "$FLOW_SESSION/shards/A/env.sh"
 cd "$REPO_ROOT"
 git init -q && git config core.hooksPath /dev/null
 git commit --allow-empty -m init -q
@@ -29,6 +30,7 @@ export REPO_ROOT
 FLOW_SESSION="$(mktemp -d)"
 export FLOW_SESSION
 mkdir -p "$FLOW_SESSION"
+mkdir -p "$FLOW_SESSION/shards/A" && echo 'CF_SLUG="myflow-shard-A"' > "$FLOW_SESSION/shards/A/env.sh"
 cd "$REPO_ROOT"
 git init -q && git config core.hooksPath /dev/null
 git commit --allow-empty -m init -q
@@ -64,6 +66,7 @@ REPO_ROOT="$(mktemp -d)"
 export REPO_ROOT
 FLOW_SESSION="$(mktemp -d)"
 export FLOW_SESSION
+mkdir -p "$FLOW_SESSION/shards/A" && echo 'CF_SLUG="myflow-shard-A"' > "$FLOW_SESSION/shards/A/env.sh"
 cd "$REPO_ROOT"
 git init -q -b main && git config core.hooksPath /dev/null
 git commit --allow-empty -m init -q
@@ -80,6 +83,41 @@ tag_in_state=$(jq -r '.checkpoints.A' "$FLOW_SESSION/dispatch-state.json")
 assert_eq "$tag" "$tag_in_state" "T5 state matches the real tag"
 git worktree remove --force "$WT" 2>/dev/null || true
 rm -rf "$REPO_ROOT" "$FLOW_SESSION" "$WT_PARENT"
+
+# T6: another flow's leftover cf/aaa-shard-A sorts before this flow's
+# cf/myflow-shard-A -> the tag must land on the branch this shard's env.sh names.
+REPO_ROOT="$(mktemp -d)"
+export REPO_ROOT
+FLOW_SESSION="$(mktemp -d)"
+export FLOW_SESSION
+mkdir -p "$FLOW_SESSION/shards/A" && echo 'CF_SLUG="myflow-shard-A"' > "$FLOW_SESSION/shards/A/env.sh"
+cd "$REPO_ROOT"
+git init -q -b main && git config core.hooksPath /dev/null
+git commit --allow-empty -m init -q
+git branch cf/aaa-shard-A
+git checkout -qb cf/myflow-shard-A
+git commit --allow-empty -m mine -q
+git checkout -q main
+sha=$(git rev-parse cf/myflow-shard-A)
+"$CF_TESTS_DIR/../scripts/cf-pi-record-round.sh" --round 1 --result A=PASS
+tag_in_state=$(jq -r '.checkpoints.A' "$FLOW_SESSION/dispatch-state.json")
+assert_contains "$tag_in_state" "shard-A@$sha" "T6 checkpoint is this flow's shard branch, not a leftover"
+rm -rf "$REPO_ROOT" "$FLOW_SESSION"
+
+# T7: a FLOW_SESSION with no shard env.sh (record-round.test.sh's shape) run
+# against a repo holding some flow's cf/*-shard-A -> no tag, no checkpoint.
+REPO_ROOT="$(mktemp -d)"
+export REPO_ROOT
+FLOW_SESSION="$(mktemp -d)"
+export FLOW_SESSION
+cd "$REPO_ROOT"
+git init -q -b main && git config core.hooksPath /dev/null
+git commit --allow-empty -m init -q
+git branch cf/other-shard-A
+"$CF_TESTS_DIR/../scripts/cf-pi-record-round.sh" --round 1 --result A=PASS
+assert_eq "0" "$(git tag -l 'cf-checkpoint/*' | wc -l | tr -d ' ')" "T7 no tag without the shard's env.sh"
+assert_eq "false" "$(jq '.checkpoints | has("A")' "$FLOW_SESSION/dispatch-state.json")" "T7 no checkpoints.A"
+rm -rf "$REPO_ROOT" "$FLOW_SESSION"
 
 # T4: given REPO_ROOT empty (non-git scratch mode) -> expect exit code 0, no tag attempted, .checkpoints unchanged (graceful degrade)
 FLOW_SESSION="$(mktemp -d)"
