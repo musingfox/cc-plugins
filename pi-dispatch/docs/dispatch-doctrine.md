@@ -112,8 +112,8 @@ dispatcher picks the reviewer's routing and owns the judgement. A builder
 already on the strongest routing available gets a fresh session on that same
 routing, or main itself, as reviewer. The reviewer is just another dispatch —
 same primitives, a routing at least as capable. Between the two Claude seats
-the rule holds on effort: the frontmatter pins the builder at `low` and the
-reviewer at `xhigh`.
+the rule holds on model and effort: the frontmatter pins the builder at `low`
+and the reviewer on `opus` at `xhigh`.
 
 Proportionality: deterministic checks always run; a separate reviewer is
 dispatched only when the deliverable is a code change or the contract has
