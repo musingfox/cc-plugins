@@ -9,11 +9,6 @@
   ],
   "plugins": [
     {
-      "name": "omt",
-      "source": "./omt",
-      "description": "OMT - One Man Team: Your personal development squad powered by Agent-First workflow with 5 autonomous agents"
-    },
-    {
       "name": "viz",
       "source": "./viz",
       "description": "Visual output for chat and browser — inline code-shape visuals (viz-inline) plus markdown/Mermaid HTML rendering (viz-render)"

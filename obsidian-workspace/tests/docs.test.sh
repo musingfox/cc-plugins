@@ -10,8 +10,8 @@ n="$(grep -c 'skills: init, jot, pm · templates, tests' README.md || true)"
 n="$(awk '/^### Obsidian Workspace/,/^### pi-dispatch/' README.md | grep -ci 'tickets' || true)"
 [ "$n" -ge 1 ] || fail "root README Obsidian Workspace section must mention tickets"
 
-order="$(grep -oE '^├── (obsidian-workspace|omt|pi-dispatch)/' README.md | paste -sd, -)"
-[ "$order" = '├── obsidian-workspace/,├── omt/,├── pi-dispatch/' ] || fail "tree order is $order"
+order="$(grep -oE '^├── (obsidian-workspace|pi-dispatch)/' README.md | paste -sd, -)"
+[ "$order" = '├── obsidian-workspace/,├── pi-dispatch/' ] || fail "tree order is $order"
 
 n="$(awk '/^## Skills/,/^## How It Works/' obsidian-workspace/README.md | grep -c 'tickets' || true)"
 [ "$n" -eq 1 ] || fail "plugin Skills section tickets count is $n, want 1"

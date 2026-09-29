@@ -12,20 +12,6 @@ Add this marketplace to your Claude Code:
 
 ## Available Plugins
 
-### OMT - One Man Team
-
-Your personal development squad powered by Agent-First workflow:
-- **5 Core Agents**: @hive (lifecycle coordinator), @pm (requirements), @arch (architecture), @dev (TDD implementation), @reviewer (code review + commit)
-- **Contract-First Design**: Defined input/output contracts between agents (`hive.json`, `pm.json`, `arch.json`, `dev.json`)
-- **One Command**: `/omt "goal"` → autonomous planning → consensus gate → execution
-- **Quality Assurance**: Automated code review and git commit workflows
-- **State Synchronization**: PostToolUse hooks for automatic state tracking
-
-**Installation:**
-```bash
-/plugin install omt
-```
-
 ### Viz — Markdown & Mermaid HTML Renderer
 
 Visual output across the whole spectrum — inline chat shapes for short explanations, browser HTML for long documents:
@@ -289,7 +275,6 @@ cc-plugins/
 ├── hook-guard/         skills: hook-guard
 ├── obsidian-workspace/ skills: init, jot, pm · templates, tests · hooks: register (Claude Mod)
 ├── omp-quota/          hooks: register (Claude Mod) · tests
-├── omt/                skills: contract-validation · agents, commands, contracts, lib
 ├── pi-dispatch/        skills: pi-dispatch · agents: builder, reviewer · scripts, shims, extensions, tests
 ├── spec/               skills: spec, glossary · scripts: spec.sh · tests
 ├── spiral/             commands: spiral · agents: divergence, probe, prototype · scripts · tests
