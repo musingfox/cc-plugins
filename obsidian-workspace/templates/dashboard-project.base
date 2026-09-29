@@ -3,7 +3,7 @@ filters:
     - file.inFolder("pm/__PROJECT__")
 
 formulas:
-  display: 'if(title, title, file.name)'
+  display: 'file.asLink(if(title, title, file.name))'
   days_until_due: 'if(due, (date(due) - today()).days, "")'
 
 properties:
