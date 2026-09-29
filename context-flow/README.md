@@ -21,7 +21,7 @@ A goal that points at a handoff document carrying explicit, human-approved contr
 
 ## Effort per Seat
 
-Each agent pins its own `effort:` in frontmatter; the orchestrator sets neither model nor effort at dispatch. Effort rises with how much of the seat's work is still undecided: `cf:implement` executes pinned contracts at `low`, while `cf:research`, `cf:plan` and `cf:review` run at `xhigh`. `cf:review` also pins `model: opus`, so the judge sits at or above the builder.
+Each agent pins its own `model:` and `effort:` in frontmatter; the orchestrator sets neither at dispatch. Effort rises with how much of the seat's work is still undecided, and the model follows it: `cf:implement` executes pinned contracts on `sonnet` at `medium`, while `cf:research`, `cf:plan` and `cf:review` run on `opus` at `xhigh`. `cf:implement` sits at `medium` rather than `low` because Sonnet at `low` sometimes reports a change done without running its check. The `opus` pin keeps the `xhigh` seats off Sonnet when the session runs on it, and keeps the judge at or above the builder.
 
 The default implementer is an OMP worker outside Claude Code. Its model and thinking level come from `PI_DISPATCH_CMD`, not from frontmatter.
 
@@ -66,7 +66,7 @@ The default implementer is an OMP worker outside Claude Code. Its model and thin
 
 ### Direct Sub-agent Invocation Caveat
 
-Agents (`@cf:research`, `@cf:plan`, etc.) are designed to be dispatched by the `/cf` orchestrator, which hands each one exactly the inputs its contract names. **If you invoke a sub-agent directly** (e.g., `@cf:research <goal>`), it still runs at its pinned effort and on the session's model (`cf:review` on `opus`), but without the orchestrator's transition validation, human gate, and loop budget. Prefer `/cf` for full pipeline behavior.
+Agents (`@cf:research`, `@cf:plan`, etc.) are designed to be dispatched by the `/cf` orchestrator, which hands each one exactly the inputs its contract names. **If you invoke a sub-agent directly** (e.g., `@cf:research <goal>`), it still runs on its pinned model and effort, but without the orchestrator's transition validation, human gate, and loop budget. Prefer `/cf` for full pipeline behavior.
 
 ## Design Documentation
 
