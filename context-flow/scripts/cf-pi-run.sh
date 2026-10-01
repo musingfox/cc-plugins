@@ -134,6 +134,9 @@ say() {
 # must stay in the search or a post-resume failure reports no evidence at all.
 newest_jsonl() {
   local f d globs=""
+  # Only OMP writes worker JSONL. A Claude shard that follows an OMP round (builder
+  # switched mid-flow) would otherwise quote that round's pi-sessions/ errorMessage.
+  [ "$BUILDER" = claude ] && return 0
   for f in "$SHARD_SESSION/pi-rundir" "$SHARD_SESSION/pi-rundir-prev"; do
     [ -f "$f" ] || continue
     d="$(cat "$f" 2>/dev/null || true)"
