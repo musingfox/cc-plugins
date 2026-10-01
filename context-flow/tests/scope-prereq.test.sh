@@ -137,10 +137,9 @@ case "$(sed -n '/^## Undeclared files/,/^$/p' "$SHARD/outcome.md")" in
 esac
 rm -rf "$FLOW"
 
-# T3: the gate's CLI contract, as the Claude-fallback path (cf.md §3.6) consumes
-# it — exit 2 plus a machine-readable UNDECLARED line on stdout. Unlike
-# cf-pi-run.sh --gates-only, the fallback has no cf-pi-run.sh around it, so
-# these two signals are all it gets.
+# T3: the gate's CLI contract, as a caller outside cf-pi-run.sh would consume
+# it — exit 2 plus a machine-readable UNDECLARED line on stdout, the only
+# two signals the gate script itself gives.
 build_fixture "src/rogue.py"
 set +e
 scope_out=$(bash "$REAL_SCRIPTS/cf-pi-scope.sh" "$SHARD" 2>&1)

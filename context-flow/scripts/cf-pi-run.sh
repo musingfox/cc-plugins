@@ -32,8 +32,7 @@
 #                            be read as this round's (a re-launched shard reuses
 #                            the same session directory)
 #   1-2. cf-pi-prepare.sh    worktree + branch, prerequisite checkpoints merged,
-#                            brief assembled (plain and --prepare-only; the
-#                            Claude fallback shares it)
+#                            brief assembled (plain and --prepare-only)
 #   3. cf-pi-probe.sh        liveness probe            (plain only)
 #   4. cf-pi-dispatch.sh     background OMP            (plain only)
 #   5. poll loop             cf-pi-poll.sh once per ~30s, max 64 rounds at the default wall clock
@@ -369,7 +368,7 @@ on_exit() {
 trap on_exit EXIT
 
 # -------- 1-2. prepare: worktree, prerequisite checkpoints, brief -------
-# Shared with --prepare-only and the Claude fallback (cf.md §3.6). Through $SCRIPT_DIR, not
+# Shared with --prepare-only. Through $SCRIPT_DIR, not
 # $SCRIPTS: fixtures stub the worktree and brief scripts it calls via $SCRIPTS.
 
 if [ "$MODE" != gates ]; then
@@ -782,8 +781,8 @@ else
 fi
 
 # -------- 10. actual ⊆ declared file scope -----------------------------
-# Mechanism lives in cf-pi-scope.sh so --gates-only and the Claude-fallback path
-# (cf.md §3.6) run the identical gate instead of a prose approximation.
+# Mechanism lives in cf-pi-scope.sh so the plain form and --gates-only
+# run the identical gate instead of a prose approximation.
 
 set +e
 scope_out=$("$SCRIPT_DIR/cf-pi-scope.sh" "$SHARD_SESSION" 2>&1)  # not $SCRIPTS: this gate is never stubbable

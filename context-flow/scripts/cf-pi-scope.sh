@@ -4,8 +4,7 @@
 # The only deterministic guard against a builder leaving files in the user's
 # project that no contract declared. EVERY implementer path must run it — the
 # OMP path via cf-pi-run.sh step 10, the Claude builder via cf-pi-run.sh
-# --gates-only (same step), the Claude-fallback path via the /cf orchestrator
-# (commands/cf.md §3.6). `git status --porcelain` is NOT a
+# --gates-only (same step). `git status --porcelain` is NOT a
 # substitute: the builder commits with `git add -A`, and porcelain is blind to
 # anything already committed.
 #
