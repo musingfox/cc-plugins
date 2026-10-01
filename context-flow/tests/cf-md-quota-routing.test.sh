@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Pins cf.md's quota routing: no pre-dispatch gate, quota reasons are never
-# re-launched, and a quota outcome is a §3.6 fallback trigger.
+# re-launched on the same routing, and a quota outcome on OMP is offered a route
+# back to the Claude builder (CF_IMPLEMENTER=claude) or a stop.
 # NO set -e
 
 : "${CF_TESTS_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
@@ -26,3 +27,6 @@ assert_contains "$any_fail" "When any shard in the round ended \`QUOTA\` or \`QU
   "a quota outcome holds the round's other FAIL re-launches"
 
 assert_contains "$(grep -m1 '^### 3\.6' "$CF_MD")" "QUOTA" "§3.6 heading names the quota tags"
+
+assert_contains "$any_fail" 'CF_IMPLEMENTER=claude' "a quota outcome can route back to the Claude builder"
+assert_eq "0" "$(printf '%s\n' "$any_fail" | grep -cF 'Claude fallback' || true)" "Any FAIL names no Claude fallback"
