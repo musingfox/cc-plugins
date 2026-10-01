@@ -40,7 +40,7 @@ audit of a small repo loads the core alone.
 | Contributing | [contributing.md](references/contributing.md) | a `CONTRIBUTING` file in the root, `docs/` or `.github/`; process rules inside `CLAUDE.md`; hooks the repo itself sets, found with `git config --show-origin core.hooksPath` and `.git/hooks` |
 | Nested | [nested.md](references/nested.md) | a `CLAUDE.md` or `AGENTS.md` below the root; `.claude/rules/`; workspaces or package manifests below the root; a rule that matters in one directory |
 | Invariants, decisions, terms | load `/spec:spec`, `/adr:adr` or `/spec:glossary` before editing an entry | `docs/spec/`, `docs/decisions/` or `docs/adr/`, `CONTEXT.md`; a constraint or decision candidate |
-| UI design | [design.md](references/design.md) | a frontend framework, design tokens or stylesheets |
+| UI design | [design.md](references/design.md) | a `DESIGN.md`; a frontend framework, design tokens or stylesheets |
 | Operations | [operations.md](references/operations.md) | IaC or deploy config: terraform, `wrangler.*`, compose files, k8s manifests |
 
 How a module fires decides the move it allows:

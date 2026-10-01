@@ -1,7 +1,9 @@
 # UI design module
 
-Home: `docs/design.md`. It covers UI and visual design only; software design decisions
-go to `/adr:adr`.
+Home: `DESIGN.md` at the root, the format
+[Google Stitch introduced](https://designmd.app/what-is-design-md) for coding agents:
+design tokens in YAML frontmatter, design rules in prose. It covers UI and visual design
+only; software design decisions go to `/adr:adr`.
 
 ## What it holds
 
@@ -9,9 +11,10 @@ go to `/adr:adr`.
 - Rules for using components and tokens: when to use which, and what never to combine.
 - What the design system leaves out on purpose.
 
-Token values, palettes and component props live in the token files and the component
-library. The doc names the source ("every color in `tokens.css`") instead of copying the
-values. A rule a linter or visual test enforces gets one line that names the check.
+Token values have one home. When `DESIGN.md` is the source, its frontmatter holds the
+values and the code's tokens are generated from it. Otherwise the token files hold them,
+and `DESIGN.md` names the source ("every color in `tokens.css`") instead of copying the
+values. Component props stay in the component library. A rule a linter or visual test enforces gets one line that names the check.
 
 ## Keeping it from drifting
 
