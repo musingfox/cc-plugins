@@ -1,5 +1,5 @@
 ---
-description: "Context-flow pipeline — contract-driven development with human-in-the-loop decision gating; OMP as default implementer, Claude implement agent as fallback"
+description: "Context-flow pipeline — contract-driven development with human-in-the-loop decision gating; Claude cf:implement agents build by default, OMP is an opt-in overflow"
 argument-hint: "<goal>"
 allowed-tools: [Agent, Read, Write, Bash, Glob, Grep, AskUserQuestion, Monitor]
 ---
@@ -14,11 +14,11 @@ Phase 3 mechanics live in `${CLAUDE_PLUGIN_ROOT}/scripts/cf-pi-*.sh`. The orches
 
 ```bash
 SCRIPTS="${CLAUDE_PLUGIN_ROOT}/scripts"
-SESSION=$("$SCRIPTS/cf-pi-setup.sh" "<slug>")   # honors PI_DISPATCH_CMD / PI_STALL_THRESHOLD_S / PI_WALL_CLOCK_S
+SESSION=$("$SCRIPTS/cf-pi-setup.sh" "<slug>")   # honors CF_IMPLEMENTER / PI_DISPATCH_CMD / PI_STALL_THRESHOLD_S / PI_WALL_CLOCK_S
 # <slug> = task short name you derive from the goal: kebab-case, 1-3 words
 # (e.g. "rwd-setup"). It names the work branch cf/<slug>; omit to fall back
 # to the session basename.
-. "$SESSION/env.sh"                      # exposes SESSION_BASENAME, BRIEF_FILE, REPORT_FILE, PI_PROTOCOL, PI_AVAILABLE, PI_DESC, PROTOCOL_DIR, thresholds
+. "$SESSION/env.sh"                      # exposes SESSION_BASENAME, BRIEF_FILE, REPORT_FILE, PI_PROTOCOL, PI_AVAILABLE, CF_IMPLEMENTER, PI_DESC, PROTOCOL_DIR, thresholds
 PROTOCOL_DIR="${PROTOCOL_DIR:-${CLAUDE_PLUGIN_ROOT}/docs}"
 echo '{"retries_used":0}' > "$SESSION/loop-budget.json"
 echo "SESSION=$SESSION"
@@ -50,13 +50,13 @@ to breaking-change-only.` — then apply these deltas:
 
 ### Implementer pre-flight
 
-After setup, read `$PI_AVAILABLE` from env.sh:
+After setup, read `CF_IMPLEMENTER` and `PI_AVAILABLE` from env.sh:
 
-- `PI_AVAILABLE=1` → Phase 3 uses OMP (default).
-- `PI_AVAILABLE=0` → Phase 3 falls back to Claude `cf:implement` agent. Log the `cf-pi-setup: pi-probe:` line setup printed on stderr and `Phase 3 will use Claude implement agent.` A `NO_BIN` line means the agent binary is missing (install pi: `npm i -g @earendil-works/pi-coding-agent`). Do NOT abort.
-- `PI_AVAILABLE=0` with `ERROR:PI_DISPATCH_CMD is not set`, or an `ERROR:` naming a retired variable → do not fall back silently. Ask via `AskUserQuestion`: set up pi routing now (recommended) or run Phase 3 on the Claude fallback. On set-up, follow the pi-dispatch skill's "When it is missing" steps to choose and probe a command, then re-run setup with it inline (`SESSION=$(PI_DISPATCH_CMD='<choice>' "$SCRIPTS/cf-pi-setup.sh" "<slug>")`) and re-read env.sh; the flow records the command there.
+- `CF_IMPLEMENTER=claude` (also unset or empty) → Phase 3 uses Claude `cf:implement`, whatever `PI_AVAILABLE` says. Log `Phase 3 will use Claude cf:implement.` plus one clause saying whether the OMP overflow is available (`PI_AVAILABLE=1`) or not (`PI_AVAILABLE=0`; a `NO_BIN` line in the `cf-pi-setup: pi-probe:` line printed on stderr means the agent binary is missing — install pi: `npm i -g @earendil-works/pi-coding-agent`). Do NOT abort and do NOT ask.
+- `CF_IMPLEMENTER=omp` with `PI_AVAILABLE=1` → Phase 3 uses OMP per §3.6.
+- `CF_IMPLEMENTER=omp` with `PI_AVAILABLE=0` (including `ERROR:PI_DISPATCH_CMD is not set`, or an `ERROR:` naming a retired variable) → do not switch silently. Ask via `AskUserQuestion`: set up pi routing now, or run Phase 3 on Claude `cf:implement`. On set-up, follow the pi-dispatch skill's "When it is missing" steps to choose and probe a command, then re-run setup with it inline (`SESSION=$(CF_IMPLEMENTER=omp PI_DISPATCH_CMD='<choice>' "$SCRIPTS/cf-pi-setup.sh" "<slug>")`) and re-read env.sh; the flow records the command there.
 
-The fallback path is also reachable mid-flow (a shard's `Status: FAIL` with unrecoverable probe error or with Reason `QUOTA` or `QUOTA-WINDOW` — §3.4, or the human selects "Fall back to Claude implement agent" at a recovery prompt). Procedure: §3.6.
+OMP is offered mid-flow only at the moments §3.6 lists.
 
 ---
 
@@ -66,11 +66,11 @@ The fallback path is also reachable mid-flow (a shard's `Status: FAIL` with unre
 |-------|-------|-------|
 | Research | `cf:research` | Read, Grep, Glob, Bash, WebFetch |
 | Plan | `cf:plan` | Read, Write, Grep, Glob |
-| **Implement (default)** | **OMP via background `cf-pi-run.sh`** | OMP's own tools + main's Bash/Read |
-| Implement (fallback) | `cf:implement` | Read, Edit, Write, Bash, Glob, Grep, WebFetch |
+| **Implement (default)** | **`cf:implement`** | Read, Edit, Write, Bash, Glob, Grep, WebFetch |
+| Implement (overflow, opt-in) | OMP via background `cf-pi-run.sh` | OMP's own tools + main's Bash/Read |
 | Review | `cf:review` | Read, Write, Grep, Glob, Bash |
 
-Phase 3 routes the OMP builder via `$PI_DISPATCH_CMD`, the agent command with its `--model` flag (for example `pi --model openai-codex/gpt-5.6-terra`; unset, pi runs on its own settings). The retired `PI_BIN`, `PI_PROVIDER`, `PI_MODEL` and `PI_EXTRA_ARGS` are refused when set: setup's probe reports `ERROR:<var> is retired` on stderr and records `PI_AVAILABLE=0`, so Phase 3 runs on the Claude fallback until the human moves that routing into `PI_DISPATCH_CMD`. Setup records `$PI_DISPATCH_CMD` in `env.sh`, and every later step reads it from there, so a change in the environment takes effect only in a new flow. The Claude fallback runs on the default model. Choose the builder's model with the review seat in mind — the reviewer must sit at or above the builder's capability (dispatch doctrine: reviewer ≥ builder), and nothing enforces that for you. If a more specialized agent exists for the goal (e.g., a frontend-dev agent for UI work), prefer it.
+The default builder is `cf:implement` on the default model; OMP builds only when `CF_IMPLEMENTER=omp` is recorded in `env.sh`. OMP rounds route the builder via `$PI_DISPATCH_CMD`, the agent command with its `--model` flag (for example `pi --model openai-codex/gpt-5.6-terra`; unset, pi runs on its own settings). The retired `PI_BIN`, `PI_PROVIDER`, `PI_MODEL` and `PI_EXTRA_ARGS` are refused when set: setup's probe reports `ERROR:<var> is retired` on stderr and records `PI_AVAILABLE=0`, so OMP stays unavailable until the human moves that routing into `PI_DISPATCH_CMD`. Setup records `$PI_DISPATCH_CMD` in `env.sh`, and every later step reads it from there, so a change in the environment takes effect only in a new flow. Choose the OMP builder's model with the review seat in mind — the reviewer must sit at or above the builder's capability (dispatch doctrine: reviewer ≥ builder), and nothing enforces that for you. If a more specialized agent exists for the goal (e.g., a frontend-dev agent for UI work), prefer it.
 
 ### Agent Output Discipline (file-write + summary reply)
 
@@ -122,7 +122,7 @@ Each phase below specifies its own option set. "Ask the human X" everywhere mean
 [research] → VALIDATE
   → [plan] → VALIDATE → HUMAN GATE (High decisions only)
        ↑ Research Insufficiency BLOCKED → research (cross-phase)
-  → [implement — OMP default, Claude fallback] → VALIDATE
+  → [implement — Claude default, OMP overflow] → VALIDATE
        ↑ Failure Class = retry-different-approach → implement (same plan, with hint)
        ↑ Failure Class = loop-back-to-plan → plan (revise contracts)
        ↑ Failure Class = pivot-goal → escalate to human (bypass retry budget)
@@ -279,7 +279,7 @@ carries that approval from the upstream handoff).
 
 ## Phase 3: Implement
 
-State to the human upfront: `Phase 3: parallel-sharded OMP fan-out on <N> contract(s). Parent branch cf/$CF_SLUG; per-shard branches cf/$CF_SLUG-shard-<id>.`
+State to the human upfront: `Phase 3: parallel-sharded fan-out on <N> contract(s), built by <cf:implement | OMP ($PI_DESC)> per CF_IMPLEMENTER. Parent branch cf/$CF_SLUG; per-shard branches cf/$CF_SLUG-shard-<id>.`
 
 Phase 3 splits the contract set by file-touch graph and runs one `cf-pi-run.sh` per shard, each as a **main-launched background task** (no sub-agent). The full per-shard lifecycle (worktree → brief → probe → dispatch → poll → gates → outcome) lives inside that script; you only fan out, collect, and route.
 
