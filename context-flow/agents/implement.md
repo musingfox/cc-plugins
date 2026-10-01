@@ -47,3 +47,5 @@ Do NOT paste report bodies, code excerpts, or test output into your reply.
 
 - All test cases from the contracts must be executed, not just written.
 - Do not modify code outside the scope of the contracts unless absolutely necessary for the implementation to work.
+- Before you reply, stop every background process you started and confirm none is left, so nothing you left running races the gates in the same worktree.
+- A command that may run past about nine minutes runs with `run_in_background` and is waited on by foreground checks of under 10 minutes each; never reply while it is still running.
