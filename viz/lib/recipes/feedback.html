@@ -373,8 +373,11 @@ main.wide { max-width: 1080px; }
     padding: var(--space-2) var(--space-5); border-radius: var(--radius-sm);
     font-size: var(--text-sm); box-shadow: var(--elev-raised);
     transition: transform var(--motion-base) var(--ease-standard); pointer-events: none; z-index: 100;
+    width: max-content; max-width: min(720px, calc(100vw - 32px));
 }
 .toast.show { transform: translateX(-50%) translateY(0); }
+/* A conflict toast now stays up, so it would sit under the banner it explains. */
+body:has(.reload-banner:not(.hidden)) .toast { bottom: calc(var(--space-6) + 56px); }
 .reload-banner {
     position: fixed; bottom: var(--space-6); left: 50%; transform: translateX(-50%);
     background: var(--surface-warm); color: var(--warn); padding: var(--space-2) var(--space-4);
@@ -573,7 +576,8 @@ window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
                 var tag = document.createElement('span'); tag.className = 'rec'; tag.textContent = '建議';
                 row.appendChild(tag);
             }
-            row.addEventListener('click', function () {
+            row.addEventListener('click', function (e) {
+                if (e.detail > 1) return;
                 onToggle(label); markDirty(); paint();
             });
             list.appendChild(row);
@@ -701,9 +705,12 @@ window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
                 answers[q.id].choices = M.toggle(answers[q.id].choices, c.label, q.multi);
                 markDirty(); paint();
             }
-            card.addEventListener('click', pick);
+            // The second click of a double-click would undo the first. Space is left
+            // to scroll the page: a card keeps focus after a click, so Space on it
+            // used to toggle the pick away unseen.
+            card.addEventListener('click', function (e) { if (e.detail <= 1) pick(); });
             card.addEventListener('keydown', function (e) {
-                if (e.target === card && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pick(); }
+                if (e.target === card && e.key === 'Enter') { e.preventDefault(); pick(); }
             });
             grid.appendChild(card);
         });
@@ -866,11 +873,13 @@ window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
     }
     function hideReloadBanner() { document.getElementById('reload-banner').classList.add('hidden'); }
 
-    function showToast(msg) {
+    // ms: how long it stays; 0 keeps it up until the next toast replaces it.
+    function showToast(msg, ms) {
         var t = document.getElementById('toast');
         t.textContent = msg; t.classList.add('show');
         clearTimeout(t._timer);
-        t._timer = setTimeout(function () { t.classList.remove('show'); }, 2000);
+        if (ms === 0) return;
+        t._timer = setTimeout(function () { t.classList.remove('show'); }, ms || 2000);
     }
 
     function downloadMarkdown(md) {
@@ -892,12 +901,34 @@ window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
         M.setNotes(currentModel, notesValue);
     }
 
+    // Labels of the questions that carry options but no pick yet. The first Save
+    // is the one the waiting agent reads, so a blank sent by accident is final.
+    function unanswered() {
+        var qs = M.questions(currentModel);
+        if (!qs.length) return M.options(currentModel).length && !selected ? [currentModel.fm.title || cfg(currentModel, 'panel')] : [];
+        return qs.filter(function (q) {
+            return q.options.length && !(answers[q.id] && answers[q.id].choices.length);
+        }).map(function (q) { return q.id.toUpperCase() + ' ' + (q.title || ''); });
+    }
+
+    // What the Save actually wrote, read back from the committed model.
+    function receipt() {
+        var qs = M.questions(currentModel);
+        if (!qs.length) return '已儲存：' + (selected || '（未選）');
+        return '已儲存 — ' + qs.map(function (q) {
+            return q.id.toUpperCase() + ' ' + (q.choice.length ? q.choice.join('、') : '（未選）');
+        }).join('；');
+    }
+
     function saveToServer() {
         if (!currentModel) { showToast('還在載入…'); return; }
         if (!window.SRC_PATH || window.SRC_PATH.indexOf('/') !== 0) {
             showToast('沒有來源路徑（file:// 開啟）— 改用「複製」貼回 agent');
             return;
         }
+        var blank = unanswered();
+        if (blank.length && !window.confirm('這些題目還沒選，送出後 agent 會當成留白：\n\n'
+            + blank.join('\n') + '\n\n確定要送出嗎？')) return;
         commitFeedback();
         var md = M.serialize(currentModel);
         var clientMtime = window.SRC_MTIME ? parseFloat(window.SRC_MTIME) : null;
@@ -909,15 +940,15 @@ window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
         }).then(function (r) {
             if (r.status === 200) {
                 window.SRC_MTIME = String(r.data.mtime); isDirty = false;
-                showToast(selected ? ('已儲存：' + selected + ' — 回終端機確認') : '已儲存回饋 — 回終端機確認');
+                showToast(receipt() + ' — 回終端機確認', 8000);
             } else if (r.status === 409) {
                 window.SRC_MTIME = String(r.data.current_mtime);
-                showToast('檔案在外部被改動 — 再按一次「儲存回饋」覆蓋');
+                showToast('沒有存進去：檔案在外部被改動 — 再按一次「儲存回饋」覆蓋', 0);
             } else {
-                showToast('儲存失敗：' + (r.data.error || r.status));
+                showToast('儲存失敗：' + (r.data.error || r.status), 0);
             }
         }).catch(function (e) {
-            showToast('儲存失敗：' + e.message + '（server 沒開？改用「複製」）');
+            showToast('儲存失敗：' + e.message + '（server 沒開？改用「複製」）', 0);
         });
     }
 

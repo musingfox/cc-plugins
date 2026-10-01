@@ -56,7 +56,8 @@ seams, not to add a second flagship.
 >
 > Selection logic (`toggle`, answer-key placement) lives in `feedback.model.js`
 > and is covered by `tests/feedback.roundtrip.test.js`; the DOM wiring in
-> `feedback.html` is the one seam with no automated check.
+> `feedback.html` is covered only by `tests/feedback.e2e.ts` (`bun run e2e`), which
+> drives a headless Chromium and is not part of `bun test`.
 
 ## Current architecture
 

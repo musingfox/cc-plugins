@@ -141,11 +141,13 @@ describe('feedback round mode', () => {
         expect(out.match(/^choice:/gm)).toBe(null);
     });
 
-    test('toggle: multi accumulates, single replaces', () => {
+    // A re-click on a single pick keeps it: a double-click, or a second click to look
+    // again, used to clear the answer while the page still read as answered.
+    test('toggle: multi accumulates, single replaces and a re-click keeps it', () => {
         expect(M.toggle(['a'], 'b', true)).toEqual(['a', 'b']);
         expect(M.toggle(['a', 'b'], 'a', true)).toEqual(['b']);
         expect(M.toggle(['a'], 'b', false)).toEqual(['b']);
-        expect(M.toggle(['a'], 'a', false)).toEqual([]);
+        expect(M.toggle(['a'], 'a', false)).toEqual(['a']);
     });
 
     // '#' is an ordinary character in a value, so a template written with trailing

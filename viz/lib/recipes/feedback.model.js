@@ -92,11 +92,11 @@ function createFeedbackModel() {
     }
 
     // Which labels a click leaves selected. Multi accumulates; single replaces,
-    // and re-clicking the sole selection clears it.
+    // and re-clicking the sole selection keeps it.
     function toggle(choices, label, multi) {
         var cur = (choices || []).slice();
         var i = cur.indexOf(label);
-        if (!multi) return i === -1 ? [label] : [];
+        if (!multi) return [label];
         if (i === -1) cur.push(label); else cur.splice(i, 1);
         return cur;
     }

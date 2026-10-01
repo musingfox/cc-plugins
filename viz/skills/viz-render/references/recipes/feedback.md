@@ -81,7 +81,8 @@ notes:                                   # round-level free text, still availabl
 - **Fields** — only `title`, `options`, `recommend`, `multi`, `choice`, `notes` are
   recognised after the dot. Everything else stays an ordinary top-level key.
 - **`<id>.multi: true`** — the option cards become checkboxes. Without it a question
-  is single-select, and re-clicking the selected card clears it.
+  is single-select: a click picks, a re-click keeps the pick, and the second click of
+  a double-click is ignored. A card answers to Enter, not Space, so Space still scrolls.
 - **`<id>.choice`** — always a *list* on disk, pipe-separated, empty when unanswered.
   A single-select answer is simply a one-element list, so a reader parses both the
   same way.
@@ -123,7 +124,10 @@ If no `##` matches a question title the toggle is hidden and the page shows only
    and opens the interactive page (http://, so Save works).
 3. Human reads the body, picks an option, writes notes.
 4. Human clicks **儲存回饋 (Save)** → `POST /api/save` writes `choice`/`notes`
-   back into the same `.md`; the body is untouched.
+   back into the same `.md`; the body is untouched. A question with options but no
+   pick asks for confirmation first, the success toast lists what each question
+   saved, and a Save that did not land (conflict or failure) stays on screen until
+   the next one.
 5. Agent re-reads the `.md` and takes `choice:` and `notes:` as the human's
    answer. Empty `choice:` = not saved → fall back to a terminal answer.
 
