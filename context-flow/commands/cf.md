@@ -442,7 +442,7 @@ Bash(run_in_background: true, command:
 
 If the second attempt still returns FAIL, escalate via `AskUserQuestion` (peek context with `head -80 "$SESSION/shards/<id>/escalate.md"` if present):
 
-- Options: `accept-partial` (drop failed shard, route remaining via §3.4 below) / `abort-flow` / `attempt-third-retry`.
+- Options: `accept-partial` (drop failed shard, route remaining via §3.4 below) / `abort-flow` / `attempt-third-retry` / `rerun-on-omp` (a Claude shard only, and only when `PI_AVAILABLE=1`: record `CF_IMPLEMENTER=omp` per §3.6 and run it as an OMP round).
 
 Per-shard, per-round FAIL retry budget = 1 (design §6).
 
@@ -530,6 +530,18 @@ Replan budget = 2 attempts per contract (third NEEDS_REPLAN escalates). Rollback
 ### 3.6 OMP overflow (`CF_IMPLEMENTER=omp`): one background `cf-pi-run.sh` per shard, `QUOTA` outcomes
 
 OMP builds a round only when `CF_IMPLEMENTER=omp` is recorded in `$SESSION/env.sh` and `PI_AVAILABLE=1`. The full per-shard lifecycle (worktree → brief → probe → dispatch → poll → gates → outcome) lives inside `cf-pi-run.sh`; you only fan out, collect, and route.
+
+**When to offer OMP.** Main suggests it at exactly three moments, and only when `PI_AVAILABLE=1`:
+
+1. A Claude usage limit shows in a `cf:implement` reply (§3.2 step 4), or the weekly limit is spent.
+2. A shard's second FAIL on Claude (§3.4 Any FAIL).
+3. The human says they raised their quota, for example that the weekly limit was lifted.
+
+Never ask at flow start. With `PI_AVAILABLE=0` never offer OMP at all: pi set up mid-flow applies to the next flow. A switch appends `CF_IMPLEMENTER=omp` to `$SESSION/env.sh` and takes effect from the next wave or re-run; rounds already built stay as they are.
+
+On a usage-limit reply, stop this round's Claude dispatches and re-briefs, then ask via `AskUserQuestion`: switch these shards to OMP (offered only with `PI_AVAILABLE=1`), wait for the reset and re-dispatch them, or stop. This is not counted against the retry budget.
+
+OMP builds with the model in `$PI_DISPATCH_CMD`. Keep the reviewer at or above that model (dispatch doctrine: reviewer ≥ builder); nothing enforces it for you.
 
 **No pre-dispatch quota gate.** There is none, deliberately: since dispatch moved from omp to pi there is no provider-side headroom signal to read (`pi auth check` reports readiness, not remaining balance, and is blind to package-provided providers). Exhaustion is caught reactively — `cf-pi-run.sh`'s poll classifies it as `QUOTA` (balance or plan, which only paying resets) or `QUOTA-WINDOW` (a rolling window that clears on its own in hours), and one worker hitting the wall aborts its whole batch rather than letting every sibling pay for the same wall: the shard that hits it records the wall for the flow, and every sibling `cf-pi-run.sh` stops its own worker from that record with the same tag. On that outcome (§3.4 Any FAIL), route those shards back to the Claude builder (§3.2) or re-run later as a new flow with a different `$PI_DISPATCH_CMD`.
 
