@@ -47,5 +47,7 @@ Do NOT paste report bodies, code excerpts, or test output into your reply.
 
 - All test cases from the contracts must be executed, not just written.
 - Do not modify code outside the scope of the contracts unless absolutely necessary for the implementation to work.
+- Commit with the repo's hooks on: never pass `--no-verify` and never override `core.hooksPath`. If a hook blocks a commit and you cannot satisfy it, write the hook's message to `ESCALATE_FILE` and stop.
+- Never rewrite a commit already on the shard branch — no `--amend`, no `fixup!`/autosquash rebase, no rebuilding the branch from its base. On a re-run or re-brief, add new commits on top; the gates already recorded the existing ones.
 - Before you reply, stop every background process you started and confirm none is left, so nothing you left running races the gates in the same worktree.
 - A command that may run past about nine minutes runs with `run_in_background` and is waited on by foreground checks of under 10 minutes each; never reply while it is still running.
