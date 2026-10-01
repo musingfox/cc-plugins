@@ -219,7 +219,7 @@ Your output MUST:
 4. Self-check contract atomicity per your agent prompt's `## Atomicity Self-Check` rules — collapse or split contracts that fail.
 ```
 
-**If this is a re-dispatch after implement FAIL**, add a `## Implement Failure` section to the dispatch — see §Phase 3.4 (Failure → Plan Loopback) for the exact format.
+**If this is a re-dispatch after a shard returned NEEDS_REPLAN**, dispatch plan in partial-replan mode with the shard's `escalate.md` — see §3.4 for the routing and format.
 
 The plan agent writes its full output to `$SESSION/plan.md` per the agent's Return Format. **You do NOT re-save the agent's reply** — read sections from `$SESSION/plan.md` on demand for Transition Validation.
 

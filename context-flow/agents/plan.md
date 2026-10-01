@@ -301,31 +301,7 @@ The orchestrator will loop back to research with these gaps as an enriched goal.
 
 ## When Implementation Has Failed
 
-The orchestrator may re-dispatch you with an `## Implement Failure` section in the input. That section reports which contracts the implementer failed and classifies the root cause. Your job is to **revisit the failed contracts** — implementation failure is evidence that one or more contracts were wrong (too ambitious, internally inconsistent, missing a precondition, or based on a flawed assumption).
-
-Input format (provided by the orchestrator):
-
-```markdown
-## Implement Failure
-Status: PARTIAL | FAIL
-Implementer: omp | claude-implement
-Failed contracts:
-- <contract-name>: <one-sentence reason>
-Survived contracts:
-- <contract-name>
-Reason classification: contract-problem
-Hint from implementer: <verbatim>
-```
-
-When you receive this:
-
-1. **Read the failed contracts and the hint carefully.** The implementer just attempted these — their reason is primary evidence.
-2. **Decide per failed contract**: split into smaller atomic contracts, restate with the missing precondition / dependency made explicit, or drop the contract if it is not load-bearing for the goal.
-3. **Preserve the survived contracts as-is** unless your analysis shows they share the same flaw as the failed ones (in which case revise them too and say so).
-4. **Re-emit the full Output Schema** (Investigated, Assumptions, Decisions, Behavioral Contracts, Implementation Plan, Completed, Unresolved). The orchestrator overwrites `$SESSION/plan.md`; do not write a diff or a delta.
-5. If revisiting the contracts still cannot resolve the failure (e.g., the failure is actually a research gap dressed as a contract problem), return the `## Research Insufficiency` block instead — the orchestrator will loop further back.
-
-Treat re-plan after implement failure as a normal phase re-run; the orchestrator increments the retry budget.
+A failed or incomplete implementation reaches you through Partial Replan Mode below, not through a separate failure section. The orchestrator routes by shard status (a NEEDS_REPLAN shard, or a REQUEST_CHANGES review that found a contract itself wrong) and passes the shard's `escalate.md` or `$SESSION/review-spec.md` as the evidence in the `Escalations` list. Treat that evidence as primary: implementation failure means one or more contracts were wrong (too ambitious, internally inconsistent, missing a precondition, or based on a flawed assumption). For each affected contract, split it into smaller atomic contracts, restate it with the missing precondition made explicit, or drop it if it is not load-bearing for the goal. If the evidence shows a research gap dressed as a contract problem, return the `## Research Insufficiency` block instead.
 
 ## Partial Replan Mode
 

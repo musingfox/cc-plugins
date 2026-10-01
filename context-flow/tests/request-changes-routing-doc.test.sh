@@ -72,3 +72,8 @@ for stale in 'retry-different-approach' 'loop-back-to-plan' 'Implement Failure';
 done
 design_line=$(printf '%s\n' "$handling" | grep -F 'fundamental design issues' || true)
 assert_contains "$design_line" 'review-spec.md' "fundamental design issues loop back to plan with the review findings"
+
+# T-no-implement-failure: no doc still describes the retired Implement Failure section.
+for f in commands/cf.md agents/plan.md docs/pi-implementer-protocol.md; do
+  assert_eq "0" "$(grep -cF 'Implement Failure' "$CF_TESTS_DIR/../$f" || true)" "$f no longer names Implement Failure"
+done

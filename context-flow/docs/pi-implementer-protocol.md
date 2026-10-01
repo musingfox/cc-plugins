@@ -191,7 +191,7 @@ Diagnose from the session JSONL first, stderr second; `cf-pi-postmortem.sh` for 
 | No JSONL within 60s | worker failed to start | check stderr; retry once |
 | JSONL stale > threshold | stall (network / lockup) | kill; read last events; route per gates |
 | Exits < 5s, no report | brief failed to load (`@file` path wrong) | check stderr; re-dispatch corrected |
-| Report exists, no `## Completed` | worker gave up mid-run | may be all-Unresolved; route to Plan via Implement Failure |
+| Report exists, no `## Completed` | worker gave up mid-run | may be all-Unresolved; route by status per cf.md §3.4 (partial replan) |
 | Tests pass for worker, fail for orchestrator | environment drift | re-run with env captured in brief; persistent → escalate |
 
 ---
