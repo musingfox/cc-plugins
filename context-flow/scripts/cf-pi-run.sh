@@ -544,6 +544,31 @@ if [ "$MODE" = full ]; then
   dispatch_and_poll
 fi
 
+# `rebriefs` lists the re-briefs --gates-only already handed back this round, one
+# kind per line; --prepare-only and the plain form clear it.
+rebrief_recorded() { grep -qxF "$1" "$SHARD_SESSION/rebriefs" 2>/dev/null; }
+record_rebrief() { echo "$1" >> "$SHARD_SESSION/rebriefs"; }
+
+report_ok() {
+  [ -s "$REPORT_FILE" ] || return 1
+  local head_lines; head_lines=$(head -20 "$REPORT_FILE")
+  echo "$head_lines" | grep -q '^## Summary' || return 1
+  echo "$head_lines" | grep -q '^## Completed' || return 1
+}
+
+# Survivors = (declared in this shard) ∩ (claimed Completed in the report).
+compute_survivors() {
+  local declared cname out=""
+  declared=$(shard_contract_names)
+  for cname in $(completed_contracts); do
+    if echo "$declared" | grep -qxF "$cname"; then
+      out="$out${out:+
+}$cname"
+    fi
+  done
+  printf '%s' "$out"
+}
+
 # -------- 6. escalation -------------------------------------------------
 
 # check_escalation [SURVIVORS]
@@ -566,21 +591,21 @@ check_escalation() {
   exit 2
 }
 
-check_escalation
+if [ "$MODE" = gates ]; then
+  # A Claude builder can escalate while fixing failed tests, after gate 1 already
+  # accepted its report. Known survivors then travel with the escalation so Plan
+  # preserves them. Before a tests re-brief the only report on disk may be one
+  # written beside the escalation, which the protocol says to ignore.
+  esc_survivors=""
+  if [ -s "$ESCALATE_FILE" ] && rebrief_recorded tests && report_ok; then
+    esc_survivors=$(compute_survivors)
+  fi
+  check_escalation "$esc_survivors"
+else
+  check_escalation
+fi
 
 # -------- 7. gate 1: report file ---------------------------------------
-
-# `rebriefs` lists the re-briefs --gates-only already handed back this round, one
-# kind per line; --prepare-only and the plain form clear it.
-rebrief_recorded() { grep -qxF "$1" "$SHARD_SESSION/rebriefs" 2>/dev/null; }
-record_rebrief() { echo "$1" >> "$SHARD_SESSION/rebriefs"; }
-
-report_ok() {
-  [ -s "$REPORT_FILE" ] || return 1
-  local head_lines; head_lines=$(head -20 "$REPORT_FILE")
-  echo "$head_lines" | grep -q '^## Summary' || return 1
-  echo "$head_lines" | grep -q '^## Completed' || return 1
-}
 
 # Self-contained on purpose: when the prior session cannot be resumed, this
 # file IS the whole prompt a cold worker receives, so it must name the brief
@@ -643,13 +668,7 @@ say "gate 1 ok"
 # Review phase, not a per-shard grep.
 
 declared_names=$(shard_contract_names)
-survivors=""
-for cname in $(completed_contracts); do
-  if echo "$declared_names" | grep -qxF "$cname"; then
-    survivors="$survivors${survivors:+
-}$cname"
-  fi
-done
+survivors=$(compute_survivors)
 say "survivors=$(echo "$survivors" | grep -c . || true)"
 
 # -------- 9. gate 3: test execution (with at most one re-dispatch) -----
