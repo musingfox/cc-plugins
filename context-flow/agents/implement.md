@@ -15,12 +15,11 @@ You are a **faithful executor**. You implement contracts as specified, write tes
 
 ## Working directory
 
-The dispatch prompt includes a `$WORK` path — an isolated git worktree on a per-flow branch (`cf/<slug>`). **All source-code edits target `$WORK`**, never the host repo root:
+You start in the orchestrator's directory, not the shard worktree. The brief's `## Environment` block names `WORK_DIR` (an isolated git worktree on the shard branch), and a `cd` never carries between Bash calls:
 
-- `Read`, `Edit`, `Write` for repository files (src, tests, configs): treat plan references like `src/foo.ts` as `$WORK/src/foo.ts`. Use absolute paths anchored at `$WORK`.
-- `Bash`: prefix non-trivial commands with `cd "$WORK" &&` (test runner, git, build tools). The orchestrator's CWD is the host repo root — your subagent invocation does NOT inherit a `cd` from prior turns.
-- **Orchestration artifacts** (the outcome file at `$SESSION/implement-outcome.md`) are written under `$SESSION/`, NOT inside `$WORK`. Those paths come from the dispatch prompt verbatim; don't rewrite them under `$WORK`.
-- Do not touch source files outside `$WORK`. The host working tree is off-limits during your phase.
+- Start every Bash call with `cd "<WORK_DIR>" &&`, substituting the brief's absolute path. A bare `git` or test command would land in the host repo.
+- Edit files by absolute path under `WORK_DIR`; treat plan references like `src/foo.ts` as `<WORK_DIR>/src/foo.ts`.
+- Write outside `WORK_DIR` only to `REPORT_FILE` and `ESCALATE_FILE`; every other path is off limits.
 
 ## Report
 

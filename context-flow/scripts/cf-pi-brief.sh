@@ -179,7 +179,7 @@ shard_group="$SHARD_ID"
   echo
 
   echo "## Environment"
-  echo "- **WORK_DIR**: \`$WORK\`     (you are already on the cf branch here)"
+  echo "- **WORK_DIR**: \`$WORK\`     (cd into it first; every command runs from here, on the cf branch)"
   echo "- **CF_BRANCH**: \`$CF_BRANCH\`     (commit per-contract to this branch)"
   echo "- **BASE_HEAD**: \`${BASE_HEAD:-(unset)}\`     (compute diffs against this commit)"
   echo "- **REPORT_FILE**: \`$REPORT_FILE\`     (write your structured report here)"
