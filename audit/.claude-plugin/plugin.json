@@ -1,0 +1,18 @@
+{
+  "name": "audit",
+  "description": "[Experimental] Repository audits that put each piece of knowledge where it cannot drift — starting with agent-facing docs: what is a cache of the code, what is a rule, what is a decision, and where each belongs",
+  "version": "0.1.0",
+  "author": {
+    "name": "Nick Huang",
+    "email": "nick12703990@gmail.com"
+  },
+  "keywords": [
+    "audit",
+    "documentation",
+    "drift",
+    "claude-md",
+    "agents"
+  ],
+  "homepage": "https://github.com/musingfox/cc-plugins/tree/main/audit",
+  "license": "MIT"
+}

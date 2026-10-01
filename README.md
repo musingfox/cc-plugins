@@ -247,6 +247,18 @@ Upcoming Google Calendar events inside the session, as a Claude Mod (needs `CLAU
 /plugin install calendar
 ```
 
+### Audit (Experimental)
+
+Repository audits that put each piece of knowledge where it cannot drift. Each audit is a skill you type by hand (`disable-model-invocation: true`), so none costs context until you run it:
+- **`/audit:docs`**: sorts every section of the agent-facing docs — `CLAUDE.md` and `AGENTS.md` at every level, `docs/`, spec and ADR entries — into history, constraint, decision or current state; current state is a cache of the code, so it is replaced by a pointer to its source, rules move into the directory they govern, decisions go to `/adr:adr` and silent invariants to `/spec:spec`
+- **`docs-classifier` agent**: classifies one long doc, samples its claims against the code, and writes a report; its output is a lead list the skill verifies before acting
+- More audits (tests, infrastructure config) are planned as further skills
+
+**Installation:**
+```bash
+/plugin install audit
+```
+
 ## Plugin Development
 
 This repository serves as both a marketplace and a development workspace for custom Claude Code plugins.
@@ -267,6 +279,7 @@ cc-plugins/
 ├── adr/                skills: adr
 ├── agent-browser/      skills: agent-browser, playwright, web-test
 ├── apple-podcasts/     skills: apple-podcasts-fetch
+├── audit/              skills: docs · agents: docs-classifier · tests
 ├── calendar/          hooks: register (Claude Mod) · tests
 ├── context-flow/       commands: cf  · agents: research, plan, implement, review · scripts, tests
 ├── deepen/             skills: survey · agents: explorer · scripts, docs, tests

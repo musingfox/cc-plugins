@@ -87,6 +87,11 @@
       "name": "calendar",
       "source": "./calendar",
       "description": "[Experimental] Upcoming Google Calendar events in-session — /cal toggles a band above the prompt with the next 7 days, /cal N for N days (Claude Mod; needs CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 and the claude.ai Google Calendar connector)"
+    },
+    {
+      "name": "audit",
+      "source": "./audit",
+      "description": "[Experimental] Repository audits that put each piece of knowledge where it cannot drift — starting with agent-facing docs: what is a cache of the code, what is a rule, what is a decision, and where each belongs"
     }
   ]
 }
