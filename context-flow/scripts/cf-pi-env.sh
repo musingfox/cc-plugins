@@ -124,7 +124,8 @@ resolve_canon_dispatch() {
 #   Echoes the runner's own summary line(s) from LOG, or "unparsed".
 #
 #   Quoted, never recomputed: whichever shape the runner prints ("24 passed, 0
-#   failed", "10 passing" + "2 pending", "tests: 24, failed: 0") is reported as
+#   failed", "10 passing" + "2 pending", bun's "47 pass" + "0 fail", "tests: 24,
+#   failed: 0") is reported as
 #   written, because a per-runner parser is wrong for the next runner. The LAST
 #   few matching lines win — runners print per-file lines before the summary.
 #
@@ -133,7 +134,7 @@ resolve_canon_dispatch() {
 #   integration gate, whose green authorizes delivery.
 test_counts_of() {
   local log="$1" counts
-  counts="$(grep -iE '[0-9]+ (passed|passing|failed|failing|skipped|pending|todo|ignored)|(tests|failures|passed|failed|skipped)[:=] ?[0-9]+' \
+  counts="$(grep -iE '[0-9]+ (pass|passed|passing|fail|failed|failing|skipped|pending|todo|ignored)|(tests|failures|passed|failed|skipped)[:=] ?[0-9]+' \
     "$log" 2>/dev/null | tail -3 | paste -sd'|' - | tr -s ' ' | cut -c1-240 || true)"
   printf '%s' "${counts:-unparsed}"
 }

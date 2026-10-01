@@ -7,7 +7,7 @@
 # per-runner parser is wrong for the next runner; when there is no count-shaped
 # line the marker says so instead of inventing one.
 #
-#   - a runner that prints a summary  -> test_counts= quotes it
+#   - a runner that prints a summary  -> test_counts= quotes it (incl. bun's "47 pass")
 #   - a silent runner                 -> test_counts=unparsed
 #   - an all-skipped green suite      -> counts show the skips, exit code does not
 #   - cf-pi-run.sh carries the counts into outcome.md and warns on `unparsed`
@@ -38,6 +38,13 @@ out="$(bash "$TESTSH" "$S" bash -c 'echo "  10 passing"; echo "  2 pending"')"
 c="$(counts_of "$out")"
 assert_contains "$c" "10 passing" "mocha shape: passes are quoted"
 assert_contains "$c" "2 pending" "mocha shape: pendings are quoted"
+rm -rf "$S"
+
+S="$(new_session)"
+out="$(bash "$TESTSH" "$S" bash -c 'echo "(pass) slugify > keeps ascii [0.1ms]"; echo ""; echo " 47 pass"; echo " 0 fail"; echo " 120 expect() calls"; echo "Ran 47 tests across 2 files. [52.00ms]"')"
+c="$(counts_of "$out")"
+assert_contains "$c" "47 pass" "bun shape: passes are quoted"
+assert_contains "$c" "0 fail" "bun shape: fails are quoted"
 rm -rf "$S"
 
 # ---- the case the exit code cannot see: everything skipped, exit 0 ----
