@@ -68,3 +68,5 @@ done
 s7=$(awk '/^## 7\./{f=1; print; next} f && /^## /{exit} f' "$DESIGN")
 assert_eq "0" "$(printf '%s\n' "$s7" | grep -c 'main never re-launches for a test failure' || true)" "T8 design section 7 no longer says main never re-launches"
 assert_contains "$s7" "REBRIEF" "T8b design section 7 names the REBRIEF re-launch"
+assert_contains "$s7" "An infrastructure re-launch is self-cleaning" "T8c design section 7 scopes self-cleaning to infrastructure re-launches"
+assert_eq "0" "$(printf '%s\n' "$s7" | grep -c 'A main-issued re-launch is self-cleaning' || true)" "T8d design section 7 does not call a main-issued re-launch self-cleaning"
