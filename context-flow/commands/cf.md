@@ -694,7 +694,7 @@ Route on the **Spec verdict** only. A Standards documented-convention violation 
   3. Map each contract the Spec reply lists as `<Name>: FAIL` to its shard id: `jq -r --arg c "<Name>" '.groups | to_entries[] | select(.value.contracts | index($c)) | .key' "$SESSION/shards.json"`. A FAIL contract that maps to no shard means the verdict and `shards.json` disagree: escalate.
   4. Tell the human which shard ids re-launch, then re-launch only those. On Claude, run §3.2 steps 2–5 for each shard, starting with `cf-pi-run.sh --prepare-only` so the new `R<n>` cases reach the brief, and give the agent `$SESSION/review-spec.md` as the failure details. On OMP, one background `cf-pi-run.sh` per shard in a single message, with the four positionals of §3.6; it reuses the shard's worktree and rebuilds the brief from contracts.json, so the new `R<n>` cases reach the worker:
      ```
-     Bash(run_in_background: true, command:
+     Bash(run_in_background: true, timeout: 7200000, command:
        "$SCRIPTS/cf-pi-run.sh $SESSION/shards/<id> '<one-sentence goal>' '<short constraints>' '<resolved SHARD_TEST_RUNNER>'")
      ```
   5. Collect and route as in §3.3 and §3.4, recording the round. When every shard is PASS, the integration gate rebuilds `cf/$CF_SLUG` from the flow base; then run Phase 4 again.

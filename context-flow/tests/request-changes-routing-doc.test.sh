@@ -60,3 +60,7 @@ assert_eq "0" "$(printf '%s\n' "$handling" | grep -cF 'Claude fallback' || true)
 presenting=$(awk '/^### Presenting Results/ {p=1} p {print} /^### Handling the Verdict/ && p {exit}' "$CFMD")
 assert_contains "$presenting" 'builder:' "Presenting names each shard's builder from outcome.md"
 assert_eq "0" "$(printf '%s\n' "$presenting" | grep -cF 'Fallback: Claude implement agent' || true)" "Presenting no longer says Fallback: Claude implement agent"
+
+# T-timeout: every background cf-pi-run.sh launch in the handling carries the two-hour timeout.
+launches=$(printf '%s\n' "$handling" | grep -F -B1 'cf-pi-run.sh $SESSION/shards/<id>' | grep -F 'run_in_background' || true)
+assert_contains "$launches" 'timeout: 7200000' "Phase 4 OMP re-run launch carries timeout: 7200000"
