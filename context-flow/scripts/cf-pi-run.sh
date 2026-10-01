@@ -448,6 +448,7 @@ dispatch_and_poll() {
     exit 1
   fi
   say "dispatching pi${resume_file:+ (resume re-brief)}"
+  local pre_tip; pre_tip=$(git -C "$WORK" rev-parse HEAD 2>/dev/null || true)
   # Keep the outgoing run dir: on a resume the new one's sessions/ stays empty,
   # so this is where a post-resume failure's evidence lives (newest_jsonl).
   if [ -f "$SHARD_SESSION/pi-rundir" ]; then
@@ -480,6 +481,23 @@ dispatch_and_poll() {
     exit 1
   }
 
+  # A provider error that ends the turn after the work is done is not an
+  # infrastructure failure. 2026-09-29: grok wrote the fix and passed its own
+  # tests, then its last message hit Cursor's retryable resource_exhausted, pi
+  # exited rc=1, and the re-launch would have redone finished work. When this
+  # dispatch left a report or new commits, the gates judge them; gate 1 asks the
+  # resumed session for a missing report. Quota walls, timeouts and stalls are
+  # matched before the arms that call this and stay failures.
+  gates_or_fail() {  # reason  diagnostic
+    local tip; tip=$(git -C "$WORK" rev-parse HEAD 2>/dev/null || true)
+    if [ -s "$REPORT_FILE" ] || { [ -n "$tip" ] && [ "$tip" != "$pre_tip" ]; }; then
+      "$SCRIPTS/cf-pi-stop.sh" "$SHARD_SESSION" --abort >/dev/null 2>&1 || true
+      say "worker ended on $1 after producing work; the gates judge it ($2)"
+      return 0
+    fi
+    fail_kill "$1" "$2"
+  }
+
   local round=0
   # Ceiling derives from the documented tuning knob: raising PI_WALL_CLOCK_S for
   # heavy briefs (Rust/Docker) must actually lift the hard stop, not just the
@@ -507,19 +525,19 @@ dispatch_and_poll() {
       # only after a space so an OUTPUT= path cannot trip it, and WINDOW first.
       *\ QUOTA-WINDOW*)        record_quota_wall QUOTA-WINDOW; fail_kill QUOTA-WINDOW "poll $status_line" ;;
       *\ QUOTA*)               record_quota_wall QUOTA; fail_kill QUOTA "poll $status_line" ;;
-      *exit\ rc=*)             fail_kill rc-fail "poll $status_line" ;;
+      *exit\ rc=*)             gates_or_fail rc-fail "poll $status_line"; return 0 ;;
       *TIMEOUT*)               fail_kill timeout "poll $status_line" ;;
       *STALL*)                 fail_kill stall "poll $status_line" ;;
       *empty*terminal=stop*)
         # Agent cleanly ended its turn (stopReason=stop) but produced no report/diff
         # (e.g. thinking-only). NOT a stall — detectable at once, fail fast.
         fail_kill no-output "agent ended turn without output ($status_line)" ;;
-      *ERROR*|*not-stop*)      fail_kill error "poll $status_line" ;;
+      *ERROR*|*not-stop*)      gates_or_fail error "poll $status_line"; return 0 ;;
       *died-mid-stream*)
         # rc==0 but no agent_end: events present -> died mid-stream (error);
         # no events at all -> no actionable jsonl.
         if [ -n "$rundir" ] && [ -s "$rundir/result.md" ]; then
-          fail_kill error "died mid-stream ($status_line)"
+          gates_or_fail error "died mid-stream ($status_line)"; return 0
         else
           fail_kill no-jsonl "died with no events ($status_line)"
         fi ;;
@@ -529,7 +547,7 @@ dispatch_and_poll() {
         write_outcome FAIL dispatch-broken "" "(all): poll $status_line" "-" "-"
         say "FAIL dispatch-broken"
         exit 1 ;;
-      STATUS=FAIL*)            fail_kill error "poll $status_line" ;;
+      STATUS=FAIL*)            gates_or_fail error "poll $status_line"; return 0 ;;
       *)                       fail_kill poll-unknown "poll unknown ($status_line)" ;;
     esac
   done
