@@ -12,6 +12,10 @@ Home: `ARCHITECTURE.md` at the root. The shape follows
   "the model layer does not depend on the views".
 - Cross-cutting concerns, in their own section.
 
+A codemap found in `CLAUDE.md` moves here whatever the repo's size, and `CLAUDE.md`
+keeps one pointer line: an always-loaded file carries rules and pointers
+([platform.md](platform.md#why-always-loaded-files-carry-the-fewest-facts)).
+
 How each module works belongs in inline docs. An invariant that can break silently gets
 a `/spec:spec` entry, and the map names it. Why the structure was chosen goes to
 `/adr:adr`.
