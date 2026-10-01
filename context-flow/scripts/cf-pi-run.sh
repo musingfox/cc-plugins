@@ -32,10 +32,13 @@
 #                            be read as this round's (a re-launched shard reuses
 #                            the same session directory)
 #   1-2. cf-pi-prepare.sh    worktree + branch, prerequisite checkpoints merged,
-#                            brief assembled (shared with the Claude fallback)
-#   3. cf-pi-probe.sh        liveness probe
-#   4. cf-pi-dispatch.sh     background OMP
+#                            brief assembled (plain and --prepare-only; the
+#                            Claude fallback shares it)
+#   3. cf-pi-probe.sh        liveness probe            (plain only)
+#   4. cf-pi-dispatch.sh     background OMP            (plain only)
 #   5. poll loop             cf-pi-poll.sh once per ~30s, max 64 rounds at the default wall clock
+#                            (plain only)
+#   6-13 run in the plain form and in --gates-only.
 #   6. escalation detect     $ESCALATE_FILE present => NEEDS_REPLAN
 #   7. gate 1 report         head -20 contains ## Summary && ## Completed;
 #                            one report-only re-dispatch before failing
@@ -366,7 +369,7 @@ on_exit() {
 trap on_exit EXIT
 
 # -------- 1-2. prepare: worktree, prerequisite checkpoints, brief -------
-# Shared with the Claude fallback (cf.md §3.6). Through $SCRIPT_DIR, not
+# Shared with --prepare-only and the Claude fallback (cf.md §3.6). Through $SCRIPT_DIR, not
 # $SCRIPTS: fixtures stub the worktree and brief scripts it calls via $SCRIPTS.
 
 if [ "$MODE" != gates ]; then
@@ -574,7 +577,7 @@ report_ok() {
   echo "$head_lines" | grep -q '^## Completed' || return 1
 }
 
-if ! report_ok; then
+if [ "$MODE" = full ] && ! report_ok; then
   # A missing report does not mean missing work: the commits can all be on the
   # branch and the deterministic gates green, with only the write-up skipped.
   # The report is still required -- commit messages carry no cf vocabulary by
@@ -680,6 +683,13 @@ fi
 if [ "$TEST_RC" -ne 0 ]; then
   if grep -q '^test_exit=' "$SHARD_SESSION/gate3.out"; then
     # Test runner ran; tests failed twice. One re-dispatch allowed.
+    if [ "$MODE" = gates ]; then
+      affected=$(shard_contract_names | awk '{print $0 ": gate3 test fail (persistent)"}')
+      pm=$(do_postmortem)
+      write_outcome NEEDS_REPLAN test-fail-persistent "$survivors" "$affected" "$pm" "-"
+      say "NEEDS_REPLAN test-fail-persistent"
+      exit 2
+    fi
     say "gate 3 failed twice (rc=$TEST_RC), re-briefing pi"
     REBRIEF_FILE="$SHARD_SESSION/re-brief.md"
     {
@@ -729,8 +739,8 @@ else
 fi
 
 # -------- 10. actual ⊆ declared file scope -----------------------------
-# Mechanism lives in cf-pi-scope.sh so the Claude-fallback path (cf.md §3.6)
-# runs the identical gate instead of a prose approximation.
+# Mechanism lives in cf-pi-scope.sh so --gates-only and the Claude-fallback path
+# (cf.md §3.6) run the identical gate instead of a prose approximation.
 
 set +e
 scope_out=$("$SCRIPT_DIR/cf-pi-scope.sh" "$SHARD_SESSION" 2>&1)  # not $SCRIPTS: this gate is never stubbable
