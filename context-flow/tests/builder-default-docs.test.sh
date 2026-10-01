@@ -63,3 +63,8 @@ for t in revert-gate-docs brief-anatomy-doc brief-writable-rule review-two-axis;
     assert_eq "ok" "fail" "T7 $t passes"
   fi
 done
+
+# T8: design section 7 scopes "main never re-launches" to OMP rounds and names the REBRIEF loop.
+s7=$(awk '/^## 7\./{f=1; print; next} f && /^## /{exit} f' "$DESIGN")
+assert_eq "0" "$(printf '%s\n' "$s7" | grep -c 'main never re-launches for a test failure' || true)" "T8 design section 7 no longer says main never re-launches"
+assert_contains "$s7" "REBRIEF" "T8b design section 7 names the REBRIEF re-launch"
