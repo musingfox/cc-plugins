@@ -281,9 +281,9 @@ carries that approval from the upstream handoff).
 
 State to the human upfront: `Phase 3: parallel-sharded fan-out on <N> contract(s), built by <cf:implement | OMP ($PI_DESC)> per CF_IMPLEMENTER. Parent branch cf/$CF_SLUG; per-shard branches cf/$CF_SLUG-shard-<id>.`
 
-Phase 3 splits the contract set by file-touch graph and runs one `cf-pi-run.sh` per shard, each as a **main-launched background task** (no sub-agent). The full per-shard lifecycle (worktree → brief → probe → dispatch → poll → gates → outcome) lives inside that script; you only fan out, collect, and route.
+Phase 3 splits the contract set by file-touch graph and builds one shard per connected component. On the default builder each shard is a background `cf:implement` agent bracketed by `cf-pi-run.sh --prepare-only` and `--gates-only` (§3.2); on OMP it is one background `cf-pi-run.sh` (§3.6). The gates live inside that script; you only fan out, collect, and route.
 
-**Token discipline (design §7), non-negotiable**: read ONLY each shard's paths-only `outcome.md` plus bounded peeks (`Read(file, limit=…)`, `jq '.field'`, `head`/`tail -N`, `sed -n` section slices). NEVER read `report.md`, `contracts.json`, `escalate.md`, briefs, postmortems, JSONL, or test logs — background-task stdout stays in the task's own output file.
+**Token discipline (design §7), non-negotiable**: read ONLY each shard's paths-only `outcome.md` plus bounded peeks (`Read(file, limit=…)`, `jq '.field'`, `head`/`tail -N`, `sed -n` section slices). NEVER read `report.md`, `contracts.json`, `escalate.md`, briefs, postmortems, JSONL, or test logs — background-task stdout stays in the task's own output file (of `gates.out`, only its last line).
 
 ### 3.0 Parent worktree setup (idempotent)
 
@@ -330,7 +330,7 @@ SHARD_IDS=$(jq -r '.groups | keys[]' "$SESSION/shards.json")
   Must not need live services / shared ports / external daemons (parallel shards each run
   it in their own worktree — a shared resource makes every first run collide and fail).
   Missing from plan → fall back to `TEST_RUNNER` and warn the human in one line.
-  Record it the same way: the Claude fallback (§3.6) runs its shard gates in fresh shells.
+  Record it the same way: `--gates-only` (§3.2) runs its shard gates in a fresh shell, and so does the OMP round (§3.6).
 
   ```bash
   printf 'SHARD_TEST_RUNNER=%s\n' "$(printf '%q' '<resolved shard command>')" >> "$SESSION/env.sh"
@@ -340,9 +340,58 @@ SHARD_IDS=$(jq -r '.groups | keys[]' "$SESSION/shards.json")
 
 **Wave rule.** A shard is READY when every id in its `depends_on` already has a PASS checkpoint (`jq -r '.checkpoints | keys[]' "$SESSION/dispatch-state.json"`); shards with `depends_on: []` are READY immediately. Launch ONLY the READY shards — a dependent shard dispatched early forks a base without its prerequisites' interfaces and `cf-pi-run.sh` refuses it (`FAIL prereq-missing`). Dependent shards launch as the next wave from §3.4 routing; `cf-pi-run.sh` merges their prerequisites' checkpoints into their worktree base automatically.
 
+This is the Claude round, the default builder. With `CF_IMPLEMENTER=omp` recorded in `$SESSION/env.sh`, run the OMP round in §3.6 instead. A round runs in this order; the gates decide whether each shard's work and report stand, so a builder's reply is never read for its verdict:
+
+1. **Snapshot the host.** Write `$SESSION/host-snapshot`, the host HEAD and a hash of its porcelain status, so step 6 can tell whether anything touched the host repo:
+
+   ```bash
+   . "$SESSION/env.sh"
+   { git -C "${REPO_ROOT:-.}" rev-parse HEAD; git -C "${REPO_ROOT:-.}" status --porcelain | shasum -a 256; } > "$SESSION/host-snapshot"
+   ```
+
+2. **Prepare, sequentially.** One foreground Bash, run from the host repo root (the shard worktree forks from the repository of the current directory), runs `--prepare-only` for each READY shard in turn. It clears the shard's previous round and reuses its worktree. A shard whose prepare writes an `outcome.md` (`FAIL prereq-missing`, `prereq-merge-conflict`, `brief-assembly`, or `outcome-missing`) is done for the round; every other shard is logged as dispatched:
+
+   ```bash
+   . "$SESSION/env.sh"
+   cd "${REPO_ROOT:-.}"
+   for id in A B; do                     # the READY ids
+     "$SCRIPTS/cf-pi-run.sh" --prepare-only "$SESSION/shards/$id" '<one-sentence goal>' '<short constraints>' "$SHARD_TEST_RUNNER" > "$SESSION/shards/$id/prepare.out" 2>&1
+     if [ -s "$SESSION/shards/$id/outcome.md" ]; then echo "$id prepare-failed"; else echo "$id dispatched $(date +%s)" >> "$SESSION/claude-dispatch.log"; fi
+   done
+   ```
+
+3. **Dispatch, in one message.** One `Agent` per prepared shard, with no `name:`, so they run as parallel background subagents. The prompt carries only the brief path, `WORK_DIR`, the `Report path:`, the escalate path and the `cd` rule:
+
+   ```
+   Agent(
+     subagent_type: "cf:implement",
+     prompt: "
+       Brief: $SESSION/shards/A/implement-brief.md
+       WORK_DIR: $SESSION/shards/A/work
+       Report path: $SESSION/shards/A/implement-report.md
+       Escalate path: $SESSION/shards/A/escalate.md
+       Start every Bash command with `cd $SESSION/shards/A/work &&`; write nowhere else.
+     "
+   )
+   ... (one Agent per prepared id)
+   ```
+
+   Dispatch at most 20 per message and the rest in the next batch once those return: the 21st concurrent subagent fails with `Concurrent subagent limit reached`.
+
+4. **Gate each return.** When an agent returns, run `--gates-only` for that shard as a background Bash, whatever the reply says — the gates decide. Act on nothing else in the reply, except a Claude usage limit shown there: that goes to §3.6, not to the gates.
+
+   ```
+   Bash(run_in_background: true, timeout: 7200000, command:
+     ". $SESSION/env.sh && echo \"A returned $(date +%s)\" >> $SESSION/claude-dispatch.log && $SCRIPTS/cf-pi-run.sh --gates-only $SESSION/shards/A '<one-sentence goal>' '<short constraints>' \"$SHARD_TEST_RUNNER\" > $SESSION/shards/A/gates.out 2>&1")
+   ```
+
+5. **Read each gates return.** A non-empty `$SESSION/shards/<id>/outcome.md` → the shard is done. Otherwise, if the last line of `gates.out` is `REBRIEF <kind> <path>` → dispatch a fresh `cf:implement` with the same prompt plus a `Re-brief: <path>` line, then step 4 again. Neither → treat the shard as `FAIL outcome-missing`.
+
+6. **Close the round.** When every dispatched shard has an `outcome.md`, compare `$SESSION/host-snapshot` against the host's HEAD and porcelain hash now. On a mismatch, tell the human what moved; never fail the round on it. Continue at §3.3.
+
 ### 3.3 Collect
 
-Wait for ALL shards of the current wave before routing (round-collection rule, design §4) so NEEDS_REPLAN coalesces into a single Plan invocation. End your turn after fan-out; the harness re-invokes you on each task completion — check whether every id dispatched this wave now has a non-empty `$SESSION/shards/<id>/outcome.md`, and if not, end the turn again.
+Wait for ALL shards of the current wave before routing (round-collection rule, design §4) so NEEDS_REPLAN coalesces into a single Plan invocation. End your turn after fan-out; the harness re-invokes you on each task completion — check whether every id dispatched this wave now has a non-empty `$SESSION/shards/<id>/outcome.md`, and if not, end the turn again. A Claude round arms no Monitor: each shard's background `--gates-only` Bash re-invokes you when it completes (§3.2 step 4), and the progress Monitor belongs to the OMP round (§3.6).
 
 Once all are done, read each shard's status from its paths-only outcome (never the report/diff/JSONL it points to):
 
