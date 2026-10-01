@@ -20,12 +20,16 @@ assert_eq "0" "$RC" "T1 exit"
 assert_eq "0" "$(grep -c 'old.jsonl' "$SHARD/outcome.md" || true)" "T1 outcome does not point at the old OMP session"
 fx_clean
 
-# T2: gates-only FAIL quotes no old OMP errorMessage
+# T2: a Claude FAIL whose cause comes from derive_cause's default branch quotes no
+# old OMP errorMessage (report none -> REBRIEF report -> second call ends report-malformed)
 fx_build
 seed_old_omp
-fx_report valid
-fx_test_mode nomarker
+fx_report none
+fx_run --prepare-only "$SHARD" goal none "$RUNNER"
 fx_run --gates-only "$SHARD" goal none "$RUNNER"
+assert_eq "3" "$RC" "T2 first gates-only asks for a re-brief"
+fx_run --gates-only "$SHARD" goal none "$RUNNER"
+assert_contains "$(cat "$SHARD/outcome.md")" "report-malformed" "T2 reaches the default-branch reason"
 assert_eq "0" "$(grep -c 'OLD OMP ROUND' "$SHARD/outcome.md" || true)" "T2 outcome does not quote the old OMP error"
 assert_eq "0" "$(grep -c 'old.jsonl' "$SHARD/outcome.md" || true)" "T2 outcome does not point at the old OMP session"
 fx_clean
