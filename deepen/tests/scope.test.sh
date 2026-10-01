@@ -25,6 +25,8 @@ n=$(grep -c 'CONTEXT.md' "$f" || true)
 [ "$n" -ge 1 ] || fail "T4: CONTEXT.md, got $n"
 n=$(grep -c 'docs/adr/' "$f" || true)
 [ "$n" -ge 1 ] || fail "T4: docs/adr/, got $n"
+n=$(grep -c 'docs/decisions/' "$f" || true)
+[ "$n" -ge 1 ] || fail "T4: docs/decisions/, the directory /adr:adr prefers, got $n"
 
 n=$(grep -c 'not a git repository' "$f" || true)
 [ "$n" -ge 1 ] || fail "T5: not a git repository, got $n"

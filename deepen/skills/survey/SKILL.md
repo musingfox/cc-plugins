@@ -32,7 +32,7 @@ Tell the user the chosen scope in one line before anything else runs: the direct
 
 ## 2. Context
 
-Before dispatch, read `CONTEXT.md` if it exists and any ADRs under `docs/adr/`. They constrain what a candidate may contradict.
+Before dispatch, read `CONTEXT.md` if it exists and any ADRs under `docs/decisions/` or `docs/adr/`, the directories `/adr:adr` looks in first. They constrain what a candidate may contradict.
 
 ## 3. Explore
 
