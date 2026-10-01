@@ -656,12 +656,6 @@ say "survivors=$(echo "$survivors" | grep -c . || true)"
 
 # cf-pi-test.sh prints "test_exit=<n>" and exits with that code. We use exit code directly.
 # TEST_RUNNER is intentionally word-split (e.g. "npm test", "cargo test --lib").
-# shellcheck disable=SC2086
-set +e
-"$SCRIPTS/cf-pi-test.sh" "$SHARD_SESSION" $TEST_RUNNER > "$SHARD_SESSION/gate3.out" 2>&1
-TEST_RC=$?
-set -e
-TEST_COUNTS="$(sed -n 's/^test_counts=//p' "$SHARD_SESSION/gate3.out" | tail -1)"
 
 # A stalled runner outran its deadline. Re-briefing the builder cannot fix a
 # suite that never returns, so stop here instead of spending a dispatch on it.
@@ -678,78 +672,88 @@ fail_if_stalled() { # $1 = gate output file
   exit 1
 }
 
-fail_if_stalled "$SHARD_SESSION/gate3.out"
+# run_gate3 OUTFILE: one suite run; sets TEST_RC and TEST_COUNTS.
+run_gate3() {
+  set +e
+  # shellcheck disable=SC2086
+  "$SCRIPTS/cf-pi-test.sh" "$SHARD_SESSION" $TEST_RUNNER > "$1" 2>&1
+  TEST_RC=$?
+  set -e
+  TEST_COUNTS="$(sed -n 's/^test_counts=//p' "$1" | tail -1)"
+}
 
-if [ "$TEST_RC" -ne 0 ]; then
-  # Distinguish "tests failed" from "test runner errored".
-  if grep -q '^test_exit=' "$SHARD_SESSION/gate3.out"; then
-    # Cheap retest before the expensive re-dispatch: a first-run failure is often an
-    # environment transient (parallel shards colliding on a shared port/service), not
-    # OMP's code. Re-dispatching OMP for those wastes a full dispatch+poll cycle.
-    say "gate 3 first run failed (rc=$TEST_RC), retesting once before re-dispatch"
-    set +e
-    "$SCRIPTS/cf-pi-test.sh" "$SHARD_SESSION" $TEST_RUNNER > "$SHARD_SESSION/gate3-retest.out" 2>&1
-    RETEST_RC=$?
-    set -e
-    TEST_COUNTS="$(sed -n 's/^test_counts=//p' "$SHARD_SESSION/gate3-retest.out" | tail -1)"
-    fail_if_stalled "$SHARD_SESSION/gate3-retest.out"
-    if [ "$RETEST_RC" -eq 0 ]; then
-      say "gate 3 retest passed — first failure was an environment transient"
-      TEST_RC=0
-    fi
-  fi
-fi
+# Persistent failure => NEEDS_REPLAN, all this shard's contracts affected.
+fail_tests_persistent() {
+  local affected pm
+  affected=$(shard_contract_names | awk '{print $0 ": gate3 test fail (persistent)"}')
+  pm=$(do_postmortem)
+  write_outcome NEEDS_REPLAN test-fail-persistent "$survivors" "$affected" "$pm" "-"
+  say "NEEDS_REPLAN test-fail-persistent"
+  exit 2
+}
 
-if [ "$TEST_RC" -ne 0 ]; then
-  if grep -q '^test_exit=' "$SHARD_SESSION/gate3.out"; then
-    # Test runner ran; tests failed twice. One re-dispatch allowed.
-    if [ "$MODE" = gates ]; then
-      affected=$(shard_contract_names | awk '{print $0 ": gate3 test fail (persistent)"}')
+if [ "$MODE" = gates ] && rebrief_recorded tests; then
+  # The builder has had its fix round: exactly one more run decides.
+  say "gate 3 re-entry after the fix re-brief, running the suite once"
+  run_gate3 "$SHARD_SESSION/gate3-retry.out"
+  fail_if_stalled "$SHARD_SESSION/gate3-retry.out"
+  [ "$TEST_RC" -eq 0 ] || fail_tests_persistent
+else
+  run_gate3 "$SHARD_SESSION/gate3.out"
+  fail_if_stalled "$SHARD_SESSION/gate3.out"
+
+  if [ "$TEST_RC" -ne 0 ]; then
+    # Distinguish "tests failed" from "test runner errored".
+    if grep -q '^test_exit=' "$SHARD_SESSION/gate3.out"; then
+      # Cheap retest before the expensive re-dispatch: a first-run failure is often an
+      # environment transient (parallel shards colliding on a shared port/service), not
+      # OMP's code. Re-dispatching OMP for those wastes a full dispatch+poll cycle.
+      say "gate 3 first run failed (rc=$TEST_RC), retesting once before re-dispatch"
+      run_gate3 "$SHARD_SESSION/gate3-retest.out"
+      fail_if_stalled "$SHARD_SESSION/gate3-retest.out"
+      if [ "$TEST_RC" -eq 0 ]; then
+        say "gate 3 retest passed — first failure was an environment transient"
+      else
+        # Tests failed twice. One re-brief allowed.
+        say "gate 3 failed twice (rc=$TEST_RC), re-briefing the builder"
+        REBRIEF_FILE="$SHARD_SESSION/re-brief.md"
+        {
+          printf '## Previous run feedback\n'
+          printf 'The orchestrator ran the test suite and it failed. Inspect the failures and fix. Fold each fix into that contract'\''s EXISTING commit instead of adding fixup commits: `git commit --amend` if it is the branch tip, otherwise `git commit --fixup=<that commit> && GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash %s`. This branch is a private worktree; rewriting it is safe. Then print DONE.\n\n' "$BASE_HEAD"
+          printf '### Test output tail (last 30 lines)\n```\n'
+          tail -30 "$SHARD_SESSION/gate3-retest.out" 2>/dev/null || tail -30 "$SHARD_SESSION/gate3.out"
+          printf '\n```\n'
+        } > "$REBRIEF_FILE"
+        # Also append to the brief: the fresh-dispatch fallback (no prior session id)
+        # re-sends the whole brief, which must then carry the feedback too.
+        { printf '\n\n'; cat "$REBRIEF_FILE"; } >> "$BRIEF_FILE"
+
+        if [ "$MODE" = gates ]; then
+          # The Claude builder is resumed by main, not re-dispatched here; the
+          # next --gates-only call sees `tests` and runs the suite once.
+          record_rebrief tests
+          NO_OUTCOME_EXIT=1
+          echo "REBRIEF tests $REBRIEF_FILE"
+          exit 3
+        fi
+
+        # Re-dispatch resumes the prior OMP session with only the feedback as the new
+        # prompt -- OMP keeps its working context instead of a cold start.
+        # dispatch_and_poll exits on failure paths; on DONE returns.
+        dispatch_and_poll "$REBRIEF_FILE"
+        check_escalation "$survivors"
+
+        run_gate3 "$SHARD_SESSION/gate3-retry.out"
+        fail_if_stalled "$SHARD_SESSION/gate3-retry.out"
+        [ "$TEST_RC" -eq 0 ] || fail_tests_persistent
+      fi
+    else
+      # No test_exit marker => test runner errored (compile/setup fail).
       pm=$(do_postmortem)
-      write_outcome NEEDS_REPLAN test-fail-persistent "$survivors" "$affected" "$pm" "-"
-      say "NEEDS_REPLAN test-fail-persistent"
-      exit 2
+      write_outcome FAIL "test runner error" "" "(all): test runner errored before test_exit" "$pm" "-"
+      say "FAIL test runner error"
+      exit 1
     fi
-    say "gate 3 failed twice (rc=$TEST_RC), re-briefing pi"
-    REBRIEF_FILE="$SHARD_SESSION/re-brief.md"
-    {
-      printf '## Previous run feedback\n'
-      printf 'The orchestrator ran the test suite and it failed. Inspect the failures and fix. Fold each fix into that contract'\''s EXISTING commit instead of adding fixup commits: `git commit --amend` if it is the branch tip, otherwise `git commit --fixup=<that commit> && GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash %s`. This branch is a private worktree; rewriting it is safe. Then print DONE.\n\n' "$BASE_HEAD"
-      printf '### Test output tail (last 30 lines)\n```\n'
-      tail -30 "$SHARD_SESSION/gate3-retest.out" 2>/dev/null || tail -30 "$SHARD_SESSION/gate3.out"
-      printf '\n```\n'
-    } > "$REBRIEF_FILE"
-    # Also append to the brief: the fresh-dispatch fallback (no prior session id)
-    # re-sends the whole brief, which must then carry the feedback too.
-    { printf '\n\n'; cat "$REBRIEF_FILE"; } >> "$BRIEF_FILE"
-
-    # Re-dispatch resumes the prior OMP session with only the feedback as the new
-    # prompt -- OMP keeps its working context instead of a cold start.
-    # dispatch_and_poll exits on failure paths; on DONE returns.
-    dispatch_and_poll "$REBRIEF_FILE"
-    check_escalation "$survivors"
-
-    set +e
-    "$SCRIPTS/cf-pi-test.sh" "$SHARD_SESSION" $TEST_RUNNER > "$SHARD_SESSION/gate3-retry.out" 2>&1
-    TEST_RC=$?
-    set -e
-    TEST_COUNTS="$(sed -n 's/^test_counts=//p' "$SHARD_SESSION/gate3-retry.out" | tail -1)"
-    fail_if_stalled "$SHARD_SESSION/gate3-retry.out"
-
-    if [ "$TEST_RC" -ne 0 ]; then
-      # Persistent failure => NEEDS_REPLAN, all this shard's contracts affected.
-      affected=$(shard_contract_names | awk '{print $0 ": gate3 test fail (persistent)"}')
-      pm=$(do_postmortem)
-      write_outcome NEEDS_REPLAN test-fail-persistent "$survivors" "$affected" "$pm" "-"
-      say "NEEDS_REPLAN test-fail-persistent"
-      exit 2
-    fi
-  else
-    # No test_exit marker => test runner errored (compile/setup fail).
-    pm=$(do_postmortem)
-    write_outcome FAIL "test runner error" "" "(all): test runner errored before test_exit" "$pm" "-"
-    say "FAIL test runner error"
-    exit 1
   fi
 fi
 if [ "${TEST_COUNTS:-unparsed}" = unparsed ]; then
