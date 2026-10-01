@@ -570,6 +570,11 @@ check_escalation
 
 # -------- 7. gate 1: report file ---------------------------------------
 
+# `rebriefs` lists the re-briefs --gates-only already handed back this round, one
+# kind per line; --prepare-only and the plain form clear it.
+rebrief_recorded() { grep -qxF "$1" "$SHARD_SESSION/rebriefs" 2>/dev/null; }
+record_rebrief() { echo "$1" >> "$SHARD_SESSION/rebriefs"; }
+
 report_ok() {
   [ -s "$REPORT_FILE" ] || return 1
   local head_lines; head_lines=$(head -20 "$REPORT_FILE")
@@ -577,19 +582,11 @@ report_ok() {
   echo "$head_lines" | grep -q '^## Completed' || return 1
 }
 
-if [ "$MODE" = full ] && ! report_ok; then
-  # A missing report does not mean missing work: the commits can all be on the
-  # branch and the deterministic gates green, with only the write-up skipped.
-  # The report is still required -- commit messages carry no cf vocabulary by
-  # protocol, so it is the ONLY contract<->commit channel, and step 12 cannot
-  # tell an unimplemented contract from an unreported one. So ask for the
-  # report alone on the resumed session instead of burning a round re-running
-  # finished work.
-  say "gate 1 report missing/malformed — asking pi for the report only"
+# Self-contained on purpose: when the prior session cannot be resumed, this
+# file IS the whole prompt a cold worker receives, so it must name the brief
+# and the worktree rather than say "as in the brief".
+write_report_rebrief() {
   REPORT_REBRIEF="$SHARD_SESSION/report-re-brief.md"
-  # Self-contained on purpose: when the prior session cannot be resumed, this
-  # file IS the whole prompt a cold worker receives, so it must name the brief
-  # and the worktree rather than say "as in the brief".
   {
     printf '## Missing report\n'
     printf 'Your implementation work is NOT in question here and must NOT be redone: `%s` is missing or does not open with the required schema.\n\n' "$REPORT_FILE"
@@ -600,6 +597,29 @@ if [ "$MODE" = full ] && ! report_ok; then
   # pi-rundir is missing, and that is the one fallback where this file is not
   # itself the prompt.
   { printf '\n\n'; cat "$REPORT_REBRIEF"; } >> "$BRIEF_FILE"
+}
+
+if [ "$MODE" = gates ] && ! report_ok && ! rebrief_recorded report; then
+  # The builder is a Claude session main resumes, not a process this script can
+  # re-dispatch: hand the request back once per round, then fail on a second miss.
+  say "gate 1 report missing/malformed — handing back a report-only re-brief"
+  write_report_rebrief
+  record_rebrief report
+  NO_OUTCOME_EXIT=1
+  echo "REBRIEF report $REPORT_REBRIEF"
+  exit 3
+fi
+
+if [ "$MODE" = full ] && ! report_ok; then
+  # A missing report does not mean missing work: the commits can all be on the
+  # branch and the deterministic gates green, with only the write-up skipped.
+  # The report is still required -- commit messages carry no cf vocabulary by
+  # protocol, so it is the ONLY contract<->commit channel, and step 12 cannot
+  # tell an unimplemented contract from an unreported one. So ask for the
+  # report alone on the resumed session instead of burning a round re-running
+  # finished work.
+  say "gate 1 report missing/malformed — asking pi for the report only"
+  write_report_rebrief
   dispatch_and_poll "$REPORT_REBRIEF"
   check_escalation
 fi
