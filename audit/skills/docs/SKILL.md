@@ -1,11 +1,11 @@
 ---
 name: docs
-description: Audit a repository's agent-facing docs — CLAUDE.md and AGENTS.md at every level, docs/, spec and ADR entries — and re-layer them so each fact lives where it cannot drift.
+description: Audit a repository's docs — README, CONTRIBUTING, CLAUDE.md and AGENTS.md at every level, docs/, spec and ADR entries — and re-layer them so each fact lives where it cannot drift.
 disable-model-invocation: true
 argument-hint: "[repo path]"
 ---
 
-# Audit agent-facing docs
+# Audit repository docs
 
 A doc earns its place by carrying what the code cannot say: why a choice was made, what
 must not change, and lookups too expensive to redo. Everything else the code already
@@ -24,21 +24,52 @@ the code disagree:
 Only current state is a cache, and it is where drift lives: counts, lists, maps,
 precedence claims.
 
+## Core and modules
+
+Every repo gets the core. `README.md` tells a human what the project is and how to
+install and use it. The root `CLAUDE.md` carries the rules and pointers every session
+needs, and points at the README instead of restating it. `AGENTS.md` follows the rules in
+[references/platform.md](references/platform.md#loading).
+
+Everything else is a module. Read a module's reference only when its signal fires, so an
+audit of a small repo loads the core alone.
+
+| Module | Reference | Signal |
+|---|---|---|
+| Architecture | [architecture.md](references/architecture.md) | an `ARCHITECTURE.md`; a codemap inside another doc; more than about 10,000 lines of code |
+| Contributing | [contributing.md](references/contributing.md) | a `CONTRIBUTING` file in the root, `docs/` or `.github/`; commit or push hooks |
+| Nested | [nested.md](references/nested.md) | a `CLAUDE.md` or `AGENTS.md` below the root; `.claude/rules/`; workspaces or package manifests below the root; a rule that matters in one directory |
+| Invariants, decisions, terms | `/spec:spec`, `/adr:adr`, `/spec:glossary` | `docs/spec/`, `docs/decisions/` or `docs/adr/`, `CONTEXT.md`; a constraint or decision candidate |
+| UI design | [design.md](references/design.md) | a frontend framework, design tokens or stylesheets |
+| Operations | [operations.md](references/operations.md) | IaC or deploy config: terraform, `wrangler.*`, compose files, k8s manifests |
+
+How a module fires decides the move it allows:
+
+- **A doc of the module exists.** Audit it.
+- **The module's content sits in another doc.** Propose moving it to the module's home.
+- **Only the repo signal fires.** Ask the human the module's question with
+  AskUserQuestion. Create the file only from content the answer supplies.
+
 ## 1. Inventory
 
-List every agent-facing doc and how it reaches an agent: root and nested `CLAUDE.md` and
-`AGENTS.md`, `.claude/rules/` files and their `paths:`, `@` imports, `docs/`, the spec
-and ADR directories. Read what each doc says about itself — a section that states it
-keeps closed history on purpose is a design, not sediment. Load mechanics are in
-[references/platform.md](references/platform.md).
+List every doc and how it reaches its reader: `README.md` and `CONTRIBUTING` at every
+level, root and nested `CLAUDE.md` and `AGENTS.md`, `.claude/rules/` files and their
+`paths:`, `@` imports, `docs/`, the spec and ADR directories. Read what each doc says
+about itself — a section that states it keeps closed history on purpose is a design, not
+sediment. Load mechanics are in [references/platform.md](references/platform.md).
 
-Done when every doc is listed with its load path and any intent it states.
+Then check every module's signal against the repo and the docs you listed.
+
+Done when every doc is listed with its load path and any intent it states, and every
+module is marked fired, with how, or silent. A module whose signal first shows during
+classification fires then.
 
 ## 2. Classify
 
 Dispatch one `audit:docs-classifier` per doc longer than 500 lines, in parallel, each
-with its own report path; read shorter docs yourself. A classifier returns each
-section's kinds with line ranges, a drift sample, duplicates across docs, and anchors.
+with its own report path and the references of the fired modules; read shorter docs
+yourself. A classifier returns each section's kinds with line ranges, a drift sample,
+duplicates across docs, and anchors.
 
 Done when every section of every doc has a kind.
 
@@ -74,11 +105,8 @@ Done when every doc you will change has its anchor list.
   that already keeps its decision record — a numbered architecture section that code
   cites — gets no second copy. A decision that was surfaced but never made goes to the
   human to make.
-- **Relocation.** A rule that matters in one directory moves into that directory's
-  `CLAUDE.md`, rules only, starting with the directories that change most
-  (`git log --name-only`). The parent keeps a one-line pointer for a session that
-  creates a file there before reading one. Follow the repo's `AGENTS.md` convention. A
-  rule spread over scattered paths becomes a `.claude/rules/` file with `paths:`.
+- **Placement.** A passage moves to the home the core or a fired module names for it.
+  The repo's own convention wins over a module's default name.
 - **Spec binding.** A spec entry's `verify:` runs an in-repo test, so CI can run it; a
   checker that lives in a plugin never reaches CI. An entry still `proposed` stays
   unenforced. A new check is green on the current code and red on a scratch violation

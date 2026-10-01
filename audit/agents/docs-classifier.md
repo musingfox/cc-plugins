@@ -1,6 +1,6 @@
 ---
 name: docs-classifier
-description: Classify every section of one agent-facing doc as history, constraint, decision or current state, check a sample of its claims against the code, and write the findings to the given report path. Returns a short summary, never the walk.
+description: Classify every section of one repository doc as history, constraint, decision or current state, check a sample of its claims against the code, and write the findings to the given report path. Returns a short summary, never the walk.
 model: opus
 effort: xhigh
 tools: Read, Write, Grep, Glob, Bash
@@ -8,7 +8,8 @@ tools: Read, Write, Grep, Glob, Bash
 
 You classify one **Doc** and write what you found to one **Report path**. The prompt
 names `Doc: <path>` and `Report path: <file>`, and may add `Other docs: <paths>` to
-check for duplicates. The report is the only file you write.
+check for duplicates and `Modules: <paths>` naming the module references that say what
+each doc's home holds. The report is the only file you write.
 
 Read the doc in full, then the code it describes as far as each claim needs.
 
@@ -30,8 +31,9 @@ A section can carry several kinds; give each its own line range.
    sub-ranges, and the code paths it concerns.
 2. **Rules.** For each constraint: the test that enforces it (file:line), partly
    enforced, or prose only.
-3. **Duplicates.** Passages that repeat another agent-facing doc, with line numbers on
-   both sides.
+3. **Duplicates.** Passages that repeat another doc, with line numbers on both sides.
+   A passage that belongs to a module's home but sits elsewhere is listed here too,
+   with the module's name.
 4. **Drift sample.** Up to twelve checkable claims from current-state parts — counts,
    lists, names of files, functions, tables or keys, precedence and ordering claims.
    Each one held or drifted, with file:line on both sides.

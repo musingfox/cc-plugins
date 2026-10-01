@@ -32,3 +32,7 @@ for p in adr spec; do
   grep -Fq "/$p:$p" "$s" || fail "T8 the skill routes to /$p:$p"
   [ "$(jq --arg p "$p" '[.plugins[] | select(.name == $p)] | length' .claude-plugin/marketplace.json)" -eq 1 ] || fail "T8 $p is not a marketplace entry"
 done
+
+for file in audit/skills/docs/references/*.md; do
+  grep -Fq "](references/$(basename "$file")" "$s" || fail "T9 $(basename "$file") is reachable from no pointer in the skill"
+done
