@@ -1,19 +1,34 @@
 #!/usr/bin/env bash
-# Full Phase-3 lifecycle for ONE shard, end-to-end, in pure shell.
+# Phase-3 lifecycle for ONE shard, end-to-end, in pure shell. Two builders share it:
+# the plain form dispatches OMP; --prepare-only / --gates-only bracket a Claude
+# builder (cf:implement) that main dispatches between the two calls.
 # Main launches this as a background task (run_in_background) and only reads the
 # resulting OUTCOME_FILE -- it never sees brief/report/JSONL/test logs directly
 # (the background task's stdout is captured to its own output file, not main's
 # context). Runs to completion synchronously here, so it is exempt from the
 # foreground Bash ceiling.
 #
-# Usage:   cf-pi-run.sh SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER
+# Usage:   cf-pi-run.sh [--prepare-only|--gates-only] SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER
+#   (plain)         steps 0-13: prepare, probe, dispatch OMP, poll, gates
+#   --prepare-only  steps 0-2 only: ready the worktree and brief for a Claude
+#                   builder, never probe or dispatch. Run with cwd inside the
+#                   host repo. Last stdout line: PREPARED <brief path>, exit 0,
+#                   no outcome.md.
+#   --gates-only    steps 6-13 only, after the Claude builder returned: the same
+#                   gates the OMP path runs, ending in the same outcome.md.
+#                   Removes only a stale outcome.md and implement.diff. A missing
+#                   report or a suite red twice hands back one re-brief per round
+#                   (REBRIEF <kind> <path> as the last stdout line, exit 3, no
+#                   outcome.md); `rebriefs` records which were already issued.
 # Stdout:  operator-facing progress lines (one per major event)
-# Writes:  $BRIEF_FILE, $REPORT_FILE (OMP), $ESCALATE_FILE (OMP optional),
+# Writes:  $BRIEF_FILE, $REPORT_FILE (builder), $ESCALATE_FILE (builder optional),
 #          $DIFF_FILE, $OUTCOME_FILE (this script -- structured outcome)
-# Exit:    0 = PASS, 1 = FAIL, 2 = NEEDS_REPLAN
+# Exit:    0 = PASS (or PREPARED), 1 = FAIL, 2 = NEEDS_REPLAN, 3 = REBRIEF
+#          (--gates-only only)
 #
 # Lifecycle (in order):
-#   0. clear run artifacts   last round's outcome/report/escalate/diff must not
+#   0. clear run artifacts   (plain and --prepare-only; --gates-only removes only a
+#                            stale outcome/diff) last round's files must not
 #                            be read as this round's (a re-launched shard reuses
 #                            the same session directory)
 #   1-2. cf-pi-prepare.sh    worktree + branch, prerequisite checkpoints merged,
@@ -40,8 +55,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=cf-pi-env.sh
 . "$SCRIPT_DIR/cf-pi-env.sh"
 
+USAGE="Usage: cf-pi-run.sh [--prepare-only|--gates-only] SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER"
+MODE=full
+BUILDER=omp
+case "${1:-}" in
+  --prepare-only) MODE=prepare; BUILDER=claude; shift ;;
+  --gates-only)   MODE=gates;   BUILDER=claude; shift ;;
+  --*) echo "$USAGE" >&2; exit 1 ;;
+esac
+
 if [ $# -ne 4 ]; then
-  echo "Usage: cf-pi-run.sh SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER" >&2
+  echo "$USAGE" >&2
   exit 1
 fi
 
@@ -76,12 +100,16 @@ START_TS=$(date +%s)
 # is always fresh), while write_outcome/derive_cause read it on ANY failure --
 # including one before dispatch, which would otherwise report the previous
 # round's session JSONL and errorMessage as this round's cause.
-rm -f "$OUTCOME_FILE" "$REPORT_FILE" "$ESCALATE_FILE" "$DIFF_FILE" "$TEST_LOG" \
-      "$SHARD_SESSION/prereq-merged" \
-      "$SHARD_SESSION/pi-rundir" "$SHARD_SESSION/pi-rundir-prev" \
-      "$SHARD_SESSION/escalate-snippet.md" "$SHARD_SESSION/postmortem.log" \
-      "$SHARD_SESSION/gate3.out" "$SHARD_SESSION/gate3-retest.out" \
-      "$SHARD_SESSION/gate3-retry.out" "$SHARD_SESSION/dispatch.stderr" 2>/dev/null || true
+if [ "$MODE" = gates ]; then
+  rm -f "$OUTCOME_FILE" "$DIFF_FILE" 2>/dev/null || true
+else
+  rm -f "$OUTCOME_FILE" "$REPORT_FILE" "$ESCALATE_FILE" "$DIFF_FILE" "$TEST_LOG" \
+        "$SHARD_SESSION/prereq-merged" "$SHARD_SESSION/rebriefs" \
+        "$SHARD_SESSION/pi-rundir" "$SHARD_SESSION/pi-rundir-prev" \
+        "$SHARD_SESSION/escalate-snippet.md" "$SHARD_SESSION/postmortem.log" \
+        "$SHARD_SESSION/gate3.out" "$SHARD_SESSION/gate3-retest.out" \
+        "$SHARD_SESSION/gate3-retry.out" "$SHARD_SESSION/dispatch.stderr" 2>/dev/null || true
+fi
 
 # -------- helpers --------------------------------------------------------
 
@@ -207,6 +235,7 @@ write_outcome() {
     printf '## Tests\n%s\n\n' "$test_counts"
     printf '## Run\n'
     printf -- '- shard: %s\n' "$SHARD_ID"
+    printf -- '- builder: %s\n' "$BUILDER"
     printf -- '- elapsed: %s\n' "$(elapsed_s)"
     printf -- '- report: %s\n' "$report_path"
     printf -- '- diff: %s\n' "$diff_path"
@@ -324,9 +353,13 @@ record_quota_wall() {
 # all_done tests -s outcome.md) and main with nothing to route. Everything below
 # runs under set -e, and the worktree setup + env re-source can both die without
 # reaching a write_outcome, so guarantee an outcome on every exit path.
+# An intentional no-outcome exit (PREPARED, REBRIEF) sets NO_OUTCOME_EXIT first;
+# keying on the exit code instead would let a failing command that happens to
+# exit 3 pass for a re-brief.
+NO_OUTCOME_EXIT=0
 on_exit() {
   local rc=$?
-  [ -s "$OUTCOME_FILE" ] || \
+  [ "$NO_OUTCOME_EXIT" -eq 1 ] || [ -s "$OUTCOME_FILE" ] || \
     write_outcome FAIL outcome-missing "" "(all): cf-pi-run aborted before any gate (rc=$rc)" "-" "-" 2>/dev/null || true
   exit "$rc"
 }
@@ -336,6 +369,7 @@ trap on_exit EXIT
 # Shared with the Claude fallback (cf.md §3.6). Through $SCRIPT_DIR, not
 # $SCRIPTS: fixtures stub the worktree and brief scripts it calls via $SCRIPTS.
 
+if [ "$MODE" != gates ]; then
 say "preparing shard (worktree, prerequisites, brief)"
 prep_rc=0
 prep_out=$("$SCRIPT_DIR/cf-pi-prepare.sh" "$SHARD_SESSION" "$GOAL" "$CONSTRAINTS" "$TEST_RUNNER") || prep_rc=$?
@@ -356,35 +390,44 @@ fi
 load_cf_pi_env "$SHARD_SESSION"
 load_cf_flow_env "$FLOW_SESSION"
 
+if [ "$MODE" = prepare ]; then
+  echo "PREPARED $BRIEF_FILE"
+  NO_OUTCOME_EXIT=1
+  exit 0
+fi
+fi
+
 # -------- 3. probe ------------------------------------------------------
 
-say "probing pi"
-PROBE_STATUS=$("$SCRIPTS/cf-pi-probe.sh" "$SHARD_SESSION")
-case "$PROBE_STATUS" in
-  OK*)
-    say "probe ok"
-    ;;
-  NO_JSONL*)
-    write_outcome FAIL probe-error "" "(all): probe NO_JSONL" "-" "-"
-    say "FAIL probe NO_JSONL"
-    exit 1
-    ;;
-  ERROR:*)
-    write_outcome FAIL probe-error "" "(all): probe $PROBE_STATUS" "-" "-"
-    say "FAIL probe $PROBE_STATUS"
-    exit 1
-    ;;
-  STALLED*)
-    write_outcome FAIL probe-stalled "" "(all): probe $PROBE_STATUS" "-" "-"
-    say "FAIL probe $PROBE_STATUS"
-    exit 1
-    ;;
-  *)
-    write_outcome FAIL probe-error "" "(all): probe unknown ($PROBE_STATUS)" "-" "-"
-    say "FAIL probe unknown: $PROBE_STATUS"
-    exit 1
-    ;;
-esac
+if [ "$MODE" = full ]; then
+  say "probing pi"
+  PROBE_STATUS=$("$SCRIPTS/cf-pi-probe.sh" "$SHARD_SESSION")
+  case "$PROBE_STATUS" in
+    OK*)
+      say "probe ok"
+      ;;
+    NO_JSONL*)
+      write_outcome FAIL probe-error "" "(all): probe NO_JSONL" "-" "-"
+      say "FAIL probe NO_JSONL"
+      exit 1
+      ;;
+    ERROR:*)
+      write_outcome FAIL probe-error "" "(all): probe $PROBE_STATUS" "-" "-"
+      say "FAIL probe $PROBE_STATUS"
+      exit 1
+      ;;
+    STALLED*)
+      write_outcome FAIL probe-stalled "" "(all): probe $PROBE_STATUS" "-" "-"
+      say "FAIL probe $PROBE_STATUS"
+      exit 1
+      ;;
+    *)
+      write_outcome FAIL probe-error "" "(all): probe unknown ($PROBE_STATUS)" "-" "-"
+      say "FAIL probe unknown: $PROBE_STATUS"
+      exit 1
+      ;;
+  esac
+fi
 
 # -------- 4-5. dispatch + poll (factored so step 9 can re-dispatch) -----
 
@@ -494,7 +537,9 @@ dispatch_and_poll() {
   exit 1
 }
 
-dispatch_and_poll
+if [ "$MODE" = full ]; then
+  dispatch_and_poll
+fi
 
 # -------- 6. escalation -------------------------------------------------
 

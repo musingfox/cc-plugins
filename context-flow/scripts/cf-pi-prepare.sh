@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Ready ONE shard for either builder: worktree + branch, prerequisite
-# checkpoints merged, brief assembled. cf-pi-run.sh (OMP path) and the Claude
-# fallback (commands/cf.md §3.6) both start here, so a cold-start fallback gets
-# the same worktree, BASE_HEAD, prerequisites and brief the gates rely on.
+# checkpoints merged, brief assembled. Both cf-pi-run.sh modes start here -- the
+# plain OMP form and --prepare-only for the Claude builder -- and so does the
+# Claude fallback (commands/cf.md §3.6), so every builder gets the same
+# worktree, BASE_HEAD, prerequisites and brief the gates rely on.
 #
 # Usage:   cf-pi-prepare.sh SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER
 #          Run with cwd inside the host repo: cf-pi-worktree.sh forks from it.
