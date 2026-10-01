@@ -433,10 +433,10 @@ Precedence within one round: **FAIL retries are resolved first, then NEEDS_REPLA
 
 **`QUOTA` and `QUOTA-WINDOW` are never re-launched either.** The shard hit the provider's quota wall — `QUOTA` is balance or plan, which only paying resets; `QUOTA-WINDOW` is a rolling window that clears on its own in hours — and a re-launch on the same `$PI_DISPATCH_CMD` pays for the same wall a second time. Siblings of the same batch end with the same tag as their Reason and `sibling-abort` in Affected. Show the human the reason line and each affected shard's `outcome.md`, and ask via `AskUserQuestion` whether to route those shards through the Claude fallback (§3.6) or to stop so the human can start a new flow with a different `$PI_DISPATCH_CMD`. When any shard in the round ended `QUOTA` or `QUOTA-WINDOW`, do not re-launch that round's other FAIL shards on the same `$PI_DISPATCH_CMD` either: a re-launch starts after the wall was recorded, reads it as stale, and pays for it again. Route them the same way as the quota shard, through §3.6 or a stop to re-route. Do not count these against the retry budget.
 
-Otherwise a FAIL means OMP infrastructure failure (probe error, dispatch broken, stall after in-script retry, report still missing after its own report-only re-dispatch). Re-launch `cf-pi-run.sh` for that shard with the same inputs — one message, one background `Bash` per failed shard if multiple. The re-launch clears the previous round's outcome/report/escalate/diff itself, so the shard's session directory needs no cleanup from you. Re-arm the progress monitor in a LATER message than the re-launch, not the same one: `cf-pi-watch.sh` evaluates "all done" on its first iteration, so a watch racing the re-launch could still catch the stale `outcome.md` before the script clears it.
+Otherwise a FAIL is an infrastructure failure on either builder: a prepare error (`prereq-missing`, `prereq-merge-conflict`, `brief-assembly`), a report still malformed after its one re-brief, a runner error, a revert-gate error, or a missing outcome; on OMP also a probe error, a broken dispatch, and a stall after the in-script retry. Re-launch that shard once on the flow's current builder. On Claude, the re-launch is §3.2 steps 2–5 for that shard: `--prepare-only` clears the previous round's outcome/report/escalate/diff and reuses the worktree, so the shard's session directory needs no cleanup from you. On OMP it is a background `cf-pi-run.sh` per §3.6, one message with one background `Bash` per failed shard, and it clears the same files itself. Re-arm the OMP progress monitor in a LATER message than the re-launch, not the same one: `cf-pi-watch.sh` evaluates "all done" on its first iteration, so a watch racing the re-launch could still catch the stale `outcome.md` before the script clears it.
 
 ```
-Bash(run_in_background: true, command:
+Bash(run_in_background: true, timeout: 7200000, command:
   "$SCRIPTS/cf-pi-run.sh $SESSION/shards/<id> '<one-sentence goal>' '<short constraints>' '<resolved SHARD_TEST_RUNNER>'")
 ```
 
@@ -502,7 +502,7 @@ Read only the reply's first Summary bullet to branch:
   ```bash
   "$SCRIPTS/cf-pi-merge-revision.sh" "$SESSION" "$SESSION/contracts-revision-${ROUND}.json"
   "$SCRIPTS/cf-pi-shard.sh"          "$SESSION"   # re-emits shards.json; affected shards get new env
-  # then re-fan-out: one background cf-pi-run.sh per affected shard id, single message (back to §3.2)
+  # then re-fan-out only the affected shards on the flow's builder: the §3.2 Claude round (steps 2–5), or one background cf-pi-run.sh per affected shard id in a single message (§3.6)
   ```
 - `Status: REPLAN_REQUIRES_ROLLBACK (...)` → Plan declines partial-replan; the preserved interface itself is the problem. Bounded read of the rollback list:
   ```bash
