@@ -44,3 +44,19 @@ if bash "$CF_TESTS_DIR/review-two-axis.test.sh" >/dev/null; then
 else
   assert_eq "ok" "fail" "review-two-axis.test.sh still ok"
 fi
+
+# T7 — the re-run follows the flow's builder
+assert_contains "$handling" '--prepare-only' "REQUEST_CHANGES on Claude re-prepares the shard first"
+prep_ln=$(first_line '--prepare-only')
+if [ -n "$add_ln" ] && [ -n "$prep_ln" ] && [ "$add_ln" -lt "$prep_ln" ]; then
+  assert_eq "order" "order" "repros are appended before any shard is re-prepared"
+else
+  assert_eq "add<prepare" "$add_ln,$prep_ln" "repros are appended before any shard is re-prepared"
+fi
+step4=$(printf '%s\n' "$handling" | awk '/^  4\. / {p=1} /^  5\. / {exit} p')
+assert_contains "$step4" 'review-spec.md' "step 4 hands the agent review-spec.md as failure details"
+assert_eq "0" "$(printf '%s\n' "$handling" | grep -cF 'Claude fallback' || true)" "Handling names no Claude fallback"
+
+presenting=$(awk '/^### Presenting Results/ {p=1} p {print} /^### Handling the Verdict/ && p {exit}' "$CFMD")
+assert_contains "$presenting" 'builder:' "Presenting names each shard's builder from outcome.md"
+assert_eq "0" "$(printf '%s\n' "$presenting" | grep -cF 'Fallback: Claude implement agent' || true)" "Presenting no longer says Fallback: Claude implement agent"

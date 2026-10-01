@@ -681,7 +681,7 @@ Use changelog format from the Spec report — Added / Changed / Fixed sections d
 {bounded read of `$SESSION/review-spec.md` — `## Contract Verification` (count PASS vs total) and `## Advisories` (critical/warning only — drop info unless relevant)}
 ```
 
-When describing the run, mention which implementer ran (`Implementation by OMP ($PI_DESC)` or `Fallback: Claude implement agent`).
+When describing the run, name each shard's builder from the `- builder:` line of its `outcome.md` (`claude` → `cf:implement`, `omp` → `OMP ($PI_DESC)`).
 
 ### Handling the Verdict
 
@@ -694,12 +694,11 @@ Route on the **Spec verdict** only. A Standards documented-convention violation 
   1. Turn the repros into test cases: `"$SCRIPTS/cf-pi-add-repros.sh" "$SESSION" "$SESSION/review-repros.json"`. It prints `ADDED <contract> R<n>` or `DUPLICATE <contract> <id>` per repro and exits 0. On a non-zero exit (2 usage or missing file, 3 malformed entry, 4 jq missing, 5 a contract not in contracts.json) nothing was changed: re-dispatch the Spec axis only, quoting the script's stderr line.
   2. Increment `retries_used`.
   3. Map each contract the Spec reply lists as `<Name>: FAIL` to its shard id: `jq -r --arg c "<Name>" '.groups | to_entries[] | select(.value.contracts | index($c)) | .key' "$SESSION/shards.json"`. A FAIL contract that maps to no shard means the verdict and `shards.json` disagree: escalate.
-  4. Tell the human which shard ids re-launch, then re-launch only those. On OMP, one background `cf-pi-run.sh` per shard in a single message, with the same four positionals as §3.2; it reuses the shard's worktree and rebuilds the brief from contracts.json, so the new `R<n>` cases reach the worker:
+  4. Tell the human which shard ids re-launch, then re-launch only those. On Claude, run §3.2 steps 2–5 for each shard, starting with `cf-pi-run.sh --prepare-only` so the new `R<n>` cases reach the brief, and give the agent `$SESSION/review-spec.md` as the failure details. On OMP, one background `cf-pi-run.sh` per shard in a single message, with the four positionals of §3.6; it reuses the shard's worktree and rebuilds the brief from contracts.json, so the new `R<n>` cases reach the worker:
      ```
      Bash(run_in_background: true, command:
        "$SCRIPTS/cf-pi-run.sh $SESSION/shards/<id> '<one-sentence goal>' '<short constraints>' '<resolved SHARD_TEST_RUNNER>'")
      ```
-     On the Claude fallback, run §3.6 for each shard and give the implement agent `$SESSION/review-spec.md` as the failure details.
   5. Collect and route as in §3.3 and §3.4, recording the round. When every shard is PASS, the integration gate rebuilds `cf/$CF_SLUG` from the flow base; then run Phase 4 again.
   6. Do NOT rebase yet — the cf branch accumulates more commits.
 - **REQUEST_CHANGES with fundamental design issues** → this means a contract is wrong, not just the implementation. Loop back to plan via the `## Implement Failure` mechanism in §3.4 with class `loop-back-to-plan`. Increment `retries_used`. Do NOT rebase.
