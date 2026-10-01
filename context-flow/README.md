@@ -59,6 +59,16 @@ The default implementer is the Claude `cf:implement` agent. OMP, a worker outsid
 /plugin install context-flow
 ```
 
+### Worktree Permissions
+
+Parallel `cf:implement` builders write their shard worktrees under `/tmp`: cf sessions live in `/tmp/cf-*`. To spare a permission prompt per shard, add both `/tmp` and `/private/tmp` (macOS resolves `/tmp` there) to `permissions.additionalDirectories` in `~/.claude/settings.json`:
+
+```json
+{ "permissions": { "additionalDirectories": ["/tmp", "/private/tmp"] } }
+```
+
+A top-level `additionalDirectories` key has no effect; it must sit under `permissions`.
+
 ### Optional Dependencies
 
 - **The pi-dispatch plugin** — required: it supplies the shard worktrees and the gate scripts that every Phase 3 builder runs through.
