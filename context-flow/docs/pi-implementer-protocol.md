@@ -1,6 +1,6 @@
-# OMP Implementer Protocol
+# Implementer Protocol
 
-Governs the Phase 3 handoff when the orchestrator delegates to **OMP** (dispatched via the pi-dispatch canonical scripts) instead of the Claude `cf:implement` agent. Four parts: brief assembly, worker methodology, report contract, and the transition validation that protects against self-grading.
+Governs the Phase 3 handoff to either builder: the Claude `cf:implement` agent (default) or **OMP** (opt-in, dispatched via the pi-dispatch canonical scripts). The brief, the report schema and the gates serve both. Four parts: brief assembly, worker methodology, report contract, and the transition validation that protects against self-grading.
 
 Core stance: the orchestrator never trusts the worker's stdout or report. The worker reports via files; the orchestrator verifies independently (gates + test execution). Stdout is log noise.
 
@@ -9,6 +9,8 @@ Core stance: the orchestrator never trusts the worker's stdout or report. The wo
 ---
 
 ## 1. Invocation
+
+*OMP only* — a `cf:implement` agent is launched with `Agent(subagent_type: "cf:implement")` instead, and skips the launcher, liveness and poll mechanics below.
 
 `scripts/cf-pi-dispatch.sh` is the authoritative launcher — it delegates to the canonical `pi-dispatch.sh` (sibling pi-dispatch plugin), which runs `omp --mode json` detached with the brief attached via `@file`. Do not hand-roll worker invocations. Load-bearing facts:
 
@@ -165,7 +167,7 @@ Every brief carries an `## Environment` block — absolute values for `WORK_DIR`
 
 Performed by the orchestrator (inside `cf-pi-run.sh` per shard). The worker's report is untrusted input.
 
-1. **Pre-flight probe** — `cf-pi-probe.sh` sends a `say ok` prompt (`PI_PROBE_DEADLINE_S`, default 60s) before any real dispatch. Fail → abort Phase 3 with the exact errorMessage + resolved provider/model and concrete remediation (`omp auth …`, quota reset time, model-id check); a hung probe means a broken invocation — recommend the Claude implementer fallback. Costs ~cents; a failed brief dispatch wastes far more.
+1. **Pre-flight probe** — `cf-pi-probe.sh` sends a `say ok` prompt (`PI_PROBE_DEADLINE_S`, default 60s) before any real dispatch. Fail → abort Phase 3 with the exact errorMessage + resolved provider/model and concrete remediation (`omp auth …`, quota reset time, model-id check); a hung probe means a broken invocation — stop and report it. Costs ~cents; a failed brief dispatch wastes far more.
 2. **Poll loop** — lives inside `cf-pi-run.sh` (background task, exempt from the foreground Bash ceiling): every ~30s `cf-pi-poll.sh` emits one status line (`RUNNING` / `STATUS=OK` / stall / timeout / error variants), max 64 rounds at the default wall clock. Defaults: `PI_STALL_THRESHOLD_S=180` (long tool calls approach this — don't go below 120), `PI_WALL_CLOCK_S=1800`; raise both for Rust/Docker-heavy briefs. The ceiling is **per dispatch**, and a shard may dispatch up to three times (first run + gate-1 report re-brief + gate-3 fix re-brief), so the worst-case wall clock per shard is 3×`PI_WALL_CLOCK_S`. **A failed poll call says nothing about the worker** — re-poll (up to 3×), then verify with `kill -0` before declaring death; the worker is failed only by an explicit kill-status line from a successful poll.
 3. **Report gate** — `$REPORT_FILE` exists, non-empty, has `## Summary` + `## Completed` in `head -20`. A first miss buys one resume re-brief that asks for the report ALONE (explicitly forbidding a re-implementation): the commits are often all on the branch with only the write-up skipped, and since commit messages carry no contract name (§2 step 5) the report is the only contract↔commit channel — it cannot be inferred from a green test run, which says nothing about a contract nobody implemented. Still missing after that → the run failed; promote nothing.
 4. **Survivors** — a contract survives iff it was declared in this shard AND claimed in `## Completed`. There is deliberately no grep of test sources against contract prose (a removed "grep guard" did that — it mechanically checked the non-deterministic question "does this test capture the intent?" and demoted virtually every well-written test; that judgement belongs to Review).
@@ -182,8 +184,8 @@ Diagnose from the session JSONL first, stderr second; `cf-pi-postmortem.sh` for 
 
 | Symptom | Likely cause | Action |
 |---|---|---|
-| Probe times out, no stdout | bad invocation / missing auth / broken install | abort Phase 3; inspect probe artifacts; offer Claude fallback |
-| JSONL `usage_limit_reached` | quota | report `resets_at`; offer fallback or another provider |
+| Probe times out, no stdout | bad invocation / missing auth / broken install | abort Phase 3; inspect probe artifacts |
+| JSONL `usage_limit_reached` | quota | report `resets_at`; offer another provider |
 | JSONL `401`/`unauthorized` | auth expired | recommend `omp auth <provider>`; never silently switch providers |
 | JSONL `model_not_found` | bad model id | recommend listing models; abort |
 | No JSONL within 60s | worker failed to start | check stderr; retry once |
@@ -196,5 +198,5 @@ Diagnose from the session JSONL first, stderr second; `cf-pi-postmortem.sh` for 
 
 ## 8. Out of Scope
 
-- External-API verification (ctx7) inside the worker — contracts needing it go to the Claude implement agent or get pre-resolved in planning; the worker reports Unresolved on unknown library behavior.
+- External-API verification (ctx7) inside the worker — contracts needing it go to a `cf:implement` builder or get pre-resolved in planning; the worker reports Unresolved on unknown library behavior.
 - Cross-shard awareness — each worker sees only its own brief; parallel coordination is entirely the orchestrator's (cf-pi-shard.sh + cf.md Phase 3).

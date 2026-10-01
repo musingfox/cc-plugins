@@ -7,9 +7,10 @@ effort: xhigh
 tools: Read, Write, Grep, Glob, Bash
 ---
 
-<!-- model: opus is a capability floor, not a preference: builders route up to
-     the strongest OMP config overlay available, and the dispatch doctrine
-     requires the reviewer seat to sit at or above the builder. -->
+<!-- model: opus is a capability floor, not a preference: the default builder is
+     cf:implement on sonnet and OMP is the opt-in overflow builder (routed up to the
+     strongest config overlay available), and the dispatch doctrine requires the
+     reviewer seat to sit at or above the builder. -->
 
 One review definition, two briefs. Judge the diff at `## Diff path` on exactly one axis and write one report file.
 

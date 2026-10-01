@@ -1,7 +1,7 @@
 # Parallel Sharded Implement — Design
 
 Status: implemented (Phase 3 of `/cf`)
-Scope: fan out OMP work in parallel as main-launched background tasks; main reads paths-only outcomes and routes structured escalations without bouncing through the user.
+Scope: fan out `cf:implement` agents (default) and opt-in OMP workers in parallel; main reads paths-only outcomes and routes structured escalations without bouncing through the user.
 
 Operational detail lives in `commands/cf.md` (orchestration) and `docs/pi-implementer-protocol.md` (worker contract). This document records the architecture and the decisions behind it.
 
@@ -9,7 +9,8 @@ Operational detail lives in `commands/cf.md` (orchestration) and `docs/pi-implem
 
 ```
 goal → Plan (contracts.json) → cf-pi-shard.sh (file-touch graph → shards)
-     → N × cf-pi-run.sh (background task: worktree → brief → dispatch → poll → gates → outcome.md)
+     → N × cf-pi-run.sh (background task: worktree → brief → dispatch → poll → gates → outcome.md)   [OMP, opt-in]
+     → N × (cf-pi-run.sh --prepare-only → cf:implement agent → cf-pi-run.sh --gates-only → outcome.md)   [default]
      → main collects paths-only outcomes → route:
          all PASS        → integration gate (merge + full suite) → review
          any NEEDS_REPLAN → coalesced partial-replan → re-fan-out affected shards
@@ -19,10 +20,11 @@ goal → Plan (contracts.json) → cf-pi-shard.sh (file-touch graph → shards)
 | Layer | Owns | Claude-token cost |
 |---|---|---|
 | Main orchestrator | fan-out decisions, reading paths-only `outcome.md`, routing, integration, user-facing summary | bounded reads only |
-| `cf-pi-run.sh` (per shard, background task) | full worker lifecycle in pure shell; heavy stdout goes to the task's own output file | zero |
-| OMP worker | implement contracts, per-contract commit, write report/escalate file | zero (separate billing) |
+| `cf-pi-run.sh` (per shard, background task) | OMP: full worker lifecycle in pure shell; `--prepare-only` / `--gates-only` bracket a `cf:implement` agent; heavy stdout goes to the task's own output file | zero |
+| `cf:implement` agent (default) | implement contracts, per-contract commit, write report/escalate file | the agent's own session; only its bounded reply enters main |
+| OMP worker (opt-in) | same work as `cf:implement` | zero (separate billing) |
 
-No sub-agent sits between main and a shard: the background-task output split IS the token firewall (its stdout never enters main's context).
+For OMP no sub-agent sits between main and a shard: the background-task output split IS the token firewall (its stdout never enters main's context).
 
 ## 2. Sharding Model
 
@@ -80,7 +82,7 @@ Never silently waste validated work. Partial-replan is the default; Plan owns th
 
 Main must never hold flow artifacts in context. Structural guarantee: each shard is a background task, so its stdout can't leak into main; convention covers the rest.
 
-Never enters main: `contracts.json` bodies, worker reports, JSONL event streams, test logs, briefs, escalate bodies, revision JSON, diffs. All live on disk; main passes **paths**.
+Never enters main: `contracts.json` bodies, worker reports, JSONL event streams, test logs, briefs, escalate bodies, revision JSON, diffs. All live on disk; main passes **paths**. The one exception is a `cf:implement` agent's reply, which enters main bounded by implement.md's Return Format (`Report written: <path>` plus at most five bullets).
 
 Every read main performs on a flow artifact is bounded: `Read(file, limit=N)`, `jq '.field'`, `head/tail -N`, `sed -n '/^## X/,/^## Y/p'`. Unbounded `cat`/`Read` on any artifact > 1KB is forbidden.
 
@@ -90,7 +92,7 @@ Anti-growth: `dispatch-state.json` holds only the latest round (~1KB); history i
 
 Three layers, all fed by `cf-pi-run.sh` mirroring its latest progress line to `$SHARD_SESSION/progress`:
 
-- **Push (primary)**: after fan-out the orchestrator arms one `Monitor` on `cf-pi-watch.sh`, which emits one chat notification per meaningful change (phase transitions, liveness transitions, per-shard final `Status (reason) — cause`) and exits when all outcomes exist — that exit doubles as the round-collection signal. Volatile counters are normalized away so it never spams.
+- **Push (primary, OMP rounds only)**: after an OMP fan-out the orchestrator arms one `Monitor` on `cf-pi-watch.sh`, which emits one chat notification per meaningful change (phase transitions, liveness transitions, per-shard final `Status (reason) — cause`) and exits when all outcomes exist — that exit doubles as the round-collection signal. Volatile counters are normalized away so it never spams.
 - **Pull (on demand)**: `cf-pi-status.sh $SESSION` — one line per shard, liveness + current phase; read-only, safe any time.
 - **Post-hoc**: `## Cause` in each outcome (reason-matched, bounded) plus the durable non-PASS bundle under `$PI_RUNS_DIR`. Reporting non-PASS causes to the human is mandatory — never a bare FAIL.
 
@@ -99,7 +101,7 @@ Three layers, all fed by `cf-pi-run.sh` mirroring its latest progress line to `$
 - **Escalation discipline**: the worker must use `$ESCALATE_FILE` instead of silently giving up or claiming success; the gates are the defense in depth.
 - **`touches_files` underset**: understated file lists let shards collide at runtime. `cf-pi-run.sh` post-validates `actual ⊆ declared` (root build/lock manifests and version-only plugin.json bumps allowlisted as warnings) and NEEDS_REPLANs on violation. Verified real in early dogfooding (N=1 plan trial omitted doc cross-references).
 - **Cross-shard semantic regressions**: different-file edits can still break shared invariants; the integration gate's full suite is the only net.
-- **Disk pressure**: cap fan-out at N ≤ 6 by default; worktrees are removed after integration.
+- **Disk pressure**: no fan-out cap is enforced beyond the platform's 20 concurrent subagents; worktrees are removed after integration.
 
 ## 10. Decisions Locked In
 
@@ -112,3 +114,4 @@ F. Single flow; N=1 walks the same path.
 G. No distillation sub-agent — the background-task output split enforces the token firewall.
 H. Contract revisions applied by `cf-pi-merge-revision.sh` (jq), not by main's Edit tool.
 I. Rich-prose escape hatch: `attachments` in contracts.json, included verbatim in briefs.
+J. The default Phase 3 builder is the Claude `cf:implement` agent, bracketed by `cf-pi-run.sh --prepare-only` and `--gates-only`; OMP is an opt-in overflow worker recorded as `CF_IMPLEMENTER`. Both use the same brief, report schema and gates.
