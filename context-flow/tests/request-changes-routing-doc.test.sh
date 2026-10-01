@@ -64,3 +64,11 @@ assert_eq "0" "$(printf '%s\n' "$presenting" | grep -cF 'Fallback: Claude implem
 # T-timeout: every background cf-pi-run.sh launch in the handling carries the two-hour timeout.
 launches=$(printf '%s\n' "$handling" | grep -F -B1 'cf-pi-run.sh $SESSION/shards/<id>' | grep -F 'run_in_background' || true)
 assert_contains "$launches" 'timeout: 7200000' "Phase 4 OMP re-run launch carries timeout: 7200000"
+
+# T-status-routing: Phase 4 routes by §3.4's statuses, not by retired Failure Classes.
+phase4_text=$(awk '/^## Phase 4: Review/ {p=1} p {print} /^## Context Compression/ && p {exit}' "$CFMD")
+for stale in 'retry-different-approach' 'loop-back-to-plan' 'Implement Failure'; do
+  assert_eq "0" "$(printf '%s\n' "$phase4_text" | grep -cF -- "$stale" || true)" "Phase 4 no longer names $stale"
+done
+design_line=$(printf '%s\n' "$handling" | grep -F 'fundamental design issues' || true)
+assert_contains "$design_line" 'review-spec.md' "fundamental design issues loop back to plan with the review findings"

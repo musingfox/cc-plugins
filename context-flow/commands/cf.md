@@ -688,7 +688,7 @@ Route on the **Spec verdict** only. A Standards documented-convention violation 
 - **no spec available** → call `AskUserQuestion` with options: "Supply the spec path", "abort-flow", "Other" (nothing to judge; do not send this back to implement).
 - **APPROVE, no advisories and no Standards documented-convention violation** → present changelog to human → **run post-PASS rebase** (see below). Done.
 - **APPROVE with advisories** (Spec advisories, or any Standards documented-convention violation) → present changelog + advisories + Standards findings to human, then call `AskUserQuestion` with options: "Address all now (loop to implement)", "Address only critical advisories", "Ship as-is — accept advisories", "Other". On "Ship as-is" or after advisories addressed, **run post-PASS rebase**.
-- **REQUEST_CHANGES with contract failures** → re-launch only the shards that hold the failing contracts, measured on the review's repros (treat as `retry-different-approach`):
+- **REQUEST_CHANGES with contract failures** → re-launch only the shards that hold the failing contracts, measured on the review's repros:
   1. Turn the repros into test cases: `"$SCRIPTS/cf-pi-add-repros.sh" "$SESSION" "$SESSION/review-repros.json"`. It prints `ADDED <contract> R<n>` or `DUPLICATE <contract> <id>` per repro and exits 0. On a non-zero exit (2 usage or missing file, 3 malformed entry, 4 jq missing, 5 a contract not in contracts.json) nothing was changed: re-dispatch the Spec axis only, quoting the script's stderr line.
   2. Increment `retries_used`.
   3. Map each contract the Spec reply lists as `<Name>: FAIL` to its shard id: `jq -r --arg c "<Name>" '.groups | to_entries[] | select(.value.contracts | index($c)) | .key' "$SESSION/shards.json"`. A FAIL contract that maps to no shard means the verdict and `shards.json` disagree: escalate.
@@ -699,7 +699,7 @@ Route on the **Spec verdict** only. A Standards documented-convention violation 
      ```
   5. Collect and route as in §3.3 and §3.4, recording the round. When every shard is PASS, the integration gate rebuilds `cf/$CF_SLUG` from the flow base; then run Phase 4 again.
   6. Do NOT rebase yet — the cf branch accumulates more commits.
-- **REQUEST_CHANGES with fundamental design issues** → this means a contract is wrong, not just the implementation. Loop back to plan via the `## Implement Failure` mechanism in §3.4 with class `loop-back-to-plan`. Increment `retries_used`. Do NOT rebase.
+- **REQUEST_CHANGES with fundamental design issues** → this means a contract is wrong, not just the implementation. Loop back to plan with the review findings (`$SESSION/review-spec.md`) as the partial-replan input, the way §3.4 handles a NEEDS_REPLAN shard. Increment `retries_used`. Do NOT rebase.
 
 ### Post-PASS spec maintenance
 
@@ -743,7 +743,7 @@ Interpret the first token of `$REBASE_STATUS`:
 | `OK <sha>` | Cf branch rebased onto latest `$BASE_BRANCH`, head is `<sha>`, suite green on that tree. | "Rebased onto `$BASE_BRANCH` and the suite passes there. Ready to fast-forward." |
 | `NOOP <sha>` | `$BASE_BRANCH` hasn't moved during the flow; cf branch already linear over it, suite green. | "Already linear over `$BASE_BRANCH`, suite green." |
 | `CONFLICT <files>` | Rebase aborted to keep state clean; cf branch is still at its original (pre-rebase) tip. | "Rebase conflicts in `<files>`. Branch left at original tip — resolve manually before ff." |
-| `TESTFAIL <sha> <log>` | The delivered tree fails its own suite. | "The rebased tree fails the suite — do NOT fast-forward. Failures in `<log>`." Do not print the ff guidance; route the failures back to implement as `retry-different-approach`. That loop returns here: implement adds commits without rebasing, so the base is already applied and this step re-verifies on the NOOP path. |
+| `TESTFAIL <sha> <log>` | The delivered tree fails its own suite. | "The rebased tree fails the suite — do NOT fast-forward. Failures in `<log>`." Do not print the ff guidance; re-run the shards that hold the failing contracts, as in REQUEST_CHANGES with contract failures. That loop returns here: implement adds commits without rebasing, so the base is already applied and this step re-verifies on the NOOP path. |
 | `TESTSTALLED <sha> <log>` | That suite outran its deadline. | "The suite did not finish on the rebased tree (see `<log>`) — delivery is unverified, do NOT fast-forward." Ask the human whether to raise `CF_TEST_DEADLINE_S` and re-run, or ship unverified. |
 | `OK-UNVERIFIED <sha>` / `NOOP-UNVERIFIED <sha>` | Same as `OK`/`NOOP`, but no `$TEST_RUNNER` was in scope, so nothing ran on the delivered tree. | "Rebased onto `$BASE_BRANCH`, but no test runner was resolved — the delivered tree is unverified." Still offer the ff, and say plainly that no suite backs it. |
 | `SKIP <reason>` | Non-git mode or missing base; nothing to rebase. | Skip rebase messaging entirely. |
