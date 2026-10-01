@@ -3,14 +3,14 @@
 # Usage:   cf-pi-setup.sh [SLUG]   (SLUG = task short name for the branch, kebab-case)
 # Stdin:   none
 # Stdout:  SESSION path (single line)
-# Env in:  PI_DISPATCH_CMD, PI_STALL_THRESHOLD_S, PI_WALL_CLOCK_S (all optional)
+# Env in:  PI_DISPATCH_CMD, CF_IMPLEMENTER (claude|omp), PI_STALL_THRESHOLD_S, PI_WALL_CLOCK_S (all optional)
 # Side effects:
 #   - creates $SESSION (under /tmp)
 #   - writes $SESSION/env.sh (sourced by sibling scripts — session-wide vars only;
 #     flat per-session paths are derived by load_cf_pi_env)
 #   - writes $SESSION/cleanup.sh (worktree script appends to this)
 #   - writes $SESSION/README.md (human pointer to inspect/clean up the session)
-#   - records PI_AVAILABLE gate into env.sh
+#   - records PI_AVAILABLE gate and CF_IMPLEMENTER into env.sh
 #
 # Note: loop-budget.json is owned by the /cf orchestrator (commands/cf.md
 # Setup block). cf-pi-setup.sh does NOT write it.
@@ -30,6 +30,16 @@ CF_SLUG="${1:-$SESSION_BASENAME}"
 
 PI_DISPATCH_CMD="${PI_DISPATCH_CMD:-}"
 PI_DESC="${PI_DISPATCH_CMD:-<PI_DISPATCH_CMD not set>}"
+
+# The builder is chosen once here; later steps read env.sh, not the live environment.
+case "${CF_IMPLEMENTER:-}" in
+  omp) CF_IMPLEMENTER=omp ;;
+  ""|claude) CF_IMPLEMENTER=claude ;;
+  *)
+    echo "cf-pi-setup: CF_IMPLEMENTER=$CF_IMPLEMENTER is not claude or omp; recording claude" >&2
+    CF_IMPLEMENTER=claude
+    ;;
+esac
 
 # Availability gate via the canonical probe — cf owns no agent-binary handling.
 # shellcheck source=cf-pi-env.sh
@@ -54,6 +64,7 @@ PI_DESC=$(printf '%q' "$PI_DESC")
 PI_STALL_THRESHOLD_S="${PI_STALL_THRESHOLD_S:-180}"
 PI_WALL_CLOCK_S="${PI_WALL_CLOCK_S:-1800}"
 PI_AVAILABLE=$PI_AVAILABLE
+CF_IMPLEMENTER=$(printf '%q' "$CF_IMPLEMENTER")
 EOF
 
 echo '#!/usr/bin/env bash' > "$SESSION/cleanup.sh"

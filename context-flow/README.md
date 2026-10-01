@@ -62,6 +62,7 @@ The default implementer is an OMP worker outside Claude Code. Its model and thin
 ### Optional Dependencies
 
 - **pi** (`npm i -g @earendil-works/pi-coding-agent`) with `PI_DISPATCH_CMD` set — the default Phase 3 implementer. Without it, setup records `PI_AVAILABLE=0` and Phase 3 runs on the Claude `cf:implement` fallback. The pi-dispatch skill walks through choosing a command.
+- **`CF_IMPLEMENTER=omp`** — opt in to OMP as the Phase 3 builder; set it in the environment before `/cf` starts. `cf-pi-setup.sh` records the choice once as `CF_IMPLEMENTER=<claude|omp>` in the session's `env.sh`; unset, empty or any other value records `claude`.
 - **`ctx7` CLI** (`npm i -g ctx7` then `ctx7 login`) — enables research and implement phases to verify third-party library / API behavior with version-specific docs. Falls back to `WebFetch` if not installed. Without either, agents report Unresolved when the goal hinges on external behavior they can't infer from the local codebase.
 
 ### Direct Sub-agent Invocation Caveat
