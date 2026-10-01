@@ -338,42 +338,11 @@ SHARD_IDS=$(jq -r '.groups | keys[]' "$SESSION/shards.json")
 
 ### 3.2 Fan-out
 
-**No pre-dispatch quota gate.** There is none, deliberately: since dispatch moved from omp to pi there is no provider-side headroom signal to read (`pi auth check` reports readiness, not remaining balance, and is blind to package-provided providers). Exhaustion is caught reactively — `cf-pi-run.sh`'s poll classifies it as `QUOTA` (balance or plan, which only paying resets) or `QUOTA-WINDOW` (a rolling window that clears on its own in hours), and one worker hitting the wall aborts its whole batch rather than letting every sibling pay for the same wall: the shard that hits it records the wall for the flow, and every sibling `cf-pi-run.sh` stops its own worker from that record with the same tag. On that outcome (§3.4 Any FAIL), route the round through the Claude fallback (§3.6) or re-run later as a new flow with a different `$PI_DISPATCH_CMD`.
-
 **Wave rule.** A shard is READY when every id in its `depends_on` already has a PASS checkpoint (`jq -r '.checkpoints | keys[]' "$SESSION/dispatch-state.json"`); shards with `depends_on: []` are READY immediately. Launch ONLY the READY shards — a dependent shard dispatched early forks a base without its prerequisites' interfaces and `cf-pi-run.sh` refuses it (`FAIL prereq-missing`). Dependent shards launch as the next wave from §3.4 routing; `cf-pi-run.sh` merges their prerequisites' checkpoints into their worktree base automatically.
-
-Launch the READY shards in PARALLEL — one `cf-pi-run.sh` per shard as a **background task** (`Bash` with `run_in_background: true`), all in a **single message**:
-
-```
-Bash(run_in_background: true, command:
-  "$SCRIPTS/cf-pi-run.sh $SESSION/shards/A '<one-sentence goal>' '<short constraints>' '<resolved SHARD_TEST_RUNNER>'")
-Bash(run_in_background: true, command:
-  "$SCRIPTS/cf-pi-run.sh $SESSION/shards/B '<one-sentence goal>' '<short constraints>' '<resolved SHARD_TEST_RUNNER>'")
-... (one background Bash per READY id)
-```
-
-The 4 positionals are `SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER` — pass the resolved `SHARD_TEST_RUNNER` (the full suite belongs to the integration gate). Do NOT pass research output, decision alternatives, plan prose, or rejected approaches; each shard derives everything else from its `SHARD_SESSION/env.sh`. Background tasks are exempt from the 10-minute Bash ceiling (set `BASH_MAX_TIMEOUT_MS` as a safety net); each writes `$SESSION/shards/<id>/outcome.md` on completion.
 
 ### 3.3 Collect
 
 Wait for ALL shards of the current wave before routing (round-collection rule, design §4) so NEEDS_REPLAN coalesces into a single Plan invocation. End your turn after fan-out; the harness re-invokes you on each task completion — check whether every id dispatched this wave now has a non-empty `$SESSION/shards/<id>/outcome.md`, and if not, end the turn again.
-
-**Progress visibility** — the human must never sit blind while shards run. Immediately after fan-out (same turn), arm ONE progress monitor:
-
-```
-Monitor(
-  command: "\"$SCRIPTS/cf-pi-watch.sh\" \"$SESSION\" 300",
-  description: "cf shards progress",
-  timeout_ms: 3600000, persistent: false
-)
-```
-
-`cf-pi-watch.sh` emits one line per meaningful change — lifecycle-phase transitions, liveness transitions (ALIVE/STALL/…), and a final per-shard `Status (reason) — cause` summary — then exits when every shard has an outcome. The `300` sets a 5-minute poll interval, so meaningful changes coalesce into at most one notification burst every 5 min instead of spamming. Each line arrives as a chat notification, so progress is visible mid-run with zero polling from you. Round counters and byte sizes are normalized away; it will not spam.
-
-- Also print one line so the human can check on demand: `` Watch progress: bash $SCRIPTS/cf-pi-status.sh $SESSION ``
-- The monitor's `--- all shards done ---` event doubles as the round-collection signal — proceed to reading outcomes.
-- If the monitor times out (flow > 1h) with shards still pending, re-arm it.
-- On a `STALL` event, do not intervene — `cf-pi-run.sh` handles kill/retry itself; the event is for awareness.
 
 Once all are done, read each shard's status from its paths-only outcome (never the report/diff/JSONL it points to):
 
@@ -509,33 +478,40 @@ If either fires, escalate to the user via `AskUserQuestion`:
 
 Replan budget = 2 attempts per contract (third NEEDS_REPLAN escalates). Rollback budget = 2 cycles per flow (third escalates). FAIL retry budget = 1 per shard per round (handled in §3.4 Any FAIL).
 
-### 3.6 Fallback: Claude implement agent (PI_AVAILABLE=0, a `QUOTA`/`QUOTA-WINDOW` outcome, or human-selected)
+### 3.6 OMP overflow (`CF_IMPLEMENTER=omp`): one background `cf-pi-run.sh` per shard, `QUOTA` outcomes
 
-The fallback fills the SAME seat under the SAME contract — only the builder changes. Per shard, sequentially (Claude agents are not free fan-out):
+OMP builds a round only when `CF_IMPLEMENTER=omp` is recorded in `$SESSION/env.sh` and `PI_AVAILABLE=1`. The full per-shard lifecycle (worktree → brief → probe → dispatch → poll → gates → outcome) lives inside `cf-pi-run.sh`; you only fan out, collect, and route.
 
-1. **Prepare (same as OMP)**: run the step `cf-pi-run.sh` starts with, from the host repo root (the shard worktree forks from the repository of the current directory), so a cold start gets the worktree, `$BASE_HEAD`, merged prerequisites and brief that the gates below rely on:
+**No pre-dispatch quota gate.** There is none, deliberately: since dispatch moved from omp to pi there is no provider-side headroom signal to read (`pi auth check` reports readiness, not remaining balance, and is blind to package-provided providers). Exhaustion is caught reactively — `cf-pi-run.sh`'s poll classifies it as `QUOTA` (balance or plan, which only paying resets) or `QUOTA-WINDOW` (a rolling window that clears on its own in hours), and one worker hitting the wall aborts its whole batch rather than letting every sibling pay for the same wall: the shard that hits it records the wall for the flow, and every sibling `cf-pi-run.sh` stops its own worker from that record with the same tag. On that outcome (§3.4 Any FAIL), route those shards back to the Claude builder (§3.2) or re-run later as a new flow with a different `$PI_DISPATCH_CMD`.
 
-   ```bash
-   . "$SESSION/env.sh"
-   "$SCRIPTS/cf-pi-prepare.sh" "$SESSION/shards/<id>" '<one-sentence goal>' '<short constraints>' "$SHARD_TEST_RUNNER"
-   ```
+Launch the READY shards in PARALLEL — one `cf-pi-run.sh` per shard as a **background task** (`Bash` with `run_in_background: true` and `timeout: 7200000`), all in a **single message**:
 
-   The last stdout line is `PREPARED <brief path>`. A `FAIL <reason> [<detail>]` line (`prereq-missing`, `prereq-merge-conflict`, `brief-assembly`) becomes a hand-written outcome `FAIL <reason>`; a non-zero exit with no FAIL line becomes `FAIL outcome-missing`. A rerun reuses the worktree and rebuilds the brief.
-2. **Dispatch**: `Agent(subagent_type: "cf:implement")` with the brief path + the shard worktree's absolute path; instruct it to work ONLY under that worktree, follow the brief's report format to `implement-report.md`, and never touch the gate/test files' expectations.
-3. **Gates (unchanged, non-negotiable)**: run the same deterministic gates the OMP path gets — from the shard session run `"$SCRIPTS/cf-pi-test.sh" "$SHARD_SESSION" $SHARD_TEST_RUNNER` (bounded read of the tail), then the file-scope gate `"$SCRIPTS/cf-pi-scope.sh" "$SHARD_SESSION"` (exit 0 = clean; exit 2 + `UNDECLARED <csv>` on stdout = scope violation → `NEEDS_REPLAN undeclared_file_touched` with that csv as the outcome's undeclared_files; an `ALLOWLISTED <csv>` line is a warning only), then completeness (survivors == declared; missing contracts → NEEDS_REPLAN incomplete-contracts). Run the scripts — never approximate the scope gate with `git status --porcelain`, which is blind to the files the builder already committed. The builder's self-report is untrusted on this path too.
-4. **Revert gate**: once those pass, run the gate `cf-pi-run.sh` runs last. It makes one control run plus one run per contract, so launch it as a background task and end your turn until it completes:
+```
+Bash(run_in_background: true, timeout: 7200000, command:
+  "$SCRIPTS/cf-pi-run.sh $SESSION/shards/A '<one-sentence goal>' '<short constraints>' '<resolved SHARD_TEST_RUNNER>'")
+Bash(run_in_background: true, timeout: 7200000, command:
+  "$SCRIPTS/cf-pi-run.sh $SESSION/shards/B '<one-sentence goal>' '<short constraints>' '<resolved SHARD_TEST_RUNNER>'")
+... (one background Bash per READY id)
+```
 
-   ```
-   Bash(run_in_background: true, command:
-     ". $SESSION/env.sh && $SCRIPTS/cf-pi-revert-gate.sh $SESSION/shards/<id> $SHARD_TEST_RUNNER > $SESSION/shards/<id>/revert-gate.out")
-   ```
+The 4 positionals are `SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER` — pass the resolved `SHARD_TEST_RUNNER` (the full suite belongs to the integration gate). Do NOT pass research output, decision alternatives, plan prose, or rejected approaches; each shard derives everything else from its `SHARD_SESSION/env.sh`. A foreground Bash is capped at 10 minutes, so a background task carries an explicit `timeout: 7200000` (two hours) and is stopped there; each writes `$SESSION/shards/<id>/outcome.md` on completion.
 
-   `$SHARD_TEST_RUNNER` stays unquoted so it splits into words, as on the OMP path. The gate refuses to run over uncommitted changes to the shard's own files, so the builder's work must be committed. Read `head -1 "$SESSION/shards/<id>/revert-gate.out"`, its one verdict line:
-   - `CLEAN <n>` → PASS. `SKIPPED no-git` → PASS; tell the human the gate was skipped in non-git scratch mode.
-   - `STAYS_GREEN <A>[,<B>...]` → NEEDS_REPLAN `tests-green-on-revert`: those contracts go under Affected as `<Name>: tests-green-on-revert` and out of Survived.
-   - `ERROR <reason>`, or an empty file → FAIL `revert-gate-error`, with the ERROR line (or the exit code) as the Cause.
-5. **Outcome**: write the same `outcome.md` shape by hand (Status/Reason/Survived/Affected, paths only) so §3.3 Collect and §3.4 routing work identically.
-6. **Reviewer seat**: unchanged — Phase-4 `cf:review` + integration gate. No step of this path lets the implement agent certify its own work.
+**Progress visibility** — the human must never sit blind while shards run. Immediately after fan-out (same turn), arm ONE progress monitor:
+
+```
+Monitor(
+  command: "\"$SCRIPTS/cf-pi-watch.sh\" \"$SESSION\" 300",
+  description: "cf shards progress",
+  timeout_ms: 3600000, persistent: false
+)
+```
+
+`cf-pi-watch.sh` emits one line per meaningful change — lifecycle-phase transitions, liveness transitions (ALIVE/STALL/…), and a final per-shard `Status (reason) — cause` summary — then exits when every shard has an outcome. The `300` sets a 5-minute poll interval, so meaningful changes coalesce into at most one notification burst every 5 min instead of spamming. Each line arrives as a chat notification, so progress is visible mid-run with zero polling from you. Round counters and byte sizes are normalized away; it will not spam.
+
+- Also print one line so the human can check on demand: `` Watch progress: bash $SCRIPTS/cf-pi-status.sh $SESSION ``
+- The monitor's `--- all shards done ---` event doubles as the round-collection signal — proceed to reading outcomes.
+- If the monitor times out (flow > 1h) with shards still pending, re-arm it.
+- On a `STALL` event, do not intervene — `cf-pi-run.sh` handles kill/retry itself; the event is for awareness.
 
 ---
 
