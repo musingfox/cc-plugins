@@ -123,9 +123,7 @@ Each phase below specifies its own option set. "Ask the human X" everywhere mean
   → [plan] → VALIDATE → HUMAN GATE (High decisions only)
        ↑ Research Insufficiency BLOCKED → research (cross-phase)
   → [implement — Claude default, OMP overflow] → VALIDATE
-       ↑ Failure Class = retry-different-approach → implement (same plan, with hint)
-       ↑ Failure Class = loop-back-to-plan → plan (revise contracts)
-       ↑ Failure Class = pivot-goal → escalate to human (bypass retry budget)
+       ↑ NEEDS_REPLAN → plan (partial replan, §3.4)
        ↑ codebase-gap hint → research (cross-phase)
   → [review] → PRESENT
        ↑ REQUEST_CHANGES fundamental → plan (cross-phase)
@@ -799,7 +797,7 @@ When you cannot proceed (`retries_used >= 4`, all contracts unresolved, fundamen
 |-----------|--------|
 | Research finds nothing relevant | Escalate: "Codebase has nothing related to this goal. Start from scratch or wrong codebase?" |
 | All High decisions rejected by human | Escalate: "All approaches rejected. Provide direction or research alternatives?" |
-| All implement contracts Unresolved | Route per §3.4 Failure Class. If any class is `pivot-goal`, escalate immediately (no `retries_used` increment). Otherwise, if `retries_used` already at cap, escalate. |
+| All implement contracts Unresolved | Route per §3.4: each shard ends `NEEDS_REPLAN incomplete-contracts` or `escalate`, and the partial replan or the escalation follows. If `retries_used` is already at cap, escalate. |
 | All review contracts FAIL | Re-run implement (1st time) or escalate (2nd time, or if budget exhausted) |
 | `retries_used >= 4` | Escalate with full context |
 
