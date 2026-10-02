@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { arrowMove, nextRing, submitTarget } from '../hooks/ring.ts'
+import { arrowMove, nextRing, reorderTarget, submitTarget } from '../hooks/ring.ts'
 
 describe('arrowMove', () => {
   const items = ['group:0:todo', 'row:a', 'row:b']
@@ -37,4 +37,10 @@ describe('nextRing', () => {
   test('keeps the last list item when the ring moves to a button', () => expect(nextRing(held, 'sort')).toEqual({ at: 'sort', item: 'row:a' }))
   test('keeps the last list item when the ring lands on an engine stop', () => expect(nextRing(held, undefined)).toEqual({ at: null, item: 'row:a' }))
   test('takes a heading as the last list item', () => expect(nextRing(held, 'group:0:done')).toEqual({ at: 'group:0:done', item: 'group:0:done' }))
+})
+
+describe('reorderTarget', () => {
+  test('returns the card while it is still drawn', () => expect(reorderTarget('row:a', ['group:0:todo', 'row:b', 'row:a'])).toBe('row:a'))
+  test('returns nothing once it is gone', () => expect(reorderTarget('row:a', ['group:0:todo', 'row:b'])).toBe(null))
+  test('returns nothing when the ring held no card', () => expect(reorderTarget(null, ['group:0:todo'])).toBe(null))
 })

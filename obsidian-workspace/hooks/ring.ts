@@ -29,3 +29,8 @@ export type Ring = { at: string | null; item: string | null }
 export function nextRing(prev: Ring, element: string | undefined): Ring {
   return { at: element ?? null, item: element?.startsWith('group:') || element?.startsWith('row:') ? element : prev.item }
 }
+
+// After p or s, the card the ring was on, when it is still drawn.
+export function reorderTarget(item: string | null, items: string[]): string | null {
+  return item !== null && items.includes(item) ? item : null
+}
