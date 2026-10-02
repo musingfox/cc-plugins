@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'claude-code/testing'
 import { priorityColor, statusColor } from '../hooks/style.ts'
-import { PANE, cardSelect, headerIn, issue, mounted, nodesOf, press, runsOf, shown, stringsIn, viewSelect, vizWorld } from './fixtures/pane.ts'
+import { PANE, cardSelect, colorsIn, headerIn, issue, mounted, nodesOf, pick, press, pressKey, runsOf, shown, stringsIn, viewSelect, vizWorld } from './fixtures/pane.ts'
 import { AB, SESSION, VIEW_NAMES, VIEW_STRINGS, world } from './fixtures/world.ts'
+import { MIX, P } from './fixtures/rows.ts'
+import { rowKey } from '../hooks/list.ts'
 
 describe('statusColor', () => {
   const cases: [string | undefined, string | undefined][] = [
@@ -248,5 +250,63 @@ describe('the view picker', () => {
     expect(viewSelect(tree).props.options).toEqual(VIEW_NAMES.map((name) => ({ value: name, label: name })))
     const flat = JSON.stringify(tree)
     expect(flat.indexOf('"key":"views"')).toBeLessThan(flat.indexOf('"key":"group:0:todo"'))
+  })
+})
+
+describe('the colours drawn', () => {
+  const THEME_KEYS = ['text', 'inactive', 'subtle', 'promptBorder', 'claude', 'permission', 'success', 'warning', 'error']
+
+  // Every colour prop that is not a theme key, naming its element: an empty list is a pass.
+  const outsideTheme = (tree: any) => colorsIn(tree).filter(({ value }) => typeof value !== 'string' || !THEME_KEYS.includes(value) || /^#|^rgb|^ansi/.test(value))
+
+  test('the All Tasks list after a priority press carries only theme keys', async ($, on) => {
+    const w = world(on, { query: JSON.stringify(MIX) })
+    await issue($, '')
+    await pressKey($, w, 'priority')
+    const tree = await $.ui.render(PANE)
+    expect(colorsIn(tree).length).toBeGreaterThan(0)
+    expect(outsideTheme(tree)).toEqual([])
+  })
+
+  test('a card with links and a browser error carries only theme keys', async ($, on) => {
+    const parent = 'pm/cc-plugins/tasks/archive/p.md'
+    const rows = JSON.stringify([
+      { path: P('a'), status: 'todo', title: 'A' },
+      { path: parent, status: 'done', title: 'Parent P' },
+      { path: P('q'), status: 'todo', title: 'Q' },
+    ])
+    const card = '---\ntitle: A\nstatus: blocked\npriority: high\nparent: "[[p]]"\nblocked_by:\n  - "[[q]]"\nrelated: ["[[doc-x]]"]\n---\nbody\n'
+    const w = vizWorld(on, { query: rows, reads: { [P('a')]: card }, render: { exitCode: 1, stderr: 'Error: File not found: x\n' } })
+    await issue($, '')
+    await pressKey($, w, rowKey(P('a')))
+    await press($, w)
+    const tree = await $.ui.render(PANE)
+    expect(stringsIn(tree)).toContain('Error: File not found: x')
+    expect(outsideTheme(tree)).toEqual([])
+  })
+
+  test('an Active card with a high priority carries only theme keys', async ($, on) => {
+    const w = world(on, { query: AB, read: '---\ntitle: a\nstatus: todo\npriority: high\n---\nbody\n' })
+    await issue($, 'Active')
+    await pick($, w, 'cards', P('a'))
+    const tree = await $.ui.render(PANE)
+    expect(colorsIn(tree).length).toBeGreaterThan(0)
+    expect(outsideTheme(tree)).toEqual([])
+  })
+
+  test('a failed query carries only theme keys', async ($, on) => {
+    world(on, { query: { deny: 'spawn failed' } })
+    await issue($, '')
+    const tree = await $.ui.render(PANE)
+    expect(colorsIn(tree).length).toBeGreaterThan(0)
+    expect(outsideTheme(tree)).toEqual([])
+  })
+
+  test('a missing config carries only theme keys', async ($, on) => {
+    world(on, { files: {} })
+    await issue($, '')
+    const tree = await $.ui.render(PANE)
+    expect(colorsIn(tree).length).toBeGreaterThan(0)
+    expect(outsideTheme(tree)).toEqual([])
   })
 })
