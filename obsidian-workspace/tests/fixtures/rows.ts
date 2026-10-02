@@ -14,3 +14,6 @@ export const MIX = [
   { path: 'pm/other/tasks/x.md', status: 'todo', priority: 'high' },
   { path: P('a'), status: 'todo', priority: 'medium' },
 ]
+
+// The list atom's initial value: nothing filtered, priority order, `done` folded.
+export const LIST_START = { query: '', priority: null, sort: 'priority', folded: ['group:0:done'] } as const

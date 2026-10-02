@@ -524,6 +524,19 @@ function boardCard(card: CardRegion): Card {
   }
 }
 
+// The Client takes at most 100 rows: its props are bounded at 100,000 serialized characters.
+function clientList({ groups, hidden }: NonNullable<PaneState['groups']>) {
+  let left = 100
+  let cut = hidden
+  const shown = groups.map(({ status, count, rows }) => {
+    const kept = rows.slice(0, left)
+    left -= kept.length
+    cut += rows.length - kept.length
+    return { status, count, rows: kept.map(({ path, badge, title, due, tags }) => ({ path, badge, title, due, tags })) }
+  })
+  return { groups: shown.filter((group) => group.rows.length), hidden: cut }
+}
+
 // vscode and mobile draw a Client as an empty Box without complaint, so only the surface can say whether it will show.
 function hasClient(surface: string) {
   return surface === 'terminal' || surface === 'desktop'
@@ -557,7 +570,7 @@ async function drawPane($: any, e: any) {
       argumentCard: state.card?.origin === 'argument',
     })
     const listCard = state.card?.origin === 'list' ? boardCard(state.card) : null
-    const boardProps = listCard ? { groups: [], hidden: 0, card: listCard } : { groups: board.groups, hidden: board.hidden, card: null }
+    const boardProps = listCard ? { groups: [], hidden: 0, card: listCard } : { ...clientList(board), card: null }
     children.push(Client({ key: BOARD_KEY, module: './board.ts', width: columns, height: rows, props: { rows, columns, ...boardProps } }))
   } else if (state.cards.length) {
     children.push(
