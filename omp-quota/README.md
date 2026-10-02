@@ -97,7 +97,8 @@ and `—` when omp gives none. Each share is colored by the percentage shown: re
 0–30%, orange for 31–60%, green for 61–100%; `—` stays uncolored.
 
 Every line is cut at the band's width with an ellipsis rather than wrapped. The band yields
-to a survey while one holds it, and redraws after every settled fetch, failed ones
+to a survey while one holds it, shares its space with any band another mod draws there (`/cal`,
+for one) instead of hiding it, and redraws after every settled fetch, failed ones
 included, so it always shows the latest data the module holds. Collapse it with
 ctrl+x ctrl+a (or its `[-]` mark) without turning it off. It is drawn from `Box` and `Text`
 only, with the props `flexDirection`, `color`, `dimColor`, and `wrap`.

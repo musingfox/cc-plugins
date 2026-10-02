@@ -10,12 +10,16 @@ function stringsIn(node: any): string[] {
 
 const BENEATH = { type: 'Text', children: ['beneath'] }
 
-function beneath(on: any) {
-  on('ui.render', { component: 'AbovePrompt' }, () => BENEATH)
+
+// The band's rows that show: the empty Box the engine draws beneath the band takes none.
+function rowsOf(tree: any): any[] {
+  return (tree.props?.children ?? tree.children).filter(
+    (row: any) => !(row?.type === 'Box' && !(row.children ?? row.props?.children)?.length),
+  )
 }
 
 function linesOf(tree: any): string[] {
-  return (tree.props?.children ?? tree.children).map((line: any) => stringsIn(line).join(''))
+  return rowsOf(tree).map((line: any) => stringsIn(line).join(''))
 }
 
 // A band line without its reset times and padding: the part that does not move with the clock.
@@ -249,22 +253,20 @@ describe('/quota', () => {
   })
 
   test('toggles the band on, then off, answering nothing and asking for a redraw each time', async ($, on) => {
-    const w = world(on)
-    beneath(on)
+    const w = world(on, { beneath: BENEATH })
     await $.session.start(SESSION)
     await w.clock.settle()
     const before = w.invalidates
     expect(await $.command.run({ command: 'quota' })).toEqual({})
     expect(w.invalidates).toBe(before + 1)
-    expect(linesOf(await $.ui.render(BAND))).toEqual(BAND_LINES)
+    expect(linesOf(await $.ui.render(BAND))).toEqual([...BAND_LINES, 'beneath'])
     expect(await $.command.run({ command: 'quota' })).toEqual({})
     expect(w.invalidates).toBe(before + 2)
     expect(await $.ui.render(BAND)).toEqual(BENEATH)
   })
 
   test('only the command shows the band, never a poll or a worsening', async ($, on) => {
-    const w = world(on)
-    beneath(on)
+    const w = world(on, { beneath: BENEATH })
     w.omp(fixtureWith({ 'openai-codex:secondary': 'ok' }), FIXTURE)
     await $.session.start(SESSION)
     await w.clock.settle()
@@ -274,8 +276,7 @@ describe('/quota', () => {
   })
 
   test('other arguments answer the usage line and run nothing', async ($, on) => {
-    const w = world(on)
-    beneath(on)
+    const w = world(on, { beneath: BENEATH })
     await $.session.start(SESSION)
     await w.clock.settle()
     const runs = w.runs.length
@@ -285,20 +286,18 @@ describe('/quota', () => {
   })
 
   test('a store that refuses still toggles the band', async ($, on) => {
-    const w = world(on, { store: 'refuse' })
-    beneath(on)
+    const w = world(on, { store: 'refuse', beneath: BENEATH })
     expect(await $.session.start(SESSION)).toEqual({ cwd: '/work' })
     await w.clock.settle()
     expect(await $.ui.render(BAND)).toEqual(BENEATH)
     expect(await $.command.run({ command: 'quota' })).toEqual({})
-    expect(linesOf(await $.ui.render(BAND))).toEqual(BAND_LINES)
+    expect(linesOf(await $.ui.render(BAND))).toEqual([...BAND_LINES, 'beneath'])
   })
 })
 
 describe('/quota refresh', () => {
   test("drops omp's cache, then refetches, both against the user's omp home", async ($, on) => {
-    const w = world(on)
-    beneath(on)
+    const w = world(on, { beneath: BENEATH })
     await $.session.start(SESSION)
     await w.clock.settle()
     expect(await $.command.run({ command: 'quota', args: 'refresh' })).toEqual({ text: 'omp quota refreshed' })
@@ -336,22 +335,20 @@ describe('/quota refresh', () => {
 
 describe('quota band', () => {
   test('a band left on in an earlier session draws from the start', async ($, on) => {
-    const w = world(on, { store: { band: true } })
-    beneath(on)
+    const w = world(on, { store: { band: true }, beneath: BENEATH })
     await $.session.start(SESSION)
     await w.clock.settle()
-    expect(linesOf(await $.ui.render(BAND))).toEqual(BAND_LINES)
+    expect(linesOf(await $.ui.render(BAND))).toEqual([...BAND_LINES, 'beneath'])
   })
 
   test('a toggle is remembered by the next session start', async ($, on) => {
-    const w = world(on)
-    beneath(on)
+    const w = world(on, { beneath: BENEATH })
     await $.session.start(SESSION)
     await w.clock.settle()
     await $.command.run({ command: 'quota' })
     await $.session.start(SESSION)
     await w.clock.settle()
-    expect(linesOf(await $.ui.render(BAND))).toEqual(BAND_LINES)
+    expect(linesOf(await $.ui.render(BAND))).toEqual([...BAND_LINES, 'beneath'])
     await $.command.run({ command: 'quota' })
     await $.session.start(SESSION)
     await w.clock.settle()
@@ -359,19 +356,24 @@ describe('quota band', () => {
   })
 
   test('a store that refuses at session start leaves the band off', async ($, on) => {
-    const w = world(on, { store: 'refuse' })
-    beneath(on)
+    const w = world(on, { store: 'refuse', beneath: BENEATH })
     await $.session.start(SESSION)
     await w.clock.settle()
     expect(await $.ui.render(BAND)).toEqual(BENEATH)
   })
 
   test('yields to a survey holding the band', async ($, on) => {
-    const w = world(on, { store: { band: true } })
-    beneath(on)
+    const w = world(on, { store: { band: true }, beneath: BENEATH })
     await $.session.start(SESSION)
     await w.clock.settle()
     expect(await $.ui.render({ ...BAND, props: { ...BAND.props, hasSurvey: true } })).toEqual(BENEATH)
+  })
+
+  test("stacks over another plugin's band instead of hiding it", async ($, on) => {
+    const w = world(on, { store: { band: true }, beneath: BENEATH })
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    expect(linesOf(await $.ui.render(BAND))).toEqual([...BAND_LINES, 'beneath'])
   })
 
   test('draws one truncating line per provider with limits, least left first, under a dim stale notice', async ($, on) => {
@@ -382,7 +384,7 @@ describe('quota band', () => {
     await $.command.run({ command: 'quota', args: 'refresh' })
     const tree: any = await $.ui.render(BAND)
     expect(linesOf(tree)).toEqual(['Stale: omp exited 1; showing data from 0m ago', ...BAND_LINES])
-    const lines = tree.props?.children ?? tree.children
+    const lines = rowsOf(tree)
     expect(lines.map((line: any) => line.props.wrap)).toEqual(Array(6).fill('truncate-end'))
     expect(lines[0].props.dimColor).toBe(true)
   })
@@ -392,7 +394,7 @@ describe('quota band', () => {
     await $.session.start(SESSION)
     await w.clock.settle()
     const tree: any = await $.ui.render(BAND)
-    const lines = tree.props?.children ?? tree.children
+    const lines = rowsOf(tree)
     const colored = (line: any) =>
       (line.props?.children ?? line.children)
         .filter((span: any) => span?.props?.color)

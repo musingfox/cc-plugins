@@ -91,7 +91,7 @@ async function toggleBand($: any) {
 
 // Every window cell is padded to the widest one in its column, so windows line up across
 // providers; a line's last cell is left unpadded so no line ends in spaces.
-async function renderBand($: any, e: any) {
+async function renderBand($: any, e: any, beneath: unknown) {
   const { Box, Text } = await $.ui.resolve(e)
   const model = quotaModelOf(view, await $.clock.now())
   const cells = model.providers.flatMap((p) => p.windows)
@@ -115,6 +115,7 @@ async function renderBand($: any, e: any) {
     const spans = windows.flatMap((c, i) => cellSpans(c, i, i === windows.length - 1))
     lines.push(Text({ wrap: 'truncate-end', children: [provider.padEnd(nameWidth), ...spans] }))
   }
+  if (beneath) lines.push(beneath)
   return Box({ flexDirection: 'column', children: lines })
 }
 
@@ -149,6 +150,7 @@ export function register(on: On) {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (!bandOn || e.props.hasSurvey) return next(e)
-    return renderBand($, e)
+    // The band is one instance: a tree that drops next(e) hides every other plugin's band.
+    return renderBand($, e, await next(e))
   })
 }

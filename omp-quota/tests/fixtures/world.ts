@@ -27,6 +27,8 @@ export type WorldOptions = {
   env?: Record<string, string>
   commandRegister?: Hook
   store?: Record<string, unknown> | 'refuse'
+  // What the rest of the chain draws in the band: another plugin's tree; by default the engine's empty Box.
+  beneath?: unknown
 }
 
 // A stub world beneath the plugin: every $ call it makes is answered and recorded here.
@@ -73,6 +75,7 @@ export function world(on: any, options: WorldOptions = {}) {
     toasts.push(e.text)
     return { value: undefined }
   })
+  on('ui.render', { component: 'AbovePrompt' }, () => options.beneath ?? { type: 'Box', children: [] })
   on('ui.invalidate', () => {
     state.invalidates += 1
     return { value: undefined }
