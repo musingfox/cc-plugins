@@ -2,7 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 import { PANE, REFRESH_HINT as HINT, cardSelect, clientNode, expectDrawn, headerIn, issue, mounted, nodesOf, openFirstRow, runsOf, stringsIn, uvxRuns, viewSelect, vizWorld } from './fixtures/pane.ts'
 import { CARD, MERMAID_CARD, SESSION, world } from './fixtures/world.ts'
 import { MIX, P } from './fixtures/rows.ts'
-import { RED } from '../hooks/style.ts'
+import { ERROR as RED } from '../hooks/style.ts'
 
 const OUTSIDE = '1 row of the All Tasks view is not a card under pm/cc-plugins and was left out.'
 

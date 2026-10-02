@@ -5,10 +5,10 @@ import { AB, SESSION, VIEW_NAMES, VIEW_STRINGS, world } from './fixtures/world.t
 
 describe('statusColor', () => {
   const cases: [string | undefined, string | undefined][] = [
-    ['todo', '#8b8d98'],
-    ['in-progress', '#0090ff'],
-    ['blocked', '#e5484d'],
-    ['done', '#46a758'],
+    ['todo', 'text'],
+    ['in-progress', 'permission'],
+    ['blocked', 'error'],
+    ['done', 'success'],
     ['Done', undefined],
     ['wip', undefined],
     [undefined, undefined],
@@ -18,18 +18,18 @@ describe('statusColor', () => {
 
 describe('priorityColor', () => {
   const cases: [string | undefined, string | undefined][] = [
-    ['high', '#e5484d'],
-    ['medium', '#f5a524'],
-    ['low', '#8b8d98'],
+    ['high', 'error'],
+    ['medium', 'warning'],
+    ['low', 'inactive'],
     ['urgent', undefined],
     [undefined, undefined],
   ]
   for (const [priority, color] of cases) test(`colours ${priority} as ${color}`, () => expect(priorityColor(priority)).toBe(color))
 })
 
-const ORANGE = '#f5a524'
-const RED = '#e5484d'
-const GREY = '#8b8d98'
+const WARNING = 'warning'
+const ERROR = 'error'
+const TEXT = 'text'
 const MOD = 'mod-obw-issue-pane'
 const MOD_PATH = `pm/cc-plugins/tasks/${MOD}.md`
 
@@ -46,11 +46,11 @@ async function drawn($: any, w: any, card: string) {
 }
 
 describe('the status label', () => {
-  test('a todo card reads its whole header with a grey status', async ($, on) => {
+  test('a todo card reads its whole header with a plain-text status', async ($, on) => {
     const w = world(on)
     const tree = await drawn($, w, MOD)
     expect(stringsIn(headerIn(tree)).join('')).toBe('status: todo · priority: medium · AC 0/1')
-    expect(textIn(headerIn(tree), 'todo').props.color).toBe(GREY)
+    expect(textIn(headerIn(tree), 'todo').props.color).toBe(TEXT)
   })
 
   test('a status outside the vocabulary has no colour', async ($, on) => {
@@ -64,7 +64,7 @@ describe('the status label', () => {
     const header = headerIn(await drawn($, w, 'k'))
     expect(stringsIn(header).join('')).toBe('status: — · priority: high')
     expect('color' in propsOf(textIn(header, '—'))).toBe(false)
-    expect(textIn(header, 'high').props.color).toBe(RED)
+    expect(textIn(header, 'high').props.color).toBe(ERROR)
   })
 
   test('a doc row without a status reads a dash in its card header', async ($, on) => {
@@ -80,9 +80,9 @@ describe('the status label', () => {
 })
 
 describe('the priority label', () => {
-  test('a medium priority is orange', async ($, on) => {
+  test('a medium priority is warning-coloured', async ($, on) => {
     const w = world(on)
-    expect(textIn(headerIn(await drawn($, w, MOD)), 'medium').props.color).toBe(ORANGE)
+    expect(textIn(headerIn(await drawn($, w, MOD)), 'medium').props.color).toBe(WARNING)
   })
 
   test('an absent priority is a dash with no colour', async ($, on) => {
@@ -174,8 +174,8 @@ describe('the card separator', () => {
 })
 
 describe('error messages', () => {
-  const isRed = (node: any) => {
-    expect(node.props.color).toBe(RED)
+  const isError = (node: any) => {
+    expect(node.props.color).toBe(ERROR)
     expect('dimColor' in node.props).toBe(false)
   }
   const isDim = (node: any) => {
@@ -183,9 +183,14 @@ describe('error messages', () => {
     expect('color' in node.props).toBe(false)
   }
 
-  test('a query error is red', async ($, on) => {
+  test('a query error is error-coloured', async ($, on) => {
     const w = world(on, { query: 'Vault not found.\n' })
-    isRed(textIn(await drawn($, w, ''), 'Vault not found.'))
+    isError(textIn(await drawn($, w, ''), 'Vault not found.'))
+  })
+
+  test('a CLI that did not run is error-coloured', async ($, on) => {
+    const w = world(on, { query: { deny: 'spawn failed' } })
+    isError(textIn(await drawn($, w, ''), 'The obsidian CLI did not run: it is not on PATH, or it did not answer within 10 s.'))
   })
 
   test('the pm hint under a query error stays dim', async ($, on) => {
@@ -193,28 +198,28 @@ describe('error messages', () => {
     isDim(textIn(await drawn($, w, ''), 'If pm/cc-plugins/dashboard.base is missing, run /obw:pm to create it.'))
   })
 
-  test('a missing config is red', async ($, on) => {
+  test('a missing config is error-coloured', async ($, on) => {
     const w = world(on, { files: {} })
-    isRed(textIn(await drawn($, w, ''), 'No .obsidian.yaml in /work or any directory above it.'))
+    isError(textIn(await drawn($, w, ''), 'No .obsidian.yaml in /work or any directory above it.'))
   })
 
-  test('a card read error is red', async ($, on) => {
+  test('a card read error is error-coloured', async ($, on) => {
     const w = world(on, { read: 'Error: File "pm/cc-plugins/tasks/nope.md" not found.\n' })
-    isRed(textIn(await drawn($, w, 'nope'), 'Error: File "pm/cc-plugins/tasks/nope.md" not found.'))
+    isError(textIn(await drawn($, w, 'nope'), 'Error: File "pm/cc-plugins/tasks/nope.md" not found.'))
   })
 
-  test('a browser error is red', async ($, on) => {
+  test('a browser error is error-coloured', async ($, on) => {
     const w = vizWorld(on, { render: { exitCode: 1, stderr: 'Error: File not found: x\n' } })
     await drawn($, w, MOD)
     await press($, w)
-    isRed(textIn(await $.ui.render(PANE), 'Error: File not found: x'))
+    isError(textIn(await $.ui.render(PANE), 'Error: File not found: x'))
   })
 
   test('the empty-list notice stays dim', async ($, on) => {
     const w = world(on, { query: '[]' })
     const tree = await drawn($, w, '')
     isDim(textIn(tree, 'No cards in the All Tasks view of pm/cc-plugins.'))
-    expect(nodesOf(tree, 'Text').some((node: any) => node.props?.color === RED)).toBe(false)
+    expect(nodesOf(tree, 'Text').some((node: any) => node.props?.color === ERROR)).toBe(false)
   })
 
   test('the vault progress line stays dim', async ($, on) => {

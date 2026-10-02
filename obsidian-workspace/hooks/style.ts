@@ -1,20 +1,20 @@
-// RED, ORANGE and GREEN are omp-quota's values; a module imports only its own plugin's files.
-export const RED = '#e5484d'
-const ORANGE = '#f5a524'
-const GREEN = '#46a758'
-const GREY = '#8b8d98'
-const BLUE = '#0090ff'
+// Claude Code theme keys, so the pane follows the person's /theme; no raw colour appears anywhere in it.
+export const ERROR = 'error'
+export const INACTIVE = 'inactive'
+export const SUBTLE = 'subtle'
+export const RULE = 'promptBorder'
+export const ACCENT = 'claude'
 
 const STATUS = new Map([
-  ['todo', GREY],
-  ['in-progress', BLUE],
-  ['blocked', RED],
-  ['done', GREEN],
+  ['todo', 'text'],
+  ['in-progress', 'permission'],
+  ['blocked', ERROR],
+  ['done', 'success'],
 ])
 const PRIORITY = new Map([
-  ['high', RED],
-  ['medium', ORANGE],
-  ['low', GREY],
+  ['high', ERROR],
+  ['medium', 'warning'],
+  ['low', INACTIVE],
 ])
 
 export const STATUS_ORDER = [...STATUS.keys()]

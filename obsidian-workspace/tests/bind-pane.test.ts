@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import { BAND, bandLines } from './fixtures/band.ts'
 import { CONFIG_PATH, PANE, issue, mounted, nodesOf, openFirstRow, press, shown, stringsIn } from './fixtures/pane.ts'
 import { CONFIG, world } from './fixtures/world.ts'
-import { RED } from '../hooks/style.ts'
+import { ERROR as RED } from '../hooks/style.ts'
 
 const BIND = '/Users/u/.claude-mobile/launches/sid-1.json'
 const CARD_PATH = 'pm/cc-plugins/tasks/mod-obw-issue-pane.md'

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 import { PANE, REFRESH_HINT as HINT, cardSelect, clientNode, expectDrawn, issue, nodesOf, pick, runsOf, stringsIn, viewSelect } from './fixtures/pane.ts'
 import { ALL_TASKS_ARGV, CARD, DASHBOARD_ARGV, VIEW_NAMES, VIEW_STRINGS, world } from './fixtures/world.ts'
 import { MIX, P } from './fixtures/rows.ts'
-import { RED } from '../hooks/style.ts'
+import { ERROR as RED } from '../hooks/style.ts'
 
 const readArgv = (path: string) => ['obsidian', 'vault=obsidian', 'read', `path=${path}`]
 

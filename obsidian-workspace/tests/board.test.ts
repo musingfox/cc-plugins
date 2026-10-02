@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 import Board from '../hooks/board.ts'
-import { RED } from '../hooks/style.ts'
+import { ERROR as RED } from '../hooks/style.ts'
 import { fakeSurface, linesOf, textsOf } from './fixtures/surface.ts'
 import { P } from './fixtures/rows.ts'
 const row = (name: string, badge: string, fields: any = {}) => ({ path: P(name), badge, title: name, due: '', tags: '', ...fields })

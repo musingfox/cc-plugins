@@ -17,7 +17,7 @@ import type { CardHeader } from './card.ts'
 import { vizManifestPath, vizInstallPath, renderTarget, renderArgv, renderOutcome, RENDER_TIMEOUT_MS, isLoopbackUrl, tailnetUrl, SERVE_STATUS_ARGV, SERVE_TIMEOUT_MS } from './viz.ts'
 import { splitFences, termaidHeaderAllowed, diagramOutcome, TERMAID_ARGV, TERMAID_TIMEOUT_MS } from './mermaid.ts'
 import type { Segment } from './mermaid.ts'
-import { priorityColor, statusColor, RED } from './style.ts'
+import { priorityColor, statusColor, ERROR } from './style.ts'
 import { bindingAction, bindingOf, bindingPath, sameBinding, statusChanges } from './bind.ts'
 import type { Binding } from './bind.ts'
 
@@ -533,7 +533,7 @@ async function drawPane($: any, e: any) {
   const { Box, Text, Select, Markdown, Button, Code, Client } = await $.ui.resolve(e)
   const safe = (text: string) => bounded(text).text
   const dim = (text: string) => Text({ dimColor: true, children: [safe(text)] })
-  const red = (text: string) => Text({ color: RED, children: [safe(text)] })
+  const red = (text: string) => Text({ color: ERROR, children: [safe(text)] })
   const line = ({ kind, text }: Line) => (kind === 'error' ? red(text) : dim(text))
   const span = (text: string, color?: string) => Text({ ...(color ? { color } : {}), children: [safe(text)] })
   const children: any[] = []

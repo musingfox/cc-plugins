@@ -1,6 +1,6 @@
 import type { ClientSurface } from 'claude-code'
 import { clamp } from './board-size.ts'
-import { RED } from './style.ts'
+import { ERROR } from './style.ts'
 import { displayWidth, fitWidth } from './width.ts'
 import type { BoardGroup as Group, BoardRow } from './list.ts'
 
@@ -93,7 +93,7 @@ export default function Board(props: Props, surface: ClientSurface<State>) {
     if (card.kind !== 'shown') surface.onKey(toList)
     const back = Text({ dimColor: true, children: ['← list'] })
     if (card.kind === 'loading') return column([back, Text({ dimColor: true, children: [`Reading ${card.name}…`] })])
-    if (card.kind === 'error') return column([back, Text({ color: RED, children: [card.message] })])
+    if (card.kind === 'error') return column([back, Text({ color: ERROR, children: [card.message] })])
     // One line each, so the body window below them is exactly what the counter says.
     const fitted = (text: string) => fitWidth(text, props.columns).trimEnd()
     const header = [
