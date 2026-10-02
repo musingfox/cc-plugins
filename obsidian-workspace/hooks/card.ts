@@ -1,6 +1,7 @@
+import type { ObwHeader, ObwRelations } from '../types/index.d.ts'
 import { unquote } from './yaml-scalar.ts'
 
-export type CardHeader = { title?: string; status?: string; priority?: string }
+export type CardHeader = ObwHeader
 
 export function headerOf(frontmatter: string): CardHeader {
   const header: CardHeader = {}
@@ -34,7 +35,7 @@ export function acLabel(body: string): string | null {
   return total ? `AC ${checked}/${total}` : null
 }
 
-export type Relations = { parent: string[]; blocked_by: string[]; related: string[] }
+export type Relations = ObwRelations
 
 const RELATION_FIELD = /^(parent|blocked_by|related):(.*)$/s
 const WIKILINK = /\[\[([^\]]*)\]\]/g

@@ -2,6 +2,7 @@ import { bounded, MAX_CHARS } from './bounds.ts'
 import { countRows, isMissing } from './counts.ts'
 import { cardName, keptRows } from './rows.ts'
 import { PRIORITY_ORDER, STATUS_ORDER } from './style.ts'
+import type { ObwList } from '../types/index.d.ts'
 
 type Row = { path: string; status?: string | null; priority?: string | null; title?: string | null; due?: string | null; tags?: string | null }
 
@@ -19,7 +20,7 @@ export type BoardRow = {
 }
 export type BoardGroup = { status: string | null; key: string; count: number; rows: BoardRow[] }
 
-export type ListSettings = { query: string; priority: 'high' | 'medium' | 'low' | null; sort: 'priority' | 'title'; folded: string[] }
+export type ListSettings = ObwList
 
 export type Item =
   | { kind: 'heading'; key: string; label: string; status: string | null; count: number; open: boolean }

@@ -1,3 +1,4 @@
+import type { ObwSegment } from '../types/index.d.ts'
 import type { Run } from './cli-output.ts'
 
 // The allowlist below is what termaid 0.9.0 was measured to draw; a new pin means measuring it again.
@@ -5,7 +6,7 @@ export const TERMAID_ARGV = ['uvx', 'termaid@0.9.0', '--width', '80']
 
 export const TERMAID_TIMEOUT_MS = 5_000
 
-export type Segment = { kind: 'markdown'; text: string } | { kind: 'mermaid'; text: string; source: string }
+export type Segment = ObwSegment
 
 type Fence = { char: string; length: number; indent: number; mermaid: boolean; text: string; content: string[] }
 

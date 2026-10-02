@@ -1,9 +1,10 @@
 import { isBadCardName, dashboardPath, projectRoot } from './argv.ts'
 import { bounded } from './bounds.ts'
+import type { ObwScope } from '../types/index.d.ts'
 
 type ArgvResult = { argv: string[] } | { refused: 'vault' | 'project' | 'view' | 'path' }
 
-export type Scope = { vault: string; project: string }
+export type Scope = ObwScope
 
 function isBadProject(value: string) {
   return isBadCardName(value) || /[\[\]"\s]/.test(value)
