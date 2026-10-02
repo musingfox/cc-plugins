@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { PANE, clientNode, elementsIn, browserButtons, expectDrawn, nodesOf, press, runsOf, shown, stringsIn, uvxRuns, vizWorld } from './fixtures/pane.ts'
+import { NOT_DRAWN, PANE, browserButtons, buttonOf, elementsIn, expectDrawn, nodesOf, press, runsOf, shown, stringsIn, uvxRuns, vizWorld, watchState } from './fixtures/pane.ts'
 import { AB, CARD, DIAGRAM, MERMAID_CARD, SESSION, world } from './fixtures/world.ts'
+import { BACK_KEY } from '../hooks/ring.ts'
 
 const MERMAID_BODY = '# m\n\n```mermaid\ngraph LR\nA-->B\n```\n\ntail\n'
 const TWO_BLOCKS = '```mermaid\ngraph LR\nA-->B\n```\n\n```mermaid\npie\n```\n'
@@ -217,8 +218,8 @@ describe('a drawn diagram swaps in', () => {
     await shown($, w, 'm')
     const tree = await $.ui.render(PANE)
     expect(browserButtons(tree).length).toBe(1)
-    const order = elementsIn(tree)
-    expect(order.findIndex((node) => node.props?.key === 'open-in-browser')).toBeLessThan(order.findIndex((node) => node.type === 'Code'))
+    const order = elementsIn(tree).map((node) => (node.props?.key === 'open-in-browser' ? 'Open' : node.type))
+    expect(order.indexOf('Open')).toBeLessThan(order.indexOf('Code'))
     await press($, w)
     expect(w.writes[0].text).toBe(MERMAID_BODY)
     expect(nodesOf(await $.ui.render(PANE), 'Code').length).toBe(1)
@@ -275,7 +276,7 @@ describe('a diagram after a newer read', () => {
     let tree = await $.ui.render(PANE)
     expect(nodesOf(tree, 'Code').length).toBe(0)
     expect(stringsIn(tree)).not.toContain('DIAGRAM-A')
-    expect(clientNode(tree)).toBeDefined()
+    expect(buttonOf(tree, BACK_KEY)).toBeDefined()
     w.release(7, 'DIAGRAM-B')
     await w.clock.settle()
     tree = await $.ui.render(PANE)
@@ -324,5 +325,30 @@ describe('bounded diagram text', () => {
     expect(elements[code - 1].type).toBe('Text')
     expect(elements[code - 1].props.dimColor).toBe(true)
     expect(stringsIn(elements[code - 1])).toEqual(['Clipped: showing 10000 of 11000 characters.'])
+  })
+})
+
+describe('diagrams crossing $.state', () => {
+  test('the pane value equals its JSON round trip and the diagram still draws', async ($, on) => {
+    const w = world(on, { read: MERMAID_CARD })
+    const state = watchState(on)
+    await shown($, w, 'm')
+    const value = state.latest('pane')
+    expect(value).toEqual(JSON.parse(JSON.stringify(value)))
+    expect(value.card.diagrams).toEqual([null, DRAWN, null])
+    expect(nodesOf(await $.ui.render(PANE), 'Code').map((node: any) => node.props.source)).toEqual([DRAWN])
+  })
+
+  test('a block left undrawn is null in the list and stays code in the Markdown', async ($, on) => {
+    const w = world(on, { read: cardOf(TWO_BLOCKS), termaid: 'defer' })
+    await shown($, w, 'm')
+    w.release(3, '')
+    await w.clock.settle()
+    w.release(4, DIAGRAM)
+    await w.clock.settle()
+    const tree = await $.ui.render(PANE)
+    expect(stringsIn(tree)).not.toContain(NOT_DRAWN)
+    expect(nodesOf(tree, 'Code').map((node: any) => node.props.source)).toEqual([DRAWN])
+    expect(nodesOf(tree, 'Markdown')[0].props.text).toContain('```mermaid\ngraph LR')
   })
 })

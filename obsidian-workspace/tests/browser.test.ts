@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { CONFIG_PATH, HOME_MANIFEST, PANE, PRESS, ROOT, clientNode, browserButtons, expectDrawn, issue, mounted, nodesOf, press, renderRuns, runsOf, stringsIn, vizWorld } from './fixtures/pane.ts'
+import { CONFIG_PATH, HOME_MANIFEST, PANE, PRESS, ROOT, browserButtons, buttonOf, expectDrawn, issue, mounted, nodesOf, press, renderRuns, runsOf, stringsIn, vizWorld } from './fixtures/pane.ts'
 import { AB, CONFIG, manifest, world } from './fixtures/world.ts'
+import { BACK_KEY } from '../hooks/ring.ts'
 
 const MOD = 'mod-obw-issue-pane'
 // The browser target is the row's path below the project, so a task card carries its folder.
@@ -107,7 +108,7 @@ describe('the Open in browser button', () => {
   test('the list alone draws no button', async ($, on) => {
     vizWorld(on)
     await issue($, '')
-    expect(browserButtons(await $.ui.render(PANE)).length).toBe(0)
+    expect(buttonOf(await $.ui.render(PANE), 'open-in-browser')).toBeUndefined()
   })
 })
 
@@ -332,7 +333,7 @@ describe('a press result after a newer read', () => {
     await w.clock.settle()
     const tree = await $.ui.render(PANE)
     expect(stringsIn(tree).filter((text) => OUTCOME.test(text))).toEqual([])
-    expect(clientNode(tree)).toBeDefined()
+    expect(buttonOf(tree, BACK_KEY)).toBeDefined()
     expect(nodesOf(tree, 'Markdown').length).toBe(1)
   })
 })

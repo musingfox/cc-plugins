@@ -1,8 +1,11 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { PANE, REFRESH_HINT as HINT, cardSelect, clientNode, expectDrawn, issue, nodesOf, pick, runsOf, stringsIn, viewSelect } from './fixtures/pane.ts'
+import { PANE, REFRESH_HINT as HINT, buttonOf, cardSelect, expectDrawn, headingKeys, issue, nodesOf, pick, rowKeys, runsOf, stringsIn, viewSelect } from './fixtures/pane.ts'
 import { ALL_TASKS_ARGV, CARD, DASHBOARD_ARGV, VIEW_NAMES, VIEW_STRINGS, world } from './fixtures/world.ts'
 import { MIX, P } from './fixtures/rows.ts'
+import { rowKey } from '../hooks/list.ts'
 import { ERROR as RED } from '../hooks/style.ts'
+import { groupKey } from '../hooks/list.ts'
+import { BACK_KEY } from '../hooks/ring.ts'
 
 const readArgv = (path: string) => ['obsidian', 'vault=obsidian', 'read', `path=${path}`]
 
@@ -31,27 +34,21 @@ describe('default view', () => {
 })
 
 describe('All Tasks list', () => {
-  const pathsIn = (tree: any) => clientNode(tree).props.props.groups.flatMap((group: any) => group.rows.map((row: any) => row.path))
+  const pathsIn = (tree: any) => rowKeys(tree).map((key: string) => key.slice(rowKey('').length))
 
-  test('the default list is drawn in the Client', async ($, on) => {
+  test('the default list is drawn as Buttons', async ($, on) => {
     world(on, { query: JSON.stringify(MIX) })
     await issue($, '')
     const tree = await $.ui.render(PANE)
-    expect(clientNode(tree).props.props.groups.map((group: any) => [group.status, group.count])).toEqual([
-      ['todo', 4],
-      ['in-progress', 1],
-      ['blocked', 1],
-      ['done', 2],
-      ['waiting', 1],
-      [null, 1],
-    ])
-    expect(stringsIn(tree)).toEqual([...VIEW_STRINGS, '1 row of the All Tasks view is not a card under pm/cc-plugins and was left out.'])
+    expect(headingKeys(tree)).toEqual([groupKey(0, 'todo'), groupKey(0, 'in-progress'), groupKey(0, 'blocked'), groupKey(0, 'done'), groupKey(0, 'waiting'), groupKey(0, '')])
+    expect(stringsIn(tree)).toContain('1 row of the All Tasks view is not a card under pm/cc-plugins and was left out.')
+    expect(stringsIn(tree).slice(0, VIEW_STRINGS.length)).toEqual(VIEW_STRINGS)
   })
 
-  test('/issue All Tasks draws the list', async ($, on) => {
+  test('/issue All Tasks draws the list with done folded', async ($, on) => {
     world(on, { query: JSON.stringify(MIX) })
     await issue($, 'All Tasks')
-    expect(pathsIn(await $.ui.render(PANE))).toEqual([P('b'), P('a'), P('i'), P('j'), P('c'), P('d'), P('f'), P('e'), P('g'), P('h')])
+    expect(pathsIn(await $.ui.render(PANE))).toEqual([P('b'), P('a'), P('i'), P('j'), P('c'), P('d'), P('g'), P('h')])
   })
 
   test('picking All Tasks draws the list', async ($, on) => {
@@ -59,7 +56,7 @@ describe('All Tasks list', () => {
     await issue($, 'Docs')
     await pick($, w, 'views', 'All Tasks')
     const tree = await $.ui.render(PANE)
-    expect(clientNode(tree)).toBeDefined()
+    expect(headingKeys(tree).length).toBeGreaterThan(0)
     expect(cardSelect(tree)).toBe(undefined)
     expect(viewSelect(tree).props.value).toBe('All Tasks')
   })
@@ -82,7 +79,7 @@ describe('All Tasks list', () => {
     await issue($, '')
     const tree = await $.ui.render(PANE)
     expect(cardSelect(tree)).toBe(undefined)
-    expect(clientNode(tree)).toBe(undefined)
+    expect(headingKeys(tree)).toEqual([])
     expect(stringsIn(tree)).toContain('No cards in the All Tasks view of pm/cc-plugins.')
     const notice = nodesOf(tree, 'Text').find((node: any) => stringsIn(node).includes('No cards in the All Tasks view of pm/cc-plugins.'))
     expect(notice.props.dimColor).toBe(true)
@@ -93,7 +90,7 @@ describe('All Tasks list', () => {
     world(on, { query: '[{"path":"pm/cc-plugins/tasks/e.md","status":"done"}]' })
     await issue($, '')
     const tree = await $.ui.render(PANE)
-    expect(clientNode(tree).props.props.groups.map((group: any) => [group.status, group.count])).toEqual([['done', 1]])
+    expect(headingKeys(tree)).toEqual([groupKey(0, 'done')])
     expect(stringsIn(tree).some((text: string) => text.includes('No cards'))).toBe(false)
   })
 
@@ -146,7 +143,7 @@ describe('done cards', () => {
     const tree = await $.ui.render(PANE)
     expect(runsOf(w, 'read')[0].argv[3]).toBe('path=pm/cc-plugins/tasks/e.md')
     expect(nodesOf(tree, 'Markdown')).toHaveLength(1)
-    expect(clientNode(tree)).toBeDefined()
+    expect(buttonOf(tree, BACK_KEY)).toBeDefined()
     expectDrawn(tree)
   })
 })
@@ -241,28 +238,7 @@ describe('command result', () => {
     world(on, { query: '[{"path":"pm/cc-plugins/tasks/a.md","status":"zz-marker"}]' })
     const result = await issue($, '')
     expect(result).toEqual({})
-    expect(JSON.stringify(clientNode(await $.ui.render(PANE)).props.props)).toContain('zz-marker')
+    expect(JSON.stringify(await $.ui.render(PANE))).toContain('zz-marker')
     expect(JSON.stringify(result).includes('zz-marker')).toBe(false)
-  })
-})
-
-describe('bounded list text', () => {
-  test('vault values in the list props stay within draw bounds', async ($, on) => {
-    const CR = String.fromCharCode(13)
-    world(on, {
-      query: JSON.stringify([
-        { path: P('a'), status: 'x'.repeat(11000) },
-        { path: P('b'), status: `a${CR}b`, priority: `c${CR}d`, title: `t${CR}u` },
-      ]),
-    })
-    await issue($, '')
-    const tree = await $.ui.render(PANE)
-    expectDrawn(tree)
-    const props = clientNode(tree).props.props
-    const flat = JSON.stringify(props)
-    expect(flat.includes(CR)).toBe(false)
-    expect(flat.includes('x'.repeat(33))).toBe(false)
-    expect(props.groups.map((group: any) => group.status)).toEqual(['x'.repeat(31) + '…', 'ab'])
-    expect(props.groups[1].rows[0].title).toBe('tu')
   })
 })

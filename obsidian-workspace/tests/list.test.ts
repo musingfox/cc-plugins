@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 import { countRows } from '../hooks/counts.ts'
-import { LIST_BUDGET, listGroups, listItems } from '../hooks/list.ts'
+import { LIST_BUDGET, groupKey, listGroups, listItems, rowKey } from '../hooks/list.ts'
 import { LIST_START, MIX, P } from './fixtures/rows.ts'
 
 test('groups rows by status in schema order, each sorted by priority', () => {
@@ -61,9 +61,9 @@ test('bounds and caps the drawn fields', () => {
 })
 
 test('keeps each drawn field on one line', () => {
-  const { groups } = listGroups('cc-plugins', [{ path: P('a'), status: 'x\ny', title: 'a\n\nb', due: '1\t2', tags: 'c\td' }])
+  const { groups } = listGroups('cc-plugins', [{ path: P('a'), status: 'x\ny', title: 'a\n\nb', tags: 'c\td' }])
   expect(groups[0].status).toBe('x y')
-  expect(groups[0].rows[0]).toMatchObject({ title: 'a b', due: '1 2', tags: 'c d' })
+  expect(groups[0].rows[0]).toMatchObject({ title: 'a b', tags: 'c d' })
 })
 
 test('marks a status cut to the cap', () => {
@@ -84,14 +84,14 @@ describe('heading and row keys', () => {
   test('two statuses cut to the same label keep different keys', () => {
     const rows = [{ path: P('a'), status: 'x'.repeat(40) }, { path: P('b'), status: 'x'.repeat(41) }]
     expect(listGroups('cc-plugins', rows).groups.map((group) => group.key)).toEqual([
-      'group:0:' + 'x'.repeat(31) + '…',
-      'group:1:' + 'x'.repeat(31) + '…',
+      groupKey(0, 'x'.repeat(31) + '…'),
+      groupKey(1, 'x'.repeat(31) + '…'),
     ])
   })
 
   test('a missing status keys as an empty label and a done row as done', () => {
-    expect(listGroups('cc-plugins', [{ path: P('a') }]).groups[0].key).toBe('group:0:')
-    expect(listGroups('cc-plugins', [{ path: P('a'), status: 'done' }]).groups[0].key).toBe('group:0:done')
+    expect(listGroups('cc-plugins', [{ path: P('a') }]).groups[0].key).toBe(groupKey(0, ''))
+    expect(listGroups('cc-plugins', [{ path: P('a'), status: 'done' }]).groups[0].key).toBe(groupKey(0, 'done'))
   })
 
   test('a filter hiding the first group leaves the second keyed as before', () => {
@@ -100,7 +100,7 @@ describe('heading and row keys', () => {
       { path: P('b'), status: 'x'.repeat(41), title: 'second' },
     ]
     const { groups } = listGroups('cc-plugins', rows)
-    expect(keysOfItems(groups, { query: 'second', folded: [] })).toEqual(['group:1:' + 'x'.repeat(31) + '…', `row:${P('b')}`])
+    expect(keysOfItems(groups, { query: 'second', folded: [] })).toEqual([groupKey(1, 'x'.repeat(31) + '…'), rowKey(P('b'))])
   })
 
   test('no key holds a control character', () => {
@@ -112,7 +112,7 @@ describe('heading and row keys', () => {
   test('the same name in two folders keys by path', () => {
     const rows = [{ path: P('a'), status: 'todo' }, { path: 'pm/cc-plugins/tasks/archive/a.md', status: 'todo' }]
     const { groups } = listGroups('cc-plugins', rows)
-    expect(groups[0].rows.map((row) => row.key)).toEqual(['row:pm/cc-plugins/tasks/a.md', 'row:pm/cc-plugins/tasks/archive/a.md'])
+    expect(groups[0].rows.map((row) => row.key)).toEqual([rowKey('pm/cc-plugins/tasks/a.md'), rowKey('pm/cc-plugins/tasks/archive/a.md')])
   })
 })
 
@@ -122,26 +122,26 @@ describe('listItems', () => {
   test('draws headings with rows and leaves the done group folded', () => {
     const items = listItems(groups, LIST_START as any).items
     expect(items.filter((item) => item.kind === 'heading').map((item) => item.key)).toEqual([
-      'group:0:todo',
-      'group:0:in-progress',
-      'group:0:blocked',
-      'group:0:done',
-      'group:0:waiting',
-      'group:0:',
+      groupKey(0, 'todo'),
+      groupKey(0, 'in-progress'),
+      groupKey(0, 'blocked'),
+      groupKey(0, 'done'),
+      groupKey(0, 'waiting'),
+      groupKey(0, ''),
     ])
-    expect(items.some((item) => item.kind === 'row' && item.key === `row:${P('e')}`)).toBe(false)
-    expect(items.find((item) => item.kind === 'heading' && item.key === 'group:0:done')).toMatchObject({ open: false, count: 2 })
+    expect(items.some((item) => item.kind === 'row' && item.key === rowKey(P('e')))).toBe(false)
+    expect(items.find((item) => item.kind === 'heading' && item.key === groupKey(0, 'done'))).toMatchObject({ open: false, count: 2 })
   })
 
   test('folding the todo group leaves its heading and drops its rows', () => {
-    const keys = keysOfItems(groups, { folded: ['group:0:todo', 'group:0:done'] })
-    expect(keys.includes('group:0:todo')).toBe(true)
-    expect(keys.includes(`row:${P('b')}`)).toBe(false)
+    const keys = keysOfItems(groups, { folded: [groupKey(0, 'todo'), groupKey(0, 'done')] })
+    expect(keys.includes(groupKey(0, 'todo'))).toBe(true)
+    expect(keys.includes(rowKey(P('b')))).toBe(false)
   })
 
   test('unfolding done draws its rows in priority order', () => {
     const keys = keysOfItems(groups, { folded: [] })
-    expect(keys.slice(keys.indexOf('group:0:done') + 1, keys.indexOf('group:0:done') + 3)).toEqual([`row:${P('f')}`, `row:${P('e')}`])
+    expect(keys.slice(keys.indexOf(groupKey(0, 'done')) + 1, keys.indexOf(groupKey(0, 'done')) + 3)).toEqual([rowKey(P('f')), rowKey(P('e'))])
   })
 
   const filterRows = [
@@ -154,17 +154,17 @@ describe('listItems', () => {
 
   test('a query matches the title or the tags, ignoring case, and the counts follow', () => {
     const { items } = listItems(filtered, { ...LIST_START, query: 'SPIRAL', folded: [] } as any)
-    expect(items.map((item) => item.key)).toEqual(['group:0:todo', `row:${P('s1')}`, 'group:0:done', `row:${P('s2')}`])
+    expect(items.map((item) => item.key)).toEqual([groupKey(0, 'todo'), rowKey(P('s1')), groupKey(0, 'done'), rowKey(P('s2'))])
     expect(items.filter((item) => item.kind === 'heading').map((item) => (item as any).count)).toEqual([1, 1])
   })
 
   test('a tag past the drawn cut still matches', () => {
-    expect(keysOfItems(filtered, { query: 'zz-late' })).toEqual(['group:0:todo', `row:${P('late')}`])
+    expect(keysOfItems(filtered, { query: 'zz-late' })).toEqual([groupKey(0, 'todo'), rowKey(P('late'))])
   })
 
   test('a blank query filters nothing and a query is trimmed', () => {
     expect(keysOfItems(filtered, { query: '   ' })).toEqual(keysOfItems(filtered))
-    expect(keysOfItems(filtered, { query: ' nope ' })).toEqual(['group:0:todo', `row:${P('n')}`])
+    expect(keysOfItems(filtered, { query: ' nope ' })).toEqual([groupKey(0, 'todo'), rowKey(P('n'))])
   })
 
   test('a query matching nothing leaves no item', () => {
@@ -173,7 +173,7 @@ describe('listItems', () => {
 
   test('a priority keeps only the rows with that raw priority', () => {
     const rows = listItems(groups, { ...LIST_START, priority: 'medium', folded: [] } as any).items.filter((item) => item.kind === 'row')
-    expect(rows.map((item) => item.key)).toEqual([`row:${P('a')}`, `row:${P('g')}`])
+    expect(rows.map((item) => item.key)).toEqual([rowKey(P('a')), rowKey(P('g'))])
   })
 
   test('sorting by title orders each group by title and back by priority', () => {
@@ -184,8 +184,8 @@ describe('listItems', () => {
     ]
     const { groups: todo } = listGroups('cc-plugins', rows)
     const order = (sort: string) => keysOfItems(todo, { sort }).slice(1)
-    expect(order('priority')).toEqual([P('z'), P('k'), P('m')].map((path) => `row:${path}`))
-    expect(order('title')).toEqual([P('m'), P('k'), P('z')].map((path) => `row:${path}`))
+    expect(order('priority')).toEqual([P('z'), P('k'), P('m')].map((path) => rowKey(path)))
+    expect(order('title')).toEqual([P('m'), P('k'), P('z')].map((path) => rowKey(path)))
   })
 
   test('a long listing is cut before the budget and counts what it left out', () => {

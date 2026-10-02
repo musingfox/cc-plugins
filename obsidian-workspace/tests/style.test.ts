@@ -128,8 +128,8 @@ describe('the card separator', () => {
     expect(stringsIn(rule)).toEqual(['─'.repeat(80)])
     expect(rule.props.dimColor).toBe(true)
     const flat = JSON.stringify(tree)
-    expect(flat.indexOf('"type":"Select"')).toBeGreaterThan(-1)
-    expect(flat.indexOf('"type":"Select"')).toBeLessThan(flat.indexOf('"marginTop":1'))
+    expect(flat.indexOf('"key":"back"')).toBeGreaterThan(-1)
+    expect(flat.indexOf('"key":"back"')).toBeLessThan(flat.indexOf('"marginTop":1'))
   })
 
   test('a pane without a body width draws a 40-column rule', async ($, on) => {
@@ -247,6 +247,6 @@ describe('the view picker', () => {
     expect(viewSelect(tree).props.value).toBe('All Tasks')
     expect(viewSelect(tree).props.options).toEqual(VIEW_NAMES.map((name) => ({ value: name, label: name })))
     const flat = JSON.stringify(tree)
-    expect(flat.indexOf('"key":"views"')).toBeLessThan(flat.indexOf('"key":"board"'))
+    expect(flat.indexOf('"key":"views"')).toBeLessThan(flat.indexOf('"key":"group:0:todo"'))
   })
 })

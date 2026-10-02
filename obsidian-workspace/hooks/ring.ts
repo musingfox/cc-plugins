@@ -1,6 +1,10 @@
 // The pane's keyboard decisions as pure functions: the kit cannot send a key, so each one is a table in ring.test.ts.
 
+import { isListKey, rowKey } from './list.ts'
+import type { ObwRing } from '../types/index.d.ts'
+
 export const QUERY_KEY = 'query'
+export const BACK_KEY = 'back'
 
 type Scroll = { origin: { kind: 'person' | 'plugin' }; pointer?: unknown; by: number }
 type ListView = { isList: boolean; items: string[]; firstMatch: string | null; at: string | null }
@@ -23,11 +27,11 @@ export function submitTarget(items: { key: string; kind: 'heading' | 'row' }[]):
   return first.kind === 'heading' && second?.kind === 'row' ? second.key : first.key
 }
 
-export type Ring = { at: string | null; item: string | null }
+export type Ring = ObwRing
 
 // `item` is the last list item the ring held, which survives the ring moving onto a toolbar button.
 export function nextRing(prev: Ring, element: string | undefined): Ring {
-  return { at: element ?? null, item: element?.startsWith('group:') || element?.startsWith('row:') ? element : prev.item }
+  return { at: element ?? null, item: element !== undefined && isListKey(element) ? element : prev.item }
 }
 
 // After p or s, the card the ring was on, when it is still drawn.
@@ -37,9 +41,9 @@ export function reorderTarget(item: string | null, items: string[]): string | nu
 
 // Where the ring goes when a card is left: `back` while another card remains, else the row the person opened.
 export function backTarget(trail: string[], items: string[]): string | null {
-  if (trail.length > 1) return 'back'
+  if (trail.length > 1) return BACK_KEY
   if (trail.length === 0) return null
-  const row = `row:${trail[0]}`
+  const row = rowKey(trail[0])
   return items.includes(row) ? row : (items[0] ?? null)
 }
 

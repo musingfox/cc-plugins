@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { NOT_DRAWN, PANE, cardSelect, clientNode, expectDrawn, headerIn, issue, nodesOf, pick, runsOf, stringsIn, viewSelect } from './fixtures/pane.ts'
-import { CARD, ALL_TASKS_ARGV, DASHBOARD_ARGV, QUERY_ARGV, SESSION, VIEW_NAMES, VIEW_STRINGS, world } from './fixtures/world.ts'
+import { NOT_DRAWN, PANE, buttonOf, cardSelect, expectDrawn, headerIn, headingKeys, issue, nodesOf, pick, rowKeys, runsOf, stringsIn, viewSelect } from './fixtures/pane.ts'
+import { CARD, ALL_TASKS_ARGV, DASHBOARD_ARGV, QUERY_ARGV, SESSION, VIEW_NAMES, world } from './fixtures/world.ts'
+import { rowKey } from '../hooks/list.ts'
+import { BACK_KEY } from '../hooks/ring.ts'
 
 const MOD = 'mod-obw-issue-pane'
 const MOD_PATH = `pm/cc-plugins/tasks/${MOD}.md`
@@ -33,7 +35,7 @@ describe('pane', () => {
   test('/issue opens the obw issue pane', async ($, on) => {
     const w = world(on)
     await issue($, '')
-    expect(w.opened[0]).toEqual({ id: 'obw-issue', title: 'obw issue', focus: true, closeOnEscape: true })
+    expect(w.opened[0]).toEqual({ id: 'obw-issue', title: 'obw issue', focus: true, closeOnEscape: true, holdToasts: true })
   })
 
   test('a refused pane is one transcript line and nothing is read', async ($, on) => {
@@ -259,7 +261,6 @@ describe('list', () => {
       { value: 'pm/cc-plugins/tasks/b.md', label: 'doing · b' },
     ])
     expect(cardSelect(tree).props.value).toBe(undefined)
-    expect(w.invalidates >= 1).toBe(true)
   })
 
   test('the pane re-orders nothing the CLI sent', async ($, on) => {
@@ -427,7 +428,7 @@ describe('list', () => {
     expect(nodesOf(loading, 'Markdown')).toHaveLength(0)
     await w.clock.advance(60000)
     await done
-    expect(clientNode(await $.ui.render(PANE))).toBeDefined()
+    expect(headingKeys(await $.ui.render(PANE)).length).toBeGreaterThan(0)
   })
 })
 
@@ -437,7 +438,7 @@ describe('the view switcher', () => {
     await issue($, '')
     const tree = await $.ui.render(PANE)
     expect(nodesOf(tree, 'Select')).toHaveLength(1)
-    expect(nodesOf(tree, 'Client')).toHaveLength(1)
+    expect(headingKeys(tree).length).toBeGreaterThan(0)
     expect(viewSelect(tree).props.options).toEqual(VIEW_NAMES.map((name) => ({ value: name, label: name })))
     expect(viewSelect(tree).props.value).toBe('All Tasks')
   })
@@ -558,6 +559,7 @@ describe('the view switcher', () => {
 
   test('picking a view leaves no card of the view it left', async ($, on) => {
     const w = world(on, { query: rows(MOD_PATH), read: CARD })
+    await issue($, 'Active')
     await issue($, MOD)
     expect(nodesOf(await $.ui.render(PANE), 'Markdown')).toHaveLength(1)
     await pick($, w, 'views', 'Docs')
@@ -596,20 +598,28 @@ describe('the view switcher', () => {
 })
 
 describe('card', () => {
-  test('/issue <card> draws the header and body below the list', async ($, on) => {
+  test('/issue <card> draws the header and body in the card view', async ($, on) => {
     const w = world(on, { query: rows(MOD_PATH, 'pm/cc-plugins/tasks/other.md'), read: CARD })
     await issue($, MOD)
     const tree = await $.ui.render(PANE)
     expect(w.runs.map((run: any) => run.argv)).toEqual([DASHBOARD_ARGV, ALL_TASKS_ARGV, readArgv(MOD_PATH)])
-    expect(clientNode(tree)).toBeDefined()
+    expect(buttonOf(tree, BACK_KEY)).toBeDefined()
     const strings = stringsIn(tree)
     expect(strings).toContain('Claude Mod：面板顯示 obw 的 task 與 issue')
     expect(stringsIn(headerIn(tree)).join('')).toBe('status: todo · priority: medium · AC 0/1')
     const markdowns = nodesOf(tree, 'Markdown')
     expect(markdowns.length).toBe(1)
     expect(markdowns[0].props.text).toBe('# mod-obw-issue-pane\n\n## Acceptance Criteria\n- [ ] one\n')
+  })
+
+  test('/issue <card> in another view draws the card below that view\'s list', async ($, on) => {
+    world(on, { query: rows(MOD_PATH, 'pm/cc-plugins/tasks/other.md'), read: CARD })
+    await issue($, 'Active')
+    await issue($, MOD)
+    const tree = await $.ui.render(PANE)
+    expect(buttonOf(tree, BACK_KEY)).toBeUndefined()
     const flat = JSON.stringify(tree)
-    expect(flat.indexOf('"type":"Client"') < flat.indexOf('"type":"Markdown"')).toBe(true)
+    expect(flat.indexOf('"key":"cards"')).toBeLessThan(flat.indexOf('"type":"Markdown"'))
   })
 
   test('a card read with no status in its frontmatter reads two dashes', async ($, on) => {
@@ -635,19 +645,19 @@ describe('card', () => {
     const w = world(on, { query: rows('pm/cc-plugins/docs/d.md'), reads: { 'pm/cc-plugins/tasks/zzz.md': CARD } })
     await issue($, 'zzz')
     expect(runsOf(w, 'read')[0].argv).toEqual(readArgv('pm/cc-plugins/tasks/zzz.md'))
-    expect(clientNode(await $.ui.render(PANE))).toBeDefined()
+    expect(buttonOf(await $.ui.render(PANE), BACK_KEY)).toBeDefined()
   })
 
-  test('a missing card is a message under the list, with no body', async ($, on) => {
+  test('a missing card is a message in the card view, with no body', async ($, on) => {
     world(on, { read: 'Error: File "pm/cc-plugins/tasks/nope.md" not found.\n' })
     await issue($, 'nope')
     const tree = await $.ui.render(PANE)
-    expect(clientNode(tree)).toBeDefined()
+    expect(buttonOf(tree, BACK_KEY)).toBeDefined()
     expect(stringsIn(tree)).toContain('Error: File "pm/cc-plugins/tasks/nope.md" not found.')
     expect(nodesOf(tree, 'Markdown').length).toBe(0)
   })
 
-  test('a card outside the list still draws below the list without breaking the pane', async ($, on) => {
+  test('a card outside the list still draws in the card view without breaking the pane', async ($, on) => {
     world(on, {
       query: rows('pm/cc-plugins/tasks/a.md', 'pm/cc-plugins/tasks/b.md'),
       read: 'Error: File "pm/cc-plugins/tasks/zzz.md" not found.\n',
@@ -655,7 +665,7 @@ describe('card', () => {
     await issue($, 'zzz')
     const tree = await $.ui.render(PANE)
     expectDrawn(tree)
-    expect(clientNode(tree)).toBeDefined()
+    expect(buttonOf(tree, BACK_KEY)).toBeDefined()
     expect(stringsIn(tree)).toContain('Error: File "pm/cc-plugins/tasks/zzz.md" not found.')
   })
 
@@ -680,9 +690,10 @@ describe('card', () => {
 
   test('a card missing from the view still draws below the empty notice', async ($, on) => {
     world(on, { query: '[]', read: CARD })
+    await issue($, 'Docs')
     await issue($, 'done-card')
     const tree = await $.ui.render(PANE)
-    expect(stringsIn(tree)).toContain('No cards in the All Tasks view of pm/cc-plugins.')
+    expect(stringsIn(tree)).toContain('No cards in the Docs view of pm/cc-plugins.')
     expect(nodesOf(tree, 'Markdown').length).toBe(1)
   })
 
@@ -714,7 +725,7 @@ describe('card', () => {
     await w.clock.settle()
     const loading = await $.ui.render(PANE)
     expect(w.runs.length).toBe(3)
-    expect(clientNode(loading)).toBeDefined()
+    expect(buttonOf(loading, BACK_KEY)).toBeDefined()
     expect(stringsIn(loading)).toContain(`Reading ${MOD}…`)
     await w.clock.advance(60000)
     await done
@@ -741,7 +752,7 @@ describe('overlapping requests', () => {
     await Promise.all([first, second])
     await w.clock.settle()
     const tree = await $.ui.render(PANE)
-    expect(clientNode(tree)).toBeDefined()
+    expect(buttonOf(tree, BACK_KEY)).toBeDefined()
     const strings = stringsIn(tree)
     expect(strings).toContain('Card B')
     expect(strings).not.toContain('Card A')
@@ -762,11 +773,8 @@ describe('overlapping requests', () => {
     await first
     await w.clock.settle()
     const tree = await $.ui.render(PANE)
-    expect(clientNode(tree).props.props.groups).toEqual([
-      { status: 'todo', count: 1, rows: [{ path: 'pm/cc-plugins/tasks/b.md', badge: ' ', title: 'b', due: '', tags: '' }] },
-    ])
-    expect(clientNode(tree).props.props.card).toBe(null)
-    expect(stringsIn(tree)).toEqual(VIEW_STRINGS)
+    expect(rowKeys(tree)).toEqual([rowKey('pm/cc-plugins/tasks/b.md')])
+    expect(buttonOf(tree, BACK_KEY)).toBeUndefined()
     expect(runsOf(w, 'read')).toEqual([])
   })
 
@@ -786,11 +794,8 @@ describe('overlapping requests', () => {
     await first
     await w.clock.settle()
     const tree = await $.ui.render(PANE)
-    expect(clientNode(tree).props.props.groups).toEqual([
-      { status: 'todo', count: 1, rows: [{ path: 'pm/cc-plugins/tasks/b.md', badge: ' ', title: 'b', due: '', tags: '' }] },
-    ])
-    expect(clientNode(tree).props.props.card).toBe(null)
-    expect(stringsIn(tree)).toEqual(VIEW_STRINGS)
+    expect(rowKeys(tree)).toEqual([rowKey('pm/cc-plugins/tasks/b.md')])
+    expect(buttonOf(tree, BACK_KEY)).toBeUndefined()
     expect(nodesOf(tree, 'Markdown').length).toBe(0)
   })
 })

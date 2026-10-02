@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 import { BAND, bandLines } from './fixtures/band.ts'
-import { CONFIG_PATH, PANE, issue, mounted, nodesOf, openFirstRow, press, shown, stringsIn } from './fixtures/pane.ts'
+import { CONFIG_PATH, PANE, actionButtons, issue, mounted, nodesOf, openFirstRow, press, shown, stringsIn } from './fixtures/pane.ts'
 import { CONFIG, world } from './fixtures/world.ts'
 import { ERROR as RED } from '../hooks/style.ts'
 
@@ -44,10 +44,10 @@ test('B3 the desktop offers no bind button', async ($, on) => {
   expect(keys(await $.ui.render({ ...PANE, surface: 'desktop' }))).not.toContain('bind')
 })
 
-test('B4 a card opened from the list offers no bind button', async ($, on) => {
+test('B4 a card opened from the list offers Bind this session too', async ($, on) => {
   const w = world(on, base())
   await openFirstRow($, w)
-  expect(keys(await $.ui.render(PANE))).not.toContain('bind')
+  expect(keys(await $.ui.render(PANE))).toContain('bind')
 })
 
 test('B5 a failed card read offers no bind button', async ($, on) => {
@@ -115,8 +115,8 @@ const COULD_NOT_UNBIND = (tree: any) => stringsIn(tree).filter((text) => text.st
 test('U1 the bound card offers bind then Unbind this session', async ($, on) => {
   await boundCard($, on)
   const tree = await $.ui.render(PANE)
-  expect(keys(tree)).toEqual(['bind', 'unbind'])
-  expect(buttons(tree)[1].props.label).toBe('Unbind this session')
+  expect(actionButtons(tree).map((node: any) => node.props.key)).toEqual(['bind', 'unbind'])
+  expect(actionButtons(tree)[1].props.label).toBe('Unbind this session')
 })
 
 test('U2 pressing unbind removes the binding file and the band line', async ($, on) => {

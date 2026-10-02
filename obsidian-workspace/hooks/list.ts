@@ -2,23 +2,17 @@ import { bounded, MAX_CHARS } from './bounds.ts'
 import { countRows, isMissing } from './counts.ts'
 import { cardName, keptRows } from './rows.ts'
 import { PRIORITY_ORDER, STATUS_ORDER } from './style.ts'
-import type { ObwList } from '../types/index.d.ts'
+import type { ObwGroup, ObwList, ObwRow } from '../types/index.d.ts'
 
-type Row = { path: string; status?: string | null; priority?: string | null; title?: string | null; due?: string | null; tags?: string | null }
+type Row = { path: string; status?: string | null; priority?: string | null; title?: string | null; tags?: string | null }
 
-export type BoardRow = {
-  path: string
-  key: string
-  badge: 'H' | 'M' | 'L' | ' '
-  title: string
-  due: string
-  tags: string
-  // What the filter matches against: the CLI's own text, not the drawn cut.
-  fullTitle: string
-  fullTags: string
-  priority: string | null
-}
-export type BoardGroup = { status: string | null; key: string; count: number; rows: BoardRow[] }
+export type BoardRow = ObwRow
+export type BoardGroup = ObwGroup
+
+// The one place a list item's focus address is built and told apart.
+export const rowKey = (path: string) => `row:${path}`
+export const groupKey = (n: number, label: string) => `group:${n}:${label}`
+export const isListKey = (key: string) => key.startsWith('row:') || key.startsWith('group:')
 
 export type ListSettings = ObwList
 
@@ -30,8 +24,11 @@ const BADGES: Record<string, BoardRow['badge']> = { high: 'H', medium: 'M', low:
 const MAX_PATH = 200
 const MAX_TITLE = 80
 const MAX_TAGS = 48
-const MAX_DUE = 16
 const MAX_STATUS = 32
+// What the filter matches against is the CLI's own text up to the engine's string bound, the drawing far less.
+// The engine refuses a $.state value over 4 MiB, so all the rows share this much match text; a row past it matches on its drawn cut.
+const MAX_MATCH = MAX_CHARS
+const MATCH_BUDGET = 500_000
 // The engine bounds a tree at 100,000 serialized characters; the list keeps 20,000 of them for everything around it.
 export const LIST_BUDGET = 80000
 // An upper bound of what one heading or row draws besides its key, label and tags.
@@ -65,17 +62,18 @@ function byPriority<R extends Row>(rows: R[]) {
   )
 }
 
-function boardRow(row: Row): BoardRow {
+function boardRow(row: Row, room: number): BoardRow {
+  const fullTitle = oneLine(row.title ?? '', Math.min(MAX_MATCH, Math.max(room, MAX_TITLE))) || oneLine(cardName(row.path), MAX_TITLE)
+  const fullTags = oneLine(row.tags ?? '', Math.min(MAX_MATCH, Math.max(room - fullTitle.length, MAX_TAGS)))
   return {
     path: row.path,
-    key: `row:${row.path}`,
+    key: rowKey(row.path),
     badge: (typeof row.priority === 'string' && Object.hasOwn(BADGES, row.priority) && BADGES[row.priority]) || ' ',
     title: oneLine(row.title ?? '', MAX_TITLE) || oneLine(cardName(row.path), MAX_TITLE),
-    due: oneLine(row.due ?? '', MAX_DUE),
     tags: oneLine(row.tags ?? '', MAX_TAGS),
-    fullTitle: oneLine(row.title ?? '', MAX_CHARS) || oneLine(cardName(row.path), MAX_CHARS),
-    fullTags: oneLine(row.tags ?? '', MAX_CHARS),
-    priority: isMissing(row.priority) ? null : row.priority,
+    fullTitle,
+    fullTags,
+    priority: isMissing(row.priority) ? null : oneLine(row.priority, MAX_STATUS),
   }
 }
 
@@ -91,19 +89,24 @@ export function listGroups(project: string, rows: Row[]): { groups: BoardGroup[]
   const groups: BoardGroup[] = []
   const labelled = new Map<string, number>()
   let hidden = 0
+  let room = MATCH_BUDGET
   for (const status of statuses) {
     const ofStatus = byPriority(kept.filter((row) => (status === null ? isMissing(row.status) : row.status === status)))
     const drawn: BoardRow[] = []
     for (const row of ofStatus) {
       if (row.path.length > MAX_PATH) hidden++
-      else drawn.push(boardRow(row))
+      else {
+        const made = boardRow(row, room)
+        room -= made.fullTitle.length + made.fullTags.length
+        drawn.push(made)
+      }
     }
     if (!drawn.length) continue
     const label = status === null ? null : statusLabel(status)
     // `n` counts the earlier groups of the same label, so a cut status never shares a key and no filter moves one.
     const n = labelled.get(label ?? '') ?? 0
     labelled.set(label ?? '', n + 1)
-    groups.push({ status: label, key: `group:${n}:${label ?? ''}`, count: statusCount(counted, status), rows: drawn })
+    groups.push({ status: label, key: groupKey(n, label ?? ''), count: statusCount(counted, status), rows: drawn })
   }
   return { groups, hidden }
 }

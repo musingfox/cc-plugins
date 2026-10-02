@@ -1,4 +1,5 @@
 import { expect } from 'claude-code/testing'
+import { BACK_KEY, QUERY_KEY } from '../../hooks/ring.ts'
 import { CONFIG, SESSION, kindOf, manifest, world } from './world.ts'
 
 export const PANE = { component: 'Pane', surface: 'terminal', requestId: 'obw-issue', viewport: { columns: 160, rows: 40 }, props: { title: 'obw issue', isFocused: true, bodyColumns: 80, placement: 'inline', scroll: { offset: 0, bodyRows: 30 }, view: {} } } as const
@@ -42,8 +43,24 @@ export const expectDrawn = (tree: any) => expect(stringsIn(tree)).not.toContain(
 // The pane draws the view picker first and the card picker second; either may be absent.
 export const viewSelect = (tree: any) => nodesOf(tree, 'Select').find((node: any) => node.props.key === 'views')
 export const cardSelect = (tree: any) => nodesOf(tree, 'Select').find((node: any) => node.props.key === 'cards')
-// The All Tasks list region; an unmounted render leaves it unexpanded, its props readable.
-export const clientNode = (tree: any) => nodesOf(tree, 'Client').find((node: any) => node.props.key === 'board')
+// Every Button in drawing order: its key, its label and its props. `stringsIn` leaves Button labels out.
+export const buttonsIn = (tree: any) => nodesOf(tree, 'Button')
+// The card's own action Buttons: the card view's `back` is chrome, not an action.
+export const actionButtons = (tree: any) => buttonsIn(tree).filter((node: any) => node.props.key !== BACK_KEY)
+export const buttonOf = (tree: any, key: string) => buttonsIn(tree).find((node: any) => node.props.key === key)
+// The element that holds the Button as a direct child: a heading's or a row's own line.
+export const lineOf = (tree: any, key: string) =>
+  elementsIn(tree).find((node: any) => [...(node.children ?? []), ...(node.props?.children ?? [])].some((kid: any) => kid?.props?.key === key))
+export const rowKeys = (tree: any) => buttonsIn(tree).map((node: any) => node.props.key).filter((key: string) => key.startsWith('row:'))
+export const headingKeys = (tree: any) => buttonsIn(tree).map((node: any) => node.props.key).filter((key: string) => key.startsWith('group:'))
+export const labelsOf = (nodes: any[]) => nodes.map((node: any) => node.props.label)
+
+// Every `color` and `backgroundColor` prop in the tree, with the element that carries it.
+export function colorsIn(node: any): { type: string; prop: string; value: unknown }[] {
+  if (!node || typeof node !== 'object') return []
+  const own = ['color', 'backgroundColor'].filter((prop) => node.props && prop in node.props).map((prop) => ({ type: node.type, prop, value: node.props[prop] }))
+  return [...own, ...[...(node.children ?? []), ...(node.props?.children ?? [])].flatMap(colorsIn)]
+}
 
 // Runs by their verb, so an added obsidian call cannot shift an assertion off its target.
 export const runsOf = (w: any, verb: string) => w.runs.filter((run: any) => run.argv[0] === 'obsidian' && kindOf(run.argv) === verb)
@@ -90,13 +107,42 @@ export async function press($: any, w: any, key = PRESS.key) {
   return pressed
 }
 
-// The world answers ui.invalidate itself, so a mounted drawing redraws only when asked.
+// Opens All Tasks and presses its first row; the card read finishes on settle.
 export async function openFirstRow($: any, w: any) {
   await issue($, '')
-  const m = await mounted($)
-  await m.key({ key: 'down', in: 'board' })
-  await m.key({ key: 'return', in: 'board' })
+  const [first] = rowKeys(await $.ui.render(PANE))
+  await pressKey($, w, first)
+}
+
+// A press of any Button of the drawn pane; the press's async work finishes on settle.
+export async function pressKey($: any, w: any, key: string) {
+  await $.ui.render(PANE)
+  const pressed = await $.ui.press({ plugin: 'obw', key })
   await w.clock.settle()
-  await m.redraw()
-  return m
+  return pressed
+}
+
+// Types into the filter Input as an edit, or as Enter when `kind` is submit.
+export async function typeQuery($: any, w: any, text: string, kind: 'change' | 'submit' = 'change') {
+  await $.ui.render(PANE)
+  const typed = await $.ui.input({ plugin: 'obw', key: QUERY_KEY, text, kind })
+  await w.clock.settle()
+  return typed
+}
+
+// The kit's `$` has no `state`, so obw's values are watched where they are written: each write of
+// obw's pane, list and ring reaches the test's own `state.set` hook before it lands.
+export function watchState(on: any) {
+  const writes: Record<string, any[]> = { pane: [], list: [], ring: [] }
+  for (const key of Object.keys(writes)) {
+    on('state.set', { plugin: 'obw', key }, async ($: any, e: any, next: any) => {
+      writes[key].push(e.value)
+      return next(e)
+    })
+  }
+  return {
+    writes,
+    // What stands under the key: a `pane` write is Shaped, so its drawn value is the one inside the tag.
+    latest: (key: 'pane' | 'list' | 'ring') => (key === 'pane' ? writes.pane.at(-1)?.value : writes[key].at(-1)),
+  }
 }

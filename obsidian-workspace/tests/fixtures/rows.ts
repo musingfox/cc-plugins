@@ -1,3 +1,5 @@
+import { groupKey } from '../../hooks/list.ts'
+
 export const P = (name: string) => `pm/cc-plugins/tasks/${name}.md`
 
 export const MIX = [
@@ -16,4 +18,4 @@ export const MIX = [
 ]
 
 // The list atom's initial value: nothing filtered, priority order, `done` folded.
-export const LIST_START = { query: '', priority: null, sort: 'priority', folded: ['group:0:done'] } as const
+export const LIST_START = { query: '', priority: null, sort: 'priority', folded: [groupKey(0, 'done')] } as const

@@ -130,6 +130,20 @@ test('BP2 during a survey the band is what the others drew', async ($, on) => {
   expect(await $.ui.render({ ...BAND, props: { ...BAND.props, hasSurvey: true } })).toEqual(BENEATH)
 })
 
+// A hand-made `$` has no engine behind it, so obw's state lives in this map for the one test.
+function memoryState() {
+  const kept = new Map<string, { value: unknown; version: number }>()
+  return {
+    get: async (ref: any) => kept.get(ref.key) ?? { value: null, version: 0 },
+    set: async (ref: any, value: unknown, options: { ifVersion?: number } = {}) => {
+      const version = kept.get(ref.key)?.version ?? 0
+      if (options.ifVersion !== undefined && options.ifVersion !== version) return { isSet: false, version }
+      kept.set(ref.key, { value, version: version + 1 })
+      return { isSet: true, version: version + 1 }
+    },
+  }
+}
+
 test('BP3 a fault while drawing the line leaves what the others drew', async () => {
   const faulty = {
     command: { register: async () => {} },
@@ -137,7 +151,8 @@ test('BP3 a fault while drawing the line leaves what the others drew', async () 
     session: { id: async () => 'sid-1' },
     fs: { exists: async () => true, read: async () => RECORD_A },
     process: { run: async () => ({ exitCode: 0, stdout: CARD, stderr: '' }) },
-    ui: { invalidate: () => {}, resolve: async () => ({ Box: () => ({}), Text: () => { throw new Error('boom') } }) },
+    state: memoryState(),
+    ui: { resolve: async () => ({ Box: () => ({}), Text: () => { throw new Error('boom') } }) },
   }
   await handlerOf('session.start')(faulty, SESSION, async () => ({}))
   await new Promise((resolve) => setTimeout(resolve, 0))
