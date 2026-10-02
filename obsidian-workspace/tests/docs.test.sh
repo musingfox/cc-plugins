@@ -66,6 +66,11 @@ n="$(awk '/^## Issue Pane/,/^## Prerequisites/' obsidian-workspace/README.md | g
 n="$(awk '/^## Issue Pane/,/^## Prerequisites/' obsidian-workspace/README.md | grep -c '/issue <view>' || true)"
 [ "$n" -ge 1 ] || fail "obw README Issue Pane must mention /issue <view>"
 
+n="$(awk '/^## Issue Pane/,/^## Prerequisites/' obsidian-workspace/README.md | grep -c 'Click the list' || true)"
+[ "$n" -eq 0 ] || fail "obw README Issue Pane must not describe clicking the list, got $n"
+n="$(awk '/^## Issue Pane/,/^## Prerequisites/' obsidian-workspace/README.md | grep -c '/theme' || true)"
+[ "$n" -ge 1 ] || fail "obw README Issue Pane must say its colours follow /theme"
+
 n="$(grep -cF 'Built and tested against Claude Code 2.1.287.' obsidian-workspace/README.md || true)"
 [ "$n" -eq 1 ] || fail "obw README Claude Code version line count is $n, want 1"
 
