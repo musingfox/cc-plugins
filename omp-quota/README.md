@@ -7,7 +7,7 @@ Shows every omp provider's remaining quota inside a Claude Code session, as one 
 - **`/quota refresh`**: drops omp's cache and fetches fresh quota, without a model turn.
 - **Toast**: one in-session toast when a provider's status worsens from `ok`.
 
-Built and tested against Claude Code 2.1.276.
+Needs Claude Code 2.1.287 or later, where Claude Mods are on by default. Built and tested against Claude Code 2.1.287.
 
 ## How omp is run
 
@@ -102,21 +102,10 @@ included, so it always shows the latest data the module holds. Collapse it with
 ctrl+x ctrl+a (or its `[-]` mark) without turning it off. It is drawn from `Box` and `Text`
 only, with the props `flexDirection`, `color`, `dimColor`, and `wrap`.
 
-## Enabling
-
-Claude Mods are off unless Claude Code starts with the global switch:
-
-```bash
-CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude
-```
-
-The switch is not per plugin: it enables the modules of every installed plugin, not only
-this one.
-
 ## Tests
 
 ```bash
-CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin test omp-quota
+claude plugin test omp-quota
 ```
 
 The test kit is hermetic: no filesystem, network, or process; every `$` call a test makes

@@ -66,7 +66,7 @@ n="$(awk '/^## Issue Pane/,/^## Prerequisites/' obsidian-workspace/README.md | g
 n="$(awk '/^## Issue Pane/,/^## Prerequisites/' obsidian-workspace/README.md | grep -c '/issue <view>' || true)"
 [ "$n" -ge 1 ] || fail "obw README Issue Pane must mention /issue <view>"
 
-n="$(grep -cF 'Built and tested against Claude Code 2.1.276.' obsidian-workspace/README.md || true)"
+n="$(grep -cF 'Built and tested against Claude Code 2.1.287.' obsidian-workspace/README.md || true)"
 [ "$n" -eq 1 ] || fail "obw README Claude Code version line count is $n, want 1"
 
 n="$(awk '/^## Issue Pane/,/^## Prerequisites/' obsidian-workspace/README.md | grep -c 'Open in browser' || true)"

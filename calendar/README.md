@@ -6,7 +6,7 @@ Shows upcoming Google Calendar events inside a Claude Code session, as one Claud
 - **`/cal`**: toggles a band above the prompt listing the next 7 days of events.
 - **`/cal N`**: lists the next N days (1–31), turns the band on, and remembers N.
 
-Built and tested against Claude Code 2.1.282.
+Needs Claude Code 2.1.287 or later, where Claude Mods are on by default. Built and tested against Claude Code 2.1.287.
 
 ## Where events come from
 
@@ -56,18 +56,10 @@ One line per event, soonest first, in the machine's time zone (`TZ` when set):
 
 The band's on/off state and N are kept in the plugin's store and read at session start.
 
-## Enabling
-
-```bash
-CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude
-```
-
-The switch enables the modules of every installed plugin, not only this one.
-
 ## Tests
 
 ```bash
-CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin test calendar
+claude plugin test calendar
 ```
 
 The fixtures in `tests/fixtures/world.ts` are synthetic; no real calendar data belongs in

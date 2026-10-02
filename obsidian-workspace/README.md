@@ -31,19 +31,13 @@ A shown card has an **Open in browser** Button that renders the card body, Merma
 
 To read the page from another device on your tailnet, proxy viz's port once with `tailscale serve --bg --https=18090 18090`. After each render the pane reads `tailscale serve status --json` and, when a mapping covers the page's port, adds a `Tailnet: https://<machine>.<tailnet>.ts.net:18090/…` line. The pane never creates a mapping itself; without one it shows only the opened page.
 
-Enable Claude Mods globally before using the pane:
-
-```bash
-export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1
-```
-
 Test the plugin with:
 
 ```bash
 claude plugin test obsidian-workspace
 ```
 
-Built and tested against Claude Code 2.1.276.
+The pane needs Claude Code 2.1.287 or later, where Claude Mods are on by default. Built and tested against Claude Code 2.1.287.
 
 ## Prerequisites
 
@@ -55,7 +49,7 @@ Built and tested against Claude Code 2.1.276.
 - **Bases** core plugin enabled (required only for `/obw:pm` dashboards — bundled in Obsidian 1.9+)
 - [uv](https://docs.astral.sh/uv/) (optional; lets the `/issue` pane draw Mermaid blocks as text diagrams through `uvx termaid@0.9.0` — without it they show as code blocks)
 - [viz](../viz) plugin (optional; enables the `/issue` pane's **Open in browser** Button — without it the Button is not drawn)
-- `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` (required only for the `/issue` pane; skills work without it)
+- Claude Code 2.1.287 or later (required only for the `/issue` pane; the skills do not need it)
 
 ## Installation
 

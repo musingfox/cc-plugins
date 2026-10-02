@@ -161,7 +161,7 @@ Personal Obsidian vault productivity — capture, notes, and project management 
 - **Jot** (`/obw:jot`): Quick capture (timestamped journal bullet) or long-form note — triages by input shape; filename strategies (title / slug / timestamp-title), `--folder` overrides per-call
 - **Project Management** (`/obw:pm`): Task/doc/ADR lifecycle, Bases dashboards, wikilink cross-references; split a spec into blocking tickets
 - **Interactive Init** (`/obw:init`): Guided setup of `.obsidian.yaml` — vault binding, note/pm sections
-- **Prerequisites**: Obsidian app + CLI enabled, `.obsidian.yaml` config in project root; the Issue Pane also needs `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`, with uv and viz optional
+- **Prerequisites**: Obsidian app + CLI enabled, `.obsidian.yaml` config in project root; the Issue Pane also needs Claude Code 2.1.287 or later, with uv and viz optional
 
 **Installation:**
 ```bash
@@ -225,7 +225,7 @@ Survey a codebase for deepening opportunities — shallow modules, leaking seams
 
 ### omp-quota
 
-Every omp provider's remaining quota inside the session, as a Claude Mod (needs `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`, which enables every installed plugin's modules):
+Every omp provider's remaining quota inside the session, as a Claude Mod (needs Claude Code 2.1.287 or later):
 - **`/quota`**: toggles a compact table above the prompt, one line per provider with every window's share and time to reset
 - **`/quota refresh`**: runs `omp usage invalidate`, then fetches fresh quota without a model turn
 - **Toast**: one in-session toast when a provider's status worsens from `ok`
@@ -237,7 +237,7 @@ Every omp provider's remaining quota inside the session, as a Claude Mod (needs 
 
 ### calendar
 
-Upcoming Google Calendar events inside the session, as a Claude Mod (needs `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` and the claude.ai Google Calendar connector):
+Upcoming Google Calendar events inside the session, as a Claude Mod (needs Claude Code 2.1.287 or later and the claude.ai Google Calendar connector):
 - **`/cal`**: toggles a band above the prompt listing the next 7 days of events from every calendar you can see
 - **`/cal N`**: lists the next N days (1–31) and remembers the choice
 - **`exclude_calendars`**: plugin option naming calendars to leave out
