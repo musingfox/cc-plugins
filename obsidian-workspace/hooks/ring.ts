@@ -34,3 +34,11 @@ export function nextRing(prev: Ring, element: string | undefined): Ring {
 export function reorderTarget(item: string | null, items: string[]): string | null {
   return item !== null && items.includes(item) ? item : null
 }
+
+// Where the ring goes when a card is left: `back` while another card remains, else the row the person opened.
+export function backTarget(trail: string[], items: string[]): string | null {
+  if (trail.length > 1) return 'back'
+  if (trail.length === 0) return null
+  const row = `row:${trail[0]}`
+  return items.includes(row) ? row : (items[0] ?? null)
+}

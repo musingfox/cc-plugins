@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { arrowMove, nextRing, reorderTarget, submitTarget } from '../hooks/ring.ts'
+import { arrowMove, backTarget, nextRing, reorderTarget, submitTarget } from '../hooks/ring.ts'
 
 describe('arrowMove', () => {
   const items = ['group:0:todo', 'row:a', 'row:b']
@@ -43,4 +43,13 @@ describe('reorderTarget', () => {
   test('returns the card while it is still drawn', () => expect(reorderTarget('row:a', ['group:0:todo', 'row:b', 'row:a'])).toBe('row:a'))
   test('returns nothing once it is gone', () => expect(reorderTarget('row:a', ['group:0:todo', 'row:b'])).toBe(null))
   test('returns nothing when the ring held no card', () => expect(reorderTarget(null, ['group:0:todo'])).toBe(null))
+})
+
+describe('backTarget', () => {
+  const A = 'pm/cc-plugins/tasks/a.md'
+  test('goes to back while a card remains', () => expect(backTarget([A, 'pm/cc-plugins/tasks/archive/p.md'], ['group:0:todo'])).toBe('back'))
+  test('goes to the row left when the list returns', () => expect(backTarget([A], ['group:0:todo', `row:${A}`])).toBe(`row:${A}`))
+  test('goes to the first item when the row is folded away', () =>
+    expect(backTarget(['pm/cc-plugins/tasks/e.md'], ['group:0:todo', 'group:0:done'])).toBe('group:0:todo'))
+  test('goes nowhere from an empty trail', () => expect(backTarget([], ['group:0:todo'])).toBe(null))
 })
