@@ -33,3 +33,28 @@ export function acLabel(body: string): string | null {
   }
   return total ? `AC ${checked}/${total}` : null
 }
+
+export type Relations = { parent: string[]; blocked_by: string[]; related: string[] }
+
+const RELATION_FIELD = /^(parent|blocked_by|related):(.*)$/s
+const WIKILINK = /\[\[([^\]]*)\]\]/g
+
+function targetsIn(line: string) {
+  return [...line.matchAll(WIKILINK)].map((match) => match[1].split(/[|#]/)[0].trim()).filter(Boolean)
+}
+
+// A field's list items follow it as `- ` lines; any other line closes the field.
+export function relationsOf(frontmatter: string): Relations {
+  const relations: Relations = { parent: [], blocked_by: [], related: [] }
+  let open: keyof Relations | null = null
+  for (const line of frontmatter.split('\n')) {
+    const field = RELATION_FIELD.exec(line)
+    if (field) open = field[1] as keyof Relations
+    else if (!open || !/^\s*-/.test(line)) {
+      open = null
+      continue
+    }
+    for (const target of targetsIn(field ? field[2] : line)) if (!relations[open!].includes(target)) relations[open!].push(target)
+  }
+  return relations
+}

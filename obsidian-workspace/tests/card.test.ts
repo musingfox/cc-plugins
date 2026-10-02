@@ -1,5 +1,5 @@
-import { expect, test } from 'claude-code/testing'
-import { acLabel, headerOf } from '../hooks/card.ts'
+import { describe, expect, test } from 'claude-code/testing'
+import { acLabel, headerOf, relationsOf } from '../hooks/card.ts'
 const CARD = 'title: "Claude Mod：面板顯示 obw 的 task 與 issue"\nstatus: todo\npriority: medium\ndue:'
 test('reads complete card headers', () => expect(headerOf(CARD)).toEqual({ title: 'Claude Mod：面板顯示 obw 的 task 與 issue', status: 'todo', priority: 'medium' }))
 test('reads a quoted title', () => expect(headerOf("title: 'x'")).toEqual({ title: 'x' }))
@@ -23,3 +23,18 @@ const acCases: [string, string | null][] = [
   ['## Acceptance Criteria\n- [x]a\n- [ ]\n', 'AC 0/1'],
 ]
 for (const [body, label] of acCases) test(`counts ${JSON.stringify(body)} as ${label}`, () => expect(acLabel(body)).toBe(label))
+
+describe('relationsOf', () => {
+  const none = { parent: [], blocked_by: [], related: [] }
+  const cases: [string, string, object][] = [
+    ['a quoted parent', 'parent: "[[mod-obw-issue-pane]]"', { ...none, parent: ['mod-obw-issue-pane'] }],
+    ['an empty parent', 'parent:', none],
+    ['an inline empty list', 'blocked_by: []', none],
+    ['an indented block list', 'blocked_by:\n  - "[[a]]"\n  - "[[b]]"\ntags:\n  - x', { ...none, blocked_by: ['a', 'b'] }],
+    ['an unindented block list', 'blocked_by:\n- "[[a]]"', { ...none, blocked_by: ['a'] }],
+    ['an inline list with an alias', 'related: ["[[a]]", "[[b|B]]"]', { ...none, related: ['a', 'b'] }],
+    ['a heading link and its duplicate', 'related:\n  - "[[x#h]]"\n  - "[[x]]"', { ...none, related: ['x'] }],
+    ['no relation field', 'title: t\nstatus: todo', none],
+  ]
+  for (const [name, frontmatter, expected] of cases) test(`reads ${name}`, () => expect(relationsOf(frontmatter)).toEqual(expected))
+})
