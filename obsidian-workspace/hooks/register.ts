@@ -19,7 +19,7 @@ import { splitFences, termaidHeaderAllowed, diagramOutcome, TERMAID_ARGV, TERMAI
 import type { Segment } from './mermaid.ts'
 import { priorityColor, statusColor, RED } from './style.ts'
 
-const PANE = { id: PANE_ID, title: 'obw issue', focus: true, closeOnEscape: true }
+const PANE = { id: PANE_ID, title: 'obw issue', focus: true, closeOnEscape: true } as const
 
 type Browser = { kind: 'rendering' } | ReturnType<typeof renderOutcome> | (Extract<ReturnType<typeof renderOutcome>, { kind: 'opened' }> & { tailnet: string })
 
