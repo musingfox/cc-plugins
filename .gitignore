@@ -18,6 +18,8 @@ yarn-error.log*
 # Claude Code
 .claude/*.local.*
 .claude/worktrees/
+# Claude Code writes one into each mod it loads from --plugin-dir (its .claude-plugin/types/ ignores itself)
+/*/tsconfig.json
 .obsidian.yaml
 .spiral/
 .serena/
