@@ -42,3 +42,8 @@ export function backTarget(trail: string[], items: string[]): string | null {
   const row = `row:${trail[0]}`
   return items.includes(row) ? row : (items[0] ?? null)
 }
+
+// Escape in a card is the person's close; it steps back instead, and a close the plugin or the unload asked for goes through.
+export function closeGoesBack(origin: { kind: 'plugin' | 'person' | 'unload' }, trailLength: number): boolean {
+  return origin.kind === 'person' && trailLength > 0
+}

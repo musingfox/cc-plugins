@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { arrowMove, backTarget, nextRing, reorderTarget, submitTarget } from '../hooks/ring.ts'
+import { arrowMove, backTarget, closeGoesBack, nextRing, reorderTarget, submitTarget } from '../hooks/ring.ts'
 
 describe('arrowMove', () => {
   const items = ['group:0:todo', 'row:a', 'row:b']
@@ -52,4 +52,11 @@ describe('backTarget', () => {
   test('goes to the first item when the row is folded away', () =>
     expect(backTarget(['pm/cc-plugins/tasks/e.md'], ['group:0:todo', 'group:0:done'])).toBe('group:0:todo'))
   test('goes nowhere from an empty trail', () => expect(backTarget([], ['group:0:todo'])).toBe(null))
+})
+
+describe('closeGoesBack', () => {
+  test('goes back from a card', () => expect(closeGoesBack({ kind: 'person' }, 1)).toBe(true))
+  test('closes from the list', () => expect(closeGoesBack({ kind: 'person' }, 0)).toBe(false))
+  test('lets the plugin close a card', () => expect(closeGoesBack({ kind: 'plugin' }, 2)).toBe(false))
+  test('always closes on unload', () => expect(closeGoesBack({ kind: 'unload' }, 2)).toBe(false))
 })
