@@ -15,3 +15,10 @@ export function arrowMove(scroll: Scroll, view: ListView): string | null {
   if (index === 0 && scroll.by < 0) return QUERY_KEY
   return view.items[index + scroll.by] ?? null
 }
+
+// Enter in the filter hands the ring to the first matching row, or to the first heading when that group is folded.
+export function submitTarget(items: { key: string; kind: 'heading' | 'row' }[]): string | null {
+  const [first, second] = items
+  if (!first) return null
+  return first.kind === 'heading' && second?.kind === 'row' ? second.key : first.key
+}

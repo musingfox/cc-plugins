@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { arrowMove } from '../hooks/ring.ts'
+import { arrowMove, submitTarget } from '../hooks/ring.ts'
 
 describe('arrowMove', () => {
   const items = ['group:0:todo', 'row:a', 'row:b']
@@ -21,4 +21,12 @@ describe('arrowMove', () => {
     expect(move({ by: -1 }, null)).toBe(null)
   })
   test('enters the list from a toolbar button', () => expect(move({}, 'sort')).toBe('group:0:todo'))
+})
+
+describe('submitTarget', () => {
+  test('takes the first row under the first heading', () =>
+    expect(submitTarget([{ key: 'group:0:todo', kind: 'heading' }, { key: 'row:a', kind: 'row' }])).toBe('row:a'))
+  test('stays on a folded first heading', () =>
+    expect(submitTarget([{ key: 'group:0:done', kind: 'heading' }, { key: 'group:0:todo', kind: 'heading' }, { key: 'row:a', kind: 'row' }])).toBe('group:0:done'))
+  test('stays in the filter with nothing to take', () => expect(submitTarget([])).toBe(null))
 })
