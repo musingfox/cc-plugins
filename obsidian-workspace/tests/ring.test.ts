@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { arrowMove, submitTarget } from '../hooks/ring.ts'
+import { arrowMove, nextRing, submitTarget } from '../hooks/ring.ts'
 
 describe('arrowMove', () => {
   const items = ['group:0:todo', 'row:a', 'row:b']
@@ -29,4 +29,12 @@ describe('submitTarget', () => {
   test('stays on a folded first heading', () =>
     expect(submitTarget([{ key: 'group:0:done', kind: 'heading' }, { key: 'group:0:todo', kind: 'heading' }, { key: 'row:a', kind: 'row' }])).toBe('group:0:done'))
   test('stays in the filter with nothing to take', () => expect(submitTarget([])).toBe(null))
+})
+
+describe('nextRing', () => {
+  const held = { at: 'row:a', item: 'row:a' }
+  test('records the first list item the ring lands on', () => expect(nextRing({ at: null, item: null }, 'row:a')).toEqual(held))
+  test('keeps the last list item when the ring moves to a button', () => expect(nextRing(held, 'sort')).toEqual({ at: 'sort', item: 'row:a' }))
+  test('keeps the last list item when the ring lands on an engine stop', () => expect(nextRing(held, undefined)).toEqual({ at: null, item: 'row:a' }))
+  test('takes a heading as the last list item', () => expect(nextRing(held, 'group:0:done')).toEqual({ at: 'group:0:done', item: 'group:0:done' }))
 })

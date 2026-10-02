@@ -22,3 +22,10 @@ export function submitTarget(items: { key: string; kind: 'heading' | 'row' }[]):
   if (!first) return null
   return first.kind === 'heading' && second?.kind === 'row' ? second.key : first.key
 }
+
+export type Ring = { at: string | null; item: string | null }
+
+// `item` is the last list item the ring held, which survives the ring moving onto a toolbar button.
+export function nextRing(prev: Ring, element: string | undefined): Ring {
+  return { at: element ?? null, item: element?.startsWith('group:') || element?.startsWith('row:') ? element : prev.item }
+}
