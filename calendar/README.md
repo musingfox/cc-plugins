@@ -54,6 +54,7 @@ One line per event, soonest first, in the machine's time zone (`TZ` when set):
   `No events in the next N days`.
 - More events than the band holds end in a dim `… N more`. Every line is cut at the band's width.
 
+The band shares its space with any band another mod draws there (`/quota`, for one) instead of hiding it.
 The band's on/off state and N are kept in the plugin's store and read at session start.
 
 ## Tests

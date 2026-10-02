@@ -90,6 +90,8 @@ type Hook = (...args: any[]) => unknown
 export type WorldOptions = {
   store?: Record<string, unknown> | 'refuse'
   mcp?: Hook
+  // What the rest of the chain draws in the band: another plugin's tree; by default the engine's empty Box.
+  beneath?: unknown
 }
 
 // A stub world beneath the plugin: every $ call it makes is answered and recorded here.
@@ -115,6 +117,7 @@ export function world(on: any, options: WorldOptions = {}) {
         return { value: answer(EVENTS[e.args.calendarId] ?? {}) }
       }),
   )
+  on('ui.render', { component: 'AbovePrompt' }, () => options.beneath ?? { type: 'Box', children: [] })
   on('ui.invalidate', () => {
     state.invalidates += 1
     return { value: undefined }

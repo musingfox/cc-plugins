@@ -100,7 +100,7 @@ async function showBand($: any, on: boolean) {
 const DAY_COLOR = '#5b9cf5'
 const NEXT_COLOR = '#46a758'
 
-async function renderBand($: any, e: any) {
+async function renderBand($: any, e: any, beneath: unknown) {
   const { Box, Text, Link } = await $.ui.resolve(e)
   const linked = (text: string, href: string | null) => (href ? Link({ href, children: [text] }) : text)
   const tz = (await $.env.get('TZ')) || Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -121,6 +121,7 @@ async function renderBand($: any, e: any) {
     lines.push(Text({ wrap: 'truncate-end', children }))
   }
   if (hidden) lines.push(Text({ dimColor: true, children: [`… ${hidden} more`] }))
+  if (beneath) lines.push(beneath)
   return Box({ flexDirection: 'column', children: lines })
 }
 
@@ -164,6 +165,7 @@ export function register(on: On, options: { exclude_calendars?: string[] } = {})
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (!bandOn || e.props.hasSurvey) return next(e)
-    return renderBand($, e)
+    // The band is one instance: a tree that drops next(e) hides every other plugin's band.
+    return renderBand($, e, await next(e))
   })
 }

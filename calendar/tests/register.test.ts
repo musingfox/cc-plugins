@@ -7,20 +7,23 @@ function stringsIn(node: any): string[] {
   return [...(node.children ?? []), ...(node.props?.children ?? [])].flatMap(stringsIn)
 }
 
+// The band's rows that show: the empty Box the engine draws beneath the band takes none.
+function rowsOf(tree: any): any[] {
+  return (tree.props?.children ?? tree.children).filter(
+    (row: any) => !(row?.type === 'Box' && !(row.children ?? row.props?.children)?.length),
+  )
+}
+
 function linesOf(tree: any): string[] {
-  return (tree.props?.children ?? tree.children).map((line: any) => stringsIn(line).join(''))
+  return rowsOf(tree).map((line: any) => stringsIn(line).join(''))
 }
 
 const BENEATH = { type: 'Text', children: ['beneath'] }
 
-function beneath(on: any) {
-  on('ui.render', { component: 'AbovePrompt' }, () => BENEATH)
-}
 
 describe('/cal', () => {
   test('the band is off until /cal, and nothing is fetched while it is', async ($, on) => {
-    const w = world(on)
-    beneath(on)
+    const w = world(on, { beneath: BENEATH })
     await $.session.start(SESSION)
     await w.clock.settle()
     await w.clock.advance(900000)
@@ -46,8 +49,7 @@ describe('/cal', () => {
   })
 
   test('/cal again turns the band off', async ($, on) => {
-    const w = world(on)
-    beneath(on)
+    const w = world(on, { beneath: BENEATH })
     await $.session.start(SESSION)
     await $.command.run({ command: 'cal' })
     await w.clock.settle()
@@ -88,13 +90,12 @@ describe('/cal', () => {
   })
 
   test('a store that refuses leaves the band off at start and still toggles it', async ($, on) => {
-    const w = world(on, { store: 'refuse' })
-    beneath(on)
+    const w = world(on, { store: 'refuse', beneath: BENEATH })
     await $.session.start(SESSION)
     expect(await $.ui.render(BAND)).toEqual(BENEATH)
     await $.command.run({ command: 'cal' })
     await w.clock.settle()
-    expect(linesOf(await $.ui.render(BAND))).toEqual(BAND_LINES)
+    expect(linesOf(await $.ui.render(BAND))).toEqual([...BAND_LINES, 'beneath'])
   })
 })
 
@@ -241,10 +242,16 @@ describe('fetching', () => {
   })
 
   test('yields to a survey holding the band', async ($, on) => {
-    const w = world(on, { store: { band: true } })
-    beneath(on)
+    const w = world(on, { store: { band: true }, beneath: BENEATH })
     await $.session.start(SESSION)
     await w.clock.settle()
     expect(await $.ui.render({ ...BAND, props: { ...BAND.props, hasSurvey: true } })).toEqual(BENEATH)
+  })
+
+  test("stacks over another plugin's band instead of hiding it", async ($, on) => {
+    const w = world(on, { store: { band: true }, beneath: BENEATH })
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    expect(linesOf(await $.ui.render(BAND))).toEqual([...BAND_LINES, 'beneath'])
   })
 })
