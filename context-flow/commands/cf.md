@@ -1,5 +1,5 @@
 ---
-description: "Context-flow pipeline — contract-driven development with human-in-the-loop decision gating; Claude cf:implement agents build by default, OMP is an opt-in overflow"
+description: "Turn a goal into a contract-driven implementation, with a human deciding at each key gate. Use when the user asks to implement or build a feature whose scope is already settled, or to start work on a goal handed over by spiral."
 argument-hint: "<goal>"
 allowed-tools: [Agent, Read, Write, Bash, Glob, Grep, AskUserQuestion, Monitor]
 ---

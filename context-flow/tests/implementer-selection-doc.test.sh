@@ -13,9 +13,8 @@ registry=$(awk '/^## Agent Registry/ {p=1; next} p && /^###/ {exit} p' "$CFMD")
 desc=$(sed -n 2p "$CFMD")
 
 # T1
-assert_contains "$desc" 'cf:implement' "description names cf:implement"
-assert_contains "$desc" 'opt-in' "description calls OMP opt-in"
-assert_eq "0" "$(printf '%s\n' "$desc" | grep -cF 'OMP as default' || true)" "description no longer makes OMP the default"
+assert_contains "$desc" 'Use when' "description says when to use cf"
+assert_eq "0" "$(printf '%s\n' "$desc" | grep -cE 'cf:implement|OMP' || true)" "description leaves builder internals to the body"
 
 # T2
 assert_contains "$preflight" 'CF_IMPLEMENTER' "pre-flight reads CF_IMPLEMENTER"
