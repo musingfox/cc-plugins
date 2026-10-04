@@ -6,8 +6,8 @@
 #
 # Usage:   cf-pi-worktree.sh SESSION
 # Stdout:  WORK path
-# Appends REPO_ROOT, BASE_BRANCH, BASE_HEAD to $SESSION/env.sh on first
-# invocation (session-wide).
+# Writes REPO_ROOT, BASE_BRANCH, BASE_HEAD to $SESSION/env.sh each time it
+# creates the work area, replacing any earlier values.
 # Appends cleanup commands to $CLEANUP_SCRIPT: capture diff + remove
 # worktree. The cf branch is intentionally NOT deleted — it carries
 # the per-contract commit history the user keeps.
@@ -88,13 +88,15 @@ else
   echo "# scratch mode ($SESSION_BASENAME) -- no cleanup, $WORK retained for inspection" >> "$CLEANUP_SCRIPT"
 fi
 
-# Session-wide vars; append once.
-if ! grep -q '^REPO_ROOT=' "$session/env.sh" 2>/dev/null; then
-  {
-    echo "REPO_ROOT=\"$REPO_ROOT\""
-    echo "BASE_BRANCH=\"$BASE_BRANCH\""
-    echo "BASE_HEAD=\"$BASE_HEAD\""
-  } >> "$session/env.sh"
-fi
+# Rewritten on every creation, not appended once: a rolled-back shard keeps its
+# env.sh while its re-created worktree forks from today's HEAD, and a stale
+# BASE_HEAD would charge the host's newer commits to the shard.
+{
+  grep -vE '^(REPO_ROOT|BASE_BRANCH|BASE_HEAD)=' "$session/env.sh" 2>/dev/null || true
+  echo "REPO_ROOT=\"$REPO_ROOT\""
+  echo "BASE_BRANCH=\"$BASE_BRANCH\""
+  echo "BASE_HEAD=\"$BASE_HEAD\""
+} > "$session/env.sh.tmp"
+mv "$session/env.sh.tmp" "$session/env.sh"
 
 echo "$WORK"

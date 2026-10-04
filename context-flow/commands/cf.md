@@ -499,7 +499,7 @@ Read only the reply's first Summary bullet to branch:
 - `Status: PARTIAL-REPLAN (...)` → apply the revision and re-fan-out only affected shards:
   ```bash
   "$SCRIPTS/cf-pi-merge-revision.sh" "$SESSION" "$SESSION/contracts-revision-${ROUND}.json"
-  "$SCRIPTS/cf-pi-shard.sh"          "$SESSION"   # re-emits shards.json; affected shards get new env
+  "$SCRIPTS/cf-pi-shard.sh"          "$SESSION"   # re-emits shards.json and env; each shard keeps its worktree base
   # then re-fan-out only the affected shards on the flow's builder: the §3.2 Claude round (steps 2–5), or one background cf-pi-run.sh per affected shard id in a single message (§3.6)
   ```
 - `Status: REPLAN_REQUIRES_ROLLBACK (...)` → Plan declines partial-replan; the preserved interface itself is the problem. Bounded read of the rollback list:
