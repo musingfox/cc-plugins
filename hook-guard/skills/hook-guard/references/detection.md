@@ -35,6 +35,8 @@ Check via `command -v <tool>` (not `which`). Wrap in `set -euo pipefail`.
 
 **Go** — lint: `golangci-lint` / `staticcheck`. Format: `gofmt` (built-in) / `goimports`. Test: `go test` (built-in).
 
+**Syntax validation** — YAML needs `python3` with PyYAML (not in the standard library); TOML needs `python3` >= 3.11 (`tomllib`). macOS's bundled `/usr/bin/python3` (3.9) has neither, so the generated hook warns and skips those files instead of failing them.
+
 ## VCS Detection
 
 ```bash

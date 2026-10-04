@@ -23,12 +23,22 @@ staged_files() { git diff --cached --name-only --diff-filter=ACM; }
 warn() { echo "  ⚠ $1"; WARNINGS=$((WARNINGS + 1)); }
 fail() { echo "  ✗ $1"; ERRORS=$((ERRORS + 1)); }
 pass() { echo "  ✓ $1"; }
+# grep wrapper for checks: rc 0 = match, 1 = no match; rc > 1 (grep error) is recorded as a failure
+# and sets the calling check's local `found` (bash dynamic scope) so it does not also report a pass.
+match() {
+  local rc=0
+  grep "$@" &>/dev/null || rc=$?
+  if [ "$rc" -gt 1 ]; then fail "grep error (rc=$rc): grep $*"; found=1; fi
+  return "$rc"
+}
 
 # ... check functions here ...
 
 # --- Run ---
 echo "hook-guard: running pre-commit checks..."
-# ... call check functions ...
+# Call each enabled check directly, one per line (check_secrets, check_large_files, ...).
+# Every check returns 0 and records problems via fail/warn, so a finding never aborts
+# the hook under `set -e`; the summary below decides the exit code.
 
 echo ""
 if [ $ERRORS -gt 0 ]; then
@@ -52,23 +62,30 @@ check_secrets() {
     return
   fi
   local found=0
+  # POSIX ERE only: BSD grep on macOS has no -P. Entries prefixed "i:" match case-insensitively.
   local patterns=(
     'AKIA[0-9A-Z]{16}'
-    '(?i)(api[_-]?key|apikey)\s*[=:]\s*\S{8,}'
-    '(?i)(secret|password|passwd|token)\s*[=:]\s*\S{8,}'
+    'i:(api[_-]?key|apikey)[[:space:]]*[=:][[:space:]]*[^[:space:]]{8,}'
+    'i:(secret|password|passwd|token)[[:space:]]*[=:][[:space:]]*[^[:space:]]{8,}'
     'ghp_[A-Za-z0-9_]{36}'
     'sk-[A-Za-z0-9]{48}'
     'xox[bporas]-[A-Za-z0-9-]+'
   )
   for file in $(staged_files); do
     [ -f "$file" ] || continue
+    local diff; diff=$(git diff --cached -- "$file")
     for p in "${patterns[@]}"; do
-      if git diff --cached -- "$file" | grep -PE "$p" &>/dev/null; then
-        fail "Potential secret in $file (pattern: ${p:0:30}...)"; found=1
+      local opts=(-qE) re=$p rc=0
+      case "$p" in i:*) opts=(-qiE); re=${p#i:} ;; esac
+      grep "${opts[@]}" -e "$re" <<<"$diff" 2>/dev/null || rc=$?
+      if [ "$rc" -eq 0 ]; then
+        fail "Potential secret in $file (pattern: ${re:0:30}...)"; found=1
+      elif [ "$rc" -gt 1 ]; then
+        fail "Secret scan error (grep rc=$rc) on $file"; found=1
       fi
     done
   done
-  [ $found -eq 0 ] && pass "No secrets detected (regex)"
+  if [ "$found" -eq 0 ]; then pass "No secrets detected (regex)"; fi
 }
 
 check_private_keys() {
@@ -79,7 +96,7 @@ check_private_keys() {
       fail "Private key file staged: $file"; found=1 ;;
     esac
   done
-  [ $found -eq 0 ] && pass "No private key files"
+  if [ "$found" -eq 0 ]; then pass "No private key files"; fi
 }
 
 check_sensitive_paths() {
@@ -91,7 +108,7 @@ check_sensitive_paths() {
         fail "Sensitive file staged: $file"; found=1 ;;
     esac
   done
-  [ $found -eq 0 ] && pass "No sensitive files"
+  if [ "$found" -eq 0 ]; then pass "No sensitive files"; fi
 }
 ```
 
@@ -109,7 +126,7 @@ check_large_files() {
       found=1
     fi
   done
-  [ $found -eq 0 ] && pass "No large files"
+  if [ "$found" -eq 0 ]; then pass "No large files"; fi
 }
 
 check_merge_conflicts() {
@@ -117,11 +134,11 @@ check_merge_conflicts() {
   local found=0
   for file in $(staged_files); do
     [ -f "$file" ] || continue
-    if grep -nE '^(<{7}|={7}|>{7})\s' "$file" &>/dev/null; then
+    if match -E '^(<{7}|={7}|>{7})[[:space:]]' "$file"; then
       fail "Merge conflict markers in $file"; found=1
     fi
   done
-  [ $found -eq 0 ] && pass "No merge conflict markers"
+  if [ "$found" -eq 0 ]; then pass "No merge conflict markers"; fi
 }
 
 # Mixed CRLF+LF; skip binaries
@@ -131,11 +148,11 @@ check_line_endings() {
   for file in $(staged_files); do
     [ -f "$file" ] || continue
     file --mime "$file" 2>/dev/null | grep -q "binary" && continue
-    if grep -PlU '\r\n' "$file" &>/dev/null && grep -PlU '(?<!\r)\n' "$file" &>/dev/null; then
+    if match -q $'\r$' "$file" && match -qv $'\r$' "$file"; then
       warn "Mixed line endings (CRLF + LF) in $file"; found=1
     fi
   done
-  [ $found -eq 0 ] && pass "Consistent line endings"
+  if [ "$found" -eq 0 ]; then pass "Consistent line endings"; fi
 }
 
 check_trailing_whitespace() {
@@ -144,11 +161,11 @@ check_trailing_whitespace() {
   for file in $(staged_files); do
     [ -f "$file" ] || continue
     file --mime "$file" 2>/dev/null | grep -q "binary" && continue
-    if grep -nE '\s+$' "$file" &>/dev/null; then
+    if match -E '[[:space:]]+$' "$file"; then
       warn "Trailing whitespace in $file"; found=1
     fi
   done
-  [ $found -eq 0 ] && pass "No trailing whitespace"
+  if [ "$found" -eq 0 ]; then pass "No trailing whitespace"; fi
 }
 
 check_eof_newline() {
@@ -161,7 +178,7 @@ check_eof_newline() {
       warn "No newline at end of $file"; found=1
     fi
   done
-  [ $found -eq 0 ] && pass "All files end with newline"
+  if [ "$found" -eq 0 ]; then pass "All files end with newline"; fi
 }
 
 check_broken_symlinks() {
@@ -172,7 +189,7 @@ check_broken_symlinks() {
       fail "Broken symlink: $file"; found=1
     fi
   done
-  [ $found -eq 0 ] && pass "No broken symlinks"
+  if [ "$found" -eq 0 ]; then pass "No broken symlinks"; fi
 }
 ```
 
@@ -185,13 +202,13 @@ check_no_commit_markers() {
   for file in $(staged_files); do
     [ -f "$file" ] || continue
     file --mime "$file" 2>/dev/null | grep -q "binary" && continue
-    if grep -nE "$NO_COMMIT_MARKERS" "$file" &>/dev/null; then
+    if match -E "$NO_COMMIT_MARKERS" "$file"; then
       fail "No-commit marker in $file:"
       echo "    $(grep -nE "$NO_COMMIT_MARKERS" "$file" | head -3)"
       found=1
     fi
   done
-  [ $found -eq 0 ] && pass "No commit markers found"
+  if [ "$found" -eq 0 ]; then pass "No commit markers found"; fi
 }
 
 check_syntax_validation() {
@@ -207,14 +224,20 @@ check_syntax_validation() {
           python3 -c "import json; json.load(open('$file'))" 2>/dev/null || { fail "Invalid JSON: $file"; found=1; }
         fi ;;
       *.yaml|*.yml)
-        command -v python3 &>/dev/null && \
-          { python3 -c "import yaml; yaml.safe_load(open('$file'))" 2>/dev/null || { fail "Invalid YAML: $file"; found=1; }; } ;;
+        if python3 -c "import yaml" &>/dev/null; then
+          python3 -c "import yaml; yaml.safe_load(open('$file'))" 2>/dev/null || { fail "Invalid YAML: $file"; found=1; }
+        else
+          warn "Skipped YAML check for $file (needs python3 with PyYAML)"
+        fi ;;
       *.toml)
-        command -v python3 &>/dev/null && \
-          { python3 -c "import tomllib; tomllib.load(open('$file','rb'))" 2>/dev/null || { fail "Invalid TOML: $file"; found=1; }; } ;;
+        if python3 -c "import tomllib" &>/dev/null; then
+          python3 -c "import tomllib; tomllib.load(open('$file','rb'))" 2>/dev/null || { fail "Invalid TOML: $file"; found=1; }
+        else
+          warn "Skipped TOML check for $file (needs python3 >= 3.11 for tomllib)"
+        fi ;;
     esac
   done
-  [ $found -eq 0 ] && pass "File syntax valid"
+  if [ "$found" -eq 0 ]; then pass "File syntax valid"; fi
 }
 
 # Warn when a manifest changes but its lock file isn't staged
@@ -235,28 +258,34 @@ check_lock_sync() {
     warn "Cargo.toml changed but Cargo.lock not staged"; found=1
   fi
 
-  [ $found -eq 0 ] && pass "Lock files consistent"
+  if [ "$found" -eq 0 ]; then pass "Lock files consistent"; fi
 }
 ```
 
 ## Quality checks
 
-Substitute the detected tool command. If no tool detected for a category, omit the function — do not generate a no-op.
+Substitute the detected tool command on the placeholder line; keep the `if … then pass … else fail … fi` around it so a failing tool is recorded instead of aborting the hook. If no tool detected for a category, omit the function — do not generate a no-op.
 
 ```bash
 check_lint() {
   echo "Running lint..."
-  # [LINT_COMMAND]
+  if
+    # [LINT_COMMAND]
+  then pass "Lint passed"; else fail "Lint failed"; fi
 }
 
 check_format() {
   echo "Checking format..."
-  # [FORMAT_CHECK_COMMAND]  (check mode, not write)
+  if
+    # [FORMAT_CHECK_COMMAND]  (check mode, not write)
+  then pass "Format passed"; else fail "Format failed"; fi
 }
 
 check_test() {
   echo "Running tests..."
-  # [TEST_COMMAND]
+  if
+    # [TEST_COMMAND]
+  then pass "Test passed"; else fail "Test failed"; fi
 }
 ```
 
@@ -267,7 +296,7 @@ check_test() {
 | Python | `ruff check .` / `flake8 .` | `ruff format --check .` / `black --check .` | `pytest` / `python -m pytest` |
 | JS/TS | `npx eslint .` / `npx biome lint .` | `npx prettier --check .` / `npx biome format .` | `npx vitest run` / `npx jest` / `npm test` |
 | Rust | `cargo clippy -- -D warnings` | `cargo fmt -- --check` | `cargo test` |
-| Go | `golangci-lint run` / `go vet ./...` | `gofmt -l . \| grep -q .` | `go test ./...` |
+| Go | `golangci-lint run` / `go vet ./...` | `out=$(gofmt -l .) && [ -z "$out" ]` | `go test ./...` |
 
 ## Customization
 
