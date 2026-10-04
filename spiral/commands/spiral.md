@@ -1,5 +1,5 @@
 ---
-description: "Spiral — narrow a vague question into an implementation-sized goal, one layer at a time: diverge into the decisions a layer can settle, you answer a round of them, probes walk what you left open, converge into a plan or milestone, a prototype builds one throwaway thing when only a built thing can answer it, then dig another layer, go back up, or stop. Produces a goal to hand to /cf; ships no code."
+description: "Narrow a vague question, one layer at a time, into a goal you can hand to /cf to implement; writes no code. Use when the user is not yet sure what to build, asks to think a direction through (\"help me think this through\", \"I'm not sure what to do here\", \"how would this idea actually land?\"), or brings a fuzzy goal that needs deciding before any code."
 argument-hint: "<the question or vague goal>"
 allowed-tools: [Agent, Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion]
 ---
