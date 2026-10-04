@@ -5,14 +5,14 @@ description: >-
   "run this on a cheap model", "fan out these tasks in parallel", "save tokens on this
   grunt work", or when the main thread is about to write a builder brief that hands
   work to a background worker. Offload dispatch to cheap/fast pi models via
-  pi-agent.sh — name-addressed sub-agent verbs (start/send/poll/peek/ls/stop/watch)
+  the pi-agent script — name-addressed sub-agent verbs (start/send/poll/peek/ls/stop/watch)
   over background pi workers with idempotent poll, worktree isolation, and distilled
   reports. Main loads this to write the offload usage it embeds in a builder brief.
 ---
 
 # pi-dispatch — offload usage
 
-`scripts/pi-agent.sh` is the name-addressed unified entry point over the pi
+`${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh` is the name-addressed unified entry point over the pi
 worker primitives. The registry is the filesystem: `$PI_RUNS_DIR/agents/<NAME>`
 symlinks to the run's RUNDIR. Main (the orchestrator) loads this usage and
 embeds it verbatim into a builder brief when offloading; the builder operates
@@ -34,7 +34,7 @@ it, declare the file at launch; otherwise the write/edit fence refuses it, and
 on macOS so does the sandbox outside its allowed directories:
 
 ```bash
-PI_CWD=<worktree> PI_WRITABLE_FILES=/abs/path/verdict.md pi-agent.sh start NAME BRIEF
+PI_CWD=<worktree> PI_WRITABLE_FILES=/abs/path/verdict.md ${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh start NAME BRIEF
 ```
 
 `PI_WRITABLE_FILES` takes colon-separated absolute file paths whose directory
@@ -55,8 +55,8 @@ check happens inside the worker's own session instead.
 
 ## Control plane
 
-`pi-agent.sh` is the control plane: cf's own scripts sit on the same
-primitives (they call `pi-dispatch.sh` directly). A dispatched worker is
+`${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh` is the control plane: cf's own scripts sit on the same
+primitives (they call `${CLAUDE_PLUGIN_ROOT}/scripts/pi-dispatch.sh` directly). A dispatched worker is
 work handed off, not a pane to watch. Running another harness (grok, codex,
 omp) in a visible pane is a different activity with its own tooling and is not
 part of this workflow.
@@ -65,27 +65,27 @@ part of this workflow.
 
 | verb | command | purpose |
 |---|---|---|
-| dispatch a worker | `pi-agent.sh start NAME BRIEF` | launch a worker in the background |
-| follow-up turn | `pi-agent.sh send NAME TEXT_OR_FILE` | resume a finished worker's session with context (SendMessage semantics) |
-| status poll | `pi-agent.sh poll NAME` | one-shot one-line status: `RUNNING` or a terminal `STATUS=OK\|FAIL …` |
-| activity snapshot | `pi-agent.sh peek NAME` | one-shot agent-view snapshot of a live run |
-| agent panel | `pi-agent.sh ls` | list registered agents + their state |
-| cancel | `pi-agent.sh stop NAME` | idempotent group-kill + unregister |
-| background notifications | `pi-agent.sh watch INTERVAL NAME…` | BLOCKING; polls the NAMED agents only, prints one line per meaningful state change, exits when none is in flight |
+| dispatch a worker | `${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh start NAME BRIEF` | launch a worker in the background |
+| follow-up turn | `${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh send NAME TEXT_OR_FILE` | resume a finished worker's session with context (SendMessage semantics) |
+| status poll | `${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh poll NAME` | one-shot one-line status: `RUNNING` or a terminal `STATUS=OK\|FAIL …` |
+| activity snapshot | `${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh peek NAME` | one-shot agent-view snapshot of a live run |
+| agent panel | `${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh ls` | list registered agents + their state |
+| cancel | `${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh stop NAME` | idempotent group-kill + unregister |
+| background notifications | `${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh watch INTERVAL NAME…` | BLOCKING; polls the NAMED agents only, prints one line per meaningful state change, exits when none is in flight |
 
 ## How main uses this
 
 1. Decompose the work into self-contained briefs (one observable outcome
    each). For code-writing tasks, create one worktree per task with
-   `pi-worktree.sh create`, put its ABSOLUTE path in the brief, and launch
-   with `PI_CWD=<worktree> pi-agent.sh start …`. The brief tells the worker
+   `${CLAUDE_PLUGIN_ROOT}/scripts/pi-worktree.sh create`, put its ABSOLUTE path in the brief, and launch
+   with `PI_CWD=<worktree> ${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh start …`. The brief tells the worker
    where to work; only `PI_CWD` makes it start there, and it is what arms the
    worktree fence (git shim + write/edit extension). A fresh dispatch
    without it is refused (exit 2): before that, a bare `git commit` from
    the worker landed in whatever directory main ran from. To run a worker
    in the current directory on purpose, say so with `PI_CWD="$PWD"`.
 2. Embed this usage section + the per-task brief into a builder dispatch.
-   The builder runs `pi-agent.sh start` per task and `pi-agent.sh watch` as
+   The builder runs `${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh start` per task and `${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh watch` as
    its main loop, and runs each worker's acceptance check when it settles.
 3. Terminal verdicts persist in the RUNDIR and replay on re-poll; raw stream
    is kept as `pi.stream.jsonl`, distilled final text as `result.md`.
@@ -101,15 +101,15 @@ part of this workflow.
 Never poll from a Bash loop in the main thread — every poll is a tool call.
 Start the workers, then arm ONE blocking watch:
 
-From main, run `pi-agent.sh watch` as a background task (`Bash(run_in_background: true)`) and follow it with Monitor; a sub-agent cannot be woken that way, so it runs `watch` in the foreground.
+From main, run `${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh watch` as a background task (`Bash(run_in_background: true)`) and follow it with Monitor; a sub-agent cannot be woken that way, so it runs `watch` in the foreground.
 
 ```
-Bash(command: "pi-agent.sh watch 15 NAME1 NAME2 …", run_in_background: true)
+Bash(command: "${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh watch 15 NAME1 NAME2 …", run_in_background: true)
 ```
 
 The command exits when nothing is in flight; the completion notification
 carries one line per state change (verified: main is woken, no polling). A
-sub-agent with a single worker can use `pi-run.sh` instead.
+sub-agent with a single worker can use `${CLAUDE_PLUGIN_ROOT}/scripts/pi-run.sh` instead.
 
 A terminal line from a run whose stream carries usage includes
 `model=<provider/model> cost=$<sum> turns=<n>` summed over the whole run; the
@@ -140,10 +140,10 @@ reported with — they share the wall. On either tag:
 2. Roll back each aborted worker's half-done edits in its worktree:
    `git -C <WT> checkout -- . && git -C <WT> clean -fd`, and if the worker
    was allowed to commit, `git -C <WT> reset --hard <base_ref>` (the ref
-   `pi-worktree.sh create` was given). A worker's partial state is not
+   `${CLAUDE_PLUGIN_ROOT}/scripts/pi-worktree.sh create` was given). A worker's partial state is not
    reviewable; the fallback starts clean.
 3. Re-dispatch the SAME brief, minus this usage section, to a Claude
-   builder in self-do mode (`docs/main-orchestration.md` §6) on the same
+   builder in self-do mode (`${CLAUDE_PLUGIN_ROOT}/docs/main-orchestration.md` §6) on the same
    worktree. One shot: if that fails too, the task is failed.
 
 ## Routing
@@ -152,8 +152,8 @@ Routing is one environment variable, `PI_DISPATCH_CMD`: the agent command,
 expanded by bash like a shell line, ahead of the dispatch's own flags:
 
 ```bash
-PI_DISPATCH_CMD='pi --model openai-codex/gpt-5.6-terra' pi-agent.sh start NAME BRIEF
-PI_DISPATCH_CMD='env PI_CODING_AGENT_DIR=$HOME/.omp/agent omp --model cursor/grok-4.7-medium' pi-agent.sh start NAME BRIEF
+PI_DISPATCH_CMD='pi --model openai-codex/gpt-5.6-terra' ${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh start NAME BRIEF
+PI_DISPATCH_CMD='env PI_CODING_AGENT_DIR=$HOME/.omp/agent omp --model cursor/grok-4.7-medium' ${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh start NAME BRIEF
 ```
 
 It is required: unset, a fresh dispatch exits 2. A command without `--model`
@@ -165,7 +165,7 @@ it before assuming a model.
 
 ### When it is missing: set it up with the human
 
-When `pi-probe.sh` prints `ERROR:PI_DISPATCH_CMD is not set`, or an `ERROR:`
+When `${CLAUDE_PLUGIN_ROOT}/scripts/pi-probe.sh` prints `ERROR:PI_DISPATCH_CMD is not set`, or an `ERROR:`
 naming a retired variable, do not dispatch and do not fall back silently:
 
 1. See what is installed: `command -v pi omp`. Use the absolute paths it
@@ -176,13 +176,13 @@ naming a retired variable, do not dispatch and do not fall back silently:
    for omp (its own agent dir, under `~/.omp` so the sandbox admits it).
    When a retired variable is set, offer its translation first
    (`PI_PROVIDER=a PI_MODEL=b` → `--model a/b`, `PI_BIN` → the binary).
-3. Probe the chosen command inline: `PI_DISPATCH_CMD='<choice>' pi-probe.sh`.
+3. Probe the chosen command inline: `PI_DISPATCH_CMD='<choice>' ${CLAUDE_PLUGIN_ROOT}/scripts/pi-probe.sh`.
    Not `OK` → show the line and ask again.
 4. Ask whether to keep it. On yes, edit `~/.claude/settings.json`: set
    `env.PI_DISPATCH_CMD` to the choice and delete the retired keys. Write
    `$HOME` literally; bash expands it at launch. It takes effect in the next
    session, so for this one prefix `PI_DISPATCH_CMD='<choice>'` on every
-   `pi-agent.sh` and `pi-probe.sh` call.
+   `${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh` and `${CLAUDE_PLUGIN_ROOT}/scripts/pi-probe.sh` call.
 
 The command is recorded per run and replayed on resume, so `send` keeps the
 worker on the binary it started with, and the session keeps its model.
@@ -193,4 +193,4 @@ is no ranked list to defer to, so that judgement is the dispatcher's.
 ## Prerequisites
 
 `pi` installed and authenticated (`pi` → `/login`), `jq`, `git` (for
-worktrees). Probe with `pi-probe.sh` before first dispatch in a session.
+worktrees). Probe with `${CLAUDE_PLUGIN_ROOT}/scripts/pi-probe.sh` before first dispatch in a session.
