@@ -54,9 +54,7 @@ agent-browser/
 │   └── plugin.json
 ├── skills/
 │   ├── agent-browser/
-│   │   ├── SKILL.md
-│   │   └── references/
-│   │       └── commands.md
+│   │   └── SKILL.md
 │   ├── playwright/
 │   │   ├── SKILL.md
 │   │   └── references/

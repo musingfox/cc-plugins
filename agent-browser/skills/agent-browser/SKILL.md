@@ -61,9 +61,9 @@ open URL → snapshot → read refs → interact → re-snapshot → repeat
 | `uncheck` | `agent-browser uncheck @eN` | Uncheck checkbox |
 | `hover` | `agent-browser hover @eN` | Hover over element |
 | `press` | `agent-browser press <key>` | Press keyboard key |
-| `scroll` | `agent-browser scroll <dir> <amount>` | Scroll page |
+| `scroll` | `agent-browser scroll <dir> [pixels]` | Scroll page (default 300px) |
 | `screenshot` | `agent-browser screenshot [--annotate]` | Capture screenshot |
-| `set headers` | `agent-browser set headers '{...}'` | Set request headers |
+| `open --headers` | `agent-browser open <url> --headers '{...}'` | Send headers to that URL's origin only |
 
 ## Snapshot Modes
 
@@ -95,8 +95,9 @@ Combine flags freely: `agent-browser snapshot -i -c -d 3` for compact, shallow, 
 - Combinations: `press Control+a`, `press Control+c`.
 
 ### Scrolling
-- **`scroll down 3`** — Scroll down 3 viewport heights.
-- **`scroll up 1`** — Scroll up 1 viewport height.
+- **`scroll down 500`** — Scroll down 500 pixels. The amount is in pixels (default 300).
+- **`scroll up 500`** — Scroll up 500 pixels.
+- **`scrollintoview @eN`** — Scroll a specific element into view.
 - Scroll to reveal off-screen elements before interacting with them.
 
 ## Screenshots
@@ -122,13 +123,13 @@ When uncertain, snapshot. The cost of an extra snapshot is far less than using a
 
 ## Headers and Authentication
 
-Set custom headers for authenticated pages:
+Pass credentials with `open --headers`, which sends them only to that URL's origin:
 
 ```bash
-agent-browser set headers '{"Authorization": "Bearer <token>", "Cookie": "session=abc123"}'
+agent-browser open <url> --headers '{"Authorization": "Bearer <token>"}'
 ```
 
-Headers persist for the browser session and apply to matching domains. Set headers **before** navigating to authenticated pages.
+Never put credentials in `set headers`: it is a global setting that applies to every domain, so tokens and cookies would reach every third-party origin the page requests.
 
 ## Best Practices
 
@@ -141,7 +142,6 @@ Headers persist for the browser session and apply to matching domains. Set heade
 
 ## Additional Resources
 
-### Reference Files
+### Command Help
 
-For detailed command documentation with all flags and usage examples:
-- **`references/commands.md`** — Complete command reference with flag details and worked examples
+For full flags and examples of any command, run `agent-browser <command> --help`.

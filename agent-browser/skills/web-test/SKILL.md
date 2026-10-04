@@ -33,7 +33,7 @@ Investigation checklist:
 2. **Interactive inventory** — `snapshot -i` to list all interactive elements with refs.
 3. **Section focus** — `snapshot -s ".section"` to isolate specific areas of interest.
 4. **Interaction test** — Click buttons, fill forms, navigate links. Re-snapshot after each action to verify state changes.
-5. **Scroll exploration** — `scroll down N` then re-snapshot to find below-fold content.
+5. **Scroll exploration** — `scroll down 500` (pixels) or `scrollintoview @eN`, then re-snapshot to find below-fold content.
 6. **Annotated verification** — `screenshot --annotate` to visually confirm ref-to-element mapping.
 
 **Record every interaction step** — these become the basis for test cases in Phase 4.
