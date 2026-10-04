@@ -171,3 +171,35 @@ describe('feedback round mode', () => {
         expect(q.choice).toEqual(['# leave empty']);
     });
 });
+
+// The recipe doc's templates are what agents copy; parse them as written.
+describe('feedback recipe templates parse clean', () => {
+    const doc = readFileSync(join(import.meta.dir, '..', 'skills', 'viz-render',
+        'references', 'recipes', 'feedback.md'), 'utf-8');
+    const blocks = [...doc.matchAll(/```markdown\n(---\n[\s\S]*?\n---\n[\s\S]*?)```/g)]
+        .map(b => b[1]);
+
+    test('templates found: single, round, worked example', () => {
+        expect(blocks.length).toBe(3);
+    });
+
+    test('single-question template: answers empty, labels clean', () => {
+        const m = M.parse(blocks[0]);
+        expect(m.fm.choice).toBe('');
+        expect(m.fm.notes).toBe('');
+        for (const o of M.options(m)) expect(o).not.toContain('#');
+        for (const v of Object.values(m.fm)) expect(v).not.toMatch(/#|\(/);
+    });
+
+    test('round template: multi true, answers empty, labels clean', () => {
+        const m = M.parse(blocks[1]);
+        const [q1, q2] = M.questions(m);
+        expect(q1.multi).toBe(true);
+        expect(q1.choice).toEqual([]);
+        expect(q1.notes).toBe('');
+        expect(q2.choice).toEqual([]);
+        expect(m.fm.notes).toBe('');
+        for (const q of [q1, q2]) for (const o of q.options) expect(o).not.toContain('#');
+        for (const v of Object.values(m.fm)) expect(v).not.toMatch(/#|\(/);
+    });
+});
