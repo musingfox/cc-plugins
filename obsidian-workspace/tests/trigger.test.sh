@@ -15,5 +15,5 @@ n=$(grep -c '^description:' "$skill" || true)
 n=$(grep '^description:' "$skill" | grep -cF 'Requires `.obsidian.yaml`' || true)
 [ "$n" -eq 1 ] || fail "T3: description must keep Requires \`.obsidian.yaml\`"
 
-n=$(awk '/^## Operations/,/^### ADR numbering/' "$skill" | grep -c '^- \*\*To tickets\*\*' || true)
+n=$(awk '/^## Operations/,/^## Relations/' "$skill" | grep -c '^- \*\*To tickets\*\*' || true)
 [ "$n" -eq 1 ] || fail "T4: Operations must have To tickets bullet, got $n"

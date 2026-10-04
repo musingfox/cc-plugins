@@ -1,6 +1,6 @@
 ---
 name: init
-description: Interactively create `.obsidian.yaml`, install starter templates (task / doc / adr), bootstrap the project's vault workspace, migrate a pre-0.9 layout, and regenerate a dashboard that is missing a template view. Triggers via `/obw:init`, on "migrate my obw vault" or "upgrade my obw vault", or when another obw skill reports missing config.
+description: Interactively create `.obsidian.yaml`, install starter templates (task / doc), bootstrap the project's vault workspace, migrate a pre-0.9 layout, and regenerate a dashboard that is missing a template view. Triggers via `/obw:init`, on "migrate my obw vault" or "upgrade my obw vault", or when another obw skill reports missing config.
 ---
 
 # init — Initialize Obsidian Workspace
@@ -31,7 +31,7 @@ Run everything directly in the main context — the flow is interactive (`AskUse
    ```
    - If `.obsidian/templates.json` is missing → tell the user to enable the **Templates** core plugin in Obsidian, then re-run `/obw:init`. Stop.
    - Empty `TF` means vault root; otherwise `mkdir -p "$VAULT_PATH/$TF"`.
-   - For each of `task.md`, `doc.md`, `adr.md`:
+   - For each of `task.md`, `doc.md`:
      ```bash
      [ -e "$VAULT_PATH/$TF/task.md" ] || cp "${CLAUDE_PLUGIN_ROOT}/templates/task.md" "$VAULT_PATH/$TF/task.md"
      ```
@@ -79,11 +79,11 @@ Return a summary in this shape. On the keep-config path, the first line reads `.
 
 ```
 .obsidian.yaml created (vault=<NAME>, project=<PROJ>).
-Templates installed to <TF>/: task.md, doc.md, adr.md (only the missing ones).
+Templates installed to <TF>/: task.md, doc.md (only the missing ones).
 Workspace ready at pm/<PROJ>/: tasks/, docs/, dashboard.base.
 Migrated: <N> notes moved to tasks/archive/, <N> titles backfilled, dashboards regenerated. (omit if nothing migrated)
 
 Next:
   /obw:jot <text>        — quick capture to today's daily note, or a long-form note
-  /obw:pm                — task / doc / ADR management
+  /obw:pm                — task / doc management
 ```

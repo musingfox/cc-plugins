@@ -10,13 +10,13 @@ Plugin identifier: `obw` (skills invoked as `/obw:<name>` or via natural languag
 |-------|---------|
 | `/obw:init` | Pick a vault, write `.obsidian.yaml`, install starter templates, bootstrap the project workspace, migrate an older layout |
 | `/obw:jot <text>` | Quick capture (timestamped bullet to today's daily note) or long-form note — triages by input shape |
-| `/obw:pm [intent]` | Task / document / ADR lifecycle, project-scoped; split a spec into blocking tickets |
+| `/obw:pm [intent]` | Task / document lifecycle, project-scoped; split a spec into blocking tickets |
 
 ## How It Works
 
 - **Vault I/O** goes through the `obsidian` CLI, run directly in the main context (no sub-agent). This plugin does not duplicate CLI syntax; it defers to the official `obsidian:obsidian-cli` skill and `obsidian help`.
 - **Daily notes** use Obsidian's **Daily Notes** core plugin (folder / filename / template). Quick capture calls `daily:append`.
-- **Templates** (`task`, `doc`, `adr`) live in your vault's Obsidian Templates folder. On `/obw:init` the plugin copies starter files from `templates/` only if the same name doesn't already exist — it never overwrites your edits.
+- **Templates** (`task`, `doc`) live in your vault's Obsidian Templates folder. On `/obw:init` the plugin copies starter files from `templates/` only if the same name doesn't already exist — it never overwrites your edits.
 - **Dashboards** are **Obsidian Bases** (`.base` files — core in Obsidian 1.9+) generated from plugin-internal templates via shell substitution, so contents never enter Claude's context.
 
 ## Issue Pane
@@ -44,7 +44,7 @@ The pane needs Claude Code 2.1.287 or later, where Claude Mods are on by default
 - Official `obsidian` plugin (from the `obsidian-skills` marketplace) — declared as a plugin dependency, so it auto-installs with this plugin as long as that marketplace is added (`claude plugin marketplace add`)
 - [Obsidian](https://obsidian.md) app running (headless CLI also works)
 - Obsidian community plugin **`obsidian-cli`** installed and enabled. The plugin's name is `obsidian-cli` but the executable it installs is `obsidian` (invoked as `obsidian vault=<name> ...`). This is **not** the unrelated standalone `obsidian-cli` binary by Yakitrak.
-- **Templates** core plugin enabled (required for `/obw:pm` — `task` / `doc` / `adr` templates)
+- **Templates** core plugin enabled (required for `/obw:pm` — `task` / `doc` templates)
 - **Daily Notes** core plugin enabled (required for `/obw:jot` quick capture)
 - **Bases** core plugin enabled (required only for `/obw:pm` dashboards — bundled in Obsidian 1.9+)
 - [uv](https://docs.astral.sh/uv/) (optional; lets the `/issue` pane draw Mermaid blocks as text diagrams through `uvx termaid@0.9.0` — without it they show as code blocks)
@@ -103,7 +103,7 @@ pm/
     ├── dashboard.base    # Project dashboard (Bases)
     ├── tasks/            # Active tasks
     │   └── archive/      # Completed tasks
-    └── docs/             # Docs + ADRs
+    └── docs/             # Docs
 ```
 
 Every project gets `tasks/`, `docs/`, and `dashboard.base` — `/obw:init` creates all three up front, so a project is never a bare folder.
@@ -114,7 +114,7 @@ A plugin update can add dashboard views. Run `/obw:pm refresh dashboard` to brin
 
 ## Filenames
 
-All notes are kebab-cased (`Implement Auth` → `implement-auth.md`), for both `/obw:jot` notes and `/obw:pm` tasks / docs / ADRs. Because Obsidian's `{{title}}` resolves to the filename, the human-readable title lives in the `title` property — that is what the dashboards display.
+All notes are kebab-cased (`Implement Auth` → `implement-auth.md`), for both `/obw:jot` notes and `/obw:pm` tasks / docs. Because Obsidian's `{{title}}` resolves to the filename, the human-readable title lives in the `title` property — that is what the dashboards display.
 
 ## Property Schema
 
@@ -122,7 +122,6 @@ Dashboards and searches depend on these frontmatter fields. If you edit the inst
 
 - **Task** — `title`, `type: task`, `status` (`todo` / `in-progress` / `blocked` / `done`), `priority` (`high` / `medium` / `low`), `project`, `due` (date), `tags` (list), `parent` (link), `blocked_by` (list of links), `related` (list of links), `created`, `completed`
 - **Doc** — `title`, `type: doc`, `project`, `created`, `updated`
-- **ADR** — `title`, `type: adr`, `project`, `status` (`proposed` / `accepted` / `deprecated` / `superseded`), `created`, `deciders`
 
 ## Task Relations
 
@@ -136,7 +135,6 @@ Only one direction is stored. What a task *blocks*, and what its subtasks are, c
 /obw:jot #worklog 完成 API 重構 PR，等 review
 /obw:jot API Redesign Proposal --folder Architecture --tag design
 /obw:pm add task implement-auth, high priority, due 2026-05-01
-/obw:pm create adr about switching to SQLite
 /obw:pm implement-auth is blocked by db-migration
 /obw:pm implement-auth is done, archive it
 /obw:pm split this spec into tickets

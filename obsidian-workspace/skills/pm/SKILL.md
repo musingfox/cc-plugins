@@ -1,11 +1,11 @@
 ---
 name: pm
-description: Obsidian Workspace PM — tasks, documents, and ADRs in your Obsidian vault. Triggers on task/doc/ADR lifecycle requests ("add a task", "create an ADR", "archive X", "list in-progress tasks", "refresh dashboard", "split this spec into tickets") and via `/obw:pm`. Requires `.obsidian.yaml` with a `pm.project` section.
+description: Obsidian Workspace PM — tasks and documents in your Obsidian vault. Triggers on task/doc lifecycle requests ("add a task", "create a doc", "archive X", "list in-progress tasks", "refresh dashboard", "split this spec into tickets") and via `/obw:pm`. Requires `.obsidian.yaml` with a `pm.project` section. ADRs belong to the adr plugin.
 ---
 
 # pm — Obsidian Project Management
 
-Run the `obsidian` CLI directly — no sub-agent. Before any CLI call, invoke the `obsidian:obsidian-cli` skill to load exact syntax — never run `obsidian help`/`--help` to discover it. This skill owns only the PM conventions: folder layout, template names, property schema, ADR numbering, and dashboard generation.
+Run the `obsidian` CLI directly — no sub-agent. Before any CLI call, invoke the `obsidian:obsidian-cli` skill to load exact syntax — never run `obsidian help`/`--help` to discover it. This skill owns only the PM conventions: folder layout, template names, property schema, and dashboard generation.
 
 **CLI gotcha**: `file=` resolves like a wikilink — bare note name only, no path, no `.md`. Use `path=` for vault-root-relative paths. If a command returns `File not found` after a `create`, fix the parameter — never re-run `create` (it makes `name 1.md` duplicates).
 
@@ -29,7 +29,7 @@ pm/
 │   ├── dashboard.base   # project dashboard
 │   ├── tasks/           # active tasks
 │   │   └── archive/     # completed tasks
-│   └── docs/            # docs + ADRs
+│   └── docs/            # docs
 └── dashboard.base       # cross-project dashboard (optional)
 ```
 
@@ -44,11 +44,10 @@ Kebab-case, always: lowercase, whitespace and punctuation → `-`, collapse repe
 The human-readable title is not derivable from the filename, so it lives in the `title` property. Obsidian's `{{title}}` resolves to the filename, so the H1 stays kebab — `title` is what dashboards display.
 
 - `Implement Auth` → `pm/{project}/tasks/implement-auth.md`, `title: Implement Auth`
-- ADR `Switch to SQLite` → `pm/{project}/docs/adr-0007-switch-to-sqlite.md`, `title: Switch to SQLite`
 
 ## Template Names
 
-Fixed: `task`, `doc`, `adr`. Installed into the vault's Obsidian Templates folder by `/obw:init`. Use via CLI `create template=<name>`.
+Fixed: `task`, `doc`. Installed into the vault's Obsidian Templates folder by `/obw:init`. Use via CLI `create template=<name>`.
 
 If `obsidian vault=<v> templates` doesn't list one of these, `/obw:init` hasn't run (or the user removed them). Tell the user to re-run init rather than inlining template content here.
 
@@ -58,15 +57,10 @@ Use **one call** per known-name read — never chain `search → read`. The pm-s
 
 - **Create task** → `create` at `pm/{project}/tasks/{kebab}.md` with `template=task`, then set properties `title` / `project` / `priority` / `due` / `tags`.
 - **Create doc** → `create` at `pm/{project}/docs/{kebab}.md` with `template=doc`, then set `title` / `project`.
-- **Create ADR** → `create` at `pm/{project}/docs/adr-{NNNN}-{kebab}.md` with `template=adr`, then set `title` / `project` / `status`. See ADR numbering below.
 - **List tasks** → `search` with `query="[type:task] [project:{project}] [status:<s>]" format=json`.
 - **To tickets** → split a spec, task, or conversation into tickets with blocking edges; see To Tickets.
 - **Archive** → set `status=done` and `completed`, then `move` to `pm/{project}/tasks/archive`. Run the dependent check first (see Relations).
 - **Delete** → confirm first; fall back to `move` if the build lacks `delete`.
-
-### ADR numbering
-
-Before creating an ADR, `search` with `query="[type:adr] [project:{project}]" format=json` and take max(number)+1, zero-padded to 4 digits.
 
 ## Relations
 
@@ -108,7 +102,6 @@ Startable tickets — the frontier — are one `search` with `query="[type:task]
 
 **Task**: `title`, `type: task`, `status` (todo/in-progress/blocked/done), `priority` (high/medium/low), `project`, `due` (date), `tags` (list), `parent` (link), `blocked_by` (list of links), `related` (list of links), `created`, `completed`.
 **Doc**: `title`, `type: doc`, `project`, `created`, `updated`.
-**ADR**: `title`, `type: adr`, `project`, `status` (proposed/accepted/deprecated/superseded), `created`, `deciders`.
 
 Property names are lowercase. Do not invent fields — dashboards depend on this schema.
 
@@ -145,6 +138,6 @@ Conversation-mode status (user asks in chat, not Obsidian): run the equivalent `
 1. Read `.obsidian.yaml` before any operation.
 2. Never `search` to locate a note whose name is known — go straight to `read`.
 3. Never bypass the CLI with filesystem Read/Write against the vault. Only exceptions, both inside `/obw:init`: reading `.obsidian/templates.json` / `obsidian.json`, and `mkdir` for the templates folder and the project skeleton (the CLI has no folder verb). Dashboard creation uses the CLI via shell-piped content.
-4. Confirm destructive intents (delete, archive-move, ADR supersede) before executing.
+4. Confirm destructive intents (delete, archive-move) before executing.
 5. A claim of "created" / "updated" needs a receipt — the CLI's own success output counts; an error output never does. Report failures as failures.
 6. Bulk scans (e.g. auditing all archived tasks) may be delegated to a read-only Explore agent to keep the listing out of context; single-entity operations never need one.

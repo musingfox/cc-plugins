@@ -10,7 +10,6 @@ Templates are deliberately **not** auto-loaded into Claude's context. They are p
 |----------|---------|---------------|--------------|
 | `task.md` | `/obw:pm` task | `{{title}}`, `{{date}}` | `property:set` for title/project/priority/due/tags |
 | `doc.md` | `/obw:pm` document | `{{title}}`, `{{date}}` | `property:set` for title/project |
-| `adr.md` | `/obw:pm` ADR | `{{title}}`, `{{date}}` | `property:set` for title/project/status |
 | `dashboard-cross.base` | Cross-project Bases dashboard | — | none |
 | `dashboard-project.base` | Per-project Bases dashboard | `__PROJECT__` | `sed` replace `__PROJECT__` before create |
 
@@ -24,7 +23,6 @@ If you rewrite these templates, keep these fields — `/obw:pm` search and Bases
 
 - Tasks: `title`, `type: task`, `status`, `priority`, `project`, `tags`, `due`, `completed`, `parent`, `blocked_by`, `related`
 - Docs: `title`, `type: doc`, `project`
-- ADRs: `title`, `type: adr`, `project`, `status`
 
 ## Regenerating
 
