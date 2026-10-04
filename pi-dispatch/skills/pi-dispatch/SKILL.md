@@ -137,11 +137,24 @@ reported with — they share the wall. On either tag:
 1. Do not re-dispatch to pi **for this batch** — the wall does not move while
    it runs. The scope is the batch, not the session: a later dispatch is free
    to try pi again, and after `QUOTA-WINDOW` it will likely succeed.
-2. Roll back each aborted worker's half-done edits in its worktree:
-   `git -C <WT> checkout -- . && git -C <WT> clean -fd`, and if the worker
-   was allowed to commit, `git -C <WT> reset --hard <base_ref>` (the ref
-   `${CLAUDE_PLUGIN_ROOT}/scripts/pi-worktree.sh create` was given). A worker's partial state is not
-   reviewable; the fallback starts clean.
+2. Roll back each aborted worker's half-done edits in its worktree `WT`, but
+   only when `WT` is a linked worktree from
+   `${CLAUDE_PLUGIN_ROOT}/scripts/pi-worktree.sh create`. A worker run with
+   `PI_CWD="$PWD"` sits in the user's own checkout: report QUOTA and leave it
+   untouched. Keep the `reset` line only if the worker was allowed to commit
+   (`BASE_REF` is the ref `pi-worktree.sh create` was given):
+
+   ```bash
+   if [ "$(git -C "$WT" rev-parse --path-format=absolute --git-dir)" != \
+        "$(git -C "$WT" rev-parse --path-format=absolute --git-common-dir)" ]; then
+     git -C "$WT" reset --hard "$BASE_REF"
+     git -C "$WT" checkout -- . && git -C "$WT" clean -fd
+   else
+     echo "QUOTA: $WT is not a linked worktree; left untouched"
+   fi
+   ```
+
+   A worker's partial state is not reviewable; the fallback starts clean.
 3. Re-dispatch the SAME brief, minus this usage section, to a Claude
    builder in self-do mode (`${CLAUDE_PLUGIN_ROOT}/docs/main-orchestration.md` §6) on the same
    worktree. One shot: if that fails too, the task is failed.

@@ -58,9 +58,9 @@ Protocol:
      already stopped your other workers. Do NOT restart or `send` any worker.
      `QUOTA-WINDOW` means the wall resets in hours; `QUOTA` means it does not.
      Either way this batch is over — report the tag, do not wait it out.
-     Roll back each aborted worker's worktree
-     (`git -C <WT> checkout -- . && git -C <WT> clean -fd`; plus
-     `git -C <WT> reset --hard <base_ref>` if it committed), then
+     Roll back each aborted worker's worktree with the guarded command in
+     the pi-dispatch skill's provider-wall section (it only touches a
+     linked worktree; a plain checkout is left as is), then
      SendMessage main `QUOTA <names> rolled back` and end your turn — main
      re-dispatches the task to a self-do builder.
    - If the Bash call times out (600s cap), run watch again.
