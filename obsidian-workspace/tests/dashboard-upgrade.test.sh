@@ -64,3 +64,10 @@ n=$(cat "$init" "$pm" | grep -cE 'base:views[^`]*path=' || true)
 # Quoted token only: a comment may still name the verb.
 n=$(grep -E "['\"]base:views['\"]" obsidian-workspace/hooks/*.ts | wc -l | tr -d ' ' || true)
 [ "$n" -eq 0 ] || fail "T5: a hook runs base:views, got $n"
+
+step1=$(awk '/^1\. \*\*/{f=1} /^2\. \*\*/{exit} f' "$init")
+n=$(printf '%s\n' "$step1" | grep -cF 'resolve `$VAULT_PATH` from the `obsidian.json` entry' || true)
+[ "$n" -eq 1 ] || fail "T6: init keep-config path resolves VAULT_PATH count is $n, want 1"
+step7=$(awk '/^7\. \*\*/{f=1} /^8\. \*\*/{exit} f' "$init")
+n=$(printf '%s\n' "$step7" | grep -cF 'On the keep-config path, skip this step: never write `.obsidian.yaml`' || true)
+[ "$n" -eq 1 ] || fail "T7: init step 7 keep-config skip count is $n, want 1"

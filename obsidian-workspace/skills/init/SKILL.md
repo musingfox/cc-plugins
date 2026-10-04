@@ -9,7 +9,7 @@ Run everything directly in the main context — the flow is interactive (`AskUse
 
 ## Execution
 
-1. **Handle existing config** — if `.obsidian.yaml` exists in the project root, show a one-line summary (vault name + project) and ask whether to overwrite. If the user declines the overwrite, don't exit: read `vault` and `pm.project` from the existing file and jump to step 5, so bootstrap and migration still run. An already-configured project is the normal case for a migration run.
+1. **Handle existing config** — if `.obsidian.yaml` exists in the project root, show a one-line summary (vault name + project) and ask whether to overwrite. If the user declines the overwrite, don't exit: read `vault` and `pm.project` from the existing file, resolve `$VAULT_PATH` from the `obsidian.json` entry whose path basename matches that `vault` name (the step 2 listing, without asking), then jump to step 5, so bootstrap and migration still run. If no entry matches, report it and stop. This is the **keep-config** path. An already-configured project is the normal case for a migration run.
 
 2. **Pick a vault** — list vaults from Obsidian's config and ask the user:
    ```bash
@@ -55,9 +55,9 @@ Run everything directly in the main context — the flow is interactive (`AskUse
 
    Non-kebab filenames are left alone. Renaming them is a link-rewriting operation with no upside; the kebab rule applies to newly created notes.
 
-7. **Write `.obsidian.yaml`** using the template below. Omit the `pm` section if skipped.
+7. **Write `.obsidian.yaml`** using the template below. Omit the `pm` section if skipped. On the keep-config path, skip this step: never write `.obsidian.yaml`, the existing file stays as it was.
 
-8. **Offer `.gitignore` entry** — ask whether to add `.obsidian.yaml` to `.gitignore`.
+8. **Offer `.gitignore` entry** — ask whether to add `.obsidian.yaml` to `.gitignore`. On the keep-config path, skip the question if `.gitignore` already lists it.
 
 ## Config Template
 
@@ -75,7 +75,7 @@ pm:
 
 ## Confirmation Output
 
-Return a summary in this shape:
+Return a summary in this shape. On the keep-config path, the first line reads `.obsidian.yaml kept (vault=<NAME>, project=<PROJ>).` and the Templates line is omitted, since step 4 did not run:
 
 ```
 .obsidian.yaml created (vault=<NAME>, project=<PROJ>).
