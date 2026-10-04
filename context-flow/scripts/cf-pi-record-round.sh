@@ -58,7 +58,7 @@ if [ -f "$state_file" ]; then
     jq -c --argjson rnd "$prev_round" '. + {round: $rnd}' <<< "$state" >> "$archive_file"
   fi
 else
-  state='{"results_latest":{},"replan_count":{},"rollback_count":{},"checkpoints":{},"current_round":0}'
+  state='{"results_latest":{},"replan_count":{},"rollback_count":0,"checkpoints":{},"current_round":0}'
 fi
 
 # Update results_latest and counts
@@ -70,7 +70,7 @@ for res in "${results[@]}"; do
     count=$(jq -r --arg k "$key" '.replan_count[$k] // 0' <<< "$state")
     state=$(jq --arg k "$key" --argjson c "$((count + 1))" '.replan_count[$k] = $c' <<< "$state")
   fi
-  # rollback_count not incremented here per contracts; assume caller
+  # rollback_count is a per-flow integer that cf-pi-rollback.sh increments
 done
 
 state=$(jq --argjson r "$round" '.current_round = $r' <<< "$state")

@@ -65,7 +65,7 @@ Worst case: flow aborts, all branches and tags remain; the user cherry-picks val
 Never silently waste validated work. Partial-replan is the default; Plan owns the escalation to rollback.
 
 - Plan (mode `partial-replan`) receives affected contracts + preserve-interfaces list + escalate paths, and returns either `contracts-revision-<n>.json` (replace-by-name, applied by `cf-pi-merge-revision.sh` via jq, schema_version validated) or `replan-status.json` with `REPLAN_REQUIRES_ROLLBACK` when the fix demands changing a preserved interface.
-- Rollback resets the named shard checkpoints, then a full Plan re-invocation.
+- Rollback maps the named contracts to their shards, removes those shards' branches (each head kept at `refs/cf-rollback/<flow>/shard-<id>-<n>`) and drops their `dispatch-state.json` checkpoint entries (the tags stay), increments the per-flow `rollback_count`, then a full Plan re-invocation.
 - Integration-gate test failure auto-injects NEEDS_REPLAN for the contracts whose tests failed in the merged checkout, funneling into the same ladder.
 
 `contracts.json` is the load-bearing artifact; `plan.md` prose drift is tolerable, contracts drift is not.

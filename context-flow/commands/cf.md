@@ -505,9 +505,9 @@ Read only the reply's first Summary bullet to branch:
 - `Status: REPLAN_REQUIRES_ROLLBACK (...)` → Plan declines partial-replan; the preserved interface itself is the problem. Bounded read of the rollback list:
   ```bash
   jq -r '.rollback_contracts[]' "$SESSION/replan-status-${ROUND}.json"
-  ROLLBACK_COUNT=$(jq -r '.rollback_count' "$SESSION/dispatch-state.json")
+  ROLLBACK_COUNT=$(jq -r '(.rollback_count | numbers) // 0' "$SESSION/dispatch-state.json")
   ```
-  If `rollback_count < 2`: run `"$SCRIPTS/cf-pi-rollback.sh" "$SESSION" <contract...>` (resets the named shard checkpoints, increments `rollback_count`), then dispatch a full Plan re-invocation (no partial-replan flag) and return to §3.1. If `rollback_count >= 2`: escalate (see Budget guards).
+  If `$ROLLBACK_COUNT < 2`: run `"$SCRIPTS/cf-pi-rollback.sh" "$SESSION" <contract...>` with the listed contract names. It maps each contract to its shard through `shards.json` (exit 5 when one maps to no shard, exit 6 when `dispatch-state.json` is not a JSON object; either way nothing changed: escalate), removes those shards' worktrees and branches (each branch head stays reachable at `refs/cf-rollback/<flow>/shard-<id>-<n>` until the success-path cleanup in "Scaffolding leaves no trace" deletes it; the escalation path keeps it), drops their `.checkpoints` entries from `dispatch-state.json` (the checkpoint tags stay), and increments the per-flow integer `rollback_count` once, then dispatch a full Plan re-invocation (no partial-replan flag) and return to §3.1. If `$ROLLBACK_COUNT >= 2`: escalate (see Budget guards).
 
 ### 3.5 Budget guards
 
@@ -515,7 +515,7 @@ After each round, before routing the next dispatch, check budgets via bounded `j
 
 ```bash
 jq -r '.replan_count | to_entries[] | select(.value >= 3) | .key' "$SESSION/dispatch-state.json"
-jq -r 'select(.rollback_count >= 3) | "rollback-exhausted"'        "$SESSION/dispatch-state.json"
+jq -r 'select(((.rollback_count | numbers) // 0) >= 3) | "rollback-exhausted"' "$SESSION/dispatch-state.json"
 ```
 
 If either fires, escalate to the user via `AskUserQuestion`:
@@ -816,7 +816,7 @@ Captures the final diff and removes the worktree. **The cf branch (`cf/$CF_SLUG`
 
 ### Scaffolding leaves no trace
 
-Shard branches, the integration branch, and checkpoint tags are cf's own machinery, not the user's work — they must not accumulate in the project. **On the success path only**, remove them once the run is integrated:
+Shard branches, the integration branch, checkpoint tags, and rollback refs are cf's own machinery, not the user's work — they must not accumulate in the project. **On the success path only**, remove them once the run is integrated:
 
 ```bash
 for b in $(git branch --list "cf/$CF_SLUG-shard-*" "cf/$CF_SLUG-integrated" | tr -d ' *'); do
@@ -824,6 +824,9 @@ for b in $(git branch --list "cf/$CF_SLUG-shard-*" "cf/$CF_SLUG-integrated" | tr
 done
 for t in $(git tag -l "cf-checkpoint/$(basename "$SESSION")/*"); do
   git tag -d "$t" >/dev/null 2>&1 || true
+done
+for r in $(git for-each-ref --format='%(refname)' "refs/cf-rollback/$(basename "$SESSION")/"); do
+  git update-ref -d "$r" >/dev/null 2>&1 || true
 done
 ```
 
