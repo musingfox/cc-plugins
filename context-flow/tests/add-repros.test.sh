@@ -165,18 +165,21 @@ assert_eq "0" "$?" "T4 file unchanged"
 
 # T9: without the unknown-name check, that same T4 scenario exits 0,
 # so T4's expectation fails. The check is what makes T4 red-on-revert.
-mut=$(mktemp "$SCRIPTS/cf-pi-add-repros.XXXXXX")
+# The mutant lives in the fixture, beside a link to the library it sources: a
+# copy under scripts/ survives an interrupted run and `git add -A` takes it.
+mkdir "$FLOW/mut" && ln -s "$SCRIPTS/cf-pi-env.sh" "$FLOW/mut/cf-pi-env.sh"
+mut="$FLOW/mut/cf-pi-add-repros.sh"
 sed '/# unknown-name check/,/# end unknown-name check/d' "$ADD" > "$mut"
 chmod +x "$mut"
 cp "$FLOW/contracts.orig" "$FLOW/contracts.json"
 rm -f "$FLOW"/contracts-prev-*.json
 out=$("$mut" "$FLOW" "$FLOW/repros.json" 2>"$FLOW/err9")
 rc=$?
-rm -f "$mut"
 assert_eq "0" "$rc" "T9 stripped script exits 0"
 t4_would_pass=0
 [ "$rc" -eq 5 ] && t4_would_pass=1
 assert_eq "0" "$t4_would_pass" "T9 T4 exit-5 check fails"
+assert_eq "" "$(ls "$SCRIPTS" | grep -v '\.sh$' || true)" "T9 nothing left under scripts/"
 rm -rf "$FLOW"
 
 # T5: an entry missing given is rejected and the file is left alone.
