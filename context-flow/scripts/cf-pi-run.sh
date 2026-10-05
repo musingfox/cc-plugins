@@ -860,8 +860,7 @@ fi
 declared_count=$(printf '%s\n' "$declared_names" | grep -c . || true)
 say "revert gate: $declared_count contract(s), $((declared_count + 1)) suite runs"
 GATE_RC=0
-# shellcheck disable=SC2086
-"$SCRIPT_DIR/cf-pi-revert-gate.sh" "$SHARD_SESSION" $TEST_RUNNER \
+"$SCRIPT_DIR/cf-pi-revert-gate.sh" "$SHARD_SESSION" bash -c "$TEST_RUNNER" \
   > "$SHARD_SESSION/revert-gate.out" || GATE_RC=$?  # not $SCRIPTS: this gate is never stubbable
 gate_line=$(head -1 "$SHARD_SESSION/revert-gate.out" 2>/dev/null || true)
 

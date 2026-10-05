@@ -82,6 +82,11 @@ wired_clean() {
 wired_build
 wired_gates "$RUN" "$CHAIN"
 assert_eq "1" "$(count_of 'SECOND SUITE RAN' "$SHARD/test-output.log")" "G1 second suite ran in gate 3"
+assert_eq "0" "$RC" "R1 exit"
+assert_eq "PASS" "$(section Status)" "R1 Status"
+assert_eq "CLEAN 1" "$(head -1 "$SHARD/revert-gate.out")" "R1 revert gate verdict"
+marked=$(awk '/^### /{sec=substr($0,5)} /SECOND SUITE RAN/{print sec}' "$SHARD/revert-gate.log" | sort -u | tr '\n' ' ')
+assert_eq "C1 control " "$marked" "R1 control and contract runs ran the second suite"
 wired_clean
 
 # G2: unquoted, the chain is one argv for `true`, so the second suite never runs
@@ -89,6 +94,11 @@ wired_build
 mutant 's/ bash -c "\$TEST_RUNNER"/ \$TEST_RUNNER/g'
 wired_gates "$MUT" "$CHAIN"
 assert_eq "0" "$(count_of 'SECOND SUITE RAN' "$SHARD/test-output.log")" "G2 mutant never ran the second suite"
+assert_eq "2" "$RC" "R2 exit"
+assert_eq "NEEDS_REPLAN" "$(section Status)" "R2 Status"
+assert_eq "tests-green-on-revert" "$(section Reason)" "R2 Reason"
+assert_eq "STAYS_GREEN C1" "$(head -1 "$SHARD/revert-gate.out")" "R2 revert gate verdict"
+assert_eq "0" "$(count_of 'SECOND SUITE RAN' "$SHARD/revert-gate.log")" "R2 mutant never ran the second suite in the revert gate"
 wired_clean
 
 # G3: a red chain takes the red-suite path
