@@ -1,48 +1,40 @@
 # Playwright Diagnostics Reference
 
-Code patterns for diagnosing issues that agent-browser cannot detect (console errors, network failures, JavaScript state).
+Code patterns for what the agent-browser CLI cannot show: HTTP response status, iframe content, and shadow DOM. Console messages, page errors, JavaScript state, cookies, and storage come from the CLI (see Phase 2 in SKILL.md).
+
+## Contents
+
+- [Diagnostic Script Template](#diagnostic-script-template) — capture failed responses from a page load
+- [Fallback Scenario Reference](#fallback-scenario-reference) — which Playwright API answers which question
+- [Diagnostic Test Patterns](#diagnostic-test-patterns) — console, network, and page-error assertions for Phase 4
 
 ## Diagnostic Script Template
 
-```typescript
-import { chromium } from 'playwright';
+Save as `playwright-diag.mjs` in the project root, so `@playwright/test` (a Phase 1 prerequisite) resolves from the project's `node_modules`. Run it with `node playwright-diag.mjs`, read the output, then delete the file.
+
+```js
+import { chromium } from '@playwright/test';
 
 const browser = await chromium.launch();
 const page = await browser.newPage();
 
-// Capture console errors
-const consoleErrors: string[] = [];
-page.on('console', msg => {
-  if (msg.type() === 'error') consoleErrors.push(msg.text());
+// Responses with an error status: the CLI's request log carries no status
+const failedResponses = [];
+page.on('response', resp => {
+  if (resp.status() >= 400) failedResponses.push(`${resp.status()} ${resp.url()}`);
 });
 
-// Capture failed network requests
-const failedRequests: string[] = [];
-page.on('response', resp => {
-  if (resp.status() >= 400)
-    failedRequests.push(`${resp.status()} ${resp.url()}`);
+// Requests that never got a response (DNS, CORS, aborted)
+const failedRequests = [];
+page.on('requestfailed', req => {
+  failedRequests.push(`${req.failure()?.errorText} ${req.url()}`);
 });
 
 await page.goto('<url>');
+await page.waitForLoadState('networkidle');
 
-// Inspect JavaScript state
-const appState = await page.evaluate(() => {
-  return JSON.stringify((window as any).__APP_STATE__ ?? 'no state found');
-});
-
-// Inspect localStorage
-const storage = await page.evaluate(() =>
-  JSON.stringify(Object.fromEntries(Object.entries(localStorage)))
-);
-
-// Inspect cookies
-const cookies = await page.context().cookies();
-
-console.log('Console errors:', consoleErrors);
+console.log('Failed responses:', failedResponses);
 console.log('Failed requests:', failedRequests);
-console.log('App state:', appState);
-console.log('Storage:', storage);
-console.log('Cookies:', cookies);
 
 await browser.close();
 ```
@@ -51,16 +43,13 @@ await browser.close();
 
 | Scenario | Playwright API | Notes |
 |----------|---------------|-------|
-| Console error detection | `page.on('console')` | Filter by `msg.type() === 'error'` |
-| Network request failures | `page.on('response')` | Check `response.status() >= 400` |
-| JavaScript state inspection | `page.evaluate()` | Access window globals, DOM APIs |
+| Network response failures | `page.on('response')` | Check `response.status() >= 400` |
+| Requests with no response | `page.on('requestfailed')` | `request.failure().errorText` gives the reason |
+| Wait for specific API call | `page.waitForResponse('**/api/endpoint')` | Wait for matching response |
 | iframe content | `page.frameLocator('#id')` | Locate by CSS selector or name |
-| Shadow DOM traversal | `page.locator('host >> shadow=selector')` | Pierces open shadow roots |
-| Cookie inspection | `context.cookies()` | Returns all cookies for current context |
-| localStorage / sessionStorage | `page.evaluate(() => localStorage)` | Execute in page context |
+| Shadow DOM traversal | `page.locator('host-element').getByRole('button', { name: 'Click' })` | Every locator pierces open shadow roots by default; XPath and closed shadow roots do not |
 | File upload | `locator.setInputFiles('path')` | Works with `<input type="file">` |
 | File download | `page.waitForEvent('download')` | Capture download stream |
-| Wait for specific API call | `page.waitForResponse('**/api/endpoint')` | Wait for matching response |
 
 ## Diagnostic Test Patterns
 

@@ -2,7 +2,7 @@
 name: web-test
 description: >-
   Use to debug a live web page and convert findings into Playwright regression tests —
-  investigate UI bugs, fix flaky tests, generate E2E tests from exploration. Orchestrates
+  investigate UI bugs, generate E2E tests from exploration. Orchestrates
   the debug-to-test workflow. Not for writing standalone tests with no exploration (use playwright).
 ---
 
@@ -10,13 +10,13 @@ description: >-
 
 ## Overview
 
-This skill orchestrates a four-phase workflow: explore a web page with agent-browser to identify issues, diagnose problems, map element references to Playwright locators, and generate test scripts that capture findings as regression tests.
+This skill orchestrates a five-phase workflow: explore a web page with agent-browser to identify issues, diagnose problems, map element references to Playwright locators, generate test scripts that capture findings as regression tests, and run them.
 
 **Prerequisites**: `agent-browser` CLI installed (`npm install -g agent-browser && agent-browser install`) and `@playwright/test` installed in the project (`npm install -D @playwright/test && npx playwright install`).
 
-The four phases:
+The five phases:
 ```
-Explore (agent-browser) → Diagnose → Map refs to locators → Generate Playwright test
+Explore (agent-browser) → Diagnose → Map refs to locators → Generate Playwright test → Run it
 ```
 
 ## Phase 1: Explore with agent-browser
@@ -32,13 +32,15 @@ Investigation checklist:
 1. **Visual scan** — `screenshot` to observe layout, visual state, and obvious defects.
 2. **Interactive inventory** — `snapshot -i` to list all interactive elements with refs.
 3. **Section focus** — `snapshot -s ".section"` to isolate specific areas of interest.
-4. **Interaction test** — Click buttons, fill forms, navigate links. Re-snapshot after each action to verify state changes.
+4. **Interaction test** — Click, fill, and navigate along the path that reproduces the reported issue, or the flow the user asked about. Re-snapshot after each action to verify state changes.
 5. **Scroll exploration** — `scroll down 500` (pixels) or `scrollintoview @eN`, then re-snapshot to find below-fold content.
 6. **Annotated verification** — `screenshot --annotate` to visually confirm ref-to-element mapping.
 
 **Record every interaction step** — these become the basis for test cases in Phase 4.
 
-Exploration is complete when all visible sections have been inspected, all interactive elements have been tested, and all observed defects have been recorded.
+Ask the user before an action you cannot undo — delete, send, purchase, log out, change account settings — and before submitting any form on a host other than `localhost` or `127.0.0.1`. The page is real: a click there acts on real data.
+
+Exploration is complete when the reported issue has been reproduced (or shown not to occur), the elements on its path have been exercised, and every observed defect has been recorded.
 
 ## Phase 2: Diagnose Issues
 
@@ -52,11 +54,24 @@ Categorize findings from exploration:
 | Visual defect | Screenshot shows layout/style issues | Overlapping elements, clipped text |
 | Accessibility gap | Snapshot shows missing roles/labels | Input without associated label |
 
-### Fallback to Playwright for Advanced Diagnostics
+### Runtime Diagnostics with agent-browser
 
-When agent-browser cannot diagnose the root cause (console errors, network failures, JavaScript state, iframes, shadow DOM), switch to Playwright library mode. Use `page.on('console')` for console errors, `page.on('response')` for network failures, and `page.evaluate()` for JavaScript state inspection.
+Inspect runtime state with the same CLI before reaching for Playwright:
 
-For diagnostic code templates and the full fallback scenario reference, consult `references/playwright-diagnostics.md`.
+| Need | Command |
+|------|---------|
+| Console messages | `agent-browser console` |
+| Uncaught page errors | `agent-browser errors` |
+| JavaScript state | `agent-browser eval '<js>'` |
+| Cookies | `agent-browser cookies` |
+| localStorage / sessionStorage | `agent-browser storage local`, `agent-browser storage session` |
+| Requests the page made | `agent-browser network requests` |
+
+`network requests` records only what happens after its first call, and its entries carry no HTTP status. Call it once before reproducing the issue, then again to read the list.
+
+### Fallback to Playwright
+
+Switch to Playwright library mode only for what the CLI cannot show: response status codes (failed API calls), iframe content, and shadow DOM. For the script template, how to run it, and the scenario reference, consult `references/playwright-diagnostics.md`.
 
 ## Phase 3: Map Refs to Playwright Locators
 
@@ -135,6 +150,19 @@ test.describe('<Feature or Page Name>', () => {
 ### Including Fallback Diagnostics in Tests
 
 When console or network issues were diagnosed during Phase 2, convert them into test assertions. For diagnostic test patterns (console error detection, network health, JavaScript error tests), consult `references/playwright-diagnostics.md`.
+
+## Phase 5: Run the Tests
+
+A generated test is not done until it has run. Run the file with the project's Playwright runner:
+
+```bash
+npx playwright test <path/to/generated.spec.ts>
+```
+
+- **Happy-path tests** must pass. On failure, read the error, fix the locator or the wait, and run again until green.
+- **Regression tests** must fail for the bug's own reason while the bug is present — a regression test that passes against broken behavior proves nothing. If the bug is still unfixed, confirm the failure message points at the defect, then tell the user the test will pass once the fix lands. If the fix is already in place, confirm the test fails with the fix reverted, then passes with it restored.
+
+Report the final run's pass/fail counts to the user.
 
 ## Complete Workflow Example
 

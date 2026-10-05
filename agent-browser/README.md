@@ -35,9 +35,9 @@ Debug-to-test workflow — explore pages with agent-browser, diagnose issues, th
 
 **Triggers**: "debug a web page", "investigate a UI bug", "generate tests from debugging", "turn browser exploration into test cases"
 
-**Key concept**: Four-phase pipeline:
+**Key concept**: Five-phase pipeline:
 ```
-Explore (agent-browser) → Diagnose → Map refs to locators → Generate Playwright test
+Explore (agent-browser) → Diagnose → Map refs to locators → Generate Playwright test → Run it
 ```
 
 ## Installation
