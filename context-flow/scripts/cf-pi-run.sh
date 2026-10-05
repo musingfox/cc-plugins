@@ -9,6 +9,7 @@
 # foreground Bash ceiling.
 #
 # Usage:   cf-pi-run.sh [--prepare-only|--gates-only] SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER
+#   Every mode first refuses a blank TEST_RUNNER (lifecycle step 0b).
 #   (plain)         steps 0-13: prepare, probe, dispatch OMP, poll, gates
 #   --prepare-only  steps 0-2 only: ready the worktree and brief for a Claude
 #                   builder, never probe or dispatch. Run with cwd inside the
@@ -31,6 +32,9 @@
 #                            stale outcome/diff) last round's files must not
 #                            be read as this round's (a re-launched shard reuses
 #                            the same session directory)
+#   0b. blank runner         TEST_RUNNER that is empty or only whitespace =>
+#                            FAIL test-runner-missing, in every mode, before
+#                            step 1 (`bash -c` on it would exit 0 and pass gate 3)
 #   1-2. cf-pi-prepare.sh    worktree + branch, prerequisite checkpoints merged,
 #                            brief assembled (plain and --prepare-only)
 #   3. cf-pi-probe.sh        liveness probe            (plain only)
@@ -373,7 +377,7 @@ on_exit() {
 trap on_exit EXIT
 
 # `bash -c` on a blank string exits 0, so gate 3 would pass and the revert gate
-# would name every contract. the integration gate refuses an empty runner too; this sits
+# would name every contract. the integration gate refuses a blank runner too; this sits
 # after step 0 and the trap so this round's outcome.md exists for cf.md §3.2 step 2.
 case "$TEST_RUNNER" in
   *[![:space:]]*) ;;

@@ -28,3 +28,13 @@ assert_contains "$(printf '%s\n' "$any_fail" | grep -m1 'exempt from the re-laun
   "D5 the exemption sentence lists test-runner-missing"
 assert_contains "$(printf '%s\n' "$any_fail" | grep -m1 '^\*\*`test-runner-missing`')" "Cause" \
   "D6 a blank runner goes to the human with the outcome's Cause"
+
+# D7: the blank-runner refusal precedes step 1 in every mode, so the header's
+# lifecycle has to say so or --gates-only reads as "steps 6-13 only".
+run_header=$(sed -n '1,/^set -euo pipefail/p' "$RUN")
+assert_contains "$run_header" "test-runner-missing" "D7 cf-pi-run.sh header names the blank-runner refusal"
+
+# D8
+runsh_header=$(sed -n '1,/^set -uo pipefail/p' "$CF_TESTS_DIR/run.sh")
+assert_eq "0" "$(printf '%s\n' "$runsh_header" | grep -c 'evals')" "D8 run.sh no longer says integration evals the runner"
+assert_contains "$runsh_header" 'bash -c' "D8 run.sh says integration runs it through bash -c"

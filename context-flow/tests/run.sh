@@ -7,7 +7,7 @@
 # Wired as the gate-3 / integration TEST_RUNNER:
 #     TEST_RUNNER="bash context-flow/tests/run.sh"
 # gate-3 invokes it via cf-pi-test.sh (which emits its own test_exit= marker);
-# integration evals it directly and reads $?. We also print test_exit= here so
+# integration runs it through `bash -c` and reads $?. We also print test_exit= here so
 # the runner is self-describing when run standalone. Failing files print
 # "not ok" / failing assertions print "  ✗ " — both match
 # cf-pi-integrate.sh's failure-attribution grep.
