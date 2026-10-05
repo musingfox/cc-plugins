@@ -2,14 +2,13 @@
 name: survey
 description: >-
   Survey a codebase for deepening opportunities — shallow modules, leaking
-  seams, interfaces that are hard to test through — then hand candidates as
-  a Mermaid report.
+  seams, interfaces that are hard to test through — then hand candidates to viz
+  as a Mermaid report.
+argument-hint: "[scope]"
 disable-model-invocation: true
 ---
 
 # Survey
-
-Survey adapted from [mattpocock/skills](https://github.com/mattpocock/skills) `improve-codebase-architecture` (MIT, Copyright (c) 2026 Matt Pocock), commit 3cca18b368ae95cdbdebbff572ccafa662551015. HTML-REPORT.md is not imported: viz renders markdown and Mermaid only, so hand-built SVG and Tailwind cannot port. Step 3 grilling is not imported: the skill ends at the report; `/spiral` narrows.
 
 ## 1. Scope
 
@@ -23,7 +22,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/hotspots.sh"
 
 Read the `scope:` line.
 
-- `scope: hotspot` — the ranked paths (top three) are the scope.
+- `scope: hotspot` — the first three ranked paths are the scope (hotspots.sh prints up to five).
 - `scope: wide` — the whole tree is the scope; keep the ranked list as hints. If history is thin (`window` below 10 or an empty log), say in the one-line scope message that the whole tree is being surveyed because history is thin.
 
 If hotspots.sh exits 1 (`not a git repository`) and `$ARGUMENTS` is empty, stop. Ask in plain prose for a direction. That is an input question, not permission.
@@ -48,7 +47,7 @@ If a report file is missing after dispatch, say which scope produced nothing and
 
 ## 4. Read
 
-Do not Read an explorer report whole. For each `/tmp/viz/<project>/deepen-explorer-*.md` that exists, take only:
+Do not Read an explorer report whole. For each report path you dispatched in step 3 that exists, take only:
 
 ```bash
 sed -n '/^## Summary/,/^## Notes/p' /tmp/viz/<project>/deepen-explorer-<timestamp>-<n>.md

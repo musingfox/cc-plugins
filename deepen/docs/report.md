@@ -4,7 +4,15 @@ Scope: <direction, hotspot paths, or whole tree>
 
 Legend: **Strength** is one of Strong, Worth exploring, Speculative.
 
-Write wins in glossary terms. Use exactly: locality, leverage, interface, depth, seam, adapter, module.
+Write wins in design vocabulary. Use exactly: locality, leverage, interface, depth, seam, adapter, module.
+
+- **module**: anything with an interface and an implementation, at any scale.
+- **interface**: everything a caller must know to use the module correctly, beyond its signature.
+- **depth**: how much behaviour sits behind a small interface.
+- **seam**: the place where behaviour can change without editing there; where a module's interface lives.
+- **adapter**: a concrete thing that satisfies an interface at a seam.
+- **leverage**: what callers get from depth; one implementation pays back across many callers and tests.
+- **locality**: what maintainers get from depth; change and bugs concentrate in one place.
 
 If the diagram needs a paragraph, redraw the diagram. Markdown and Mermaid only.
 

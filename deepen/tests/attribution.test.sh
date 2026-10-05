@@ -4,7 +4,7 @@ cd "$(git rev-parse --show-toplevel)"
 
 fail() { echo "  ✗ $*"; exit 1; }
 
-f=deepen/skills/survey/SKILL.md
+f=deepen/docs/PROVENANCE.md
 lic=deepen/docs/LICENSE-upstream
 
 n=$(grep -c 'adapted from .*mattpocock/skills.*MIT.*3cca18b368ae95cdbdebbff572ccafa662551015' "$f" || true)
@@ -28,3 +28,6 @@ n=$(grep -c 'Copyright (c) 2026 Matt Pocock' "$lic" || true)
 [ "$n" -eq 1 ] || fail "T5: LICENSE copyright must be 1, got $n"
 n=$(grep -c 'MIT License' "$lic" || true)
 [ "$n" -eq 1 ] || fail "T5: MIT License must be 1, got $n"
+
+n=$(grep -c 'mattpocock/skills' deepen/skills/survey/SKILL.md || true)
+[ "$n" -eq 0 ] || fail "T6: provenance belongs in docs/PROVENANCE.md, SKILL.md has $n"

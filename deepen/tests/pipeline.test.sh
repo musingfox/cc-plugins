@@ -38,3 +38,12 @@ n=$(grep -c 'Do NOT propose interfaces' "$f" || true)
 
 n=$(grep -ciE '<svg|<html|<div' "$f" || true)
 [ "$n" -eq 0 ] || fail "T10: html/svg/div must be 0, got $n"
+
+n=$(grep -cF 'deepen-explorer-*' "$f" || true)
+[ "$n" -eq 0 ] || fail "T11: must not glob earlier explorer reports, got $n"
+
+n=$(grep -c '^argument-hint:' "$f" || true)
+[ "$n" -eq 1 ] || fail "T12: argument-hint, got $n"
+
+n=$(grep -c 'hand candidates to viz' "$f" || true)
+[ "$n" -eq 1 ] || fail "T13: description reads 'hand candidates to viz', got $n"

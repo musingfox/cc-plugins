@@ -36,3 +36,11 @@ n=$(grep -c 'redraw the diagram' "$f" || true)
 
 n=$(grep -c 'Use exactly:' "$f" || true)
 [ "$n" -eq 1 ] || fail "T5: Use exactly: must be 1, got $n"
+
+n=$(grep -ci 'glossary' "$f" || true)
+[ "$n" -eq 0 ] || fail "T6: report.md must not say glossary, got $n"
+
+for t in locality leverage interface depth seam adapter module; do
+  n=$(grep -c "^- \*\*$t\*\*:" "$f" || true)
+  [ "$n" -eq 1 ] || fail "T7: one-line definition for $t, got $n"
+done

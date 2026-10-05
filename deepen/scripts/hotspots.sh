@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Rank recent non-merge commits by depth-2 directory.
-# Prints window / top-share / scope, then up to 5 ranked lines.
+# Prints window / top-share / scope, then up to 5 ranked lines; the survey skill uses the first three.
 
 set -euo pipefail
 
+# 200 commits: the earlier window of 10 returned wide for repos with real churn (8ba6f0a).
 n=200
 while getopts 'n:' opt; do
   case "$opt" in
@@ -49,6 +50,8 @@ if [ "$window" -gt 0 ]; then
   share=$((100 * top / window))
 fi
 
+# Hotspot needs a window of at least 10 commits (below that the history is too thin to rank)
+# and a top directory in at least 25% of them (the earlier 50% bar returned wide too often, 8ba6f0a).
 if [ "$window" -ge 10 ] && [ "$share" -ge 25 ]; then
   scope=hotspot
 else
