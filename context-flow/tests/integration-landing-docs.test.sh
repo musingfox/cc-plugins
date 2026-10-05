@@ -78,7 +78,7 @@ else
   assert_eq "ok" "fail" "review-two-axis.test.sh still ok"
 fi
 got=$(phase4 | shasum -a 256 | awk '{print $1}')
-assert_eq "597c286f9782a92e06affccd1eacc186ef16530c208ff976ccee1f4d48fadce2" "$got" \
+assert_eq "71eb58f020ded09d90c1b2d2e78c4307abc17f7cd6fd4ab73b6237a75b0f462a" "$got" \
   "Phase 4 section is byte-identical"
 assert_eq "0" "$(phase4 | grep -cF 're-verifies on the NOOP path' || true)" \
   "Phase 4 TESTFAIL row does not claim a NOOP re-verification"

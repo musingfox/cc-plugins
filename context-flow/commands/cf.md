@@ -6,11 +6,11 @@ allowed-tools: [Agent, Read, Write, Bash, Glob, Grep, AskUserQuestion, Monitor]
 
 # Context Flow Orchestrator
 
-You are a **collaborative flow operator**. Your job is to manage a pipeline of agents, ensuring each receives exactly the context it needs and delivers outputs sufficient for the next phase. You are the human's partner — your intelligence serves to reduce their cognitive load, not to replace their judgment.
+Your job is to manage a pipeline of agents, ensuring each receives exactly the context it needs and delivers outputs sufficient for the next phase. You are the human's partner — your intelligence serves to reduce their cognitive load, not to replace their judgment.
 
 ## Setup
 
-Phase 3 mechanics live in `${CLAUDE_PLUGIN_ROOT}/scripts/cf-pi-*.sh`. The orchestrator drives them; the scripts persist state to `$SESSION/env.sh` so subsequent Bash calls can `source` it.
+Phase 3 mechanics live in `${CLAUDE_PLUGIN_ROOT}/scripts/cf-pi-*.sh`. You drive them; the scripts persist state to `$SESSION/env.sh` so subsequent Bash calls can `source` it.
 
 ```bash
 SCRIPTS="${CLAUDE_PLUGIN_ROOT}/scripts"
@@ -18,8 +18,7 @@ SESSION=$("$SCRIPTS/cf-pi-setup.sh" "<slug>")   # honors CF_IMPLEMENTER / PI_DIS
 # <slug> = task short name you derive from the goal: kebab-case, 1-3 words
 # (e.g. "rwd-setup"). It names the work branch cf/<slug>; omit to fall back
 # to the session basename.
-. "$SESSION/env.sh"                      # exposes SESSION_BASENAME, BRIEF_FILE, REPORT_FILE, PI_PROTOCOL, PI_AVAILABLE, CF_IMPLEMENTER, PI_DESC, PROTOCOL_DIR, thresholds
-PROTOCOL_DIR="${PROTOCOL_DIR:-${CLAUDE_PLUGIN_ROOT}/docs}"
+. "$SESSION/env.sh"                      # exposes SCRIPTS, CF_SLUG, PI_PROTOCOL, PI_AVAILABLE, CF_IMPLEMENTER, PI_DISPATCH_CMD, PI_DESC, thresholds
 echo '{"retries_used":0}' > "$SESSION/loop-budget.json"
 echo "SESSION=$SESSION"
 ```
@@ -69,10 +68,10 @@ OMP is offered mid-flow only at the moments §3.6 lists.
 | Research | `cf:research` | Read, Grep, Glob, Bash, WebFetch |
 | Plan | `cf:plan` | Read, Write, Grep, Glob |
 | **Implement (default)** | **`cf:implement`** | Read, Edit, Write, Bash, Glob, Grep, WebFetch |
-| Implement (overflow, opt-in) | OMP via background `cf-pi-run.sh` | OMP's own tools + main's Bash/Read |
+| Implement (overflow, opt-in) | OMP via background `cf-pi-run.sh` | OMP's own tools + your Bash/Read |
 | Review | `cf:review` | Read, Write, Grep, Glob, Bash |
 
-The default builder is `cf:implement` on the default model; OMP builds only when `CF_IMPLEMENTER=omp` is recorded in `env.sh`. OMP rounds route the builder via `$PI_DISPATCH_CMD`, the agent command with its `--model` flag (for example `pi --model openai-codex/gpt-5.6-terra`; unset, pi runs on its own settings). The retired `PI_BIN`, `PI_PROVIDER`, `PI_MODEL` and `PI_EXTRA_ARGS` are refused when set: setup's probe reports `ERROR:<var> is retired` on stderr and records `PI_AVAILABLE=0`, so OMP stays unavailable until the human moves that routing into `PI_DISPATCH_CMD`. Setup records `$PI_DISPATCH_CMD` in `env.sh`, and every later step reads it from there, so a change in the environment takes effect only in a new flow. Choose the OMP builder's model with the review seat in mind — the reviewer must sit at or above the builder's capability (dispatch doctrine: reviewer ≥ builder), and nothing enforces that for you. If a more specialized agent exists for the goal (e.g., a frontend-dev agent for UI work), prefer it.
+The default builder is `cf:implement` on the default model; OMP — the opt-in overflow builder, a pi agent that pi-dispatch runs in the background — builds only when `CF_IMPLEMENTER=omp` is recorded in `env.sh`. OMP rounds route the builder via `$PI_DISPATCH_CMD`, the agent command with its `--model` flag (for example `pi --model <provider>/<model>`; unset, pi runs on its own settings). The retired `PI_BIN`, `PI_PROVIDER`, `PI_MODEL` and `PI_EXTRA_ARGS` are refused when set: setup's probe reports `ERROR:<var> is retired` on stderr and records `PI_AVAILABLE=0`, so OMP stays unavailable until the human moves that routing into `PI_DISPATCH_CMD`. Setup records `$PI_DISPATCH_CMD` in `env.sh`, and every later step reads it from there, so a change in the environment takes effect only in a new flow. Choose the OMP builder's model with the review seat in mind — the reviewer must sit at or above the builder's capability (dispatch doctrine: reviewer ≥ builder), and nothing enforces that for you. If a more specialized agent exists for the goal (e.g., a frontend-dev agent for UI work), prefer it.
 
 ### Agent Output Discipline (file-write + summary reply)
 
@@ -202,8 +201,8 @@ If this is a loop-back, use the enriched goal instead (see §Loop Back).
 **Dispatch agent** with this context:
 
 ```markdown
-Contracts path: $SESSION/contracts.json
 Report path: $SESSION/plan.md
+Contracts path: $SESSION/contracts.json
 
 ## Goal
 {1-2 sentence compressed goal, incorporating human clarifications if any}
@@ -239,15 +238,15 @@ The plan agent writes its full output to `$SESSION/plan.md` per the agent's Retu
    - Has "Decisions" section. **High** decisions must carry Choice/Trade-off/Alternatives/Rationale. Medium decisions need at least a Rationale line. Low decisions need only the Choice line.
    - Has "Behavioral Contracts" with input/output/errors/depends + test cases per contract. **User-facing contracts** must also include a `States` block (Loading / Empty / Error / Success, plus Partial/Stale if applicable) with at least one test case per non-trivial state.
    - Has "Implementation Plan" with steps
-   - `jq -e '.schema_version' "$SESSION/contracts.json"` succeeds — §3.1 shards from that file and exits 3 without it
    - Has "Completed" and "Unresolved" sections
+   - `jq -e '.schema_version' "$SESSION/contracts.json"` succeeds — §3.1 shards from that file and exits 3 without it
    - If missing → re-run plan with feedback (increment `retries_used`).
 
 2. **Constraint coverage check**:
    - Every research constraint is addressed by at least one contract **test case**, OR explicitly acknowledged in Unresolved with justification.
    - If a constraint is not captured as a test case, tell the plan agent which constraint is missing and re-run.
 
-3. **High-classification audit** — the plan agent self-classifies decisions per `agents/plan.md`'s criteria (High = Strategic direction OR Irreversible technical). Your job is to **flag suspected misclassifications**, not auto-upgrade. Scan Medium/Low decisions for any that match a High criterion:
+3. **High-classification audit** — the plan agent self-classifies decisions per `${CLAUDE_PLUGIN_ROOT}/agents/plan.md`'s criteria (High = Strategic direction OR Irreversible technical). Your job is to **flag suspected misclassifications**, not auto-upgrade. Scan Medium/Low decisions for any that match a High criterion:
 
    - **Strategic direction**: changes success criteria, affects ≥ 2 features, commits product direction, introduces a new third-party vendor
    - **Irreversible technical**: non-rollback migration, public API break, auth change, removes existing functionality, new data location/format, vendor lock-in > 1 person-week
@@ -265,14 +264,14 @@ one of these fires:
 
 - the plan introduces a **breaking change** the baton did not already approve (outward
   API change, non-rollback migration, dependency major bump, security posture change —
-  the High/Irreversible list from §3),
+  the High/Irreversible list from the High-classification audit above),
 - the gap-scan or plan **contradicts a baton contract**,
 - a baton **unverified-assumption tripwire** turned out load-bearing for a chosen design.
 
 Frame that ask around the specific trigger, not as a full plan re-approval.
 
 **Normal mode** — when transition validation passes, **read
-`$PROTOCOL_DIR/human-gate-protocol.md`** and follow it. The protocol covers: gate header framing, Scope Review template, Decisions template (only for High decisions — Medium/Low are plan-agent-decided and do NOT surface at the gate), Gate Action via AskUserQuestion, and Iterative Discussion rules for multi-round dialogue.
+`${CLAUDE_PLUGIN_ROOT}/docs/human-gate-protocol.md`** and follow it. The protocol covers: gate header framing, Scope Review template, Decisions template (only for High decisions — Medium/Low are plan-agent-decided and do NOT surface at the gate), Gate Action via AskUserQuestion, and Iterative Discussion rules for multi-round dialogue.
 
 Do NOT proceed to Phase 3 without explicit human approval (baton mode's auto-proceed
 carries that approval from the upstream handoff).
@@ -283,7 +282,7 @@ carries that approval from the upstream handoff).
 
 State to the human upfront: `Phase 3: parallel-sharded fan-out on <N> contract(s), built by <cf:implement | OMP ($PI_DESC)> per CF_IMPLEMENTER. Parent branch cf/$CF_SLUG; per-shard branches cf/$CF_SLUG-shard-<id>.`
 
-Phase 3 splits the contract set by file-touch graph and builds one shard per connected component. On the default builder each shard is a background `cf:implement` agent bracketed by `cf-pi-run.sh --prepare-only` and `--gates-only` (§3.2); on OMP it is one background `cf-pi-run.sh` (§3.6). The gates live inside that script; you only fan out, collect, and route.
+Phase 3 splits the contract set by file-touch graph and builds one shard per connected component. On the default builder each shard is a background `cf:implement` agent bracketed by `cf-pi-run.sh --prepare-only` and `--gates-only` (§3.2); on OMP it is one background `cf-pi-run.sh` (§3.6). The gates live inside that script; you only fan out, collect, and route. "Design §N" below means section N of `${CLAUDE_PLUGIN_ROOT}/docs/parallel-sharded-design.md`.
 
 **Token discipline (design §7), non-negotiable**: read ONLY each shard's paths-only `outcome.md` plus bounded peeks (`Read(file, limit=…)`, `jq '.field'`, `head`/`tail -N`, `sed -n` section slices). NEVER read `report.md`, `contracts.json`, `escalate.md`, briefs, postmortems, JSONL, or test logs — background-task stdout stays in the task's own output file (of `gates.out`, only its last line).
 
@@ -311,7 +310,7 @@ FAN_OUT=$(jq '.fan_out_count' "$SESSION/shards.json")
 SHARD_IDS=$(jq -r '.groups | keys[]' "$SESSION/shards.json")
 ```
 
-`shards.json` carries `{fan_out_count, groups: {<id>: {shard_id, contracts:[…], files:[…], depends_on:[…]}}}` and seeds `$SESSION/shards/<id>/env.sh` per shard. `depends_on` (shard ids whose contract interfaces this shard consumes, derived from contract-level `depends`) drives the wave rule in §3.2. Main reads only those two scalars / id list — never the full groups payload. Also assemble the brief inputs once (shared across all shards):
+`shards.json` carries `{fan_out_count, groups: {<id>: {shard_id, contracts:[…], files:[…], depends_on:[…]}}}` and seeds `$SESSION/shards/<id>/env.sh` per shard. `depends_on` (shard ids whose contract interfaces this shard consumes, derived from contract-level `depends`) drives the wave rule in §3.2. You read only those two scalars / id list — never the full groups payload. Also assemble the brief inputs once (shared across all shards):
 
 - `GOAL_ONELINE` — derived from `$SESSION/goal.md` (one sentence).
 - `CONSTRAINTS` — `sed -n '/^## Constraints/,/^## Key Files/p' "$SESSION/research.md"`, boiled to short lines.
@@ -408,13 +407,13 @@ done
 
 **Failure transparency — mandatory.** For every non-PASS shard, before routing, read its `## Reason` + `## Cause` and tell the human in one sentence per shard WHY it failed (e.g. `B: NEEDS_REPLAN — test-fail-persistent: "AssertionError: expected 200, got 404"`). Never report a bare status. If Cause is `-`, read `tail -20` of the postmortem path from `## Artifacts` and summarize; name the postmortem path so the human can dig deeper.
 
-Persist round results to disk (main never holds the JSON in context):
+Persist round results to disk (you never hold the JSON in context):
 
 ```bash
 "$SCRIPTS/cf-pi-record-round.sh" "$SESSION" \
     --round "$ROUND" --result "A=PASS" --result "B=NEEDS_REPLAN" --result "C=FAIL"
 # Updates $SESSION/dispatch-state.json (current round only) and appends prior
-# round to $SESSION/dispatch-state-archive.jsonl (never read by main during flow).
+# round to $SESSION/dispatch-state-archive.jsonl (never read by you during the flow).
 ```
 
 Bounded reads on state for routing:
@@ -455,9 +454,9 @@ Per-shard, per-round FAIL retry budget = 1 (design §6).
 "All" means every shard in `shards.json`, not just this wave — if undispatched dependent shards remain, they are now READY (their prerequisites just passed): dispatch them as the next wave (§3.2) instead. Only with no shard left un-PASS, run the integration gate — merge all PASS shard branches into `cf/$CF_SLUG-integrated`, run the full test suite, and land the result on `cf/$CF_SLUG` as linear history:
 
 ```bash
-"$SCRIPTS/cf-pi-integrate.sh" "$SESSION" "$TEST_RUNNER"
 . "$SESSION/env.sh"
 rm -f "$SESSION/integration-result.json"
+"$SCRIPTS/cf-pi-integrate.sh" "$SESSION" "$TEST_RUNNER"
 INT_STATUS=$(jq -r '.status' "$SESSION/integration-result.json" 2>/dev/null || echo MISSING)
 ```
 
@@ -466,8 +465,8 @@ INT_STATUS=$(jq -r '.status' "$SESSION/integration-result.json" 2>/dev/null || e
 - `INT_STATUS=PASS` → read `jq -r '.test_counts' "$SESSION/integration-result.json"` before believing it, for the reason given under `## Tests` in §3.3; this is the green that authorizes delivery. `unparsed` means the runner printed no count line — say so to the human in one line rather than passing over it. Then proceed to Phase 4, which captures `$SESSION/implement.diff`.
 - `INT_STATUS=NEEDS_REPLAN` → integration gate auto-injects NEEDS_REPLAN for the affected contracts (`jq -r '.affected_contracts[]' "$SESSION/integration-result.json"`). Funnel into the partial-replan path below as if they came from shard outcomes.
 - `INT_STATUS=TEST_STALLED` → the integration suite outran `CF_TEST_DEADLINE_S` and was killed, so nothing was attributed and nothing was landed. This is infrastructure, not a contract failure: never funnel it into partial-replan. Show the human `.test_log` and `.deadline_s` and ask whether to raise the deadline and re-run the gate, or to investigate the hanging test.
-- `INT_STATUS=LINEARIZE_CONFLICT` → the commits could not be replayed onto `cf/$CF_SLUG` as linear history, or the parent worktree was refused before any rewrite; the passing tree remains on `.integration_branch` and the parent sits at `.parent_prior_tip`. Read `jq -r '.reason, .offending_shard, .offending_commit' "$SESSION/integration-result.json"` and escalate with the cause named — never proceed to Phase 4 on this status. Reasons:
 - `INT_STATUS=FAIL` → a shard merge conflicted on the integration branch (`.reason` is `merge_conflict`). File-graph sharding should make this impossible, so the shard plan and the branches disagree. Escalate with `jq -r '.offending_shard, .offending_branch' "$SESSION/integration-result.json"` named — do not resolve the conflict by hand, and never proceed to Phase 4.
+- `INT_STATUS=LINEARIZE_CONFLICT` → the commits could not be replayed onto `cf/$CF_SLUG` as linear history, or the parent worktree was refused before any rewrite; the passing tree remains on `.integration_branch` and the parent sits at `.parent_prior_tip`. Read `jq -r '.reason, .offending_shard, .offending_commit' "$SESSION/integration-result.json"` and escalate with the cause named — never proceed to Phase 4 on this status. Reasons:
   - `parent_missing` — `$SESSION/work` is absent or not a git worktree. Nothing was written; the gate can be rerun once the worktree exists on `cf/$CF_SLUG`.
   - `parent_wrong_branch` — `$SESSION/work` is checked out on a branch other than `cf/$CF_SLUG`. Nothing was written; rerun once it is back on `cf/$CF_SLUG`.
   - `parent_dirty` — `$SESSION/work` has uncommitted changes. Nothing was written; show the human `git -C "$SESSION/work" status --porcelain` and rerun once it is clean.
@@ -482,7 +481,7 @@ Coalesce all NEEDS_REPLAN this round (worker-initiated escalate.md, persistent-t
 
 `tests-green-on-revert` comes from the revert gate: the contracts it lists under `## Affected contracts` have tests that still pass with the shard's implementation put back to `$BASE_HEAD`, so those tests prove nothing. Say so for each of them in the request below, so Plan gives the contract a test case that fails without its implementation.
 
-Build the Partial Replan Request block per `agents/plan.md` §Partial Replan Request, then dispatch:
+Build the Partial Replan Request block per `${CLAUDE_PLUGIN_ROOT}/agents/plan.md` §Partial Replan Request, then dispatch:
 
 ```
 Agent(
@@ -540,7 +539,7 @@ Replan budget = 2 attempts per contract (third NEEDS_REPLAN escalates). Rollback
 
 OMP builds a round only when `CF_IMPLEMENTER=omp` is recorded in `$SESSION/env.sh` and `PI_AVAILABLE=1`. The full per-shard lifecycle (worktree → brief → probe → dispatch → poll → gates → outcome) lives inside `cf-pi-run.sh`; you only fan out, collect, and route.
 
-**When to offer OMP.** Main suggests it at exactly three moments, and only when `PI_AVAILABLE=1`:
+**When to offer OMP.** You suggest it at exactly three moments, and only when `PI_AVAILABLE=1`:
 
 1. A Claude usage limit shows in a `cf:implement` reply (§3.2 step 4), or the weekly limit is spent.
 2. A shard's second FAIL on Claude (§3.4 Any FAIL).
@@ -552,7 +551,7 @@ On a usage-limit reply, stop this round's Claude dispatches and re-briefs, then 
 
 OMP builds with the model in `$PI_DISPATCH_CMD`. Keep the reviewer at or above that model (dispatch doctrine: reviewer ≥ builder); nothing enforces it for you.
 
-**No pre-dispatch quota gate.** There is none, deliberately: since dispatch moved from omp to pi there is no provider-side headroom signal to read (`pi auth check` reports readiness, not remaining balance, and is blind to package-provided providers). Exhaustion is caught reactively — `cf-pi-run.sh`'s poll classifies it as `QUOTA` (balance or plan, which only paying resets) or `QUOTA-WINDOW` (a rolling window that clears on its own in hours), and one worker hitting the wall aborts its whole batch rather than letting every sibling pay for the same wall: the shard that hits it records the wall for the flow, and every sibling `cf-pi-run.sh` stops its own worker from that record with the same tag. On that outcome (§3.4 Any FAIL), route those shards back to the Claude builder (§3.2) or re-run later as a new flow with a different `$PI_DISPATCH_CMD`.
+**No pre-dispatch quota gate.** There is none, deliberately: there is no provider-side headroom signal to read (`pi auth check` reports readiness, not remaining balance, and is blind to package-provided providers). Exhaustion is caught reactively — `cf-pi-run.sh`'s poll classifies it as `QUOTA` (balance or plan, which only paying resets) or `QUOTA-WINDOW` (a rolling window that clears on its own in hours), and one worker hitting the wall aborts its whole batch rather than letting every sibling pay for the same wall: the shard that hits it records the wall for the flow, and every sibling `cf-pi-run.sh` stops its own worker from that record with the same tag. On that outcome (§3.4 Any FAIL), route those shards back to the Claude builder (§3.2) or re-run later as a new flow with a different `$PI_DISPATCH_CMD`.
 
 Launch the READY shards in PARALLEL — one `cf-pi-run.sh` per shard as a **background task** (`Bash` with `run_in_background: true` and `timeout: 7200000`), all in a **single message**:
 
@@ -570,7 +569,7 @@ The 4 positionals are `SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER` — p
 
 ```
 Monitor(
-  command: "\"$SCRIPTS/cf-pi-watch.sh\" \"$SESSION\" 300",
+  command: ". $SESSION/env.sh && \"$SCRIPTS/cf-pi-watch.sh\" \"$SESSION\" 300",
   description: "cf shards progress",
   timeout_ms: 3600000, persistent: false
 )
@@ -589,7 +588,7 @@ Monitor(
 
 Launch the Standards and Spec reviews as two separate read-only sub-agents in a **single message**, each writing its own report file.
 
-Capture the review diff unconditionally on both implementer paths — never into a shell variable, which would inject the full diff into the orchestrator's context. Phase 4 itself writes `$SESSION/implement.diff` from the flow's fixed point to the integrated branch:
+Capture the review diff unconditionally on both implementer paths — never into a shell variable, which would inject the full diff into your context. Phase 4 itself writes `$SESSION/implement.diff` from the flow's fixed point to the integrated branch:
 
 ```bash
 . "$SESSION/env.sh"
@@ -623,7 +622,7 @@ Any `Phase 4 fail-early:` line halts Phase 4: surface that line verbatim to the 
 
 The integration branch name is read from `$SESSION/integration-result.json`, which the integration gate publishes — never re-derive it here. The diff spans from `$BASE_HEAD` (flow-start HEAD) to that branch, so per-contract commits collapse into the review payload cleanly.
 
-The reviewer Reads this file directly; the orchestrator never reads its body.
+The reviewer Reads this file directly; you never read its body.
 
 ### Dispatch
 
@@ -800,7 +799,7 @@ Every loop-back increments `retries_used`. The single counter caps total flow ch
 
 ## Escalation
 
-When you cannot proceed (`retries_used >= 4`, all contracts unresolved, fundamental blocker), read `$PROTOCOL_DIR/escalation-protocol.md` and follow it. Key principle: re-enter at the **earliest phase invalidated by the change**.
+When you cannot proceed (`retries_used >= 4`, all contracts unresolved, fundamental blocker), read `${CLAUDE_PLUGIN_ROOT}/docs/escalation-protocol.md` and follow it. Key principle: re-enter at the **earliest phase invalidated by the change**.
 
 ---
 
@@ -832,10 +831,11 @@ Captures the final diff and removes the worktree. **The cf branch (`cf/$CF_SLUG`
 Shard branches, the integration branch, checkpoint tags, and rollback refs are cf's own machinery, not the user's work — they must not accumulate in the project. **On the success path only**, remove them once the run is integrated:
 
 ```bash
+. "$SESSION/env.sh"
 "$SCRIPTS/cf-pi-cleanup.sh" "$SESSION" "$CF_SLUG"
 ```
 
-`cf/$CF_SLUG` already carries the integration gate's linear landing, so nothing is lost. The integration branch and its `$SESSION/integrated-work` checkout go only when their tree is the one on `cf/$CF_SLUG`; when the block prints `kept …` instead, pass that line to the human. **On the escalation path, delete none of it** — §5's worst case has the human cherry-picking validated contract commits off those very branches and tags.
+`cf/$CF_SLUG` already carries the integration gate's linear landing, so nothing is lost. The integration branch and its `$SESSION/integrated-work` checkout go only when their tree is the one on `cf/$CF_SLUG`; when the block prints `kept …` instead, pass that line to the human. **On the escalation path, delete none of it** — design §3's worst case has the human cherry-picking validated contract commits off those very branches and tags.
 
 Then tell the user the one command that erases cf from the project entirely, and say it plainly — after they merge, nothing about which tool produced the work should remain:
 
