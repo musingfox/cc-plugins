@@ -4,7 +4,7 @@
 #
 # Usage:   cf-pi-merge-revision.sh FLOW_SESSION REVISION_FILE
 # Effects: in-place update of $FLOW_SESSION/contracts.json
-#          previous version archived to contracts-prev-<timestamp>.json
+#          previous version archived to contracts-prev-<YYYYmmddHHMMSS>[-n].json
 # Exit:    0 on success
 #          2 usage error
 #          3 schema_version mismatch
@@ -69,10 +69,7 @@ if [ -n "$missing" ]; then
   exit 5
 fi
 
-# Archive previous version.
-ts=$(date +%s)
-archive="$flow_session/contracts-prev-${ts}.json"
-cp "$CONTRACTS_FILE" "$archive"
+archive=$(archive_contracts "$flow_session")
 
 # Apply revision: replace contracts whose name is in revision; keep others.
 tmp=$(mktemp)

@@ -134,6 +134,22 @@ cf_own_paths() {
     --not $(cat "$3/prereq-refs" 2>/dev/null)
 }
 
+# archive_contracts FLOW_SESSION
+#   Copies contracts.json to contracts-prev-<YYYYmmddHHMMSS>[-n].json and
+#   prints that path. Never overwrites an earlier archive: two writes inside
+#   one second get a -n suffix.
+archive_contracts() {
+  local ts archive n=0
+  ts=$(date +%Y%m%d%H%M%S)
+  archive="$1/contracts-prev-${ts}.json"
+  while [ -e "$archive" ]; do
+    n=$((n + 1))
+    archive="$1/contracts-prev-${ts}-${n}.json"
+  done
+  cp "$1/contracts.json" "$archive"
+  printf '%s\n' "$archive"
+}
+
 resolve_canon_dispatch() {
   local root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
   ls "$root"/../pi-dispatch/scripts/pi-dispatch.sh \

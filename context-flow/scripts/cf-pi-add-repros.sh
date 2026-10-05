@@ -268,14 +268,7 @@ for pos, text in edits:
     out = out[:pos] + text + out[pos:]
 open(out_path, "w", encoding="utf-8", newline="").write(out)
 PY
-  ts=$(date +%Y%m%d%H%M%S)
-  archive="$flow_session/contracts-prev-${ts}.json"
-  n=0
-  while [ -e "$archive" ]; do
-    n=$((n + 1))
-    archive="$flow_session/contracts-prev-${ts}-${n}.json"
-  done
-  cp "$contracts" "$archive"
+  archive_contracts "$flow_session" >/dev/null
   mv "$doc" "$contracts"
   doc=""
 fi
