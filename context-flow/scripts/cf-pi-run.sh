@@ -176,6 +176,10 @@ derive_cause() {
       [ -s "$TEST_LOG" ] && cause="last output before the deadline: $(tail -1 "$TEST_LOG" 2>/dev/null)" ;;
     undeclared_file_touched)
       cause="scope violation — see undeclared_files below" ;;
+    incomplete-contracts)
+      # The worker finished without completing these. Any error in its JSONL is
+      # one it already got past, so quoting it would blame the wrong thing.
+      cause="declared but not completed: $(printf '%s\n' "${missing:-}" | paste -sd, - | sed 's/,/, /g')" ;;
     tests-green-on-revert)
       cause="tests stay green with the implementation reverted: $(sed -n 's/^STAYS_GREEN //p' "$SHARD_SESSION/revert-gate.out" 2>/dev/null | head -1)" ;;
     revert-gate-error)

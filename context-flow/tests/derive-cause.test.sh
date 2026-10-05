@@ -91,4 +91,11 @@ assert_contains "$cause" "SHARD_TEST_RUNNER" "T11: names SHARD_TEST_RUNNER"
 assert_contains "$cause" "$FLOW_SESSION/env.sh" "T11: names where to record it"
 case "$cause" in *stale-round-error*) _assert_fail "T11: quoted a stale worker error" ;; *) _assert_pass ;; esac
 
+# T12: contracts the report never completed name themselves, never a worker
+# error the run already recovered from (still in T11's JSONL).
+missing=$'C1\nC2'
+cause=$(derive_cause NEEDS_REPLAN incomplete-contracts)
+assert_contains "$cause" "C1, C2" "T12: names the uncompleted contracts"
+case "$cause" in *stale-round-error*) _assert_fail "T12: quoted a recovered worker error" ;; *) _assert_pass ;; esac
+
 rm -rf "$SHARD_SESSION"
