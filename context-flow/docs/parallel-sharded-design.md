@@ -15,6 +15,7 @@ goal → Plan (contracts.json) → cf-pi-shard.sh (file-touch graph → shards)
          all PASS        → integration gate (merge + full suite) → review
          any NEEDS_REPLAN → coalesced partial-replan → re-fan-out affected shards
          any FAIL        → retry once → escalate
+     → review (Standards + Spec) → Spec FAIL → turn repros into test cases → re-launch the failing contracts' shards
 ```
 
 | Layer | Owns | Claude-token cost |
@@ -32,7 +33,7 @@ Sharding is derived from a **file-touch graph**, not declared by Plan — two sh
 
 Plan emits paired artifacts: `plan.md` (human prose) + `contracts.json` (machine-readable sidecar, schema-versioned). Orchestration scripts read **only** `contracts.json` — never parse plan.md.
 
-`contracts.json` per contract: `name` (stable id), `summary`, `touches_files` (superset of every file created/modified, tests included — underset is a bug, post-validated by cf-pi-scope.sh), `test_cases` (`{id, given, expect}`), `attachments` (paths under `plan-attachments/` for rich prose; default empty).
+`contracts.json` per contract: `name` (stable id), `summary`, `input` / `output` / `errors` (the markdown contract's lines, verbatim), `depends` (contracts of this plan whose interfaces it consumes), `touches_files` (superset of every file created/modified, tests included — underset is a bug, post-validated by cf-pi-scope.sh), `test_files` (the entries of `touches_files` that are its tests, which the revert gate never reverts), `implementation_plan` (the plan steps that fulfill it), `test_cases` (`{id, given, expect}`; review repros arrive as `R<n>`), `fuzzy_criteria`, `attachments` (paths under `plan-attachments/` for rich prose; default empty). The field rules live in `agents/plan.md`.
 
 `cf-pi-shard.sh`: nodes = contracts, edge ⇔ shared touched file, one shard per connected component → `shards.json` `{fan_out_count, groups:{id:{contracts,files}}}`. `fan_out_count == 1` IS the single-worker case — same code path.
 
@@ -86,7 +87,7 @@ Never enters main: `contracts.json` bodies, worker reports, JSONL event streams,
 
 Every read main performs on a flow artifact is bounded: `Read(file, limit=N)`, `jq '.field'`, `head/tail -N`, `sed -n '/^## X/,/^## Y/p'`. Unbounded `cat`/`Read` on any artifact > 1KB is forbidden.
 
-Anti-growth: `dispatch-state.json` holds only the latest round (~1KB); history is appended to `dispatch-state-archive.jsonl`, never read by main during a flow. Gate-3 retest, the gate-1 report-only re-brief, and in-shard resume re-briefs all happen inside `cf-pi-run.sh` on OMP rounds, so main re-launches there only for infrastructure FAIL. On Claude rounds `--gates-only` instead prints one `REBRIEF tests|report <path>` per kind per round and main dispatches one fresh `cf:implement` for it (cf.md §3.2 step 5). An infrastructure re-launch is self-cleaning: `cf-pi-run.sh` clears the previous round's outcome/report/escalate/diff before dispatching, so the retry cannot be read through last round's artifacts.
+Anti-growth: `dispatch-state.json` holds only the latest round (~1KB); history is appended to `dispatch-state-archive.jsonl`, never read by main during a flow. Gate-3 retest, the gate-1 report-only re-brief, and in-shard resume re-briefs all happen inside `cf-pi-run.sh` on OMP rounds, so main re-launches there for an infrastructure FAIL, and after review for a Spec FAIL, whose repros `cf-pi-add-repros.sh` first adds to the failing contracts' test cases (cf.md §Handling the Verdict). On Claude rounds `--gates-only` instead prints one `REBRIEF tests|report <path>` per kind per round and main dispatches one fresh `cf:implement` for it (cf.md §3.2 step 5). An infrastructure re-launch is self-cleaning: `cf-pi-run.sh` clears the previous round's outcome/report/escalate/diff before dispatching, so the retry cannot be read through last round's artifacts.
 
 ## 8. Observability
 
