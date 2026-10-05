@@ -5,9 +5,9 @@
 
 . "$CF_TESTS_DIR/lib/assert.sh"
 
-# Extract the function (and the JSONL resolver it calls) from cf-pi-run.sh and
+# Extract the function (and the JSONL and revert-gate readers it calls) from cf-pi-run.sh and
 # load them with stub env.
-eval "$(sed -n '/^newest_jsonl()/,/^}/p;/^derive_cause()/,/^}/p' "$CF_TESTS_DIR/../scripts/cf-pi-run.sh")"
+eval "$(sed -n '/^newest_jsonl()/,/^}/p;/^revert_gate_error()/,/^}/p;/^derive_cause()/,/^}/p' "$CF_TESTS_DIR/../scripts/cf-pi-run.sh")"
 
 SHARD_SESSION="$(mktemp -d)"
 PI_SESSION_DIR="$SHARD_SESSION/pi-sessions"; mkdir -p "$PI_SESSION_DIR"

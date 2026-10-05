@@ -154,6 +154,13 @@ newest_jsonl() {
 # One-line human-readable failure cause for outcome.md, picked from the
 # artifact that matches the failure reason (a plausible-but-wrong cause is
 # worse than none). Empty on PASS / no evidence.
+# The revert gate's ERROR line, or what to say when it printed no verdict at
+# all. Both the outcome's Cause and its Affected list quote this.
+revert_gate_error() {
+  grep -m1 '^ERROR ' "$SHARD_SESSION/revert-gate.out" 2>/dev/null \
+    || echo "cf-pi-revert-gate exited ${GATE_RC:-?} without a verdict"
+}
+
 derive_cause() {
   local status="$1" reason="$2" cause=""
   [ "$status" = "PASS" ] && return 0
@@ -172,8 +179,7 @@ derive_cause() {
     tests-green-on-revert)
       cause="tests stay green with the implementation reverted: $(sed -n 's/^STAYS_GREEN //p' "$SHARD_SESSION/revert-gate.out" 2>/dev/null | head -1)" ;;
     revert-gate-error)
-      cause=$(grep -m1 '^ERROR ' "$SHARD_SESSION/revert-gate.out" 2>/dev/null) || true
-      [ -n "$cause" ] || cause="cf-pi-revert-gate exited ${GATE_RC:-?} without a verdict" ;;
+      cause=$(revert_gate_error) ;;
     QUOTA|QUOTA-WINDOW)
       # A sibling stopped by the wall has no error of its own: name who hit it.
       # The shard that hit it keeps its own errorMessage.
@@ -916,10 +922,9 @@ case "$GATE_RC:$gate_line" in
     say "NEEDS_REPLAN tests-green-on-revert ($gate_line)"
     exit 2 ;;
   *)
-    gate_err=$(grep -m1 '^ERROR ' "$SHARD_SESSION/revert-gate.out" 2>/dev/null || true)
-    write_outcome FAIL revert-gate-error "$survivors" \
-      "(all): ${gate_err:-revert gate exited $GATE_RC without a verdict}" "-" "-"
-    say "FAIL revert-gate-error (${gate_err:-rc=$GATE_RC, no verdict})"
+    gate_err=$(revert_gate_error)
+    write_outcome FAIL revert-gate-error "$survivors" "(all): $gate_err" "-" "-"
+    say "FAIL revert-gate-error ($gate_err)"
     exit 1 ;;
 esac
 

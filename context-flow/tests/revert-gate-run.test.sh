@@ -225,3 +225,7 @@ fx_mutant 's/(case "\$GATE_RC:\$gate_line" in\n)/${1}  1:*) ;;\n/'
 run_shard "$MUT" false
 assert_eq "0 PASS" "$RC $(section Status)" "error T3 exit 1 routed to PASS: T1 ends PASS"
 rm -rf "$FLOW"
+
+# One reader of revert-gate.out's ERROR line: derive_cause and step 13 quote
+# the same text, so Cause and Affected cannot drift apart.
+assert_eq "1" "$(grep -c 'without a verdict' "$REAL_SCRIPTS/cf-pi-run.sh")" "revert-gate.out ERROR fallback written once"
