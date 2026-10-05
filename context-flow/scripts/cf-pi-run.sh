@@ -714,8 +714,7 @@ fail_if_stalled() { # $1 = gate output file
 # run_gate3 OUTFILE: one suite run; sets TEST_RC and TEST_COUNTS.
 run_gate3() {
   set +e
-  # shellcheck disable=SC2086
-  "$SCRIPTS/cf-pi-test.sh" "$SHARD_SESSION" $TEST_RUNNER > "$1" 2>&1
+  "$SCRIPTS/cf-pi-test.sh" "$SHARD_SESSION" bash -c "$TEST_RUNNER" > "$1" 2>&1
   TEST_RC=$?
   set -e
   TEST_COUNTS="$(sed -n 's/^test_counts=//p' "$1" | tail -1)"
