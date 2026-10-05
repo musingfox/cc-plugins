@@ -181,6 +181,8 @@ derive_cause() {
         local _j; _j=$(newest_jsonl)
         [ -n "$_j" ] && cause=$(grep -m1 -o '"errorMessage":"[^"]*"' "$_j" 2>/dev/null) || true
       fi ;;
+    test-runner-missing)
+      cause="the shard test runner is blank — record SHARD_TEST_RUNNER in $FLOW_SESSION/env.sh and pass it as the 4th argument" ;;
     dispatch-refused)
       # pi-dispatch.sh prefixes its refusals; anything else is a wrapper's own
       # complaint, whose last line is the one that says why it gave up. Its

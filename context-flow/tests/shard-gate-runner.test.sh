@@ -124,6 +124,7 @@ assert_eq absent "$(fx_exists "$FLOW/worktree.count")" "B1 no worktree"
 assert_eq absent "$(fx_exists "$FLOW/brief.count")" "B1 no brief"
 assert_eq "no" "$(has "$OUT" PREPARED)" "B1 no PREPARED line"
 assert_eq "[shard A] FAIL test-runner-missing" "$(fx_last)" "B1 stdout line"
+assert_contains "$(section Cause)" "SHARD_TEST_RUNNER" "C2 Cause names SHARD_TEST_RUNNER"
 fx_clean
 
 # B2

@@ -80,4 +80,15 @@ printf 'ERROR dirty-own-paths src/a.sh\n' > "$SHARD_SESSION/revert-gate.out"
 assert_eq "ERROR dirty-own-paths src/a.sh" "$(derive_cause FAIL revert-gate-error)" \
   "T10: revert-gate-error cause is the gate's ERROR line"
 
+# T11: a blank runner names the missing setting, never a previous round's worker
+# error. T6 left a pi-rundir behind; without removing it newest_jsonl would
+# return T6's stalled-resume run and the negative check would pass vacuously.
+rm -rf "$SHARD_SESSION/pi-rundir" "$SHARD_SESSION/pi-rundir-prev"
+printf '{"errorMessage":"stale-round-error"}\n' > "$PI_SESSION_DIR/a.jsonl"
+FLOW_SESSION="$SHARD_SESSION/flow"
+cause=$(derive_cause FAIL test-runner-missing)
+assert_contains "$cause" "SHARD_TEST_RUNNER" "T11: names SHARD_TEST_RUNNER"
+assert_contains "$cause" "$FLOW_SESSION/env.sh" "T11: names where to record it"
+case "$cause" in *stale-round-error*) _assert_fail "T11: quoted a stale worker error" ;; *) _assert_pass ;; esac
+
 rm -rf "$SHARD_SESSION"
