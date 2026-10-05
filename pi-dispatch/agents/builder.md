@@ -59,7 +59,7 @@ Protocol:
      `QUOTA-WINDOW` means the wall resets in hours; `QUOTA` means it does not.
      Either way this batch is over — report the tag, do not wait it out.
      Roll back each aborted worker's worktree with the guarded command in
-     the pi-dispatch skill's provider-wall section (it only touches a
+     the provider-wall part of the brief's operator usage (it only touches a
      linked worktree; a plain checkout is left as is), then
      SendMessage main `QUOTA <names> rolled back` and end your turn — main
      re-dispatches the task to a self-do builder.
@@ -69,7 +69,7 @@ Protocol:
    `result.md` is the deliverable text only, never its verdict.
    - `STATUS=DONE …` → re-run the acceptance check yourself and capture the
      output; a mismatch with the worker's claim is itself a finding. You
-     NEVER issue the verdict yourself — hand the contract + deliverable
+     NEVER sign off yourself — hand the contract + deliverable
      paths + check output to an independent reviewer (dispatched by main,
      not by you; you never see the reviewer's brief).
    - `STATUS=BLOCKED <need>` → SendMessage main the need as a replan
@@ -79,7 +79,7 @@ Protocol:
      carries the cause). No check, no reviewer.
 5. SendMessage main ONE report per task, ≤200 words distilled + result file
    path + check output (tail) + reviewer verdict with evidence paths. Main
-   owns the final verdict. End your turn with the same summary as your final
+   owns sign-off. End your turn with the same summary as your final
    message.
 6. Before ending ANY turn: run `pi-agent.sh poll NAME` for each worker YOU
    started. If any shows RUNNING, you are NOT done — go back to step 3. Only

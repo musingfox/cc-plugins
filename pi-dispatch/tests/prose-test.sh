@@ -61,11 +61,24 @@ hits="$(grep -l 'Monitor tool' "$README" "$SKILL" "$DOCTRINE" "$AGENT")"
 [ -z "$hits" ] && ok "no doc or script says 'Monitor tool'" || bad "'Monitor tool' still in: $hits"
 
 # --- the output contract tells the dispatcher to declare its verdict file ---
-section="$(sed -n '/^## Output contract/,/^## Control plane/p' "$SKILL")"
+section="$(sed -n '/^### Output contract/,/^### Verbs/p' "$SKILL")"
 case "$section" in
   *PI_WRITABLE_FILES*) ok "SKILL's output contract says to declare the verdict file in PI_WRITABLE_FILES" ;;
   *) bad "SKILL's output contract never names PI_WRITABLE_FILES" ;;
 esac
+
+# --- the operator usage main embeds has a boundary and holds only operator steps ---
+operator="$(sed -n '/^## Operator usage/,$p' "$SKILL")"
+case "$operator" in
+  *"pi-agent.sh start"*) ok "SKILL has an Operator usage section that runs to the end of the file" ;;
+  *) bad "SKILL has no Operator usage section carrying the verbs" ;;
+esac
+case "$operator" in
+  *AskUserQuestion*) bad "the Operator usage section asks the human (builder has no AskUserQuestion)" ;;
+  *) ok "the Operator usage section never asks the human" ;;
+esac
+[ "$(grep -c '^## ' <<<"$operator")" = 1 ] && ok "the Operator usage section is the last top-level section" || bad "a top-level section follows Operator usage"
+grep -q 'Embed the `## Operator usage` section' "$SKILL" && ok "SKILL tells main which section to embed" || bad "SKILL never names the section to embed"
 
 # --- every env var read has a README row ---
 for v in PI_PROMPT PI_WALL_CLOCK_S PI_STALL_THRESHOLD_S PI_NO_MARKER_GRACE_S PI_RUN_DEADLINE_S PI_POLL_INTERVAL_S PI_WRITABLE_FILES; do

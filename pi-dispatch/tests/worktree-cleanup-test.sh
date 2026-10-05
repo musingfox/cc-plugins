@@ -679,6 +679,27 @@ else
   bad "(d) branch_name: payload leaked into generated cleanup (in_cleanup=$bn_payload_in_cleanup) OR SENTINEL created (sentinel=$bn_sentinel_created) — branch_name baked into heredoc"
 fi
 
+# ---------------------------------------------------------------------------
+# A missing create param is named by the spelling the parser accepts.
+# ---------------------------------------------------------------------------
+R_MP="$(fresh_repo)"
+for _flag in --repo_root --rundir-file; do
+  _args=(--repo_root "$R_MP" --branch_name mp --base_ref "$(git -C "$R_MP" rev-parse HEAD)"
+         --base_branch main --work_path "$R_MP/work" --diff_out "$TMP/mp.diff"
+         --cleanup_out "$TMP/mp.cleanup" --rundir-file "$TMP/mp.rundir")
+  _kept=(); _skip=0
+  for _a in "${_args[@]}"; do
+    if [ "$_skip" = 1 ]; then _skip=0; continue; fi
+    if [ "$_a" = "$_flag" ]; then _skip=1; continue; fi
+    _kept+=("$_a")
+  done
+  _err="$(bash "$WT" create "${_kept[@]}" 2>&1 >/dev/null)"
+  case "$_err" in
+    *"missing required param $_flag"*) ok "missing $_flag -> the error names $_flag" ;;
+    *) bad "missing $_flag -> error: $_err" ;;
+  esac
+done
+
 echo "---"
 echo "pass: $PASS, fail: $FAIL"
 [ "$FAIL" -eq 0 ]

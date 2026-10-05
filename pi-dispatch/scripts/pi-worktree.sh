@@ -79,7 +79,8 @@ done
 for _param in repo_root branch_name base_ref base_branch work_path diff_out cleanup_out rundir_file; do
   eval "_val=\"\${${_param}}\""
   if [ -z "$_val" ]; then
-    echo "pi-worktree: missing required param --${_param//_/-}" >&2
+    _flag="--$_param"; [ "$_param" = rundir_file ] && _flag=--rundir-file
+    echo "pi-worktree: missing required param $_flag" >&2
     exit 1
   fi
 done

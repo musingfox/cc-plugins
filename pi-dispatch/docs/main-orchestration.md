@@ -1,20 +1,29 @@
 # Main Orchestration Loop — pi-dispatch
 
 This document is the canonical description of how Claude Code's **main** thread
-orchestrates work through pi-dispatch. Main is the orchestrator and the verdict
-owner; it never executes the brief itself. The loop has six steps. Two agents
+orchestrates work through pi-dispatch. Main is the orchestrator and owns
+sign-off; it never executes the brief itself. The loop has six steps. Two agents
 do the hands-on work — **builder** (executes the brief, either by offloading
 to a pi worker or by doing it itself) and **reviewer** (independent contract
-judge). Main dispatches both and owns the final verdict.
+judge). Main dispatches both and owns sign-off.
 
 ## Scope
 
 This document covers the **one-shot** dispatch loop only: main dispatches a
-builder and a reviewer for a single task, then owns the verdict. The
+builder and a reviewer for a single task, then owns sign-off. The
 **resident** shape (cross-turn resume, agent-team) and the **background**
 shape (task with no builder) are not described here — see
 `dispatch-doctrine.md`'s consumption-shapes table for those. The six-step
 loop below is the one-shot path.
+
+## Contents
+
+1. Offload decision
+2. Brief writing
+3. Builder dispatch
+4. Reviewer dispatch
+5. Sign-off
+6. Pi-fail fallback
 
 ## 1. Offload decision
 
@@ -46,8 +55,9 @@ Main writes one self-contained brief per task. The brief carries:
   inside it (`PI_CWD`). A brief rule cannot move the worker's cwd; only the
   dispatcher can.
 
-**Offload path**: main loads the `pi-agent.sh` operator usage from
-`skills/pi-dispatch/SKILL.md` and embeds it verbatim into the brief. The
+**Offload path**: main embeds the `## Operator usage` section of
+`skills/pi-dispatch/SKILL.md` (from that heading to the end of the file)
+verbatim into the brief. The
 builder will run `pi-agent.sh start` / `watch` / `poll` / `peek` / `ls` / `stop`
 / `send` as a pure operator.
 
@@ -68,7 +78,7 @@ step 2. The builder executes:
 - usage absent → self-do mode: do the work directly, write tests, run the
   acceptance check, distill a report.
 
-The builder never issues the verdict and never judges the contract. It hands
+The builder never signs off and never judges the contract. It hands
 the contract + deliverable paths + check output back. Main relays one
 distilled report per task (NAME, what happened, result path, check output tail).
 
@@ -90,9 +100,9 @@ final verdict (PASS only if every clause is PASS).
 Main passes the reviewer only the contract + deliverable + check output —
 never the builder's transcript, never the builder's working notes.
 
-## 5. Verdict ownership
+## 5. Sign-off
 
-Main owns the final **verdict**. It reads the reviewer's per-clause PASS/FAIL
+Main owns **sign-off**. It reads the reviewer's per-clause PASS/FAIL
 and the builder's distilled report, then decides: accept, reject, or rework.
 Main is the only seat that can accept a deliverable. A dispatch with no
 reviewer on any seat is not a dispatch — it is abandonment; main either

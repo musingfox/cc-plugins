@@ -85,8 +85,9 @@ if [ -n "$R2" ] && [ "$R2" != "$R1" ] && [ "$(rec "$R2")" = "$VERDICT_C" ]; then
 if [ "$(env_seen "$R2")" = "$VERDICT_C" ]; then ok "send -> the resumed worker's env holds the verdict path"; else bad "send -> worker env '$(env_seen "$R2")'"; fi
 rm -f "$VERDICT"
 
+# 7c5d7e0 pins the reviewer on opus so it is never weaker than the builder.
 n="$(grep -c '^model:' "$REVIEWER")"
-if [ "$n" = 0 ]; then ok "reviewer has no model: line"; else bad "reviewer model: lines -> $n"; fi
+if [ "$n" = 1 ] && grep -qx 'model: opus' "$REVIEWER"; then ok "reviewer pins model: opus"; else bad "reviewer model: lines -> $n, opus pin -> $(grep -c '^model: opus$' "$REVIEWER")"; fi
 R_TOOLS="$(tools "$REVIEWER")"
 if [ -n "$R_TOOLS" ] && ! printf '%s\n' "$R_TOOLS" | grep -q Edit; then ok "reviewer tools hold no Edit"; else bad "reviewer tools -> '$R_TOOLS'"; fi
 

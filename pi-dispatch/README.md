@@ -12,7 +12,7 @@ Claude (main, or a builder)                           pi worker (cheap model)
 ```
 
 - **`scripts/pi-dispatch.sh BRIEF [OUTDIR [PRIOR_RUNDIR]]`** — launches pi in the background (setsid process group), returns `OUTPUT=/PID=/RUNDIR=` instantly. `PRIOR_RUNDIR` resumes the prior run's session (`--session <id>`), preserving worker context across rounds without re-briefing.
-- **`scripts/pi-poll.sh RUNDIR`** — stateless, idempotent one-line status: `RUNNING` or a terminal `STATUS=OK|FAIL …`. On OK it distills the final assistant text into `result.md` (raw stream kept as `pi.stream.jsonl`). Terminal verdicts persist in `RUNDIR/status` and replay on re-poll. Liveness guards (wall-clock, stall) group-kill orphans automatically. Terminal lines carry `model=<provider/model> cost=$<sum over all turns> turns=<n>`; a provider spend wall is killed on sight and tagged `QUOTA` (balance exhausted) or `QUOTA-WINDOW` (a rolling usage window that resets on its own); transient rate limits are neither, and `pi-agent.sh watch` then aborts the siblings it was given so the caller can fall back to a Claude builder.
+- **`scripts/pi-poll.sh RUNDIR`** — stateless, idempotent one-line status: `RUNNING` or a terminal `STATUS=OK|FAIL …`. On OK it distills the final assistant text into `result.md` (raw stream kept as `pi.stream.jsonl`). Terminal status lines persist in `RUNDIR/status` and replay on re-poll. Liveness guards (wall-clock, stall) group-kill orphans automatically. Terminal lines carry `model=<provider/model> cost=$<sum over all turns> turns=<n>`; a provider spend wall is killed on sight and tagged `QUOTA` (balance exhausted) or `QUOTA-WINDOW` (a rolling usage window that resets on its own); transient rate limits are neither, and `pi-agent.sh watch` then aborts the siblings it was given so the caller can fall back to a Claude builder.
 - **`scripts/pi-stop.sh RUNDIR`** — idempotent group-kill cancel.
 - **`scripts/pi-run.sh [--deadline S] BRIEF [OUTDIR [PRIOR_RUNDIR]]`** — run-to-terminal: dispatch + block until terminal in ONE call, one `OUTCOME=OK|FAIL …` line. A detached setsid watchdog reaps the worker at the deadline even if the CALLER dies mid-wait (harness timeout, killed sub-agent) — orphan safety no longer depends on the caller passing the right timeout. Use from contexts that must block in a single Bash call (sub-agents can't be woken by Monitor).
 - **`scripts/pi-probe.sh [--bin-only] [PROBE_DIR]`** — pre-flight gate: `--bin-only` checks the command's binary is on PATH (exit 0/1); the full probe runs `say ok` on the same `PI_DISPATCH_CMD` a dispatch would run, bounded by `PI_PROBE_DEADLINE_S` (default 60) and reporting `STALLED` rather than hanging its caller. Callers never touch the agent binary themselves.
@@ -90,7 +90,7 @@ Context hygiene: main never reads worker streams or source material — only bri
 
 ## Prerequisites
 
-- `pi` installed and authenticated (`pi` → `/login`), `jq`, `git` (for worktrees).
+- `pi` installed and authenticated (`pi` → `/login`), `jq`, `perl` (the detached launch and watchdogs), `git` (for worktrees).
 
 ## Tests
 
