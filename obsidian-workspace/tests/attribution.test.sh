@@ -4,7 +4,7 @@ cd "$(git rev-parse --show-toplevel)"
 
 fail() { echo "  ✗ $*"; exit 1; }
 
-skill=obsidian-workspace/skills/pm/SKILL.md
+skill=obsidian-workspace/README.md
 
 n=$(grep -c 'adapted from .*mattpocock/skills.*to-tickets.*MIT.*3cca18b368ae95cdbdebbff572ccafa662551015' "$skill" || true)
 [ "$n" -eq 1 ] || fail "T1: one unwrapped sha-pinned adapted-from line, got $n"
@@ -17,3 +17,6 @@ n=$(grep -cF "Upstream's wide refactor expand-contract sequencing is not importe
 
 n=$(grep -c 'https://github.com/mattpocock/skills' "$skill" || true)
 [ "$n" -eq 1 ] || fail "T4: github.com/mattpocock/skills once, got $n"
+
+n=$(cat obsidian-workspace/skills/pm/SKILL.md obsidian-workspace/skills/pm/references/*.md | grep -c 'mattpocock' || true)
+[ "$n" -eq 0 ] || fail "T5: the credit lives in the README, not the pm skill, got $n"

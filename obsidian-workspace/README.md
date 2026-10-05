@@ -57,7 +57,8 @@ Writes go through `obsidian eval` and are read back; a failed write is logged to
 - **Templates** core plugin enabled (required for `/obw:pm` — `task` / `doc` templates)
 - **Daily Notes** core plugin enabled (required for `/obw:jot` quick capture)
 - **Bases** core plugin enabled (required only for `/obw:pm` dashboards — bundled in Obsidian 1.9+)
-- [uv](https://docs.astral.sh/uv/) (optional; lets the `/issue` pane draw Mermaid blocks as text diagrams through `uvx termaid@0.9.0` — without it they show as code blocks)
+- [jq](https://jqlang.org) (required by `/obw:init`, which reads Obsidian's vault list and Templates settings with it)
+- [uv](https://docs.astral.sh/uv/) (required by `/obw:pm refresh dashboard`, which compares dashboards through `uv run --with pyyaml`; optional for the `/issue` pane, where it draws Mermaid blocks as text diagrams through `uvx termaid@0.9.0` — without it they show as code blocks)
 - [viz](../viz) plugin (optional; enables the `/issue` pane's **Open in browser** Button — without it the Button is not drawn)
 - Claude Code 2.1.287 or later (required only for the `/issue` pane; the skills do not need it)
 
@@ -120,7 +121,7 @@ Every project gets `tasks/`, `docs/`, and `dashboard.base` — `/obw:init` creat
 
 Upgrading a vault from before 0.9: re-run `/obw:init`. It detects the old layout and offers, each separately, to move `archive/` into `tasks/archive/` (through the CLI, so links follow), backfill the `title` property on existing notes, and regenerate the dashboards with the new views. Existing filenames are never renamed.
 
-A plugin update can add dashboard views. Run `/obw:pm refresh dashboard` to bring in All Tasks (and any other new template view) on an existing vault. The refresh regenerates `dashboard.base` from the template, so hand edits to that file are overwritten; it warns and asks first.
+A plugin update can change dashboard views, formulas, columns, and filters. Run `/obw:pm refresh dashboard` to bring in All Tasks (and any other template change) on an existing vault. The refresh compares `dashboard.base` with every template version as parsed YAML. A dashboard identical to one of them is regenerated at once; one with hand edits lists them, warns that regenerating overwrites them, and asks first.
 
 ## Filenames
 
@@ -150,3 +151,7 @@ Only one direction is stored. What a task *blocks*, and what its subtasks are, c
 /obw:pm split this spec into tickets
 /obw:pm refresh dashboard
 ```
+
+## Credits
+
+Ticket splitting adapted from [mattpocock/skills](https://github.com/mattpocock/skills) `to-tickets` (MIT, Copyright (c) 2026 Matt Pocock), commit 3cca18b368ae95cdbdebbff572ccafa662551015. Upstream's wide refactor expand-contract sequencing is not imported: the pm skill keeps the three vertical-slice rules plus prefactor and maps blocking edges onto existing `blocked_by`.

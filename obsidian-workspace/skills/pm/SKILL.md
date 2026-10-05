@@ -58,9 +58,9 @@ Use **one call** per known-name read — never chain `search → read`. The pm-s
 - **Create task** → `create` at `pm/{project}/tasks/{kebab}.md` with `template=task`, then set properties `title` / `project` / `priority` / `due` / `tags`.
 - **Create doc** → `create` at `pm/{project}/docs/{kebab}.md` with `template=doc`, then set `title` / `project`.
 - **List tasks** → `search` with `query="[type:task] [project:{project}] [status:<s>]" format=json`.
-- **To tickets** → split a spec, task, or conversation into tickets with blocking edges; see To Tickets.
+- **To tickets** → split a spec, task, or conversation into tickets with blocking edges; follow [references/to-tickets.md](references/to-tickets.md).
 - **Archive** → set `status=done` and `completed`, then `move` to `pm/{project}/tasks/archive`. Run the dependent check first (see Relations).
-- **Delete** → confirm first; fall back to `move` if the build lacks `delete`.
+- **Delete** → confirm first, then `delete`; it moves the note to the trash.
 
 ## Relations
 
@@ -74,29 +74,6 @@ Only the stated direction is stored. The inverse — who this task blocks, its s
 - **Archiving cascades a prompt** — before archiving `X`, `search` `query="[type:task] [project:{project}] [blocked_by:X]" format=json`. If any task depends on `X`, list them and ask whether to drop `X` from their `blocked_by` (and un-block those left with none). Never edit dependents silently.
 - **Cycles** — before adding `A` to `B.blocked_by`, walk `A`'s own `blocked_by` chain. If it reaches `B`, refuse and report the cycle.
 - `parent` is for epic → subtask decomposition only; use `related` for anything else.
-
-## To Tickets
-
-Ticket splitting adapted from [mattpocock/skills](https://github.com/mattpocock/skills) `to-tickets` (MIT, Copyright (c) 2026 Matt Pocock), commit 3cca18b368ae95cdbdebbff572ccafa662551015. Upstream's wide refactor expand-contract sequencing is not imported: this skill keeps the three vertical-slice rules plus prefactor and maps blocking edges onto existing `blocked_by`.
-
-Look for prefactor opportunities first: make the change easy, then make the easy change.
-
-Every ticket is a vertical slice:
-
-- A complete narrow path through schema, API, UI, and tests — not a horizontal layer.
-- Demoable or verifiable on its own.
-- Sized to one fresh context window.
-- Prefactor done first.
-
-Split a spec, task, or conversation already in context — or a vault reference the user names. A missing reference stops with the CLI error. Nothing to split → say so and write nothing.
-
-Before any vault write, show a numbered list. Per ticket: **Title**, **Blocked by** (other titles or none), **What it delivers**. Then `AskUserQuestion` with at least: approve / too coarse / too fine / edges wrong. Repeat until the user approves. Only then publish.
-
-Create tickets blockers first so no link targets a missing note. Per ticket, in that order: one **Create task** (kebab filename, `template=task`, `title` and `project`); fill `## Description` from what it delivers and `## Acceptance Criteria`. If it has blockers, set `blocked_by` once with its complete list of `[[kebab]]` wikilinks and `status=blocked`. If the source is a task note in the same project, set `parent` to `[[source]]`. Any later blocker on an already-existing task follows Relations. The source is never modified.
-
-A `create` error mid-publish → stop, receipt of which tickets landed and which did not, never re-run `create`. End with a receipt of created filenames.
-
-Startable tickets — the frontier — are one `search` with `query="[type:task] [project:{project}] -[status:done] -[blocked_by:\"[[\"]" format=json`. `blocked_by` values are always `[[kebab]]` wikilinks; an empty list `[]` is not excluded by presence, only by value. A linear chain yields one at a time.
 
 ## Property Schema
 
@@ -122,14 +99,23 @@ Generated from plugin templates via shell (template contents never enter context
     content="$(sed "s/__PROJECT__/{project}/g" "${CLAUDE_PLUGIN_ROOT}/templates/dashboard-project.base")" overwrite
   ```
 
-A `refresh dashboard` request brings an existing project dashboard up to the template:
+A `refresh dashboard` request brings an existing project dashboard up to the template. Compare the two with the plugin's script. It parses both as YAML, because Obsidian reformats a `.base` it has opened and a text diff is noise, and it prints only the differences, so the template body stays out of context:
 
-1. List the vault dashboard's view names: `obsidian vault={vault} read path="pm/{project}/dashboard.base" | grep -E 'name:|^Error'`. Never use `base:views` here: it ignores `path=` and lists the views of whatever base is open in Obsidian. An `Error: File "…" not found.` line means the base file is not found: the dashboard is missing — recreate it with the per-project command above and stop. Obsidian may drop the quotes around a name, so compare names without them.
-2. List the template's view names only: `grep '^    name:' "${CLAUDE_PLUGIN_ROOT}/templates/dashboard-project.base"`. Never read the rest of the template into context.
-3. Report which template views are missing from the vault's list. If none are, say so and stop. Otherwise warn that regenerating overwrites `dashboard.base` and discards any hand edits to it.
-4. Only after the user agrees, regenerate with the per-project create command above.
+```bash
+obsidian vault={vault} read path="pm/{project}/dashboard.base" \
+  | uv run --no-project --with pyyaml "${CLAUDE_PLUGIN_ROOT}/scripts/dashboard-diff.py" project {project}
+```
 
-The cross-project file follows the same steps with `pm/dashboard.base` and `templates/dashboard-cross.base`.
+Act on the first line of its output:
+
+- `verdict: missing` — the CLI answered `Error: File "…" not found.`, so the dashboard is missing. Recreate it with the per-project command above and stop.
+- `verdict: current` — say the dashboard is up to date and stop.
+- `verdict: stale <version>` — the dashboard is an earlier template with no hand edits, so overwriting loses nothing. Report the `changes` lines, then regenerate with the per-project command.
+- `verdict: edited` — the dashboard matches no template version. Show its `hand edits` lines, measured against the closest version (`base`), and any `changes` lines. Warn that regenerating discards the hand edits, then regenerate only after the user agrees.
+
+In those lines, `added` is only in the dashboard, `removed` is only in the template, and `changed` reads dashboard value `->` template value. Any other output is an error; report it as one.
+
+The cross-project file follows the same steps with `path="pm/dashboard.base"`, `cross` in place of `project {project}`, and the cross-project command.
 
 Conversation-mode status (user asks in chat, not Obsidian): run the equivalent `search` and format a summary table in the reply. Don't rewrite an existing `.base` file unless asked to (a `refresh dashboard` request is asking) — the only unprompted write is recreating a project dashboard that has gone missing.
 
@@ -137,7 +123,7 @@ Conversation-mode status (user asks in chat, not Obsidian): run the equivalent `
 
 1. Read `.obsidian.yaml` before any operation.
 2. Never `search` to locate a note whose name is known — go straight to `read`.
-3. Never bypass the CLI with filesystem Read/Write against the vault. Only exceptions, both inside `/obw:init`: reading `.obsidian/templates.json` / `obsidian.json`, and `mkdir` for the templates folder and the project skeleton (the CLI has no folder verb). Dashboard creation uses the CLI via shell-piped content.
+3. Never bypass the CLI with filesystem Read/Write against the vault. The only exceptions belong to `/obw:init`, which lists them under Filesystem Access. Dashboard creation uses the CLI via shell-piped content.
 4. Confirm destructive intents (delete, archive-move) before executing.
 5. A claim of "created" / "updated" needs a receipt — the CLI's own success output counts; an error output never does. Report failures as failures.
 6. Bulk scans (e.g. auditing all archived tasks) may be delegated to a read-only Explore agent to keep the listing out of context; single-entity operations never need one.

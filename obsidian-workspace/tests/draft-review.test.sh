@@ -4,8 +4,7 @@ cd "$(git rev-parse --show-toplevel)"
 
 fail() { echo "  ✗ $*"; exit 1; }
 
-skill=obsidian-workspace/skills/pm/SKILL.md
-sec=$(awk '/^## To Tickets/{f=1;print;next} /^## /{f=0} f' "$skill")
+sec=$(cat obsidian-workspace/skills/pm/references/to-tickets.md)
 
 n=$(printf '%s\n' "$sec" | grep -c 'AskUserQuestion' || true)
 [ "$n" -ge 1 ] || fail "T1: AskUserQuestion missing"

@@ -1,0 +1,37 @@
+filters:
+  and:
+    - file.inFolder("pm")
+    - 'type == "task"'
+
+formulas:
+  display: 'if(title, title, file.name)'
+
+properties:
+  formula.display:
+    displayName: "Title"
+
+views:
+  - type: table
+    name: "By Project"
+    groupBy:
+      property: project
+      direction: ASC
+    order:
+      - formula.display
+      - status
+      - priority
+      - due
+    summaries:
+      formula.display: Unique
+
+  - type: table
+    name: "Recently Completed (7d)"
+    filters:
+      and:
+        - 'status == "done"'
+        - 'completed && (today() - date(completed)).days <= 7'
+    order:
+      - formula.display
+      - project
+      - completed
+      - tags

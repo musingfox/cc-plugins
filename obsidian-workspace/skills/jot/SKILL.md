@@ -1,6 +1,6 @@
 ---
 name: jot
-description: Unified entry point for Obsidian daily-note captures and long-form notes. Triggers on "記一下 / log / 紀錄 / capture this / 寫到 journal" (→ cap mode) and "建立筆記 / new note / 寫一份筆記 / create a note on" (→ note mode). Also via `/obw:jot`. Requires `.obsidian.yaml`.
+description: Unified entry point for Obsidian daily-note captures and long-form notes. Triggers on "記一下 / log this to my journal / 紀錄 / capture this / 寫到 journal" (→ cap mode) and "建立筆記 / new note / 寫一份筆記 / create a note on" (→ note mode). Also via `/obw:jot`. Requires `.obsidian.yaml`.
 ---
 
 # jot — Capture or Note
@@ -26,7 +26,7 @@ Append a timestamped bullet to today's daily note. Nothing more. Daily note fold
 3. Append the bullet to today's daily note via `obsidian vault=<VAULT_NAME> daily:append` (creates the note if missing).
 4. Confirm with the appended line. Return `[[<daily-note-basename>]]`.
 
-Example: `記一下 #worklog 完成了 API-first 架構 draft` → `- 14:32 — 完成了 API-first 架構 draft #worklog`
+Example: `記一下 #worklog 完成了 API-first 架構 draft` → `- 14:32 — #worklog 完成了 API-first 架構 draft`
 
 ## note mode
 

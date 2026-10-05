@@ -1,0 +1,53 @@
+filters:
+  and:
+    - file.inFolder("pm/__PROJECT__")
+    - 'type == "task"'
+
+formulas:
+  days_until_due: 'if(due, (date(due) - today()).days, "")'
+
+properties:
+  formula.days_until_due:
+    displayName: "Days Until Due"
+
+views:
+  - type: table
+    name: "Active"
+    filters:
+      and:
+        - 'status != "done"'
+    order:
+      - file.name
+      - status
+      - priority
+      - due
+      - formula.days_until_due
+      - tags
+    groupBy:
+      property: status
+      direction: ASC
+
+  - type: table
+    name: "Recently Completed"
+    filters:
+      and:
+        - 'status == "done"'
+        - file.inFolder("pm/__PROJECT__/archive")
+    order:
+      - file.name
+      - completed
+      - tags
+    limit: 10
+
+  - type: table
+    name: "By Tag"
+    filters:
+      and:
+        - 'status != "done"'
+    order:
+      - file.name
+      - status
+      - tags
+    groupBy:
+      property: tags
+      direction: ASC
