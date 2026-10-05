@@ -120,7 +120,7 @@ All notes are kebab-cased (`Implement Auth` → `implement-auth.md`), for both `
 
 Dashboards and searches depend on these frontmatter fields. If you edit the installed templates, keep the field names.
 
-- **Task** — `title`, `type: task`, `status` (`todo` / `in-progress` / `blocked` / `done`), `priority` (`high` / `medium` / `low`), `project`, `due` (date), `tags` (list), `parent` (link), `blocked_by` (list of links), `related` (list of links), `created`, `completed`
+- **Task** — `title`, `type: task`, `status` (`todo` / `in-progress` / `blocked` / `done`), `priority` (`high` / `medium` / `low`), `project`, `due` (date), `tags` (list), `parent` (link), `blocked_by` (list of links), `related` (list of links), `session` (the Claude session UUID bound to the task), `created`, `completed`; the task body's `## Agent` section holds one line per event of that session
 - **Doc** — `title`, `type: doc`, `project`, `created`, `updated`
 
 ## Task Relations

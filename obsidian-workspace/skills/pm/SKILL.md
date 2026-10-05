@@ -100,7 +100,7 @@ Startable tickets — the frontier — are one `search` with `query="[type:task]
 
 ## Property Schema
 
-**Task**: `title`, `type: task`, `status` (todo/in-progress/blocked/done), `priority` (high/medium/low), `project`, `due` (date), `tags` (list), `parent` (link), `blocked_by` (list of links), `related` (list of links), `created`, `completed`.
+**Task**: `title`, `type: task`, `status` (todo/in-progress/blocked/done), `priority` (high/medium/low), `project`, `due` (date), `tags` (list), `parent` (link), `blocked_by` (list of links), `related` (list of links), `session` (the Claude session UUID bound to the task), `created`, `completed`. The `## Agent` section holds one line per event of that session, appended by the writeback hook — do not edit it by hand.
 **Doc**: `title`, `type: doc`, `project`, `created`, `updated`.
 
 Property names are lowercase. Do not invent fields — dashboards depend on this schema.
