@@ -13,3 +13,4 @@ printf '%s\n' "$v" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' || fail "T2 version mus
 [ "$(grep -c "^  \"version\": \"$v\",\$" "$m")" = 1 ] || fail "T2 version line must be in the form the pre-commit hook rewrites"
 [ "$(jq -r .homepage "$m")" = 'https://github.com/musingfox/cc-plugins/tree/main/audit' ] || fail "T3 homepage"
 [ "$(jq 'has("commands") or has("skills") or has("agents")' "$m")" = false ] || fail "T4 no component keys"
+[ "$(jq -c '.dependencies | sort' "$m")" = '["adr","spec","wizard"]' ] || fail "T5 dependencies must name every plugin the skill routes to"

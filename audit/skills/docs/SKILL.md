@@ -68,7 +68,8 @@ classification fires then.
 ## 2. Classify
 
 Dispatch one `audit:docs-classifier` per doc longer than 500 lines, in parallel, each
-with its own report path and the references of the fired modules; read shorter docs
+with its own report path in a scratch directory outside the audited repo (`mktemp -d`)
+and the references of the fired modules; read shorter docs
 yourself and write each one's section-to-kind map into the proposal. A classifier returns
 each section's kinds with line ranges, a drift sample, duplicates across docs, and
 anchors.
@@ -80,8 +81,7 @@ Done when every section of every doc has a kind.
 A classifier's output is a lead list. Confirm each claim yourself before it enters a
 proposal, against the code, or by running the tool when the claim is about what a tool
 reads or does: every drift, every "this reason is written only here",
-every decision candidate. On the first run, both decision candidates a classifier
-proposed failed the warrant test, and one "written only here" claim was false.
+every decision candidate.
 
 Done when every claim you will act on cites a check you ran.
 
@@ -95,6 +95,9 @@ change.
 Done when every doc you will change has its anchor list.
 
 ## 5. Propose, by kind
+
+Write the proposal outside the audited repo too, as one table row per change: doc and
+section, kind, change, source of truth, anchors.
 
 - **Current state.** Eliminate before you correct: a count, list or index names its
   source instead ("every key in `GRADE_D_KEYS`", "every table in `schema.sql`"), which
@@ -118,9 +121,12 @@ Done when every doc you will change has its anchor list.
   scratch violation before it ships, and an entry whose check can false-positive stays
   unbound, as `/spec:spec` rules.
 
+Show the whole proposal to the human; approved rows go to step 6.
+
 Done when every proposed change names its kind, its source of truth and its anchors;
-every module is listed as fired, with how, or silent; and every finding is applied, put
-to the human with AskUserQuestion, or ruled out of scope.
+every module is listed as fired, with how, or silent; and the human has seen the
+proposal, with each finding approved, put to them with AskUserQuestion, or ruled out of
+scope.
 
 ## 6. Apply
 
@@ -129,8 +135,5 @@ docs — tests, CI, bot config — ships only when the option the human approved
 and every test that reads a doc. Each new nested `CLAUDE.md` gets a load receipt —
 [references/platform.md](references/platform.md#load-receipt).
 
-Done when the suite is green and every new nested file has its receipt.
-
----
-
-First run: cyris, 2026-10-01 (musingfox/cyris#25).
+Done when every approved row is applied, the suite is green and every new nested file
+has its receipt.

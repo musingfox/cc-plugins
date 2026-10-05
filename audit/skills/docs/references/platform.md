@@ -36,7 +36,7 @@ rules and pointers, and current-state facts live where they load on demand.
 - Review `CLAUDE.md` edits in pull requests, revisit them after a major model release,
   and let a Stop hook propose updates from the session transcript.
   [large codebases › Layer CLAUDE.md files by directory](https://code.claude.com/docs/en/large-codebases#layer-claude-md-files-by-directory)
-- `/doctor prompt-audit` (v2.1.283 or later) reads the instruction files, rules and
+- `/doctor prompt-audit` reads the instruction files, rules and
   skills, and reports references to files or commands that do not exist and files that
   contradict each other; pass a path to audit one file or directory.
   [memory](https://code.claude.com/docs/en/memory)
