@@ -297,7 +297,7 @@ Before sharding, materialize the parent worktree that all shard branches will be
 
 After this, `$WORK` is a git worktree on `cf/$CF_SLUG` forked from the user's HEAD at flow start. Per-shard branches (`cf/$CF_SLUG-shard-A`, `-B`, …) are created from this parent inside `cf-pi-run.sh`; the integration gate lands the same tree here as linear history. The user's host working tree is never touched during implement. After Phase 4 PASS, the parent branch is rebased onto the latest `$BASE_BRANCH`.
 
-If `$REPO_ROOT` is empty (host is non-git): `$WORK` is a scratch directory; integration and rollback degrade gracefully (each script reports the limitation in its result JSON).
+If `$REPO_ROOT` is empty (host is non-git): `$WORK` is a scratch directory, and the flow cannot pass the integration gate — `cf-pi-integrate.sh` and `cf-pi-rollback.sh` both refuse a non-git flow without writing a result file. Tell the human before Phase 3 that the flow needs a git repo to deliver.
 
 ### 3.1 Shard
 
@@ -454,13 +454,18 @@ Per-shard, per-round FAIL retry budget = 1 (design §6).
 
 ```bash
 "$SCRIPTS/cf-pi-integrate.sh" "$SESSION" "$TEST_RUNNER"
-INT_STATUS=$(jq -r '.status' "$SESSION/integration-result.json")
+. "$SESSION/env.sh"
+rm -f "$SESSION/integration-result.json"
+INT_STATUS=$(jq -r '.status' "$SESSION/integration-result.json" 2>/dev/null || echo MISSING)
 ```
 
-- `INT_STATUS=PASS` → read `jq -r '.test_counts' "$SESSION/integration-result.json"` before believing it: an exit code cannot tell a green suite from one that skipped everything and exited 0, and this is the green that authorizes delivery. `unparsed` means the runner printed no count line — say so to the human in one line rather than passing over it. Then proceed to Phase 4, which captures `$SESSION/implement.diff`.
+- `INT_STATUS=MISSING` → the gate refused before doing anything and left no result file (exit 4): a blank runner, a non-git flow, or a missing `env.sh` or dispatch state. Nothing was merged or landed. Show the human the script's stderr line and escalate; never proceed to Phase 4.
+
+- `INT_STATUS=PASS` → read `jq -r '.test_counts' "$SESSION/integration-result.json"` before believing it, for the reason given under `## Tests` in §3.3; this is the green that authorizes delivery. `unparsed` means the runner printed no count line — say so to the human in one line rather than passing over it. Then proceed to Phase 4, which captures `$SESSION/implement.diff`.
 - `INT_STATUS=NEEDS_REPLAN` → integration gate auto-injects NEEDS_REPLAN for the affected contracts (`jq -r '.affected_contracts[]' "$SESSION/integration-result.json"`). Funnel into the partial-replan path below as if they came from shard outcomes.
 - `INT_STATUS=TEST_STALLED` → the integration suite outran `CF_TEST_DEADLINE_S` and was killed, so nothing was attributed and nothing was landed. This is infrastructure, not a contract failure: never funnel it into partial-replan. Show the human `.test_log` and `.deadline_s` and ask whether to raise the deadline and re-run the gate, or to investigate the hanging test.
 - `INT_STATUS=LINEARIZE_CONFLICT` → the commits could not be replayed onto `cf/$CF_SLUG` as linear history, or the parent worktree was refused before any rewrite; the passing tree remains on `.integration_branch` and the parent sits at `.parent_prior_tip`. Read `jq -r '.reason, .offending_shard, .offending_commit' "$SESSION/integration-result.json"` and escalate with the cause named — never proceed to Phase 4 on this status. Reasons:
+- `INT_STATUS=FAIL` → a shard merge conflicted on the integration branch (`.reason` is `merge_conflict`). File-graph sharding should make this impossible, so the shard plan and the branches disagree. Escalate with `jq -r '.offending_shard, .offending_branch' "$SESSION/integration-result.json"` named — do not resolve the conflict by hand, and never proceed to Phase 4.
   - `parent_missing` — `$SESSION/work` is absent or not a git worktree. Nothing was written; the gate can be rerun once the worktree exists on `cf/$CF_SLUG`.
   - `parent_wrong_branch` — `$SESSION/work` is checked out on a branch other than `cf/$CF_SLUG`. Nothing was written; rerun once it is back on `cf/$CF_SLUG`.
   - `parent_dirty` — `$SESSION/work` has uncommitted changes. Nothing was written; show the human `git -C "$SESSION/work" status --porcelain` and rerun once it is clean.

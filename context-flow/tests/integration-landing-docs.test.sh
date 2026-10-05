@@ -84,3 +84,15 @@ assert_eq "0" "$(phase4 | grep -cF 're-verifies on the NOOP path' || true)" \
   "Phase 4 TESTFAIL row does not claim a NOOP re-verification"
 assert_ge1 "$(phase4 | grep -cF 'Ask the human how to proceed; shard re-runs cannot fix' || true)" \
   "Phase 4 TESTFAIL row goes to the human"
+
+# T9: every status cf-pi-integrate.sh writes has its own route in cf.md.
+INTEGRATE="$(cd "$CF_TESTS_DIR/.." && pwd)/scripts/cf-pi-integrate.sh"
+for st in $(grep -oE 'status: "[A-Z_]+"' "$INTEGRATE" | sort -u | sed 's/status: "//; s/"//'); do
+  assert_ge1 "$(grep -cF "\`INT_STATUS=$st\`" "$CFMD" || true)" "T9 cf.md routes INT_STATUS=$st"
+done
+
+# T10: a refused run (exit 4) writes no result, so the previous round's file must
+# be gone before the gate runs, or INT_STATUS reads last round's status.
+int_block=$(awk '/cf-pi-integrate.sh" "\$SESSION" "\$TEST_RUNNER"/{print prev; print; exit} {prev=$0}' "$CFMD")
+assert_contains "$int_block" 'rm -f "$SESSION/integration-result.json"' "T10 stale integration result removed before the gate"
+assert_ge1 "$(grep -cF 'no result file' "$CFMD" || true)" "T10b cf.md routes a missing integration result"
