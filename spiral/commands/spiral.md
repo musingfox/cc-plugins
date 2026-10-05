@@ -6,8 +6,6 @@ allowed-tools: [Agent, Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion]
 
 # Spiral
 
-Two promotion rules — never duplicate a durable artifact, and a suggested-skills section — are adapted from [mattpocock/skills](https://github.com/mattpocock/skills) `handoff` (MIT, Copyright (c) 2026 Matt Pocock), commit 3cca18b368ae95cdbdebbff572ccafa662551015. Upstream's temp-directory default is not imported: the promoted milestone is the run's durable result, and the transitional scratch `.spiral/` is already gitignored.
-
 You drive the **main thread**: dispatch **Divergence** — the one thing here that must not see
 your hypotheses — dispatch **Probes** to walk whatever the human leaves open, and a **Prototype**
 where a walk can only be settled by building the thing, then converge what they settled into a
@@ -16,15 +14,15 @@ between them.
 
 Each **layer** lands one plan or milestone, concrete at that layer's grain and no finer. The
 next layer diverges from *that plan*, so the spiral descends — vague question → approach →
-milestone → an implementation-sized goal. It stops where the human says it is concrete enough.
-Spiral ships no code — the one thing it ever builds is a throwaway prototype to settle a
-decision (§3), abandoned on its own branch. `/cf` takes the goal from there.
+milestone → an implementation-sized goal. It stops where the human says it is concrete enough,
+and `/cf` takes the goal from there.
 
 A layer takes as many **rounds** as it needs. A round is one demand on the human's attention:
 every decision that is askable now, asked at once, answered, and folded back in — which is what
 makes the next ones askable. `concept.md` §5 defines the term; this file just runs it.
 
-Concept: `${CLAUDE_PLUGIN_ROOT}/docs/concept.md`. The question is `$ARGUMENTS`.
+Concept: `${CLAUDE_PLUGIN_ROOT}/docs/concept.md` holds the reasons behind these rules. Read a
+section when a step cites it (`concept.md` §N), not up front. The question is `$ARGUMENTS`.
 
 ```bash
 mkdir -p .spiral
@@ -32,7 +30,7 @@ grep -qxF '.spiral/' .gitignore 2>/dev/null || echo '.spiral/' >> .gitignore
 ```
 
 **Two counters, and they move independently.** The **layer** `L` deepens only when the human
-says 再挖一層; the **round** `A` within a layer increments whenever the layer is not settled yet —
+says 再挖一層; the **round** `a` within a layer increments whenever the layer is not settled yet —
 they rejected the menu (都不對), or they answered some decisions and left others blank. Start at
 `L1-a1`. Nothing is ever overwritten — what was asked and what came back are the carry-over that
 keeps the next round from repeating it.
@@ -47,19 +45,12 @@ keeps the next round from repeating it.
 > - `L<N>-a1` (N>1) → the previous layer's plan, `.spiral/L<N-1>-plan.md`.
 > - `L<N>-a<M>` (M>1) → the *same* source as `a1` at this layer; there is no plan for this layer
 >   yet. What changed is the rejected set and what they settled, not the artifact.
-> - A layer **reopened by an ascent** (§3, §5) → the same source as `a1` at that layer. Its
->   round counter continues past whatever is already on disk there; nothing below it is deleted.
+> - A layer **reopened by an ascent** (§3, §5) → the same source as `a1` at that layer, with the
+>   carry-over `${CLAUDE_PLUGIN_ROOT}/docs/ascent.md` describes.
 
 That carry-over is not optional. The agent has no memory; without it, the next round re-lists
 the last one, which is the churn this tool exists to avoid. Read prior rounds back from
 `.spiral/L*.md` if they have fallen out of your context.
-
-**A reopened layer's carry-over has a different shape**, and getting it wrong makes the reopening
-pointless. Carry, verbatim: the claim that was falsified and what falsified it; the superseded
-plan; and, of what was settled here, only what did not rest on that claim. A candidate that was
-rejected *because of* the false claim is not a rejected candidate any more — it is live again,
-and Divergence has to be told which is which, or it will honour the old rejection and hand back
-the same menu the falsification was supposed to re-price.
 
 It returns **the decisions this layer can settle now** — every one whose prerequisites are
 already resolved — each tagged by cost to reverse (one-way / two-way door) and carrying its
@@ -158,16 +149,18 @@ text, not lost:
   cell is one clause, with the number in the evidence column. A fact needing more than a cell
   gets a `### <發現>` subsection under the table, headed by that row's first cell.
 
-Render it and read the answers back (§Rendering). Then:
+Render it and read the answers back (§Rendering). The render refuses a brief with any answer
+key already filled or a table row whose first cell is not one of its decision's options; fix
+what it names and render again. Then:
 
 - **Every decision answered** → step 3. Answers that make *new* decisions askable do not extend
   this round; they go into §4's "left to the next layer", and §5's gate is where the human
   decides whether to go get them. A layer never ends because a list ran out (`concept.md` §5),
   and it never continues because one grew.
 - **Some answered, some blank** → the picks are settled and stay settled; the blanks are not.
-  `A+1`, back to step 1 carrying the settled ones. This is not a retry: settling some decisions
+  `a+1`, back to step 1 carrying the settled ones. This is not a retry: settling some decisions
   is exactly what makes the next ones askable, so the next round is a *different* round.
-- **Nothing answered, notes given** → 都不對. `A+1`, back to step 1 with their reasoning.
+- **Nothing answered, notes given** → 都不對. `a+1`, back to step 1 with their reasoning.
 
 The answered file stays on disk untouched — it *is* the carry-over.
 
@@ -181,11 +174,13 @@ in parallel in a single message:**
 
 > `Agent(subagent_type: "spiral:probe")` with **one** candidate, what taking it
 > would commit to, and the artifact this layer widens from. Nothing else — a probe that can see
-> the other candidates starts comparing, and comparing is not its job.
+> the other candidates starts comparing, and comparing is not its job. Pass no `model:` — a
+> per-dispatch model outranks the one the probe's definition pins.
 
-Cheap seats, as many as there are candidates. What a probe reports — what a path actually runs
-into — has a right answer, so it is mechanism work and deserves little judgment however many run
-at once (`concept.md` §2). Walking them at main-thread cost is what would make this unaffordable.
+As many probes as there are candidates, each on the model and effort its definition pins. What a
+probe reports has a right answer, but a wrong report is costly: a false wall retires a live
+candidate without a vote, and a missed wall sends a dead one back to the human. Measured A/B runs
+found a cheaper model handing back a false wall and a lower effort missing real ones.
 
 Collect the reports into `.spiral/L<N>-a<M>-probe.md`, one section per candidate, complete enough
 that the collisions survive your context rolling over. Then sort them:
@@ -206,11 +201,11 @@ that the collisions survive your context rolling over. Then sort them:
 Then take one of five exits:
 
 - **One candidate left standing** → the probes settled the decision. Go to §4.
-- **Two or more left, and the difference between them is now an opinion** → back to §2, `A+1`, a
+- **Two or more left, and the difference between them is now an opinion** → back to §2, `a+1`, a
   round asking just that decision, its candidates narrowed to the survivors and the collisions
   carried in the body. This is the second oscillation at this layer, and it is the only reason to
   put the same decision in front of them twice.
-- **Every candidate collided** → the decision has no live answer. Back to §2, `A+1`, carrying the
+- **Every candidate collided** → the decision has no live answer. Back to §2, `a+1`, carrying the
   collisions — the menu was wrong, and now you know why.
 - **The probes brought nothing back** — no collisions, no new facts, and none of them asked for a
   build → do **not** ask again. An oscillation that returns nothing is not a licence to widen
@@ -221,15 +216,14 @@ Then take one of five exits:
   `AskUserQuestion`, `退回上一層，重看那個決定` / `就在這一層繼續` plus "Other", quoting the parent
   plan's claim verbatim beside what the probe found. Not §5: there is no plan at this layer yet
   to ask over or to record on, so the answer goes into `.spiral/L<N>-a<M>-probe.md` beside the
-  collision that raised it. Going up is the decision-maker's move and no one else's
-  (`concept.md` §7), so you offer it and never take it. On 退回上一層, go to §5's ascent branch
-  without writing a plan here. Do **not** take `A+1` instead: another round at this layer would
-  re-decide on the same false footing.
+  collision that raised it. On 退回上一層, go to §5's ascent branch without writing a plan here.
+  Do **not** take `a+1` instead: another round at this layer would re-decide on the same false
+  footing.
 
 ### When reading is not enough — the Prototype
 
 A probe stops at the first hard thing it can *read*. Where the answer only exists once the thing
-runs, that is what a prototype is for — the oscillation's fourth part (`concept.md` §5). It has
+runs, that is what a prototype is for — the oscillation's third part (`concept.md` §5). It has
 two ways in: a probe comes back saying reading cannot answer it, or no probe is needed because the
 human asks to see the candidates built, or the candidates differ only in how they look or feel
 once they exist (two layouts, two interactions) and no description can separate them:
@@ -266,9 +260,6 @@ prototype leaves: `.spiral/` dies with the run, so if the verdict is load-bearin
 cites **the branch**, not the probe file (`git show <branch>:verdict.md`). A branch is a source a
 later reader can resolve; a scratch path is not.
 
-**A prototype does not make spiral a builder.** Its code is evidence, it lives on a branch nobody
-merges, and what comes back is a verdict, not a deliverable. Spiral still ships no code.
-
 ## 4 — Converge
 
 **You write** `.spiral/L<N>-plan.md` — narrowing everything they settled at this layer into one
@@ -280,18 +271,13 @@ about.
 The two-way doors you kept off the page (§2) get resolved here — a sane default and one line
 saying you took it, so nothing was decided silently.
 
-**A layer can be converged more than once.** If you are re-converging after an ascent, do not
-overwrite `.spiral/L<N>-plan.md`: rename the existing one to `.spiral/L<N>-a<M>-plan.md` for the
-round that produced it, write the new plan in its place, and open the new one by naming the claim
-that was wrong and correcting it. Do that at this step, not at the ascent itself — a reopened
-layer may well confirm what it already had. The superseded plan stays on disk: something that was
-acted on for two layers is part of the record, not a draft.
+**A layer can be converged more than once.** Re-converging a layer an ascent reopened follows
+`ascent.md`, which keeps the plan already on disk rather than overwriting it.
 
 Where §3 walked candidates, the collisions are part of the result, not background. A candidate
 the probes killed belongs in the falsifier section with what it hit; a decision the probes
 settled is settled on evidence, and the plan should say so rather than presenting it as a
-preference. **Do not re-open a decision the probes closed** — a wall is a fact, and arguing with
-it here is the same mistake as putting it to a vote.
+preference.
 
 The result carries four things:
 
@@ -327,11 +313,12 @@ Hold these while writing it:
   unverified assumption, named as one, with what would settle it. Convergence is the one motion
   here that no independent reader checks: a fact invented at this step is a fact nothing
   downstream will catch, and the layers built on it are built on nothing.
-- **Do not re-open their choices.** They already picked; your job is to make those picks
-  determinate, not to re-argue them. The rejected menus sitting in your context are input, not an
-  invitation to relitigate — you write the plan for the directions they chose, including the
-  parts you would have argued against. If their picks turn out to contradict each other, say so
-  in one line and stop, rather than silently substituting your own.
+- **Do not re-open their choices, or a decision the probes closed.** They already picked, and a
+  wall is a fact; your job is to make those picks determinate, not to re-argue them. The rejected
+  menus sitting in your context are input, not an invitation to relitigate — you write the plan
+  for the directions they chose, including the parts you would have argued against. If their
+  picks turn out to contradict each other, say so in one line and stop, rather than silently
+  substituting your own.
 
 ## 5 — The human decides whether to dig
 
@@ -362,8 +349,10 @@ rolled over. That block is scaffolding, not content: whoever reads the plan next
 layer's Divergence, `/cf`, a human) ignores it.
 
 - **夠了** → **promote, then report.** `.spiral/` is scratch — gitignored, and it dies with the
-  run. What the run decided is the one thing that must outlive it, so write
-  `docs/milestones/<slug>.md` with the milestone frontmatter on the front:
+  run. What the run decided is the one thing that must outlive it. Check
+  `docs/milestones/<slug>.md` first — a file already there is another run's record, so pick a
+  slug that names what this run settled — then write it with the milestone frontmatter on the
+  front:
 
   ```
   ---
@@ -375,8 +364,8 @@ layer's Divergence, `/cf`, a human) ignores it.
 
   **The milestone is composed from every layer, not copied from the last one.** Its commitment
   and its falsifiers gather the "what this layer settles" and "what would overturn this" of every
-  plan still standing — a superseded plan (§4) contributes nothing — because each layer settled
-  something the ones below it took as given and never restated. "Concrete enough to build on" and
+  plan still standing — a superseded plan (`ascent.md`) contributes nothing — because each layer
+  settled something the ones below it took as given and never restated. "Concrete enough to build on" and
   "left open" come from the deepest layer alone: those it did restate, and its versions replace
   the upper ones'. Copying `L<N>-plan.md` on its own silently drops most of what the run decided.
 
@@ -399,12 +388,8 @@ layer's Divergence, `/cf`, a human) ignores it.
   gate. Then stop. Executing is not yours.
 - **再挖一層** → `L+1`, round back to `a1`, and back to step 1 — diverging from *this plan*
   and carrying their notes.
-- **退回上一層** → `L-1`, reopened, and back to step 1 with the carry-over §1 describes for that
-  case. The round counter at that layer continues past whatever is already on disk there; nothing
-  is deleted. Everything from the reopened layer downward **stops standing**: its plan is renamed
-  per §4 when that layer is re-converged, and the plans below it — built on the claim that
-  fell — contribute nothing to promotion until they are re-earned. Say that plainly rather than
-  quietly leaving them in `.spiral/` for a later step to gather.
+- **退回上一層** → `L-1`, reopened. Read `${CLAUDE_PLUGIN_ROOT}/docs/ascent.md` and follow it
+  before step 1: it carries what that layer diverges with and what stops standing.
 
 Do **not** dispatch Divergence before this answer. Putting a fresh menu of directions in front
 of someone who was ready to stop manufactures the next layer — that is the churn, mechanized.
@@ -418,7 +403,8 @@ through two calls:
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/render-decision.sh" <file> <name>
 ```
 
-It ends with `[spiral] save-mode=browser|inline`.
+It ends with `[spiral] save-mode=browser|inline`. A brief it refuses exits 1 with
+`[spiral] brief rejected:` and one line per problem instead; nothing was rendered.
 - **`browser`** → hand them the `URL:` line render-decision printed, launch the waiter with the
   Bash tool's `run_in_background`, and end your turn; the human's Save resumes you. Tell them:
   pick + Save, or just type an answer instead. Surfacing the URL is not optional — over SSH
@@ -441,7 +427,7 @@ It ends with `[spiral] save-mode=browser|inline`.
   `<id>.choice:` / `<id>.notes:` and the round-level `notes:` (`\n` in a notes value is literal —
   unescape it). A decision with a non-empty `choice` is settled. One left empty is **not** — never
   read a blank as agreement with `recommend:`, an unpicked option was not picked. Then take the
-  §2 branch: all settled → §3; some settled → `A+1` carrying them; none settled → 都不對.
+  §2 branch: all settled → §3; some settled → `a+1` carrying them; none settled → 都不對.
   Every answer key empty and no `notes:` → take the typed answer, or ask.
   If you proceed from a typed answer while the waiter may still poll, `TaskStop` it.
 
@@ -457,11 +443,14 @@ It ends with `[spiral] save-mode=browser|inline`.
   skipped a layer nobody approved. Writing it yourself is exactly where this gets tempting —
   you can see the implementation from here, and that is not a reason to put it on the page.
 - **The human owns the picks and the stop.** You never choose a direction for them, and you never
-  start another layer on your own say-so. Dropping a candidate a probe found a wall in is not a
-  pick — it was shown to be wrong, and right/wrong was never theirs to vote on.
+  start another layer — deeper or back up — on your own say-so (`concept.md` §7). Dropping a
+  candidate a probe found a wall in is not a pick — it was shown to be wrong, and right/wrong was
+  never theirs to vote on.
 - **Keep the Divergence dispatch simple and goal-first** — what to widen from, the carry-over,
   the output shape. Don't pour in your own hypotheses: steering Divergence toward what you expect
   destroys the only thing it is for, and it is now the only isolation left in the loop. If it
   returns one real decision with two candidates, render exactly that — padding the page to look
   thorough is the failure mode.
 - **Files are the source of truth.** Your prose is for the human, not the record.
+
+Two promotion rules — never duplicate a durable artifact, and a suggested-skills section — are adapted from [mattpocock/skills](https://github.com/mattpocock/skills) `handoff` (MIT, Copyright (c) 2026 Matt Pocock), commit 3cca18b368ae95cdbdebbff572ccafa662551015. Upstream's temp-directory default is not imported: the promoted milestone is the run's durable result, and the transitional scratch `.spiral/` is already gitignored.

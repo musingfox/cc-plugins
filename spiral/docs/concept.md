@@ -4,6 +4,15 @@ Spiral is built on one axiom and one shape. Things get made by **converging** a 
 into a concrete result, then **diverging** from that result into new ideas — and doing this
 over and over. This document is that concept, not its application.
 
+1. The two motions
+2. The axiom (everything else is a corollary)
+3. The two roles
+4. The decision-maker
+5. Spirals nest: layers and oscillation
+6. Iteration is change, not ascent — and only feedback makes it real
+7. Dead ends and breaking the frame
+8. Why the split is sound
+
 ---
 
 ## 1. The two motions

@@ -4,7 +4,7 @@
 #
 # The wake condition is "a Save happened", not "everything was answered": the
 # file's mtime changing is the one signal that works for both a single-question
-# brief (`choice:` / `notes:`) and a round brief (`q1.choice:` / `q1.notes:`),
+# brief (`choice:` / `notes:`) and a round brief (`d1.choice:` / `d1.notes:`),
 # and it still fires for a Save that picked nothing — a 都不對 with reasoning.
 # Deciding what an empty answer means belongs to the agent, not the waiter.
 #
