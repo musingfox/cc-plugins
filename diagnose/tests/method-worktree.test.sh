@@ -91,4 +91,14 @@ n=$(printf '%s\n' "$block" | grep -cF 'ls-files --others --exclude-standard' || 
 n=$(awk '/^## Hand-off/,0' diagnose/docs/method.md | grep -cF 'Carried: uncommitted changes to tracked files' || true)
 [ "$n" -eq 1 ] || fail "T16c: hand-off must be able to say the run carried uncommitted changes, got $n"
 
+# A failed `worktree add` must stop the block: otherwise it still prints a
+# worktree path and applies the user's diff into a stale tree.
+n=$(printf '%s\n' "$block" | grep -cx 'set -e' || true)
+[ "$n" -eq 1 ] || fail "T17: Phase 0 block must stop on the first failure (set -e), got $n"
+
+n=$(grep -cF 'format-patch -1 <the commit sha> --stdout' diagnose/docs/method.md || true)
+[ "$n" -eq 1 ] || fail "T18: teardown must give the format-patch command, got $n"
+n=$(grep -cF 'mkdir -p <the literal repo path>/.diagnose' diagnose/docs/method.md || true)
+[ "$n" -eq 1 ] || fail "T18b: the patch command must create .diagnose/ first, got $n"
+
 echo "ok - method-worktree.test.sh"

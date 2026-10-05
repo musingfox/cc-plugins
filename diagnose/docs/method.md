@@ -2,6 +2,8 @@
 
 A discipline for hard bugs. Skip phases only when explicitly justified.
 
+Contents: Phase 0 Open a throwaway worktree (Teardown), Redact, Phase 1 Build a feedback loop, Phase 2 Reproduce + minimise, Phase 3 Hypothesise, Phase 4 Instrument, Phase 5 Failing test at the seam, Phase 6 Cleanup, Hand-off.
+
 When exploring the codebase, read `CONTEXT.md` (if it exists) to get a clear mental model of the relevant modules, and check ADRs in the area you're touching.
 
 ## Phase 0: Open a throwaway worktree
@@ -11,6 +13,7 @@ The diagnosis runs in a throwaway worktree. The user's working tree, index, and 
 Resolve the paths and open the worktree in **one** command:
 
 ```bash
+set -e
 REPO="$(git rev-parse --show-toplevel)"
 WORK="${TMPDIR:-/tmp}/diagnose-$(basename "$REPO")-<slug>"
 EXCLUDE="$(git rev-parse --path-format=absolute --git-common-dir)/info/exclude"
@@ -23,6 +26,8 @@ git -C "$REPO" ls-files --others --exclude-standard | sed 's/^/not carried (untr
 echo "repo path: $REPO"
 echo "worktree path: $WORK"
 ```
+
+`<slug>` is a short kebab-case name for the symptom, such as `login-500`. `set -e` stops the block at the first failure, so a failed `worktree add` prints no path and carries nothing into a leftover tree.
 
 The worktree starts from HEAD **plus the user's uncommitted changes to tracked files**. The bug is usually in the code they are looking at, and `worktree add` alone checks out only the last commit — a loop built against that never goes red, and Phase 1's "refuse to give up" then sends you hunting a bug that is not in the tree. Untracked files are not carried; the command lists them. If the symptom lives in one, say so and ask before going on.
 
@@ -43,6 +48,10 @@ Build inside the worktree. Prefix each command with `cd <the literal worktree pa
 Every exit path removes the worktree: the success path (once the commit and the patch file exist) and the early-stop path.
 
 Write `<the literal repo path>/.diagnose/<slug>.patch` from the commit **before** removing the worktree. The path is inside the repository, not inside the worktree, so the patch survives.
+
+```bash
+mkdir -p <the literal repo path>/.diagnose && git -C <the literal worktree path> format-patch -1 <the commit sha> --stdout > <the literal repo path>/.diagnose/<slug>.patch
+```
 
 Then, from the repository root:
 
@@ -79,7 +88,7 @@ Spend disproportionate effort here. **Be aggressive. Be creative. Refuse to give
 7. **Property / fuzz loop**. If the bug is "sometimes wrong output", run 1000 random inputs and look for the failure mode.
 8. **Bisection harness**. If the bug appeared between two known states (commit, dataset, version), automate "boot at state X, check, repeat" so you can `git bisect run` it.
 9. **Differential loop**. Run the same input through old-version vs new-version (or two configs) and diff outputs.
-10. **HITL bash script**. Last resort. If a human must click, copy the HITL template the entry gave you into the worktree, fill in the steps, and tell the user to run it in their own terminal — you never execute it: it blocks on `read`, and your shell has no one at the keyboard, so it dies at the first step with nothing captured. The user pastes the `KEY=VALUE` tail back to you; that is the loop's output.
+10. **HITL bash script**. Last resort. If a human must click, copy the HITL template the skill that sent you here (`diagnose` or `diagnose-now`) named into the worktree, fill in the steps, and tell the user to run it in their own terminal — you never execute it: it blocks on `read`, and your shell has no one at the keyboard, so it dies at the first step with nothing captured. The user pastes the `KEY=VALUE` tail back to you; that is the loop's output.
 
 Build the right feedback loop, and the bug is 90% fixed.
 

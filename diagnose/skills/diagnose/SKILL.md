@@ -1,7 +1,7 @@
 ---
 name: diagnose
 description: >-
-  Diagnose or debug. Also when something is broken, throwing, failing, or slow.
+  Find the confirmed cause of a bug in a throwaway worktree and hand back a branch with one failing test, without applying the fix. Use when the user asks to diagnose or root-cause a bug, not for a quick fix.
 ---
 
 # Diagnose

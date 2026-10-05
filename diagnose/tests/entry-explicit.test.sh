@@ -20,3 +20,9 @@ n=$(grep -c 'AskUserQuestion' diagnose/skills/diagnose-now/SKILL.md || true)
 
 n=$(grep -cF '${CLAUDE_PLUGIN_ROOT}/docs/method.md' diagnose/skills/diagnose-now/SKILL.md || true)
 [ "$n" -eq 1 ] || fail "T4: expected one method.md pointer, got $n"
+
+n=$(frontmatter | grep -c '^argument-hint:' || true)
+[ "$n" -eq 1 ] || fail "T5: expected argument-hint in frontmatter, got $n"
+
+n=$(grep -ci 'create the worktree first' diagnose/skills/diagnose-now/SKILL.md || true)
+[ "$n" -eq 0 ] || fail "T6: worktree must not precede the symptom, got $n"
