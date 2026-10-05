@@ -1,8 +1,10 @@
 ---
 name: glossary
 description: >-
-  Terminology for CONTEXT.md. Use when a word is overloaded, or when a
-  concept conflicts with CONTEXT.md. For architecture invariants, use spec.
+  Define and maintain the project's domain glossary in CONTEXT.md — one name per
+  concept, rejected synonyms listed. Use when a domain word is overloaded, when a
+  concept conflicts with CONTEXT.md, or when the user asks to define or name a
+  domain term. For architecture invariants, use spec.
 ---
 
 # Domain glossary
@@ -31,7 +33,7 @@ Entities and use cases take their names from this glossary.
 
 ## During the session
 
-Leave the ADR warrant to adr. These five moves are the glossary's job.
+Whether a decision deserves an ADR is for the adr skill to judge. These five moves are the glossary's job.
 
 ### Stop on a conflict
 
