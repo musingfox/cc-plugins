@@ -347,7 +347,7 @@ This is the Claude round, the default builder. With `CF_IMPLEMENTER=omp` recorde
    { git -C "${REPO_ROOT:-.}" rev-parse HEAD; git -C "${REPO_ROOT:-.}" status --porcelain | shasum -a 256; } > "$SESSION/host-snapshot"
    ```
 
-2. **Prepare, sequentially.** One foreground Bash, run from the host repo root (the shard worktree forks from the repository of the current directory), runs `--prepare-only` for each READY shard in turn. It clears the shard's previous round and reuses its worktree. A shard whose prepare writes an `outcome.md` (`FAIL prereq-missing`, `prereq-merge-conflict`, `brief-assembly`, or `outcome-missing`) is done for the round; every other shard is logged as dispatched:
+2. **Prepare, sequentially.** One foreground Bash, run from the host repo root (the shard worktree forks from the repository of the current directory), runs `--prepare-only` for each READY shard in turn. It clears the shard's previous round and reuses its worktree. A shard whose prepare writes an `outcome.md` (`FAIL test-runner-missing`, `prereq-missing`, `prereq-merge-conflict`, `brief-assembly`, or `outcome-missing`) is done for the round; every other shard is logged as dispatched:
 
    ```bash
    . "$SESSION/env.sh"

@@ -108,3 +108,78 @@ assert_eq "3" "$RC" "G3 exit"
 assert_contains "$(tail -1 "$TMP/gates.log")" "REBRIEF tests " "G3 re-brief"
 assert_contains "$(cat "$SHARD/gate3.out")" "test_exit=1" "G3 test_exit"
 wired_clean
+
+# ==== a blank runner is refused before anything runs ====
+
+NO_BLANK_GUARD='s/case "\$TEST_RUNNER" in\n  \*\[!\[:space:\]\]\*\) ;;.*?\nesac\n//s'
+has() { case "$1" in *"$2"*) echo yes ;; *) echo no ;; esac; }
+
+# B1
+fx_build
+fx_run --prepare-only "$SHARD" goal none ""
+assert_eq "1" "$RC" "B1 exit"
+assert_eq "FAIL" "$(section Status)" "B1 Status"
+assert_eq "test-runner-missing" "$(section Reason)" "B1 Reason"
+assert_eq absent "$(fx_exists "$FLOW/worktree.count")" "B1 no worktree"
+assert_eq absent "$(fx_exists "$FLOW/brief.count")" "B1 no brief"
+assert_eq "no" "$(has "$OUT" PREPARED)" "B1 no PREPARED line"
+assert_eq "[shard A] FAIL test-runner-missing" "$(fx_last)" "B1 stdout line"
+fx_clean
+
+# B2
+fx_build
+fx_run "$SHARD" goal none ""
+assert_eq "1" "$RC" "B2 exit"
+assert_eq "test-runner-missing" "$(section Reason)" "B2 Reason"
+assert_eq absent "$(fx_exists "$FLOW/probe.count")" "B2 no probe"
+assert_eq absent "$(fx_exists "$FLOW/dispatch.count")" "B2 no dispatch"
+fx_clean
+
+# B3
+fx_build
+fx_report valid
+fx_run --gates-only "$SHARD" goal none ""
+assert_eq "1" "$RC" "B3 exit"
+assert_eq "test-runner-missing" "$(section Reason)" "B3 Reason"
+assert_eq absent "$(fx_exists "$FLOW/test.count")" "B3 no gate 3"
+assert_eq absent "$(fx_exists "$SHARD/revert-gate.log")" "B3 no revert gate"
+fx_clean
+
+# B4: whitespace only is blank
+fx_build
+fx_report valid
+fx_run --gates-only "$SHARD" goal none "   "
+assert_eq "1" "$RC" "B4 exit"
+assert_eq "test-runner-missing" "$(section Reason)" "B4 Reason"
+assert_eq absent "$(fx_exists "$FLOW/test.count")" "B4 no gate 3"
+fx_clean
+
+# B5: a blank TEST_RUNNER in the shard env.sh overrides the argument
+fx_build
+fx_report valid
+printf 'TEST_RUNNER=""\n' >> "$SHARD/env.sh"
+fx_run --gates-only "$SHARD" goal none true
+assert_eq "1" "$RC" "B5 exit"
+assert_eq "test-runner-missing" "$(section Reason)" "B5 Reason"
+assert_eq absent "$(fx_exists "$FLOW/test.count")" "B5 no gate 3"
+fx_clean
+
+# B6: without the guard the same blank prepare goes through
+fx_build
+mutant "$NO_BLANK_GUARD"
+assert_eq "no" "$(has "$(cat "$MUT")" 'write_outcome FAIL test-runner-missing')" "B6 mutant has no guard"
+OUT="$(PATH="$STUBS:$PATH" bash "$MUT" --prepare-only "$SHARD" goal none "" 2>"$FLOW/run.err")"
+RC=$?
+assert_eq "0" "$RC" "B6 mutant exit"
+assert_eq "PREPARED $SHARD/implement-brief.md" "$(fx_last)" "B6 mutant last line"
+rm -rf "$MUTDIR"; fx_clean
+
+# B7: without the guard a blank runner passes gate 3 and every contract stays green
+wired_build
+mutant "$NO_BLANK_GUARD"
+wired_gates "$MUT" ""
+assert_eq "2" "$RC" "B7 mutant exit"
+assert_eq "tests-green-on-revert" "$(section Reason)" "B7 mutant Reason"
+assert_contains "$(cat "$SHARD/gate3.out")" "test_exit=0" "B7 mutant gate 3 green"
+assert_eq "STAYS_GREEN C1" "$(head -1 "$SHARD/revert-gate.out")" "B7 mutant revert gate"
+wired_clean

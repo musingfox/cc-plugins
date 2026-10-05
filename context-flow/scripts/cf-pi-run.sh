@@ -370,6 +370,17 @@ on_exit() {
 }
 trap on_exit EXIT
 
+# `bash -c` on a blank string exits 0, so gate 3 would pass and the revert gate
+# would name every contract. the integration gate refuses an empty runner too; this sits
+# after step 0 and the trap so this round's outcome.md exists for cf.md §3.2 step 2.
+case "$TEST_RUNNER" in
+  *[![:space:]]*) ;;
+  *)
+    write_outcome FAIL test-runner-missing "" "(all): blank TEST_RUNNER" "-" "-"
+    say "FAIL test-runner-missing"
+    exit 1 ;;
+esac
+
 # -------- 1-2. prepare: worktree, prerequisite checkpoints, brief -------
 # Shared with --prepare-only. Through $SCRIPT_DIR, not
 # $SCRIPTS: fixtures stub the worktree and brief scripts it calls via $SCRIPTS.
