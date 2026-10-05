@@ -2,7 +2,11 @@
 
 Generates an interactive PR review interface from a structured markdown file.
 Markdown is the canonical source — the HTML reads from it on load and exports
-back to it on Export. Edit either side, just keep markdown as source of truth.
+back to it on Save or Export. Edit either side, just keep markdown as source of truth.
+
+## Contents
+
+Trigger · Markdown structure · Bidirectional flow · Round-trip preservation · Example
 
 ## Trigger
 
@@ -59,16 +63,18 @@ title: <free text — shown in header>
    the interactive HTML in the browser.
 3. User edits in the HTML: cycles statuses, edits any field inline, filters by
    severity.
-4. User clicks **Export markdown** → updated markdown is on the clipboard.
-5. User pastes back to the agent. Agent overwrites the source `.md` and
-   re-renders. Loop.
+4. User clicks **Save** → the edited markdown is written to the source `.md`;
+   arm a Monitor on it (see `round-trip-monitoring.md`) so the agent reads it
+   back without a paste.
+5. Fallback over `file://` (Save hidden): the user clicks **Export** → updated
+   markdown is on the clipboard, they paste it to the agent, and the agent
+   overwrites the source `.md`. Either way, re-render and loop.
 
 ## Round-trip preservation
 
 The recipe preserves: frontmatter key order, severity section order, finding
 order within a section, and meta key order within a finding. New fields added
-inline in the HTML are not yet supported (Phase 1 limitation — only existing
-fields are editable).
+inline in the HTML are not supported: only existing fields are editable.
 
 ## Example
 

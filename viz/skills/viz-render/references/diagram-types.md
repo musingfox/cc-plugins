@@ -1,5 +1,9 @@
 # Mermaid Diagram Types Reference
 
+## Contents
+
+1. Flowchart / Graph (ELK layout) · 2. Architecture · 3. Sequence · 4. Class · 5. State · 6. ER · 7. Gantt · 8. Pie · Best Practices · Styling · Subgraphs
+
 ## 1. Flowchart / Graph
 
 **Use for**: Process flows, decision trees, algorithms, workflows

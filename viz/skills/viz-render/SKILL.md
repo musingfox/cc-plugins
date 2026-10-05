@@ -5,9 +5,9 @@ description: >-
   Triggers when the user asks to view, render, or preview a document as HTML;
   when the user asks to visualize, diagram, chart, or draw architecture,
   flows, sequence/class/state/ER diagrams; when resolving plan files from
-  ~/.claude/plans/; or proactively when about to output a table with 4+ rows
-  or 3+ columns, a structured comparison, an audit, a feature matrix, or any
-  formatted content exceeding ~50 lines in the terminal.
+  ~/.claude/plans/; or proactively when about to output a table over ~20 lines
+  or with 4+ rows and 3+ columns, a structured comparison, an audit, a feature
+  matrix, or any formatted content exceeding ~20 lines in the terminal.
 ---
 
 # Viz Render Skill
@@ -16,19 +16,12 @@ Render markdown documents, Mermaid diagrams, or plan files as formatted HTML
 with syntax highlighting, math formulas, and Mermaid, in the dark-only
 Musingfox design system. One skill, one script, three input shapes.
 
-## When to Use
-
-- User asks to "view as HTML", "render in browser", "preview as a web page"
-- User asks for a diagram (flowchart, sequence, architecture, ER, state, …)
-- User references a plan by name (resolve from `~/.claude/plans/`)
-- Content contains complex tables, Mermaid, or math formulas
-- **Proactive**: terminal output would contain a table with 4+ rows or 3+ columns
-- **Proactive**: comparison, audit, feature matrix, or status report as ASCII
-- **Proactive**: conversation output would exceed ~50 lines of structured content
+Requires macOS (`open`, `stat -f`), `python3`, `curl`, `lsof`, and network
+access for the CDN that loads Mermaid, KaTeX, and highlighting.
 
 ## When NOT to Use
 
-- Short content (<20 lines) or simple diagrams (2–8 nodes) — use the
+- Short non-table content (<20 lines) or simple diagrams (2–8 nodes) — use the
   viz-inline skill's chat shapes (call tree, pseudocode, diff) instead
 - User explicitly wants terminal/text output
 - User is asking to edit or modify the content, not view it
@@ -94,6 +87,8 @@ When the user requests a diagram without providing the code:
 1. Pick a diagram type (see `references/diagram-types.md` for syntax)
 2. Keep it focused: 5–15 nodes, descriptive labels <30 chars, no-space IDs
 3. If requirements are too broad, suggest splitting into multiple diagrams
+4. After rendering, ask the user to confirm the diagram drew: Mermaid runs in
+   the browser, so a syntax error is visible only to them
 
 ## Output
 
@@ -101,6 +96,10 @@ The render script prints the output HTML path (under `/tmp/viz/{project}/`),
 then a `URL:` line, and opens that URL in the default browser. Every render goes
 through the local viz server on `127.0.0.1`; only when no port is free does it
 fall back to opening the file and print no URL. Report the path to the user.
+
+Over SSH (`SSH_CLIENT` or `SSH_CONNECTION` set) the server binds `0.0.0.0`, the
+`URL:` line carries the Tailscale IP, and no browser opens. Report that URL to
+the user instead of the path.
 
 ## Recipes (interactive HTML artifacts)
 
@@ -122,12 +121,20 @@ Available recipes:
   several decisions opens on a card view projected from the body, with the
   verbatim markdown one click away. See `references/recipes/feedback.md`.
 
+Controls: **Save** writes the edit back to the source `.md` (labelled 儲存回饋
+in feedback); **Export** copies the updated markdown to the clipboard (labelled
+複製 in feedback).
+
 Workflow:
 
 1. Author the markdown with the recipe's frontmatter and structure.
 2. `bash "${CLAUDE_PLUGIN_ROOT}/lib/render.sh" <file.md> <output-name>`
-3. User edits in HTML → clicks Export → updated markdown is on clipboard.
-4. User pastes back to chat → agent overwrites the source `.md` → re-render.
+3. Arm the Monitor from `references/recipes/round-trip-monitoring.md` on the
+   source file; the user edits in HTML and clicks Save, which wakes you to read
+   the file back.
+4. Fallback when the page opened over `file://` (Save hidden): the user clicks
+   Export and pastes the markdown to chat; overwrite the source `.md` and
+   re-render.
 
 Markdown without `viz:` frontmatter falls through to the generic viewer
 unchanged.
@@ -137,55 +144,9 @@ held by another process, render.sh auto-selects the next free port (trying
 up to 5 candidates) so the recipe still opens over `http://` — no manual
 override needed. Set `VIZ_PORT=<port>` only to pin a specific base port.
 
-## Recipe Round-trip Monitoring
-
-A recipe's "儲存" button writes the edited markdown back to the source `.md`
-via the viz server (`/api/save`), but **nothing wakes you to read it** — the
-user otherwise has to come back to chat and tell you, or click 複製 and paste.
-To close the loop automatically, arm a `Monitor` on the source file right
-after rendering: the user edits, clicks 儲存, the file's mtime changes, and
-the Monitor wakes you to read it back — no copy-paste, no "I'm done" ping.
-
-**Prerequisite**: the recipe must open on `http://127.0.0.1:<port>/...` (the
-URL render.sh prints). If render.sh fell back to `file://` (server
-unavailable — all candidate ports held), the 儲存 button is hidden and
-monitoring is useless; tell the user to use 複製/Export instead.
-
-After a successful recipe render, note the absolute source path (the path
-you passed to render.sh — for plan-name inputs it is
-`~/.claude/plans/<name>.md`), then arm the Monitor:
-
-```
-Monitor:
-  description: recipe edits on <source-path>
-  timeout_ms: 300000
-  command: |
-    f="<source-path>"; prev=$(stat -f %m "$f" 2>/dev/null || echo 0); idle=0
-    while true; do
-      sleep 1
-      cur=$(stat -f %m "$f" 2>/dev/null || echo 0)
-      if [ "$cur" != "$prev" ]; then
-        echo "recipe-saved: $f mtime=$cur"; prev="$cur"; idle=0
-      else
-        idle=$((idle + 1))
-        [ "$idle" -ge 120 ] && { echo "recipe-watch-idle: $f — say resume-watch to restart"; exit 0; }
-      fi
-    done
-```
-
-- **`recipe-saved` event**: `Read` the source file, diff against what you
-  last knew, and report the updated content to the user. They need not type
-  anything.
-- **`recipe-watch-idle` (120s no change) or Monitor timeout (300s)**: tell
-  the user monitoring stopped. **Restart** = re-arm the same Monitor on the
-  same source path, on an explicit "resume watch" from the user. Do not
-  auto-restart indefinitely — idle usually means they stopped editing.
-
-`stat -f %m` is macOS; viz targets macOS (`open`, `stat -f`).
-
 ## References
 
 - **Diagram type syntax**: `references/diagram-types.md`
-- **Recipe specs**: `references/recipes/`
+- **Recipe specs and round-trip monitoring**: `references/recipes/`
 - **Mermaid docs**: https://mermaid.js.org/
 - **Live editor**: https://mermaid.live

@@ -9,6 +9,10 @@ frontmatter. Reach for this for decision briefs, approvals, "review this and tel
 me X" — anything that is a document plus a small structured response. One document
 can carry a single question or a whole **round** of independent ones (see below).
 
+## Contents
+
+Trigger · Markdown structure — single question · Round mode · Card view · Bidirectional flow · Round-trip preservation · Example · Relation to pr-review
+
 ## Trigger
 
 Use when a human needs to read a rendered document and return a structured answer
@@ -133,7 +137,7 @@ If no `##` matches a question title the toggle is hidden and the page shows only
 2. `bash "${CLAUDE_PLUGIN_ROOT}/lib/render.sh" <file.md> <name>` starts the server
    and opens the interactive page (http://, so Save works).
 3. Human reads the body, picks an option, writes notes.
-4. Human clicks **儲存回饋 (Save)** → `POST /api/save` writes `choice`/`notes`
+4. Human clicks **Save** (labelled 儲存回饋) → `POST /api/save` writes `choice`/`notes`
    back into the same `.md`; the body is untouched. A question with options but no
    pick asks for confirmation first, the success toast lists what each question
    saved, and a Save that did not land (conflict or failure) stays on screen until
@@ -141,7 +145,7 @@ If no `##` matches a question title the toggle is hidden and the page shows only
 5. Agent re-reads the `.md` and takes `choice:` and `notes:` as the human's
    answer. Empty `choice:` = not saved → fall back to a terminal answer.
 
-If opened via `file://` (no server) the Save button hides; **複製 (Export)** copies
+If opened via `file://` (no server) the Save button hides; **Export** (labelled 複製) copies
 the updated markdown to paste back instead.
 
 ## Round-trip preservation

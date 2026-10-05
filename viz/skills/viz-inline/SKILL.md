@@ -6,7 +6,7 @@ description: >-
   prose. Triggers when explaining code structure, control flow, logic, or a
   proposed change in under ~20 lines; when discussing the shape of code before
   writing it (types, signatures, call stacks); or when the user asks to
-  restate something more simply or visually ("show me", "講簡單一點").
+  restate something more simply or visually ("show me visually", "draw it", "講簡單一點").
   For long documents, big tables, or interactive output, use viz-render
   instead.
 ---
@@ -16,9 +16,6 @@ description: >-
 Explain the current topic visually, in chat, with the smallest shape that
 makes the point clear. Skip the preamble; keep prose brief. No files, no
 browser — that is viz-render's job.
-
-Adapted from HumanLayer's show-me skill (MIT,
-https://github.com/humanlayer/skills).
 
 ## Shapes
 
@@ -112,7 +109,7 @@ sequenceDiagram
 
 Escalate to the viz-render skill instead when the output is:
 
-- a document or comparison the user will read as a whole (>~50 lines)
-- a table with 4+ rows or 3+ columns
+- a document or comparison the user will read as a whole (>~20 lines)
+- a table over ~20 lines, or one with 4+ rows and 3+ columns
 - a Mermaid diagram too dense to read in a fence (>~8 nodes)
 - something the user will iterate on (recipe round-trip editing)
