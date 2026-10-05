@@ -19,6 +19,7 @@
 #          Never $TEST_LOG: that is gate 3's evidence.
 #
 # TEST_CMD runs exactly as given, never the TEST_RUNNER env.sh defines.
+# cf-pi-run.sh passes it as `bash -c "$TEST_RUNNER"`.
 # Env: CF_TEST_DEADLINE_S  seconds before a run is group-killed (default 1800)
 
 set -euo pipefail

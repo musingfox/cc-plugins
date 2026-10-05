@@ -694,7 +694,8 @@ say "survivors=$(echo "$survivors" | grep -c . || true)"
 # -------- 9. gate 3: test execution (with at most one re-dispatch) -----
 
 # cf-pi-test.sh prints "test_exit=<n>" and exits with that code. We use exit code directly.
-# TEST_RUNNER is intentionally word-split (e.g. "npm test", "cargo test --lib").
+# TEST_RUNNER runs through `bash -c`, as at the integration gate and in cf-rebase.sh,
+# so `&&`, env prefixes and quotes mean what they mean in a shell.
 
 # A stalled runner outran its deadline. Re-briefing the builder cannot fix a
 # suite that never returns, so stop here instead of spending a dispatch on it.
