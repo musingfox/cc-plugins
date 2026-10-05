@@ -32,7 +32,8 @@ Skip if the user only wants to edit existing hooks. If `jj`-native only (no `.gi
    - `.githooks/commit-msg` from `references/commit-msg.md` if enabled. `chmod +x`.
    - Run `git config core.hooksPath .githooks`.
    - Ensure `.claude/*.local.md` gitignored.
-4. **Summary** — files touched, onboarding cmd (`git config core.hooksPath .githooks`), mention Doctor / Update modes.
+4. **Verify** — `bash -n .githooks/pre-commit`, then in a scratch repo (`git init` in a temp dir, `core.hooksPath` pointing at the generated hooks) stage one clean file and one that trips a warning (e.g. trailing whitespace), and run the hook. Expect exit 0 with the warning printed. Any syntax error, unreplaced placeholder, or unexpected failure: return to Generate.
+5. **Summary** — files touched, onboarding cmd (`git config core.hooksPath .githooks`), mention Doctor / Update modes.
 
 ---
 

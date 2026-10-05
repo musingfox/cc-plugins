@@ -29,7 +29,7 @@ Check via `command -v <tool>` (not `which`). Wrap in `set -euo pipefail`.
 
 **Python** — lint: `ruff` / `flake8` / `pylint`. Format: `ruff format` / `black` / `autopep8`. Test: `pytest` (or `unittest` built-in). If `pyproject.toml` present, configured tools (`[tool.*]`) take priority over merely-installed ones.
 
-**JS/TS** — check `package.json` devDependencies first, fall back to `npx <tool> --version`. Lint: `eslint` / `biome`. Format: `prettier` / `biome`. Test: `vitest` / `jest` / `mocha` (also check `scripts.test`). Config files: `eslint.config.{js,mjs,cjs}`, `.eslintrc.*`, `.prettierrc*`, `biome.json{,c}`.
+**JS/TS** — check `package.json` devDependencies first, then `node_modules/.bin/<tool>`. Never fall back to `npx <tool>`: it can download the package during a scan that should be read-only. Lint: `eslint` / `biome`. Format: `prettier` / `biome`. Test: `vitest` / `jest` / `mocha` (also check `scripts.test`). Config files: `eslint.config.{js,mjs,cjs}`, `.eslintrc.*`, `.prettierrc*`, `biome.json{,c}`.
 
 **Rust** — `cargo clippy`, `rustfmt`, `cargo test` (built-in).
 

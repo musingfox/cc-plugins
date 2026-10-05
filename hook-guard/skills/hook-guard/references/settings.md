@@ -45,7 +45,7 @@ test_gate: true
 
 ## Applying Overrides
 
-During setup Phase 2 (recommendation):
+During Setup step 2 (Recommend):
 1. Read `.claude/hook-guard.local.md` if it exists
 2. Parse YAML frontmatter
 3. Override default values with user settings

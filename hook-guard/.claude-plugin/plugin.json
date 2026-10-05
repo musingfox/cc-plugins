@@ -1,6 +1,6 @@
 {
   "name": "hook-guard",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "One-stop hook setup assistant — detect project environment, generate git pre-commit and commit-msg scripts with security checks and code quality gates",
   "author": {
     "name": "Nick Huang",

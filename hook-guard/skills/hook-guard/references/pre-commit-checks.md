@@ -2,6 +2,8 @@
 
 Source of truth for `.githooks/pre-commit`. Include only enabled checks.
 
+Contents: Script Skeleton, Security / File Integrity / Structure checks, Quality checks (with commands per language), Customization.
+
 ## Script Skeleton
 
 ```bash
@@ -57,7 +59,7 @@ exit 0
 check_secrets() {
   echo "Checking for secrets..."
   if command -v gitleaks &>/dev/null; then
-    gitleaks protect --staged --no-banner 2>&1 || { fail "gitleaks detected potential secrets"; return; }
+    gitleaks git --pre-commit --staged --no-banner 2>&1 || { fail "gitleaks detected potential secrets"; return; }
     pass "No secrets detected (gitleaks)"
     return
   fi
