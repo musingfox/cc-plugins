@@ -13,6 +13,8 @@
 #         fx_escalate              # writes escalate.md
 #         fx_stale_outcome         # pre-seeds last round's outcome.md
 #         fx_run --gates-only "$SHARD" goal none "$RUNNER"   # sets RC OUT
+#         fx_mutant 's/old/new/'   # sets MUT: cf-pi-run.sh with one perl change
+#         FX_RUN_SCRIPT="$MUT" fx_run ...   # runs that copy instead of the real one
 #         fx_clean
 # FX_DISPATCH_REPORT=1 before fx_build makes the dispatch stub write a valid report;
 # FX_WORKTREE_FAILS=1 makes the worktree stub exit 1 with no output.
@@ -107,11 +109,33 @@ fx_escalate() { printf '## Blocker\nCannot proceed.\n' > "$SHARD/escalate.md"; }
 
 fx_stale_outcome() { printf '## Status\nFAIL\n\n## Reason\nstall\n' > "$SHARD/outcome.md"; }
 
-# fx_run ARGS... : runs the real cf-pi-run.sh with the stubs first on PATH.
-# Sets RC, OUT (stdout) and leaves stderr in $FLOW/run.err.
+# fx_run ARGS... : runs cf-pi-run.sh (or $FX_RUN_SCRIPT) with the stubs first on
+# PATH. Sets RC, OUT (stdout) and leaves stderr in $FLOW/run.err.
 fx_run() {
-  OUT="$(PATH="$STUBS:$PATH" bash "$REAL_SCRIPTS/cf-pi-run.sh" "$@" 2>"$FLOW/run.err")"
+  OUT="$(PATH="$STUBS:$PATH" bash "${FX_RUN_SCRIPT:-$REAL_SCRIPTS/cf-pi-run.sh}" "$@" 2>"$FLOW/run.err")"
   RC=$?
+}
+
+# fx_script_dir DIR : links into DIR every sibling cf-pi-run.sh resolves through
+# $SCRIPT_DIR, so a copy of cf-pi-run.sh placed there runs against them. This is
+# the one list of those siblings; a new $SCRIPT_DIR call adds its script here.
+fx_script_dir() {
+  local s
+  mkdir -p "$1"
+  for s in cf-pi-env.sh cf-pi-prepare.sh cf-pi-scope.sh cf-pi-revert-gate.sh; do
+    ln -sf "$REAL_SCRIPTS/$s" "$1/$s"
+  done
+}
+
+# fx_mutant PERL_SUBSTITUTION : MUT=$FLOW/mut/cf-pi-run.sh with that one change.
+# Asserts the change applied, so a stale pattern cannot leave a real copy behind.
+fx_mutant() {
+  local run="$REAL_SCRIPTS/cf-pi-run.sh" applied=yes
+  fx_script_dir "$FLOW/mut"
+  MUT="$FLOW/mut/cf-pi-run.sh"
+  perl -0777 -pe "$1" "$run" >"$MUT"
+  cmp -s "$run" "$MUT" && applied=no
+  assert_eq "yes" "$applied" "mutation applies: $1"
 }
 
 fx_last() { printf '%s\n' "$OUT" | tail -1; }

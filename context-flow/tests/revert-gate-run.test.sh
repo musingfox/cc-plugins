@@ -7,8 +7,8 @@
 # $SCRIPT_DIR and is real. `sleep` is stubbed on PATH, git is not.
 
 . "$CF_TESTS_DIR/lib/assert.sh"
+. "$CF_TESTS_DIR/lib/run-fixture.sh"
 
-REAL_SCRIPTS="$(cd "$CF_TESTS_DIR/../scripts" && pwd)"
 RUN="$REAL_SCRIPTS/cf-pi-run.sh"
 
 # build_fixture [--empty] CONTRACT...   C1 = effective, C2 = vacuous.
@@ -103,21 +103,6 @@ section() { sed -n "/^## $1\$/{n;p;q;}" "$SHARD/outcome.md" 2>/dev/null; }
 list_of() { sed -n "/^## $1/,/^\$/p" "$SHARD/outcome.md" 2>/dev/null; }
 has() { case "$1" in *"$2"*) echo yes ;; *) echo no ;; esac; }
 
-# mutant PERL_SUBSTITUTION -> MUT, a copy of cf-pi-run.sh with that one change,
-# next to links to every sibling it resolves through $SCRIPT_DIR.
-mutant() {
-  local s
-  mkdir -p "$FLOW/mut"
-  for s in cf-pi-env.sh cf-pi-prepare.sh cf-pi-scope.sh cf-pi-revert-gate.sh; do
-    ln -s "$REAL_SCRIPTS/$s" "$FLOW/mut/$s"
-  done
-  MUT="$FLOW/mut/cf-pi-run.sh"
-  perl -0777 -pe "$1" "$RUN" >"$MUT"
-  local applied=yes
-  cmp -s "$RUN" "$MUT" && applied=no
-  assert_eq "yes" "$applied" "mutation applies: $1"
-}
-
 # ==== a contract green without its implementation blocks promotion ====
 
 # T1: vacuous C2
@@ -171,20 +156,20 @@ rm -rf "$FLOW"
 
 # T9: red first
 build_fixture C2; stub_gate
-mutant 's/"\$SCRIPT_DIR\/cf-pi-revert-gate\.sh"/"\$SCRIPTS\/cf-pi-revert-gate.sh"/'
+fx_mutant 's/"\$SCRIPT_DIR\/cf-pi-revert-gate\.sh"/"\$SCRIPTS\/cf-pi-revert-gate.sh"/'
 run_shard "$MUT"
 assert_eq "0 PASS" "$RC $(section Status)" "T9 gate through \$SCRIPTS: T4 ends PASS"
 rm -rf "$FLOW"
 
 STEP13='s/\n# -------- 13\. .*?\n(?=# All contracts this shard declared)/\n/s'
 build_fixture C2
-mutant "$STEP13"
+fx_mutant "$STEP13"
 run_shard "$MUT"
 assert_eq "0 PASS" "$RC $(section Status)" "T9 no step 13: T1 ends PASS"
 rm -rf "$FLOW"
 
 build_fixture --empty C1
-mutant "$STEP13"
+fx_mutant "$STEP13"
 run_shard "$MUT"
 assert_eq "0 PASS" "$RC $(section Status)" "T9 no step 13: T8 ends PASS"
 rm -rf "$FLOW"
@@ -225,9 +210,9 @@ rm -rf "$FLOW"
 # Exit 2 without a STAYS_GREEN line names no contract (bash exits 2 on a syntax
 # error): not a verdict either. A copy of cf-pi-run.sh whose sibling gate does that.
 build_fixture C1
-mkdir -p "$FLOW/sd"
-for s in cf-pi-env.sh cf-pi-prepare.sh cf-pi-scope.sh; do ln -s "$REAL_SCRIPTS/$s" "$FLOW/sd/$s"; done
+fx_script_dir "$FLOW/sd"
 cp "$RUN" "$FLOW/sd/cf-pi-run.sh"
+rm "$FLOW/sd/cf-pi-revert-gate.sh"
 printf '#!/bin/bash\nexit 2\n' >"$FLOW/sd/cf-pi-revert-gate.sh"
 chmod +x "$FLOW/sd/cf-pi-revert-gate.sh"
 run_shard "$FLOW/sd/cf-pi-run.sh"
@@ -236,7 +221,7 @@ rm -rf "$FLOW"
 
 # T3: red first, routing gate exit 1 to PASS lets T1 through
 build_fixture C1
-mutant 's/(case "\$GATE_RC:\$gate_line" in\n)/${1}  1:*) ;;\n/'
+fx_mutant 's/(case "\$GATE_RC:\$gate_line" in\n)/${1}  1:*) ;;\n/'
 run_shard "$MUT" false
 assert_eq "0 PASS" "$RC $(section Status)" "error T3 exit 1 routed to PASS: T1 ends PASS"
 rm -rf "$FLOW"
