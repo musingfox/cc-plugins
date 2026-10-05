@@ -123,6 +123,9 @@ fi
 # Create the worktree on the named branch (OWD-B: one worktree, one branch).
 # ---------------------------------------------------------------------------
 git -C "$repo_root" worktree add -B "$branch_name" "$work_path" "$base_ref" >&2
+# Marks the worktree as ours in its private git dir, so the QUOTA rollback can
+# tell it from a linked worktree the user made and ran a worker in.
+: > "$(git -C "$work_path" rev-parse --path-format=absolute --git-dir)/pi-worktree-created"
 
 # ---------------------------------------------------------------------------
 # Append the cleanup block to cleanup_out.

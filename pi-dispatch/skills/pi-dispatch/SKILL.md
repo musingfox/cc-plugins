@@ -201,19 +201,19 @@ reported with — they share the wall. On either tag:
    it runs. The scope is the batch, not the session: a later dispatch is free
    to try pi again, and after `QUOTA-WINDOW` it will likely succeed.
 2. Roll back each aborted worker's half-done edits in its worktree `WT`, but
-   only when `WT` is a linked worktree from
-   `${CLAUDE_PLUGIN_ROOT}/scripts/pi-worktree.sh create`. A worker run with
-   `PI_CWD="$PWD"` sits in the user's own checkout: report QUOTA and leave it
-   untouched. Keep the `reset` line only if the worker was allowed to commit
+   only when `WT` is a worktree
+   `${CLAUDE_PLUGIN_ROOT}/scripts/pi-worktree.sh create` made — create leaves a
+   `pi-worktree-created` marker in its private git dir. A worker run with
+   `PI_CWD="$PWD"` sits in the user's own checkout or linked worktree: report
+   QUOTA and leave it untouched. Keep the `reset` line only if the worker was allowed to commit
    (`BASE_REF` is the ref `pi-worktree.sh create` was given):
 
    ```bash
-   if [ "$(git -C "$WT" rev-parse --path-format=absolute --git-dir)" != \
-        "$(git -C "$WT" rev-parse --path-format=absolute --git-common-dir)" ]; then
+   if [ -f "$(git -C "$WT" rev-parse --path-format=absolute --git-dir)/pi-worktree-created" ]; then
      git -C "$WT" reset --hard "$BASE_REF"
      git -C "$WT" checkout -- . && git -C "$WT" clean -fd
    else
-     echo "QUOTA: $WT is not a linked worktree; left untouched"
+     echo "QUOTA: $WT is not a worktree pi-worktree.sh create made; left untouched"
    fi
    ```
 
