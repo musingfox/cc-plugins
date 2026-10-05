@@ -435,7 +435,7 @@ Otherwise a FAIL is an infrastructure failure on either builder: a prepare error
 
 ```
 Bash(run_in_background: true, timeout: 7200000, command:
-  "$SCRIPTS/cf-pi-run.sh $SESSION/shards/<id> '<one-sentence goal>' '<short constraints>' '<resolved SHARD_TEST_RUNNER>'")
+  ". $SESSION/env.sh && $SCRIPTS/cf-pi-run.sh $SESSION/shards/<id> '<one-sentence goal>' '<short constraints>' \"$SHARD_TEST_RUNNER\"")
 ```
 
 If the second attempt still returns FAIL, escalate via `AskUserQuestion` (peek context with `head -80 "$SESSION/shards/<id>/escalate.md"` if present):
@@ -547,9 +547,9 @@ Launch the READY shards in PARALLEL — one `cf-pi-run.sh` per shard as a **back
 
 ```
 Bash(run_in_background: true, timeout: 7200000, command:
-  "$SCRIPTS/cf-pi-run.sh $SESSION/shards/A '<one-sentence goal>' '<short constraints>' '<resolved SHARD_TEST_RUNNER>'")
+  ". $SESSION/env.sh && $SCRIPTS/cf-pi-run.sh $SESSION/shards/A '<one-sentence goal>' '<short constraints>' \"$SHARD_TEST_RUNNER\"")
 Bash(run_in_background: true, timeout: 7200000, command:
-  "$SCRIPTS/cf-pi-run.sh $SESSION/shards/B '<one-sentence goal>' '<short constraints>' '<resolved SHARD_TEST_RUNNER>'")
+  ". $SESSION/env.sh && $SCRIPTS/cf-pi-run.sh $SESSION/shards/B '<one-sentence goal>' '<short constraints>' \"$SHARD_TEST_RUNNER\"")
 ... (one background Bash per READY id)
 ```
 
@@ -695,7 +695,7 @@ Route on the **Spec verdict** only. A Standards documented-convention violation 
   4. Tell the human which shard ids re-launch, then re-launch only those. On Claude, run §3.2 steps 2–5 for each shard, starting with `cf-pi-run.sh --prepare-only` so the new `R<n>` cases reach the brief, and give the agent `$SESSION/review-spec.md` as the failure details. On OMP, one background `cf-pi-run.sh` per shard in a single message, with the four positionals of §3.6; it reuses the shard's worktree and rebuilds the brief from contracts.json, so the new `R<n>` cases reach the worker:
      ```
      Bash(run_in_background: true, timeout: 7200000, command:
-       "$SCRIPTS/cf-pi-run.sh $SESSION/shards/<id> '<one-sentence goal>' '<short constraints>' '<resolved SHARD_TEST_RUNNER>'")
+       ". $SESSION/env.sh && $SCRIPTS/cf-pi-run.sh $SESSION/shards/<id> '<one-sentence goal>' '<short constraints>' \"$SHARD_TEST_RUNNER\"")
      ```
   5. Collect and route as in §3.3 and §3.4, recording the round. When every shard is PASS, the integration gate rebuilds `cf/$CF_SLUG` from the flow base; then run Phase 4 again.
   6. Do NOT rebase yet — the cf branch accumulates more commits.
