@@ -418,6 +418,24 @@ else
 fi
 cleanup_flow "$REPO" "$FLOW" "$TMP"
 
+# --- T7b: a whitespace-only runner is refused the same way -------------------
+# `bash -c $'\t'` exits 0 just like the empty string. The shard gate already
+# refuses it; this gate must not be the one that lets it through.
+
+setup_fixture_1
+prior=$(git -C "$FLOW/work" rev-parse HEAD)
+bash "$INTEGRATE" "$FLOW" $' \t ' >/dev/null 2>&1
+rc=$?
+assert_eq "4" "$rc" "T7b a whitespace-only test runner is refused"
+after=$(git -C "$FLOW/work" rev-parse HEAD)
+assert_eq "$prior" "$after" "T7b nothing was landed on the parent"
+if [ -f "$FLOW/integration-result.json" ]; then
+  _assert_fail "T7b no result JSON is written for a refused run"
+else
+  _assert_pass
+fi
+cleanup_flow "$REPO" "$FLOW" "$TMP"
+
 # --- T8: the runner expands the flow env, not an empty child environment -----
 # A plan-resolved runner like `npm test --prefix $REPO_ROOT` is ordinary. The
 # gate hands the string to a child shell, so anything env.sh defines has to be

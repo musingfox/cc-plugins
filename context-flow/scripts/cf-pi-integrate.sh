@@ -57,14 +57,17 @@ set +a
 # fresh shell that never saw the orchestrator's own TEST_RUNNER, so a gate that
 # depends on the caller interpolating it can silently receive nothing.
 #
-# And an empty runner is not "no tests to run": `bash -c ""` exits 0 instantly
-# and this gate would linearize onto the parent and write PASS having run
-# nothing at all. It is the green that authorizes delivery, so it refuses.
+# And a blank runner is not "no tests to run": `bash -c ""` (or only whitespace)
+# exits 0 instantly and this gate would linearize onto the parent and write PASS
+# having run nothing at all. It is the green that authorizes delivery, so it
+# refuses.
 test_runner="${test_runner_arg:-${TEST_RUNNER:-}}"
-if [ -z "$test_runner" ]; then
-  echo "cf-pi-integrate.sh: no test runner — pass one as \$2 or record TEST_RUNNER in $flow_session/env.sh" >&2
-  exit 4
-fi
+case "$test_runner" in
+  *[![:space:]]*) ;;
+  *)
+    echo "cf-pi-integrate.sh: no test runner — pass one as \$2 or record TEST_RUNNER in $flow_session/env.sh" >&2
+    exit 4 ;;
+esac
 
 if [ -z "${REPO_ROOT:-}" ]; then
   echo "cf-pi-integrate.sh: REPO_ROOT not set in flow env" >&2
