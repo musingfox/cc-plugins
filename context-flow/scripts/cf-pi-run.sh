@@ -43,7 +43,8 @@
 #                            (plain only)
 #   6-13 run in the plain form and in --gates-only.
 #   6. escalation detect     $ESCALATE_FILE present => NEEDS_REPLAN
-#   7. gate 1 report         head -20 contains ## Summary && ## Completed;
+#   7. gate 1 report         head -20 contains ## Summary && ## Completed, and each
+#                            Completed tag names one contract of this shard;
 #                            one report-only re-dispatch before failing
 #   8. survivors set         contracts this shard both declared and reported done
 #   9. gate 3 test execute   cf-pi-test.sh; one in-shard re-dispatch on fail
@@ -586,11 +587,26 @@ fi
 rebrief_recorded() { grep -qxF "$1" "$SHARD_SESSION/rebriefs" 2>/dev/null; }
 record_rebrief() { echo "$1" >> "$SHARD_SESSION/rebriefs"; }
 
+# Read at top level: a failing read must stop the run here, not vanish inside a
+# gate's command substitution.
+declared_names=$(shard_contract_names)
+
 report_ok() {
   [ -s "$REPORT_FILE" ] || return 1
   local head_lines; head_lines=$(head -20 "$REPORT_FILE")
   echo "$head_lines" | grep -q '^## Summary' || return 1
   echo "$head_lines" | grep -q '^## Completed' || return 1
+  [ -z "$(bad_contract_tags)" ]
+}
+
+# Completed tags that name no single contract of this shard: a count
+# ("remaining 29"), a list, or an unknown name. Left to step 12 they would read
+# as unimplemented contracts and send finished work to replan.
+bad_contract_tags() {
+  local cname
+  completed_contracts | while IFS= read -r cname; do
+    echo "$declared_names" | grep -qxF "$cname" || echo "$cname"
+  done
 }
 
 # Survivors = (declared in this shard) ∩ (claimed Completed in the report).
@@ -652,6 +668,10 @@ write_report_rebrief() {
   {
     printf '## Missing report\n'
     printf 'Your implementation work is NOT in question here and must NOT be redone: `%s` is missing or does not open with the required schema.\n\n' "$REPORT_FILE"
+    local bad; bad=$(bad_contract_tags 2>/dev/null || true)
+    if [ -n "$bad" ]; then
+      printf 'These `_(contract: ...)_` tags under `## Completed` name no single contract of this shard: %s. Each Completed bullet carries exactly one contract name from the brief; a contract finished in an earlier round still gets its own bullet.\n\n' "$(printf '%s\n' "$bad" | sed 's/.*/`&`/' | paste -sd, - | sed 's/,/, /g')"
+    fi
     printf 'Read `%s` (its `## Output Requirements` section holds the exact Report Schema, and `## Behavioral Contracts` names the contracts) and inspect what is already committed on this branch: `git -C %s log --stat %s..HEAD`.\n\n' "$BRIEF_FILE" "$WORK" "$BASE_HEAD"
     printf 'Then write `%s` in that schema — it must start with `## Summary`, followed by `## Completed` with one bullet per contract that is actually implemented on the branch, each carrying its `_(contract: Name)_` suffix. Report only what the commits support; do not claim a contract you cannot point at. Then print DONE.\n' "$REPORT_FILE"
   } > "$REPORT_REBRIEF"
@@ -688,7 +708,7 @@ fi
 
 if ! report_ok; then
   pm=$(do_postmortem)
-  write_outcome FAIL report-malformed "" "(all): report missing, or missing ## Summary / ## Completed in head -20, after a report-only re-dispatch" "$pm" "-"
+  write_outcome FAIL report-malformed "" "(all): report missing, missing ## Summary / ## Completed in head -20, or a Completed tag naming no single contract of this shard, after a report-only re-dispatch" "$pm" "-"
   say "FAIL gate1 report missing/malformed"
   exit 1
 fi
@@ -704,7 +724,6 @@ say "gate 1 ok"
 # job; whether the tests meaningfully cover the contract is a judgement for the
 # Review phase, not a per-shard grep.
 
-declared_names=$(shard_contract_names)
 survivors=$(compute_survivors)
 say "survivors=$(echo "$survivors" | grep -c . || true)"
 

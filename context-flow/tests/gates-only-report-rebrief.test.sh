@@ -52,3 +52,17 @@ assert_eq "3" "$RC" "T5 exit"
 assert_contains "$(cat "$SHARD/outcome.md" 2>/dev/null)" "outcome-missing" "T5 outcome-missing recorded"
 case "$(fx_last)" in REBRIEF*) assert_eq "no REBRIEF" "$(fx_last)" "T5 last line" ;; *) assert_eq ok ok "T5 last line is not a REBRIEF" ;; esac
 fx_clean
+
+# T6: a Completed tag that names no single contract of this shard (a count, a
+# list, an unknown name) is a report-format miss, not unfinished work: it gets
+# the report-only re-brief naming the tag instead of incomplete-contracts.
+fx_build
+printf '## Summary\nDid the work.\n\n## Completed\n- Everything else _(contract: remaining 29)_\n' > "$SHARD/implement-report.md"
+fx_run --gates-only "$SHARD" goal none "$RUNNER"
+assert_eq "3" "$RC" "T6 exit"
+assert_eq "REBRIEF report $SHARD/report-re-brief.md" "$(fx_last)" "T6 last stdout line"
+assert_contains "$(cat "$SHARD/report-re-brief.md" 2>/dev/null)" '`remaining 29`' "T6 re-brief names the bad tag"
+fx_report valid
+fx_run --gates-only "$SHARD" goal none "$RUNNER"
+assert_eq "0" "$RC" "T6 rewritten report passes"
+fx_clean
