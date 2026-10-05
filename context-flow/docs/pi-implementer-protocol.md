@@ -67,7 +67,7 @@ You are a **faithful executor**: implement the behavioral contracts in this brie
    ```
    Write the message the way `git log` in this repo already writes them — same prefix style, same voice, same level of detail. **Never put the contract name, shard id, or any other cf vocabulary in the message.** These commits land in the user's project and outlive the flow; the project's history must not record which tool produced it. Contract↔commit mapping lives in the flow session, not in the message.
 
-   Never bundle two contracts into one commit; never split one contract across commits. Fixing a contract after its commit? Fold the fix into that commit — `git commit --amend` at the tip, otherwise `git commit --fixup=<sha> && GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash <BASE_HEAD>`. This branch is a private worktree; rewriting it is safe.
+   Never bundle two contracts into one commit; never split one contract across commits. Fixing a contract after its commit? Fold the fix into that commit — `git commit --amend` at the tip, otherwise `git commit --fixup=<sha> && GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash <BASE_HEAD>`. This branch is a private worktree; rewriting it is safe — except when the brief's Rules name a checkpoint tag another shard merged: then land the fix as a new commit on top, and never rewrite a commit that tag contains.
 6. Decide trivial ambiguities (naming, error text, file organization) yourself from the goal and constraints. Do not report Unresolved for anything you can reasonably decide.
 
 ### Outcome per contract — exactly one of

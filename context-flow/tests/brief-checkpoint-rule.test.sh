@@ -155,3 +155,11 @@ rc=$?
 assert_eq "0" "$rc" "T4 brief exits 0 when dispatch-state.json is absent"
 assert_eq "0" "$(phrase_hits "$BRIEF")" "T4 no already-passed line when dispatch-state.json is absent"
 rm -rf "$FLOW" "$SPECS"
+
+# T6: one commit rule. The fold-a-fix instruction itself carries the checkpoint
+# exception, wherever it is given, so no rule has to override a later one.
+fold_step=$(grep -F 'Fixing a contract after its commit?' "$PROTOCOL")
+assert_contains "$fold_step" "checkpoint" "T6 protocol step 5 names the checkpoint exception"
+rebrief=$(grep -F "EXISTING commit" "$SCRIPTS/cf-pi-run.sh")
+assert_contains "$rebrief" "checkpoint" "T6b gate-3 re-brief names the checkpoint exception"
+assert_eq "0" "$(grep -c 'overrides any later instruction' "$SCRIPTS/cf-pi-brief.sh" || true)" "T6c the brief rule no longer overrides a later one"

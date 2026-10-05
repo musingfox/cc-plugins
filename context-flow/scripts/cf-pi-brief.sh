@@ -161,7 +161,7 @@ render_checkpoint_rule() {
     | sort | join(", ")
   ' "$SHARDS_FILE" 2>/dev/null || true)
   [ -n "$ids" ] || return 0
-  echo "- This branch already passed as \`$tag\`, and shard(s) $ids merged it: land every fix as a new commit on top. Never amend, rebase, reset or autosquash into a commit \`$tag\` contains — this overrides any later instruction to fold a fix into an existing commit."
+  echo "- This branch already passed as \`$tag\`, and shard(s) $ids merged it: land every fix as a new commit on top. Never amend, rebase, reset or autosquash into a commit \`$tag\` contains."
 }
 
 shard_group="$SHARD_ID"

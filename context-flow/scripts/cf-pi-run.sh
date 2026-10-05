@@ -794,7 +794,7 @@ else
         REBRIEF_FILE="$SHARD_SESSION/re-brief.md"
         {
           printf '## Previous run feedback\n'
-          printf 'The orchestrator ran the test suite and it failed. Inspect the failures and fix. Fold each fix into that contract'\''s EXISTING commit instead of adding fixup commits: `git commit --amend` if it is the branch tip, otherwise `git commit --fixup=<that commit> && GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash %s`. This branch is a private worktree; rewriting it is safe. Then print DONE.\n\n' "$BASE_HEAD"
+          printf 'The orchestrator ran the test suite and it failed. Inspect the failures and fix. Fold each fix into that contract'\''s EXISTING commit instead of adding fixup commits: `git commit --amend` if it is the branch tip, otherwise `git commit --fixup=<that commit> && GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash %s`. This branch is a private worktree; rewriting it is safe — except when the brief'\''s Rules name a checkpoint tag another shard merged: then add a new commit on top instead. Then print DONE.\n\n' "$BASE_HEAD"
           printf '### Test output tail (last 30 lines)\n```\n'
           tail -30 "$SHARD_SESSION/gate3-retest.out" 2>/dev/null || tail -30 "$SHARD_SESSION/gate3.out"
           printf '\n```\n'
