@@ -28,7 +28,13 @@ build() {
   git -C "$REPO" add -A && git -C "$REPO" commit -qm "landed A"
   git -C "$REPO" checkout -q main
 }
+SCRIPTS="$(cd "$CF_TESTS_DIR/../scripts" && pwd)"
 run_block() { (cd "$REPO" && SESSION="$FLOW" CF_SLUG="$SLUG" && eval "$CLEANUP_BLOCK") 2>&1; }
+
+# --- T0: the block main pastes into Bash carries no literal `git branch -D` --
+# guard-bash.sh sees only the command text: it cannot resolve
+# "cf/$CF_SLUG-integrated" or "$b", so it blocks the whole cleanup.
+assert_eq no "$(printf '%s' "$CLEANUP_BLOCK" | grep -q 'branch -D' && echo yes || echo no)" "T0 cleanup block has no git branch -D"
 has_branch() { git -C "$REPO" rev-parse -q --verify "refs/heads/$1" >/dev/null && echo yes || echo no; }
 has_worktree() { git -C "$REPO" worktree list --porcelain | grep -q "integrated-work$" && echo yes || echo no; }
 

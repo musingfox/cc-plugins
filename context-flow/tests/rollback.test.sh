@@ -90,7 +90,7 @@ assert_eq "" "$(guard)" "T6 legacy object count: guard silent"
 
 # T7: cf.md's success-path cleanup leaves no rollback ref behind.
 CLEANUP_BLOCK=$(awk '/^### Scaffolding leaves no trace/{f=1} f&&/^```bash/{b=1;next} b&&/^```/{exit} b' "$CF_TESTS_DIR/../commands/cf.md")
-assert_contains "$CLEANUP_BLOCK" "refs/cf-rollback/" "T7 cleanup block names rollback refs"
+assert_contains "$CLEANUP_BLOCK" "cf-pi-cleanup.sh" "T7 cleanup block runs the cleanup script"
 (SESSION="$FLOW" CF_SLUG="$(basename "$FLOW")" && eval "$CLEANUP_BLOCK")
 assert_eq "" "$(git for-each-ref "refs/cf-rollback/")" "T7 no rollback ref after success cleanup"
 

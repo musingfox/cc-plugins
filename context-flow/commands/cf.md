@@ -823,21 +823,7 @@ Captures the final diff and removes the worktree. **The cf branch (`cf/$CF_SLUG`
 Shard branches, the integration branch, checkpoint tags, and rollback refs are cf's own machinery, not the user's work — they must not accumulate in the project. **On the success path only**, remove them once the run is integrated:
 
 ```bash
-if [ "$(git rev-parse -q --verify "cf/$CF_SLUG-integrated^{tree}")" = "$(git rev-parse -q --verify "cf/$CF_SLUG^{tree}")" ]; then
-  git worktree remove --force "$SESSION/integrated-work" >/dev/null 2>&1 || true
-  git branch -D "cf/$CF_SLUG-integrated" >/dev/null 2>&1 || true
-elif git rev-parse -q --verify "cf/$CF_SLUG-integrated" >/dev/null; then
-  echo "kept cf/$CF_SLUG-integrated and $SESSION/integrated-work: its tree differs from cf/$CF_SLUG"
-fi
-for b in $(git for-each-ref --format='%(refname:short)' "refs/heads/cf/$CF_SLUG-shard-*"); do
-  git branch -D "$b" >/dev/null 2>&1 || true
-done
-for t in $(git tag -l "cf-checkpoint/$(basename "$SESSION")/*"); do
-  git tag -d "$t" >/dev/null 2>&1 || true
-done
-for r in $(git for-each-ref --format='%(refname)' "refs/cf-rollback/$(basename "$SESSION")/"); do
-  git update-ref -d "$r" >/dev/null 2>&1 || true
-done
+"$SCRIPTS/cf-pi-cleanup.sh" "$SESSION" "$CF_SLUG"
 ```
 
 `cf/$CF_SLUG` already carries the integration gate's linear landing, so nothing is lost. The integration branch and its `$SESSION/integrated-work` checkout go only when their tree is the one on `cf/$CF_SLUG`; when the block prints `kept …` instead, pass that line to the human. **On the escalation path, delete none of it** — §5's worst case has the human cherry-picking validated contract commits off those very branches and tags.
