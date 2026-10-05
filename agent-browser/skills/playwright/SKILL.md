@@ -12,18 +12,16 @@ description: >-
 
 Write browser tests using `@playwright/test`, the official Playwright test runner. It provides auto-waiting, test isolation, built-in web assertions with auto-retry, and parallel execution out of the box.
 
-Prefer `@playwright/test` for all testing scenarios. Use library mode (`playwright`) only for direct browser scripting needs: console error capture, network inspection, or custom automation outside a test context.
+For console, network, or page-state diagnostics outside a test, use the web-test skill.
 
 ## Project Setup
 
 ```bash
-# Initialize Playwright in a project
-npm init playwright@latest
-
-# Or add to existing project
 npm install -D @playwright/test
 npx playwright install
 ```
+
+`npm init playwright@latest` asks interactive questions, so leave it for the user to run in their own terminal.
 
 Essential `playwright.config.ts` (for full multi-browser, reporter, and webServer config, see `references/api-patterns.md`):
 
@@ -61,7 +59,7 @@ test.describe('Feature Name', () => {
     await submitButton.click();
 
     // Assert
-    await expect(page.getByText('Success')).toBeVisible();
+    await expect(page.getByText('Success', { exact: true })).toBeVisible();
   });
 });
 ```
@@ -86,7 +84,6 @@ Apply locators in strict priority order — always prefer the highest-precision 
 - Never use index-based locators (`nth(0)`) unless testing a list where index is semantically meaningful.
 - Never use XPath unless no other option exists.
 - Always pass `{ exact: true }` to `getByText()` to prevent partial matches.
-- Prefer accessibility-based locators (`getByRole`, `getByLabel`) — they match what users see and interact with.
 - When multiple elements share the same locator, narrow with `.filter({ hasText: 'unique' })` or scope to a parent.
 
 For locator disambiguation patterns (filter, chaining, scoping), see `references/api-patterns.md`.
@@ -211,38 +208,7 @@ npx playwright test --debug            # Step-through debugger
 npx playwright show-report             # View HTML report
 ```
 
-## Library Mode (Advanced)
-
-Use `playwright` (not `@playwright/test`) when direct browser control is needed outside a test runner:
-
-```typescript
-import { chromium } from 'playwright';
-
-const browser = await chromium.launch();
-const context = await browser.newContext();
-const page = await context.newPage();
-
-// Console error capture
-page.on('console', msg => {
-  if (msg.type() === 'error') console.log('Console error:', msg.text());
-});
-
-// Network request inspection
-page.on('response', response => {
-  if (response.status() >= 400)
-    console.log(`Failed: ${response.status()} ${response.url()}`);
-});
-
-// JavaScript execution in page context
-const title = await page.evaluate(() => document.title);
-
-// Cookie inspection
-const cookies = await context.cookies();
-
-await browser.close();
-```
-
-Use library mode for: console error capture, network inspection, `page.evaluate()`, iframe/shadow DOM exploration, cookie/localStorage checks.
+After writing a spec, run it with `npx playwright test <new-file>`. On a failure, read the error, fix the spec, and rerun. The spec is done when that run passes.
 
 ## Additional Resources
 

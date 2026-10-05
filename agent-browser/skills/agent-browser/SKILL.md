@@ -2,9 +2,9 @@
 name: agent-browser
 description: >-
   Use for live browser automation via the agent-browser CLI — open URLs, snapshot pages,
-  click/fill/screenshot, inspect elements, scrape or read web pages. Ref-based workflow
-  for AI agents. Not for writing Playwright test files (use playwright or web-test).
-allowed-tools: Bash(agent-browser *) Read Grep Glob
+  click/fill/screenshot, inspect elements, or read pages that need JavaScript rendering,
+  login, or interaction. Not for writing Playwright test files (use playwright or web-test).
+allowed-tools: Bash(agent-browser open *) Bash(agent-browser snapshot *) Bash(agent-browser screenshot *) Bash(agent-browser get *) Read Grep Glob
 ---
 
 # agent-browser
@@ -41,29 +41,7 @@ open URL → snapshot → read refs → interact → re-snapshot → repeat
 2. **Snapshot** to obtain the accessibility tree with refs
 3. **Read** the snapshot output — identify target elements by their refs
 4. **Interact** with elements using their refs (`click @e1`, `fill @e2 "text"`)
-5. **Re-snapshot** after any action that changes the DOM
-
-**Critical rule**: Refs are invalidated after navigation or significant DOM changes. Always take a fresh snapshot before interacting with elements after any page change.
-
-## Command Quick Reference
-
-| Command | Syntax | Purpose |
-|---------|--------|---------|
-| `open` | `agent-browser open <url>` | Navigate to URL |
-| `snapshot` | `agent-browser snapshot [-i] [-c] [-d N] [-s "sel"]` | Get accessibility tree with refs |
-| `click` | `agent-browser click @eN [--new-tab]` | Click element |
-| `dblclick` | `agent-browser dblclick @eN` | Double-click element |
-| `fill` | `agent-browser fill @eN "text"` | Clear field and type text |
-| `type` | `agent-browser type @eN "text"` | Type without clearing |
-| `focus` | `agent-browser focus @eN` | Focus element |
-| `select` | `agent-browser select @eN "option"` | Select dropdown option |
-| `check` | `agent-browser check @eN` | Check checkbox |
-| `uncheck` | `agent-browser uncheck @eN` | Uncheck checkbox |
-| `hover` | `agent-browser hover @eN` | Hover over element |
-| `press` | `agent-browser press <key>` | Press keyboard key |
-| `scroll` | `agent-browser scroll <dir> [pixels]` | Scroll page (default 300px) |
-| `screenshot` | `agent-browser screenshot [--annotate]` | Capture screenshot |
-| `open --headers` | `agent-browser open <url> --headers '{...}'` | Send headers to that URL's origin only |
+5. **Re-snapshot** when the page changes (see Re-snapshot Rules)
 
 ## Snapshot Modes
 
@@ -74,7 +52,6 @@ The snapshot command is the primary inspection tool. Choose the right mode:
 - **`snapshot -c`** — Compact output. Reduces token usage on large pages.
 - **`snapshot -d N`** — Limit tree depth to N levels. Use for deeply nested DOMs.
 - **`snapshot -s "selector"`** — Scope to a CSS selector. Focus on a specific page section.
-- **`snapshot --annotate`** — Overlay numbered labels `[N]` on a screenshot matching refs `@eN`.
 
 Combine flags freely: `agent-browser snapshot -i -c -d 3` for compact, shallow, interactive-only output.
 
@@ -85,7 +62,7 @@ Combine flags freely: `agent-browser snapshot -i -c -d 3` for compact, shallow, 
 - **`type @eN "text"`** — Appends without clearing. Use for adding to existing content.
 
 ### Navigation via Click
-- **`click @eN`** — Standard click. If the page navigates, re-snapshot immediately.
+- **`click @eN`** — Standard click.
 - **`click @eN --new-tab`** — Opens in new tab. Original page state is preserved.
 
 ### Keyboard
@@ -106,6 +83,8 @@ Combine flags freely: `agent-browser snapshot -i -c -d 3` for compact, shallow, 
 - **`screenshot --annotate`** — Overlay `[N]` labels on interactive elements. Use to visually confirm ref assignments before performing destructive actions.
 
 ## Re-snapshot Rules
+
+Refs are invalidated by navigation and DOM changes. Read every ref from the most recent snapshot.
 
 **Always re-snapshot after:**
 - Navigation (`open`, clicking a link)
@@ -134,14 +113,12 @@ Never put credentials in `set headers`: it is a global setting that applies to e
 ## Best Practices
 
 1. **Start with `snapshot -i`** — Interactive elements are usually sufficient. Expand to `-i -C` or full snapshot only when needed.
-2. **Verify before destructive actions** — Use `screenshot --annotate` to confirm the target element before delete, submit, or irreversible actions.
-3. **Handle dynamic content** — For SPAs and lazy-loaded content, re-snapshot if expected elements are absent. A brief wait may be needed.
+2. **Ask before irreversible actions** — Before a click or submit that deletes, buys, sends, or otherwise cannot be undone, confirm the target with `screenshot --annotate`, tell the user what the action will do, and proceed only after they approve.
+3. **Handle dynamic content** — For SPAs and lazy-loaded content, wait with `wait --load networkidle` or `wait --text "<expected text>"`, then re-snapshot.
 4. **Minimize token usage** — Use `-c` (compact) and `-d N` (depth limit) for large pages. Scope with `-s "selector"` for targeted sections.
-5. **One action per step** — Perform one interaction, then snapshot to verify the result before proceeding.
-6. **Never guess refs** — Always read refs from the most recent snapshot. Never reuse refs from a previous snapshot after a DOM change.
 
 ## Additional Resources
 
 ### Command Help
 
-For full flags and examples of any command, run `agent-browser <command> --help`.
+For the full command list, run `agent-browser --help`; for one command's flags and examples, run `agent-browser <command> --help`.

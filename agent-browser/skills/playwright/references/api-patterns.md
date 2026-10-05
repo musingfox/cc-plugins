@@ -1,5 +1,16 @@
 # Playwright API Patterns Reference
 
+## Contents
+
+- [Locator Disambiguation](#locator-disambiguation) — filter, nth, chaining, and `has` to narrow a match
+- [Assertion Quick Reference](#assertion-quick-reference) — element, content, and page assertions; negation; timeouts
+- [Advanced Fixtures](#advanced-fixtures) — page object model and shared authentication state
+- [Network Interception](#network-interception) — mock, wait for, and abort requests
+- [iframe Handling](#iframe-handling)
+- [Shadow DOM](#shadow-dom)
+- [Visual Comparison](#visual-comparison)
+- [Configuration Reference](#configuration-reference) — common `playwright.config.ts` options
+
 ## Locator Disambiguation
 
 When multiple elements match the same locator, narrow the match:
