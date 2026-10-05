@@ -211,6 +211,7 @@ Write a single JSON document conforming to schema_version 1:
       "errors": "<the markdown contract's errors line, verbatim>",
       "depends": ["<ContractName this one consumes>"],
       "touches_files": ["<path>", "<path>"],
+      "test_files": ["<path>"],
       "implementation_plan": [
         {"title": "Step 2: Add the gate", "target": "scripts/gate.sh", "approach": "revert in place", "order": "after Step 1"}
       ],
@@ -236,6 +237,7 @@ Field rules:
 - **`implementation_plan`**: the `### Step N: ... — fulfills [Name]` steps that name this contract. A step that fulfills two contracts appears in both. Each entry is `{"title","target","approach","order"}`. Optional — default omit when no step names this contract.
 - **`depends`** (load-bearing): the markdown contract's **depends** line, carried verbatim — names of contracts in THIS plan whose interfaces this one consumes. Default `[]`. The orchestrator shards by file overlap, then uses `depends` to sequence dispatch waves and to merge prerequisite checkpoints into dependent shards' worktree bases; omitting a real dependency costs the dependent shard a guaranteed first-round escalation. Dependencies on pre-existing code are NOT listed (only contracts of this plan).
 - **`touches_files`** (load-bearing): SUPERSET of every file the contract creates or modifies. **Test files count. Doc files count if the contract changes docs.** Underset is a bug — `cf-pi-run.sh` post-validates `actual_touched ⊆ declared_touched` and emits NEEDS_REPLAN with `reason: undeclared_file_touched` on violation. Use repo-relative paths.
+- **`test_files`**: the entries of `touches_files` that are this contract's tests. The revert gate puts every other touched file back to the flow base and expects these tests to go red, so list exactly the test files, wherever they live (`spec/` is not a test directory in every repo). `[]` when the contract adds no test file.
 - **`test_cases`**: structured form of the markdown Test Cases.
 - **`fuzzy_criteria`**: default `[]`. ONLY for constraints that genuinely resist a concrete test case ("minimal memory footprint", "idiomatic to the codebase") — never a dumping ground for lazy test-casing; if a concrete input→output exists, it belongs in `test_cases`. Each entry is BINDING: the Review phase must render an evidence-backed PASS/FAIL for it (measurement, comparison, or adversarial argument at the criterion's own precision), and a FAIL blocks the flow like any contract FAIL.
 - **`attachments`**: ESCAPE HATCH for rich design discussion (decision logs, diagrams). Default `[]`. Use only when contract-body prose is too long; place files under `$SESSION/plan-attachments/`. Brief assembly includes attachment contents verbatim for the implementer.
@@ -412,5 +414,5 @@ Run this self-check before producing your final output. If any item fails, fix t
 - [ ] Every research constraint is either covered by a test case or listed in Unresolved with justification.
 - [ ] No "low confidence" guesses leaked into Decisions or Contracts — guesses live in Unresolved.
 - [ ] Implementation Plan steps each cite the contract they fulfill.
-- [ ] **contracts.json sidecar**: emitted with `schema_version=1` + every contract has `touches_files` (superset, includes test files and doc files) + `depends` mirrors each markdown contract's depends line (in-plan contract names only) + `input`, `output`, and `errors` copy those markdown lines verbatim + `implementation_plan` lists every step whose fulfills clause names this contract.
+- [ ] **contracts.json sidecar**: emitted with `schema_version=1` + every contract has `touches_files` (superset, includes test files and doc files) + `test_files` lists exactly its test files + `depends` mirrors each markdown contract's depends line (in-plan contract names only) + `input`, `output`, and `errors` copy those markdown lines verbatim + `implementation_plan` lists every step whose fulfills clause names this contract.
 - [ ] If partial-replan mode: revision file uses same `name` values as base contracts; new names mean full re-plan (decline via `REPLAN_REQUIRES_ROLLBACK` instead).

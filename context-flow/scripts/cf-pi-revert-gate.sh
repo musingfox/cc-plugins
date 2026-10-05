@@ -6,8 +6,9 @@
 #
 # One control run on the untouched tree, then one run per contract (shards.json
 # order). A contract's run reverts every own path except root build/lock
-# manifests and that contract's own test files. A run that exits non-zero, or
-# is killed at the deadline, went red.
+# manifests and that contract's own test files: its `test_files` in
+# contracts.json, or without the field, its touched paths that look like tests.
+# A run that exits non-zero, or is killed at the deadline, went red.
 #
 # Usage:   cf-pi-revert-gate.sh SHARD_SESSION TEST_CMD [ARGS...]
 # Stdout:  exactly one verdict line
@@ -27,10 +28,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=cf-pi-env.sh
 . "$SCRIPT_DIR/cf-pi-env.sh"
-
-# Copied from cf-pi-scope.sh, the source: root build/lock manifests any shard
-# may touch. A run needs them to install or build, so none is ever reverted.
-BUILD_LOCK_ALLOWLIST='^(pyproject\.toml|uv\.lock|requirements[^/]*\.txt|package\.json|package-lock\.json|bun\.lock(b)?|yarn\.lock|pnpm-lock\.yaml|Cargo\.(toml|lock)|go\.(mod|sum)|Gemfile(\.lock)?)$'
 
 verdict() {
   printf '%s\n' "$1"
@@ -57,16 +54,18 @@ own_status() {
 # put_back REV PATH...: each path to its state at REV, deleted when REV lacks it.
 # Plumbing through a scratch index: `git checkout <rev> -- <path>` fires
 # post-checkout, and the real index must keep what step 11 left in it.
+# Only a blob or gitlink at REV is written. A tree at REV means the path was a
+# directory there, and its files are in the list themselves, so whatever file
+# stands in its place goes. rm tolerates a path whose parent is now a file.
 put_back() {
   local rev="$1" idx="$SHARD_SESSION/revert-gate.index" p
   shift
   local present=()
   for p in "$@"; do
-    if git -C "$WORK" cat-file -e "$rev:$p" 2>/dev/null; then
-      present+=("$p")
-    else
-      rm -f "$WORK/$p"
-    fi
+    case "$(git -C "$WORK" cat-file -t "$rev:$p" 2>/dev/null)" in
+      blob|commit) present+=("$p") ;;
+      *) rm -f "$WORK/$p" 2>/dev/null || true ;;
+    esac
   done
   [ ${#present[@]} -gt 0 ] || return 0
   rm -f "$idx"
@@ -119,15 +118,8 @@ git -C "$WORK" rev-parse --is-inside-work-tree >/dev/null 2>&1 || verdict "ERROR
 [ -n "${BASE_HEAD:-}" ] && git -C "$WORK" rev-parse --quiet --verify "$BASE_HEAD^{commit}" >/dev/null 2>&1 \
   || verdict "ERROR base-head-unresolvable" 1
 
-# The set cf-pi-scope.sh charges: the commit union, prerequisite checkpoints excluded.
-# --no-renames: rename detection lists only the new name, and the old one must be put back.
-# -z: git C-quotes a name holding a quote, backslash or control character even with
-# core.quotePath=false, and a quoted name matches no file, so the run would keep it.
-own_log() {
-  # shellcheck disable=SC2046
-  git -C "$WORK" log -z --no-renames --name-only --pretty=format: "$BASE_HEAD..HEAD" \
-    --not $(cat "$SHARD_SESSION/prereq-refs" 2>/dev/null)
-}
+# The set cf-pi-scope.sh charges (cf_own_paths in cf-pi-env.sh).
+own_log() { cf_own_paths "$WORK" "$BASE_HEAD" "$SHARD_SESSION"; }
 # Run twice: a variable cannot hold NULs, and a process substitution's status is
 # lost. A failed lookup (a prerequisite ref gone) is not an empty set: that would
 # judge the unchanged tree and name every contract.
@@ -155,10 +147,16 @@ run_suite control
 green=""
 for name in ${contracts[@]+"${contracts[@]}"}; do
   touches=$(jq -r --arg n "$name" '.contracts[] | select(.name == $n) | .touches_files[]?' "$CONTRACTS_FILE")
+  # The contract's own test_files decide; a plan without the field falls back to
+  # the path rule, which misreads layouts such as spec/scripts/*.sh.
+  tests=$(jq -r --arg n "$name" '.contracts[] | select(.name == $n) | .test_files // empty | .[]' "$CONTRACTS_FILE")
+  has_tests=$(jq -r --arg n "$name" '.contracts[] | select(.name == $n) | has("test_files")' "$CONTRACTS_FILE")
   revert=()
   for p in ${own[@]+"${own[@]}"}; do
-    if printf '%s\n' "$p" | grep -Eq "$BUILD_LOCK_ALLOWLIST"; then continue; fi
-    if is_test_path "$p" && printf '%s\n' "$touches" | grep -Fxq -- "$p"; then continue; fi
+    if printf '%s\n' "$p" | grep -Eq "$CF_BUILD_LOCK_ALLOWLIST"; then continue; fi
+    if [ "$has_tests" = true ]; then
+      if printf '%s\n' "$tests" | grep -Fxq -- "$p"; then continue; fi
+    elif is_test_path "$p" && printf '%s\n' "$touches" | grep -Fxq -- "$p"; then continue; fi
     revert+=("$p")
   done
   [ ${#revert[@]} -eq 0 ] || put_back "$BASE_HEAD" "${revert[@]}"

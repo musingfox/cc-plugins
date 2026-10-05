@@ -294,7 +294,7 @@ assert_not_verdict "T13 reverting package.json breaks T7" "STAYS_GREEN C2" 2
 rm -rf "$FLOW"
 
 prereq_fixture
-mutant 's/ *--not \$\(cat "\$SHARD_SESSION\/prereq-refs" 2>\/dev\/null\)//'
+mutant 's/^own_log\(\) \{.*\}$/own_log() { git -C "\$WORK" log -z --no-renames --name-only --pretty=format: "\$BASE_HEAD..HEAD"; }/m'
 run_gate "$MUT" bash run-tests.sh
 assert_not_verdict "T13 own paths without --not breaks T8" "STAYS_GREEN C2" 2
 rm -rf "$FLOW"

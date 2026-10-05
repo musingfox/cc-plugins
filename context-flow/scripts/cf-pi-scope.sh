@@ -46,23 +46,18 @@ declared_files=$(jq -r --arg sid "$SHARD_ID" '.groups[$sid].files[]' "$SHARDS_FI
 # Commit union, not net diff, on purpose: the gate asks whether the worker
 # touched an undeclared file, not what survived. A file created and deleted
 # again still collided with whatever shard actually owns it.
-# shellcheck disable=SC2046,SC2086
-actual_files=$(git -C "$WORK" log --name-only --pretty=format: "$BASE_HEAD..HEAD" \
-                 --not $(cat "$SHARD_SESSION/prereq-refs" 2>/dev/null) 2>/dev/null | sed '/^$/d' | sort -u)
+actual_files=$(cf_own_paths "$WORK" "$BASE_HEAD" "$SHARD_SESSION" 2>/dev/null | tr '\0' '\n' | sed '/^$/d' | sort -u)
 
 undeclared=""
 if [ -n "$actual_files" ]; then
   undeclared=$(comm -23 <(printf '%s\n' "$actual_files") <(printf '%s\n' "$declared_files") || true)
 fi
 
-# Build/lock manifests are legitimately touched when the isolated worktree must
-# add a missing dev dep to run the tests (e.g. `uv add --dev pytest`). Treat
-# them as a warning, not a scope violation.
-BUILD_LOCK_ALLOWLIST='^(pyproject\.toml|uv\.lock|requirements[^/]*\.txt|package\.json|package-lock\.json|bun\.lock(b)?|yarn\.lock|pnpm-lock\.yaml|Cargo\.(toml|lock)|go\.(mod|sum)|Gemfile(\.lock)?)$'
+# Build/lock manifests: a warning, not a scope violation (see cf-pi-env.sh).
 allowlisted=""
 if [ -n "$undeclared" ]; then
-  allowlisted=$(printf '%s\n' "$undeclared" | grep -E "$BUILD_LOCK_ALLOWLIST" || true)
-  undeclared=$(printf '%s\n' "$undeclared" | grep -vE "$BUILD_LOCK_ALLOWLIST" || true)
+  allowlisted=$(printf '%s\n' "$undeclared" | grep -E "$CF_BUILD_LOCK_ALLOWLIST" || true)
+  undeclared=$(printf '%s\n' "$undeclared" | grep -vE "$CF_BUILD_LOCK_ALLOWLIST" || true)
 fi
 
 # .githooks/pre-commit bumps <plugin>/.claude-plugin/plugin.json inside the

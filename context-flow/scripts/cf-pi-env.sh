@@ -111,6 +111,29 @@ resolve_canon_spec() {
 #   nothing if unresolved. Always returns 0 -- each caller keeps its own distinct
 #   failure branch (dispatch: fail-hard; poll: NO_PID fail-soft; stop: /nonexistent
 #   fallback). Mirror of spiral/scripts/pi-build.sh's resolver.
+# CF_BUILD_LOCK_ALLOWLIST
+#   Root build/lock manifests any shard may touch: an isolated worktree may have
+#   to add a missing dev dependency to run its tests (e.g. `uv add --dev pytest`).
+#   The scope gate warns on them instead of failing; the revert gate never
+#   reverts them, because a run needs them to install or build.
+CF_BUILD_LOCK_ALLOWLIST='^(pyproject\.toml|uv\.lock|requirements[^/]*\.txt|package\.json|package-lock\.json|bun\.lock(b)?|yarn\.lock|pnpm-lock\.yaml|Cargo\.(toml|lock)|go\.(mod|sum)|Gemfile(\.lock)?)$'
+
+# cf_own_paths WORK BASE_HEAD SHARD_SESSION
+#   NUL-separated paths the shard's own commits touched, for the scope gate and
+#   the revert gate alike: the commit union from BASE_HEAD, minus the
+#   prerequisite checkpoints in SHARD_SESSION/prereq-refs (another shard's
+#   work). Empty records included; callers drop them.
+#   --no-renames: rename detection lists only the new name, so the old path
+#   would escape both gates.
+#   -z: git C-quotes a name holding a quote, backslash or control character even
+#   with core.quotePath=false, and a quoted name matches no declared path.
+#   Fails when a prerequisite ref is gone; that is not an empty set.
+cf_own_paths() {
+  # shellcheck disable=SC2046
+  git -C "$1" log -z --no-renames --name-only --pretty=format: "$2..HEAD" \
+    --not $(cat "$3/prereq-refs" 2>/dev/null)
+}
+
 resolve_canon_dispatch() {
   local root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
   ls "$root"/../pi-dispatch/scripts/pi-dispatch.sh \
