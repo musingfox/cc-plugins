@@ -10,15 +10,11 @@ description: >-
 
 # Apple Podcasts Episode Audio Fetch
 
-Fetch audio download URLs from Apple Podcasts episodes using only HTTP APIs. No browser, no scraping — just iTunes Lookup API and RSS feed parsing.
+Fetch audio download URLs from Apple Podcasts episodes using only HTTP APIs. No browser, no scraping — one iTunes Lookup API call, with the RSS feed as a fallback.
 
-## Overview
+Apple Podcasts does not expose direct audio URLs on its web pages, so resolve them through the API in the steps below.
 
-Apple Podcasts does not expose direct audio URLs on its web pages. To obtain the audio file URL for a specific episode, follow a three-step API pipeline:
-
-1. **Parse the Apple Podcasts URL** to extract `show_id` and `track_id`
-2. **Call iTunes Lookup API** to get the podcast's RSS feed URL
-3. **Call iTunes Episode Lookup** to get the `episodeGuid`, then **fetch the RSS feed** and match the guid to extract the audio `<enclosure>` URL
+**Requirements:** `curl`, `jq`, and `xmllint` (python3 replaces `xmllint` only when it is absent). Run every call through Bash with `curl` + `jq`; WebFetch converts the response to markdown and answers through a small model, which can garble IDs and URLs picked out of a 200-item array.
 
 ## Step 1: Parse the Apple Podcasts URL
 
@@ -39,122 +35,71 @@ Extract two values:
 - **`show_id`**: The numeric ID after `id` in the URL path (e.g., `1500839292`)
 - **`track_id`**: The value of the `?i=` query parameter (e.g., `1000752065662`)
 
-Both values are required. If the URL lacks `?i=`, prompt the user to provide a URL that includes the episode-specific `?i=` parameter, or use the iTunes Episode Lookup (Step 3a) to list recent episodes for the user to choose from.
+If the URL lacks `?i=`, run Step 2, list the recent episodes (`trackName`, `releaseDate`, `trackId`) for the user to choose from, and continue with the chosen `trackId`.
 
-## Step 2: Get RSS Feed URL via iTunes Lookup API
+## Step 2: Look up the show and its episodes
 
-Make a GET request:
-
-```
-GET https://itunes.apple.com/lookup?id={show_id}
-```
-
-The response JSON contains a `results` array. The first result includes:
-
-| Field | Description |
-|-------|-------------|
-| `feedUrl` | The podcast's RSS feed URL |
-| `collectionName` | Podcast title |
-| `trackCount` | Total episode count |
-
-Extract the `feedUrl` value for Step 3.
-
-**Example using curl:**
+One request returns the podcast and its most recent episodes. Save it so later steps reuse it:
 
 ```bash
-curl -s "https://itunes.apple.com/lookup?id=1500839292" | jq '.results[0].feedUrl'
+curl -sf "https://itunes.apple.com/lookup?id=1500839292&entity=podcastEpisode&limit=200" \
+  -o "${TMPDIR:-/tmp}/apple-podcasts-lookup.json"
 ```
 
-## Step 3: Get Episode Audio URL
-
-This step has two sub-steps: first get the `episodeGuid` from iTunes, then match it in the RSS feed.
-
-### 3a: Get episodeGuid via iTunes Episode Lookup
-
-Make a GET request:
-
-```
-GET https://itunes.apple.com/lookup?id={show_id}&entity=podcastEpisode&limit=200
-```
-
-The response `results` array contains the podcast info (index 0) followed by episode objects. Each episode includes:
+The `results` array holds the podcast at index 0 (its `feedUrl` is the RSS feed) followed by episode objects. Each episode includes:
 
 | Field | Description |
 |-------|-------------|
 | `trackId` | iTunes track ID — match this against `track_id` from the URL |
-| `episodeGuid` | The RSS `<guid>` value for this episode |
 | `trackName` | Episode title |
-| `episodeUrl` | Audio file URL (try this first; fall back to RSS if missing or broken) |
+| `episodeUrl` | Direct audio file URL |
+| `episodeGuid` | The RSS `<guid>` value, used only by the RSS fallback |
 
-Find the episode where `trackId` equals the `track_id` from Step 1. Extract its `episodeGuid`.
-
-**Example using curl + jq:**
+## Step 3: Match the episode
 
 ```bash
-curl -s "https://itunes.apple.com/lookup?id=1500839292&entity=podcastEpisode&limit=200" \
-  | jq '.results[] | select(.trackId == 1000752065662) | .episodeGuid'
+jq --argjson id 1000752065662 \
+  '.results[] | select(.trackId == $id) | {trackName, episodeUrl, episodeGuid}' \
+  "${TMPDIR:-/tmp}/apple-podcasts-lookup.json"
 ```
 
-### 3b: Fetch RSS Feed and Match guid
+Pass the ID with `--argjson`: `trackId` is a JSON number, and `--arg` would compare it as a string and match nothing. Empty output means the episode is not among the most recent 200 (see Limitations).
 
-Fetch the RSS feed URL obtained in Step 2. Parse the XML to find the `<item>` whose `<guid>` matches the `episodeGuid` from Step 3a.
-
-From the matching `<item>`, extract:
-
-| XML Element | Data |
-|-------------|------|
-| `<title>` | Episode title |
-| `<pubDate>` | Publication date |
-| `<enclosure url="...">` | **Audio file download URL** |
-| `<guid>` | Episode unique identifier |
-
-**Example using curl + xmllint:**
+## Step 4: Verify the audio URL
 
 ```bash
-FEED_URL="https://feeds.soundon.fm/podcasts/..."
+curl -sIL -o /dev/null -w '%{http_code} %{content_type}\n' "EPISODE_URL"
+```
+
+The URL is good when this prints `200` and an `audio/*` content type. Return it to the user. When `episodeUrl` is missing or fails this check, take the RSS fallback (Step 5) and verify its URL the same way.
+
+## Step 5 (fallback): Match the guid in the RSS feed
+
+Read `.results[0].feedUrl` from the saved lookup, then extract the `<enclosure url>` of the `<item>` whose `<guid>` equals the episode's `episodeGuid`:
+
+```bash
+FEED_URL=$(jq -r '.results[0].feedUrl' "${TMPDIR:-/tmp}/apple-podcasts-lookup.json")
 GUID="360acf81-2bca-4f2f-b2b7-11647b8f10d4"
 
-curl -s "$FEED_URL" | xmllint --xpath \
-  "//item[guid='$GUID']/enclosure/@url" - 2>/dev/null
+curl -sf "$FEED_URL" | xmllint --xpath "string(//item[guid='$GUID']/enclosure/@url)" -
 ```
 
-Alternatively, use Python with `xml.etree.ElementTree` or a simple `grep`/`sed` approach on the raw XML, since RSS feeds are well-structured.
+Keep stderr visible to tell the outcomes apart: a parser error message with exit code 1 means the feed is not valid XML; empty output with exit code 0 means no item has that guid.
 
-## Complete Workflow Summary
+If `xmllint` is absent, set `FEED_URL` and `GUID` as above and use python3 instead (exits 1 when no item matches):
 
-```
-Apple Podcasts URL
-        │
-        ├── Extract show_id (from path: id{show_id})
-        └── Extract track_id (from query: ?i={track_id})
-                │
-                ▼
-    iTunes Lookup API: /lookup?id={show_id}
-        → feedUrl (RSS feed URL)
-                │
-                ▼
-    iTunes Episode Lookup: /lookup?id={show_id}&entity=podcastEpisode&limit=200
-        → Match trackId == track_id
-        → episodeGuid
-                │
-                ▼
-    Fetch RSS Feed (feedUrl)
-        → Match <guid> == episodeGuid
-        → <enclosure url="..."> = audio download URL
+```bash
+curl -sf "$FEED_URL" | python3 -c '
+import sys, xml.etree.ElementTree as ET
+guid = sys.argv[1]
+for item in ET.parse(sys.stdin).getroot().iter("item"):
+    if item.findtext("guid") == guid:
+        print(item.find("enclosure").get("url")); sys.exit(0)
+sys.exit(1)' "$GUID"
 ```
 
 ## Limitations and Edge Cases
 
-- **`limit` parameter**: iTunes Episode Lookup returns at most ~50 recent episodes. Older episodes may not appear. Increase `limit` up to `200` if needed, but very old episodes may still be unreachable via this API.
+- **Only the newest 200 episodes**: the lookup's `limit` defaults to 50 and caps at 200, so episodes older than the newest 200 cannot be resolved through this API. Tell the user when Step 3 finds no match.
 - **No direct episode lookup**: iTunes API does not support `/lookup?id={track_id}` for individual episodes — it returns empty results.
-- **Missing `?i=` parameter**: Without the `track_id` query parameter, a specific episode cannot be identified. The URL must include `?i=`.
-- **`episodeUrl` shortcut**: The iTunes Episode Lookup response includes an `episodeUrl` field that often contains the direct audio URL. Try this first as a shortcut before fetching the full RSS feed. Fall back to RSS if the URL is missing or returns an error.
-- **Large RSS feeds**: Some podcasts have hundreds of episodes. The RSS feed may be several MB. Consider streaming or partial parsing for efficiency.
-
-## Tool Selection
-
-When executing this workflow in Claude Code:
-
-- Use **WebFetch** to call the iTunes API endpoints and parse the JSON responses
-- Use **Bash** with `curl` for RSS feed fetching (RSS/XML is too large for WebFetch in many cases)
-- Use **Bash** with `xmllint`, `grep`, or Python for XML parsing of the RSS feed
+- **Large RSS feeds**: Some podcasts have hundreds of episodes, so the RSS feed may be several MB. Pipe it straight into the parser rather than reading it into context.
