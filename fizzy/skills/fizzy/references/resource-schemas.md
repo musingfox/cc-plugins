@@ -1,5 +1,21 @@
 # Fizzy Resource Schemas
 
+## Contents
+
+- Card Schema
+- Board Schema
+- Account Settings Schema
+- User Schema
+- Comment Schema
+- Step Schema
+- Column Schema
+- Tag Schema
+- Reaction Schema
+- Webhook Schema
+- Identity Schema
+- Key Schema Differences
+
+
 Complete field reference for all resources. Use these exact field paths in jq queries.
 
 ## Card Schema

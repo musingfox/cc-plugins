@@ -22,8 +22,8 @@ fizzy card show 579 | jq '.data | {number, title, desc_length: (.description | l
 ## Filtering
 
 ```bash
-# Cards with a specific status
-fizzy card list --all | jq '[.data[] | select(.status == "published")]'
+# Open cards only (status stays "published" for every active card, so test closed)
+fizzy card list --all | jq '[.data[] | select(.closed == false)]'
 
 # Golden cards only
 fizzy card list --indexed-by golden | jq '[.data[] | {number, title}]'

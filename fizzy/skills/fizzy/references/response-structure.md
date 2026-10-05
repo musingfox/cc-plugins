@@ -1,5 +1,15 @@
 # Fizzy Response Structure
 
+## Contents
+
+- Standard Response Format
+- Summary Field Examples
+- Pagination
+- Breadcrumbs
+- Create/Update Location
+- Error Handling
+
+
 ## Standard Response Format
 
 All responses follow this structure:
@@ -101,6 +111,6 @@ Use breadcrumbs to discover available actions without memorizing the full CLI. V
 **Common remediation:**
 
 - **Exit 3 (auth):** `fizzy auth status` → `fizzy auth login TOKEN` or `fizzy setup`
-- **Exit 2 (not found):** Verify the card number or resource ID is correct. Cards use NUMBER, not ID.
+- **Exit 2 (not found):** Verify the card number or resource ID is correct.
 - **Exit 4 (permission):** Some operations require admin/owner role.
 - **Exit 6 (network):** Check API URL with `fizzy auth status`.

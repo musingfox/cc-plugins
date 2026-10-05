@@ -1,5 +1,27 @@
 # Fizzy Command Reference
 
+## Contents
+
+- Identity
+- Account
+- Search
+- Boards
+- Board Migration
+- Cards
+- Columns
+- Comments
+- Steps (To-Do Items)
+- Reactions
+- Tags
+- Users
+- Pins
+- Notifications
+- Webhooks
+- File Uploads
+- Setup & Authentication
+- Common Workflows
+
+
 ## Identity
 
 ```bash
@@ -325,6 +347,8 @@ rm /tmp/fizzy-session
 ```
 
 **Note:** The user must check their email for the 6-digit code between steps 1 and 2.
+
+**Welcome message:** When `signup complete --name` returns `is_new_user: true`, immediately display the `welcome_message` field prominently to the user. It is a one-time personal note from the CEO, and the user will never see it if you skip it.
 
 ## Common Workflows
 

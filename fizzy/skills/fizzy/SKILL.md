@@ -10,6 +10,8 @@ description: >-
 
 Full CLI coverage: boards, cards, columns, comments, steps, reactions, tags, users, notifications, pins, webhooks, account settings, search, and board migration.
 
+Requires the [Fizzy CLI](https://github.com/basecamp/fizzy-cli) and `jq`. Check with `fizzy auth status` before the first command.
+
 ## Agent Invariants
 
 **MUST follow these rules:**
@@ -20,7 +22,8 @@ Full CLI coverage: boards, cards, columns, comments, steps, reactions, tags, use
 4. **Check for board context** via `.fizzy.yaml` or `--board` flag before listing cards
 5. **Rich text fields accept HTML** — use `<p>` tags for paragraphs, `<action-text-attachment>` for inline images
 6. **Card description is a string**, but comment body is a nested object — `.description` vs `.body.plain_text`
-7. **Display the welcome message for new signups** — When `signup complete --name` returns `is_new_user: true`, you MUST immediately display the `welcome_message` field prominently to the user. This is a one-time personal note from the CEO — if you skip it, the user will never see it.
+7. **Ask the user before irreversible commands** — `delete`, `deactivate`, and `account join-code-reset` cannot be undone. State what will be affected and wait for a yes. For `migrate board`, run with `--dry-run` first and show the preview before the real run.
+8. **Use the default output** — the piped JSON envelope. Do not add `--agent`, `--quiet`, or `--markdown`: they drop the `{ok, data, breadcrumbs}` envelope that invariants 2-3 and every jq example rely on.
 
 ## Decision Trees
 
@@ -43,7 +46,7 @@ Want to change something?
 ├── Move to column? → fizzy card column <number> --column <id>
 ├── Change status? → fizzy card close|reopen|postpone <number>
 ├── Assign? → fizzy card assign <number> --user <id>
-├── Comment? → fizzy comment create --card <number> --body "text"
+├── Comment? → fizzy comment create --card <number> --body "<p>text</p>"
 ├── Add step? → fizzy step create --card <number> --content "text"
 └── Move to board? → fizzy card move <number> --to <board_id>
 ```
@@ -95,8 +98,6 @@ Output format defaults to auto-detection: styled for TTY, JSON for pipes/non-TTY
 |-------|--------|---------|
 | `id` | `03fe4rug9kt1mpgyy51lq8i5i` | Internal ID (in JSON responses) |
 | `number` | `579` | CLI commands (`card show`, `card update`, etc.) |
-
-**All card CLI commands use the card NUMBER, not the ID.**
 
 Other resources (boards, columns, comments, steps, reactions, users) use their `id` field.
 
