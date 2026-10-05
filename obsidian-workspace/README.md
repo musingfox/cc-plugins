@@ -39,6 +39,16 @@ claude plugin test obsidian-workspace
 
 The pane needs Claude Code 2.1.287 or later, where Claude Mods are on by default. Built and tested against Claude Code 2.1.287.
 
+## Session Writeback
+
+When cc-mobile starts a Claude session for a task card, it writes `~/.claude-mobile/launches/<session_id>.json` (`cardPath`, `vault`, `project`, `paneId`, `createdAt`). Three hooks in `hooks/hooks.json` run `hooks/writeback.sh` on every prompt, stop and permission prompt of every session; a session without that file leaves in a few milliseconds and touches nothing. For a bound session they write to the card:
+
+- the first prompt sets `session` and appends `工作中` to `## Agent`;
+- each stop appends the reply's first line, and a longer reply's full text goes to `pm/<project>/runs/<card>.md`, linked from that line;
+- a permission prompt appends `需要核准`.
+
+Writes go through `obsidian eval` and are read back; a failed write is logged to `~/.claude-mobile/writeback.log` and never blocks the session.
+
 ## Prerequisites
 
 - Official `obsidian` plugin (from the `obsidian-skills` marketplace) — declared as a plugin dependency, so it auto-installs with this plugin as long as that marketplace is added (`claude plugin marketplace add`)
