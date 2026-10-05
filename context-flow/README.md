@@ -69,9 +69,13 @@ Parallel `cf:implement` builders write their shard worktrees under `/tmp`: cf se
 
 A top-level `additionalDirectories` key has no effect; it must sit under `permissions`.
 
+### Dependencies
+
+- **The pi-dispatch plugin** — required, and declared in `plugin.json`: it supplies the shard worktrees and the gate scripts that every Phase 3 builder runs through. Without it `cf-pi-setup.sh` exits 4 before the flow starts.
+- **`jq`, `perl` and `python3`** — required on `PATH`; the Phase 3 scripts call them.
+
 ### Optional Dependencies
 
-- **The pi-dispatch plugin** — required: it supplies the shard worktrees and the gate scripts that every Phase 3 builder runs through.
 - **pi** (`npm i -g @earendil-works/pi-coding-agent`) with `PI_DISPATCH_CMD` set — optional, needed only for the OMP opt-in builder. Without it, setup records `PI_AVAILABLE=0` and Phase 3 stays on `cf:implement`.
 - **`CF_IMPLEMENTER=omp`** — opt in to OMP as the Phase 3 builder; set it in the environment before `/cf` starts. `cf-pi-setup.sh` records the choice once as `CF_IMPLEMENTER=<claude|omp>` in the session's `env.sh`; unset, empty or any other value records `claude`.
 - **`ctx7` CLI** (`npm i -g ctx7` then `ctx7 login`) — enables research and implement phases to verify third-party library / API behavior with version-specific docs. Falls back to `WebFetch` if not installed. Without either, agents report Unresolved when the goal hinges on external behavior they can't infer from the local codebase.

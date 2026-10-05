@@ -19,11 +19,11 @@ assert_contains "$feature" "cf:implement" "T1b shard feature line names cf:imple
 assert_contains "$feature" "revert" "T1c shard feature line still names the revert check"
 assert_contains "$(cat "$README")" "opt-in" "T1d README says OMP is opt-in"
 
-# T2: every Optional Dependencies line naming pi-dispatch says it is required.
-deps=$(awk '/^### Optional Dependencies/{f=1; next} f && /^#/{exit} f' "$README")
+# T2: every Dependencies line naming pi-dispatch says it is required.
+deps=$(awk '/^### Dependencies/{f=1; next} f && /^#/{exit} f' "$README")
 pd_lines=$(printf '%s\n' "$deps" | grep 'pi-dispatch')
 assert_contains "$pd_lines" "required" "T2 the pi-dispatch dependency line says required"
-assert_eq "0" "$(printf '%s\n' "$pd_lines" | grep -vc 'required' || true)" "T2b no pi-dispatch line in Optional Dependencies lacks required"
+assert_eq "0" "$(printf '%s\n' "$pd_lines" | grep -vc 'required' || true)" "T2b no pi-dispatch line in Dependencies lacks required"
 
 # T3
 sec() { awk -v n="$2" '$0 ~ "^## " n "\\." {f=1; print; next} f && /^## /{exit} f' "$1"; }

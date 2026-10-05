@@ -24,7 +24,9 @@ echo '{"retries_used":0}' > "$SESSION/loop-budget.json"
 echo "SESSION=$SESSION"
 ```
 
-Re-source `$SESSION/env.sh` at the top of every subsequent Bash call so paths stay consistent. Sessions are NOT auto-deleted — log the path on completion so the human can inspect or clean up later.
+If setup exits 4, the pi-dispatch plugin is missing: every Phase 3 builder takes its worktree from it, so stop and tell the human to install pi-dispatch.
+
+Every Bash call runs in a fresh shell: start each one with `. "$SESSION/env.sh"` (writing `$SESSION` as the literal path) so `$SCRIPTS`, `$CF_SLUG` and the recorded runners are set. Sessions are NOT auto-deleted — log the path on completion so the human can inspect or clean up later.
 
 Write the goal to `$SESSION/goal.md`.
 

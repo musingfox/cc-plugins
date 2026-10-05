@@ -3,6 +3,7 @@
 # Usage:   cf-pi-setup.sh [SLUG]   (SLUG = task short name for the branch, kebab-case)
 # Stdin:   none
 # Stdout:  SESSION path (single line)
+# Exit:    0 ok, 4 the pi-dispatch plugin is not installed (no session created)
 # Env in:  PI_DISPATCH_CMD, CF_IMPLEMENTER (claude|omp), PI_STALL_THRESHOLD_S, PI_WALL_CLOCK_S (all optional)
 # Side effects:
 #   - creates $SESSION (under /tmp)
@@ -19,6 +20,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# shellcheck source=cf-pi-env.sh
+. "$SCRIPT_DIR/cf-pi-env.sh"
+# Every Phase 3 builder, Claude included, gets its worktree from pi-dispatch;
+# fail here rather than after Research, Plan and the Human Gate.
+_canon="$(resolve_canon_dispatch)"
+if [ -z "$_canon" ] || [ ! -f "$_canon" ]; then
+  echo "cf-pi-setup: pi-dispatch plugin not found; cf needs it for every Phase 3 builder. Install pi-dispatch from this marketplace." >&2
+  exit 4
+fi
 
 SESSION=$(mktemp -d "/tmp/cf-$(date +%m%d)-XXXX")
 SESSION_BASENAME="$(basename "$SESSION")"
@@ -42,14 +53,9 @@ case "${CF_IMPLEMENTER:-}" in
 esac
 
 # Availability gate via the canonical probe — cf owns no agent-binary handling.
-# shellcheck source=cf-pi-env.sh
-. "$SCRIPT_DIR/cf-pi-env.sh"
+# Not OK is also a retired routing variable, not only a missing binary: say which.
 PI_AVAILABLE=0
-_canon="$(resolve_canon_dispatch)"
-if [ -n "${_canon:-}" ] && [ -f "$_canon" ]; then
-  # Not OK is also a retired routing variable, not only a missing binary: say which.
-  _probe="$("$(dirname "$_canon")/pi-probe.sh" --bin-only 2>&1)" && PI_AVAILABLE=1 || echo "cf-pi-setup: pi-probe: $_probe" >&2
-fi
+_probe="$("$(dirname "$_canon")/pi-probe.sh" --bin-only 2>&1)" && PI_AVAILABLE=1 || echo "cf-pi-setup: pi-probe: $_probe" >&2
 
 cat > "$SESSION/env.sh" <<EOF
 SESSION="$SESSION"

@@ -49,6 +49,19 @@ assert_eq "omp" "$(env CF_IMPLEMENTER=claude bash -c '. "$1/env.sh"; printf %s "
 
 assert_contains "$(cat "$README")" "CF_IMPLEMENTER=omp" "T5 README documents CF_IMPLEMENTER=omp"
 
+# T7: pi-dispatch is a hard dependency -- every builder's worktree comes from it.
+# Without it setup stops at once instead of letting Research, Plan and the
+# Human Gate run before §3.0 fails.
+LONE="$(mktemp -d /tmp/cf-lone-XXXXXX)"; mkdir -p "$LONE/a/cf/scripts"
+cp "$CF_TESTS_DIR/../scripts/cf-pi-setup.sh" "$CF_TESTS_DIR/../scripts/cf-pi-env.sh" "$LONE/a/cf/scripts/"
+errf="$(mktemp)"
+out="$(env -u CLAUDE_PLUGIN_ROOT -u PI_DISPATCH_CMD bash "$LONE/a/cf/scripts/cf-pi-setup.sh" 2>"$errf")"; rc=$?
+[ -n "$out" ] && CREATED+=("$out")
+assert_eq "4" "$rc" "T7 missing pi-dispatch exits 4"
+assert_eq "" "$out" "T7b no session is created"
+assert_contains "$(cat "$errf")" "pi-dispatch plugin not found" "T7c stderr names the missing plugin"
+rm -rf "$LONE" "$errf"
+
 cleanup
 bad=0
 for d in "${CREATED[@]}"; do [ -e "$d" ] && bad=$((bad + 1)); done
