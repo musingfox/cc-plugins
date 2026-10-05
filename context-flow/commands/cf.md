@@ -703,6 +703,8 @@ Route on the **Spec verdict** only. A Standards documented-convention violation 
   6. Do NOT rebase yet — the cf branch accumulates more commits.
 - **REQUEST_CHANGES with fundamental design issues** → this means a contract is wrong, not just the implementation. Loop back to plan with the review findings (`$SESSION/review-spec.md`) as the partial-replan input, the way §3.4 handles a NEEDS_REPLAN shard. Increment `retries_used`. Do NOT rebase.
 
+An approved finding can ask the builder to delete or create a file that no contract declares, such as an orphan the change left behind. Declare it before re-launching, or the scope gate fails the whole shard `undeclared_file_touched`: `"$SCRIPTS/cf-pi-declare-files.sh" "$SESSION" <Contract> <path>`, with one or more paths, naming the contract whose change the file belongs to. It prints `DECLARED <contract> <path> shard-<id>`; re-launch that shard. On a non-zero exit, show its stderr to the human and re-launch nothing. Declare only the files the approved finding names: the scope gate still fails anything else the builder touches.
+
 ### Post-PASS spec maintenance
 
 Before rebasing, decide whether this flow established anything the **next** flow needs to know. Only three kinds qualify:
