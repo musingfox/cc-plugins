@@ -43,7 +43,7 @@ Chosen option: "MADR 4.0", because it provides YAML frontmatter for machine-pars
 
 ### Confirmation
 
-All new ADRs follow the MADR 4.0 template. Status field uses: proposed | accepted | deprecated | superseded by [ADR-NNNN](file).
+All new ADRs follow the MADR 4.0 template. Status field uses: proposed | rejected | accepted | deprecated | superseded by [ADR-NNNN](file).
 
 ## Pros and Cons of the Options
 

@@ -14,10 +14,6 @@ description: >-
 
 Manage Architecture Decision Records using MADR 4.0 format with full cross-reference consistency enforcement.
 
-Do NOT use when:
-- User is just discussing architecture without wanting formal ADR management
-- User is directly editing an ADR file without asking for lifecycle help
-
 ## Directory Detection
 
 Auto-detect the ADR directory by scanning (in order):
@@ -42,7 +38,7 @@ decision-makers: ""
 ---
 ```
 
-Status values: `proposed` | `accepted` | `deprecated` | `superseded by [ADR-NNNN](file)`
+Status values: `proposed` | `rejected` | `accepted` | `deprecated` | `superseded by [ADR-NNNN](file)`
 
 ### File Naming
 
@@ -180,24 +176,28 @@ Group matches into categories and present as table:
 |----------|-------------|----------------|
 | Other ADR files | `0005-api-versioning.md` | Auto-update |
 | Documentation (non-ADR `.md`) | `docs/setup.md` | Auto-update |
-| Source code comments | `src/db.ts` | Add `(superseded)` marker |
+| Source code comments | `src/db.ts` | Add notice |
 | Config files | `config.yaml` | Skip — manual review |
 
 Use AskUserQuestion per category for the user to choose:
 - **Auto-update**: Replace old ADR references with new ADR
-- **Add notice**: Append `(superseded — see ADR-NNNN)` after reference
+- **Add notice**: Append the notice after the reference
 - **Skip**: Leave unchanged, flag for manual review
 
 #### Step 6 — Execute updates
 
 For **auto-update** targets:
 - In ADR files: update `superseded by` references, update markdown links
-- In docs: replace ADR number references, update links, add "(formerly ADR-{old})" if helpful
+- In docs: replace ADR number references and update links
 
 For **add notice** targets:
-- Append `(superseded — see [ADR-NNNN](path/to/new-adr.md))` after each reference
+- Append the notice `(superseded — see [ADR-NNNN](path))` after each reference. `path` is relative to the file that holds the notice; every markdown link written or updated in this step follows the same rule.
 
-#### Step 7 — Report
+#### Step 7 — Verify
+
+Run the broken-links and stale-references checks from `${CLAUDE_PLUGIN_ROOT}/skills/adr/references/audit.md` on every file Step 6 changed. Fix each finding and re-run until both are clean. A reference the user chose to skip in Step 5 is expected to stay stale; list it in the report.
+
+#### Step 8 — Report
 
 ```
 Supersession Complete:
@@ -237,11 +237,15 @@ Simpler than supersession — no replacement ADR is created.
 #### Step 3 — Cross-reference scan
 
 Run the same 4-layer search as supersede Step 4, but use **add notice** as the default action for all categories:
-- Append `(deprecated)` after each reference found
+- Append the notice `(deprecated)` after each reference found
 
 Present findings and ask user per category whether to add notice or skip.
 
-#### Step 4 — Report
+#### Step 4 — Verify
+
+Run the broken-links and stale-references checks from `${CLAUDE_PLUGIN_ROOT}/skills/adr/references/audit.md` on every file Step 3 changed. Fix each finding and re-run until both are clean; skipped references are listed in the report.
+
+#### Step 5 — Report
 
 ```
 Deprecation Complete:
@@ -256,52 +260,4 @@ Cross-Reference Updates:
 
 ### 5. Audit ADRs
 
-Run these checks and report grouped by severity. The first three groups ask whether each ADR is well-formed; the fourth asks whether it should exist at all.
-
-#### ERRORS (must fix)
-
-- **Broken links**: Markdown links to non-existent ADR files. Scan all `.md` files for links matching `NNNN-*.md`, verify target exists.
-- **Circular supersession**: A -> B -> A. Follow supersession chains, detect cycles.
-
-#### WARNINGS (should fix)
-
-- **Stale references**: Files referencing superseded ADRs without a supersession notice. Use the 4-layer search pattern (same as supersede Step 4) for each superseded ADR.
-- **Missing frontmatter**: ADR files without `status` or `date` fields in YAML frontmatter.
-- **Orphaned supersession**: Status says "superseded by X" but X doesn't contain "Supersedes" back-reference in its More Information section.
-
-#### WARRANT (judgment — never auto-act)
-
-Apply the Decision Warrant Test to every ADR whose status is `proposed` or `accepted`. Skip the bootstrap ADR and anything already superseded or deprecated.
-
-- **No trade-off** — mechanical: "Considered Options" holds fewer than two real options (empty, a single entry, or one option plus "do nothing"). Condition 3 fails.
-- **Reversible** — read "Context and Problem Statement" and "Consequences". If the decision can be undone by an ordinary code change, with no migration, data loss, or external commitment, condition 1 fails.
-- **Self-evident** — read "Decision Outcome". If the rationale only restates the decision ("we use X because X is standard"), a future reader learns nothing. Condition 2 fails.
-
-Report one `[unwarranted]` line per ADR naming the failed condition. The default suggestion is deprecate, never supersede — there is no replacement decision. The user decides; never edit an ADR on this finding.
-
-#### INFO
-
-- **Supersession chains**: A -> B -> C (3+ links). Suggest simplification.
-- **Numbering gaps**: Missing numbers in the sequence. Informational only.
-
-Output format:
-```
-ADR Audit:
-
-ERRORS (2):
-  [broken-link] docs/setup.md:15 links to 0009-missing.md — file does not exist
-  [circular] ADR-0003 -> ADR-0007 -> ADR-0003
-
-WARNINGS (1):
-  [stale-ref] README.md:42 references ADR-0003 (superseded by ADR-0007)
-
-WARRANT (1):
-  [unwarranted] ADR-0005: Use Prettier — no trade-off (1 option considered) — suggest deprecate
-
-INFO (1):
-  [gap] Missing numbers: 0004, 0006
-
-Summary: 2 errors, 1 warning, 1 unwarranted, 1 info
-```
-
-If errors or warnings found, suggest running supersede or manual fixes. Warrant findings are for the user to act on.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/adr/references/audit.md` and run its checks.

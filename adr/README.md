@@ -43,7 +43,7 @@ All operations are triggered by natural language:
 
 ```yaml
 ---
-status: proposed          # proposed | accepted | deprecated | superseded by [ADR-NNNN](file)
+status: proposed          # proposed | rejected | accepted | deprecated | superseded by [ADR-NNNN](file)
 date: 2025-03-16
 decision-makers: ""
 ---
