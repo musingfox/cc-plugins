@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Set up isolated WORK area for the implementer (OMP or Claude implement agent).
 # - In a git repo: creates a worktree at $WORK on a fresh branch ($CF_BRANCH)
-#   forked from the user's current HEAD ($BASE_BRANCH / $BASE_HEAD).
+#   forked from the user's current HEAD ($BASE_BRANCH / $BASE_HEAD), or for a
+#   shard, from its flow's BASE_HEAD.
 # - Otherwise:     creates a plain scratch directory at $WORK.
 #
 # Usage:   cf-pi-worktree.sh SESSION
@@ -45,6 +46,16 @@ BASE_HEAD=""
 if [ -n "$REPO_ROOT" ]; then
   BASE_BRANCH="$(git -C "$REPO_ROOT" symbolic-ref --quiet --short HEAD 2>/dev/null || echo "")"
   BASE_HEAD="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo "")"
+  # A shard forks where its flow's parent cf/<slug> forked, not from wherever
+  # the host HEAD has moved since: a host commit made during the flow would
+  # otherwise land on the parent as if it were shard work.
+  if [ -n "${FLOW_SESSION:-}" ]; then
+    _flow_base=$(. "$FLOW_SESSION/env.sh" 2>/dev/null && printf '%s\t%s' "${BASE_HEAD:-}" "${BASE_BRANCH:-}")
+    if [ -n "${_flow_base%%$'\t'*}" ]; then
+      BASE_HEAD="${_flow_base%%$'\t'*}"
+      BASE_BRANCH="${_flow_base#*$'\t'}"
+    fi
+  fi
 
   # Human-readable slugs can collide with a prior flow's surviving branch, which
   # still carries unreviewed per-contract commits. Never reset it (-B would):
@@ -89,8 +100,7 @@ else
 fi
 
 # Rewritten on every creation, not appended once: a rolled-back shard keeps its
-# env.sh while its re-created worktree forks from today's HEAD, and a stale
-# BASE_HEAD would charge the host's newer commits to the shard.
+# env.sh, and its re-created worktree must record the base it forked from.
 {
   grep -vE '^(REPO_ROOT|BASE_BRANCH|BASE_HEAD)=' "$session/env.sh" 2>/dev/null || true
   echo "REPO_ROOT=\"$REPO_ROOT\""

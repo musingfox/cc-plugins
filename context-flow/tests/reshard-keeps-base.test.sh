@@ -39,11 +39,11 @@ JSON
 sid_of() { jq -r --arg n "$1" '.groups | to_entries[] | select(.value.contracts | index($n)) | .key' "$FLOW/shards.json"; }
 P="$(sid_of P1)"; C="$(sid_of C1)"
 
-# P's worktree forks from the flow start; the dependent C's is created a wave
-# later, after the repo moved, so its base is not the flow start.
+# P's worktree forks from the flow start; so does the dependent C's, created a
+# wave later after the host moved: a shard forks from its flow's BASE_HEAD.
 (cd "$REPO" && "$SCRIPTS/cf-pi-worktree.sh" "$FLOW/shards/$P") >/dev/null 2>&1
 echo later > "$REPO/later.txt"; git -C "$REPO" add -A; git -C "$REPO" commit -qm later
-C_BASE="$(git -C "$REPO" rev-parse HEAD)"
+C_BASE="$FLOW_START"
 (cd "$REPO" && "$SCRIPTS/cf-pi-worktree.sh" "$FLOW/shards/$C") >/dev/null 2>&1
 
 base_of() { (. "$FLOW/shards/$1/env.sh"; echo "${BASE_HEAD:-}"); }
@@ -62,7 +62,7 @@ jq '.contracts[1].touches_files += ["src/app2.py"]' "$FLOW/contracts.json" > "$T
 (cd "$REPO" && "$SCRIPTS/cf-pi-worktree.sh" "$FLOW/shards/$P") >/dev/null 2>&1
 
 assert_eq "$FLOW_START" "$(base_of "$P")" "T1 P keeps its base after reshard"
-assert_eq "$C_BASE" "$(base_of "$C")" "T2 dependent C keeps its later base, not the flow start"
+assert_eq "$C_BASE" "$(base_of "$C")" "T2 dependent C keeps the flow's base"
 assert_eq "1" "$(grep -c '^BASE_HEAD=' "$FLOW/shards/$P/env.sh")" "T3 BASE_HEAD not duplicated"
 assert_eq "1" "$(grep -c '^REPO_ROOT=' "$FLOW/shards/$P/env.sh")" "T3 REPO_ROOT not duplicated"
 assert_contains "$(cat "$FLOW/shards/$C/env.sh")" "SHARD_ID=\"$C\"" "T4 generated block rewritten"
@@ -85,14 +85,14 @@ assert_eq "refs/tags/cf-checkpoint-P" "$(cat "$FLOW/shards/$C/prereq-refs" 2>/de
 assert_eq "$C_BASE" "$(base_of "$C")" "T7 dependent base unchanged by prepare"
 
 # Rollback -> reshard -> prepare after the host moved: the re-created worktree
-# forks from today's HEAD, and the recorded base must follow it.
+# still forks from the flow's base, and the recorded base says so.
 echo host > "$REPO/host.txt"; git -C "$REPO" add -A; git -C "$REPO" commit -qm host
 HOST_NOW="$(git -C "$REPO" rev-parse HEAD)"
 "$SCRIPTS/cf-pi-rollback.sh" "$FLOW" P1 >/dev/null 2>&1
 "$SCRIPTS/cf-pi-shard.sh" "$FLOW" >/dev/null
 (cd "$REPO" && "$SCRIPTS/cf-pi-run.sh" --prepare-only "$FLOW/shards/$P" goal none true) >/dev/null 2>&1
-assert_eq "$HOST_NOW" "$(git -C "$PW" rev-parse HEAD 2>/dev/null)" "T8 re-created worktree forks from the moved host"
-assert_eq "$HOST_NOW" "$(base_of "$P")" "T8 BASE_HEAD equals the new fork point"
+assert_eq "$FLOW_START" "$(git -C "$PW" rev-parse HEAD 2>/dev/null)" "T8 re-created worktree forks from the flow base, not the moved host ($HOST_NOW)"
+assert_eq "$FLOW_START" "$(base_of "$P")" "T8 BASE_HEAD equals the fork point"
 assert_eq "1" "$(grep -c '^BASE_HEAD=' "$FLOW/shards/$P/env.sh")" "T8 BASE_HEAD not duplicated"
 mkdir -p "$PW/src"; echo y > "$PW/src/lib.py"
 git -C "$PW" add -A; git -C "$PW" commit -qm lib2
