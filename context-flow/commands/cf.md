@@ -202,6 +202,7 @@ If this is a loop-back, use the enriched goal instead (see §Loop Back).
 **Dispatch agent** with this context:
 
 ```markdown
+Contracts path: $SESSION/contracts.json
 Report path: $SESSION/plan.md
 
 ## Goal
@@ -238,6 +239,7 @@ The plan agent writes its full output to `$SESSION/plan.md` per the agent's Retu
    - Has "Decisions" section. **High** decisions must carry Choice/Trade-off/Alternatives/Rationale. Medium decisions need at least a Rationale line. Low decisions need only the Choice line.
    - Has "Behavioral Contracts" with input/output/errors/depends + test cases per contract. **User-facing contracts** must also include a `States` block (Loading / Empty / Error / Success, plus Partial/Stale if applicable) with at least one test case per non-trivial state.
    - Has "Implementation Plan" with steps
+   - `jq -e '.schema_version' "$SESSION/contracts.json"` succeeds — §3.1 shards from that file and exits 3 without it
    - Has "Completed" and "Unresolved" sections
    - If missing → re-run plan with feedback (increment `retries_used`).
 
