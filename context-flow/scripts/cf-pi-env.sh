@@ -177,7 +177,7 @@ run_bounded() {
       if ($waited >= $deadline) {
         kill("TERM", -$pid); sleep 2; kill("KILL", -$pid);
         waitpid($pid, 0);
-        if ($mark) { open(my $m, ">", $mark) and print $m "$deadline\n"; }
+        if ($mark && open(my $m, ">", $mark)) { print $m "$deadline\n"; close $m; }
         exit 124;
       }
       select(undef, undef, undef, 0.2);

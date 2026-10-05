@@ -55,6 +55,26 @@ marker=absent; case "$out" in *test_exit=*) marker=present ;; esac
 assert_eq "absent" "$marker" "deadline: a stall is not a red suite, so no test_exit= marker"
 rm -rf "$S"
 
+# ---- a stall's Cause quotes the suite's last output, not the supervisor ----
+# The supervisor shares the test log. If it prints anything while writing the
+# stall mark, that line becomes the log's tail and every test-stalled Cause
+# quotes it instead of where the suite stopped.
+
+S="$(new_session)"
+CF_TEST_DEADLINE_S=1 bash "$TESTSH" "$S" bash -c 'echo "suite stopped here"; sleep 30' >/dev/null 2>&1
+eval "$(sed -n '/^derive_cause()/,/^}/p' "$REAL_SCRIPTS/cf-pi-run.sh")"
+TEST_LOG="$S/test-output.log"
+assert_eq "last output before the deadline: suite stopped here" \
+  "$(derive_cause FAIL test-stalled)" "stall cause: quotes the suite's last output"
+rm -rf "$S"
+
+S="$(mktemp -d)"
+( . "$REAL_SCRIPTS/cf-pi-env.sh"
+  CF_BOUNDED_STALL_MARK="$S/mark" run_bounded 1 sleep 30 ) > "$S/out" 2>&1
+assert_eq "1" "$(cat "$S/mark" 2>/dev/null)" "stall mark: holds the deadline in seconds"
+assert_eq "" "$(cat "$S/out")" "stall mark: the supervisor prints nothing"
+rm -rf "$S"
+
 # ---- a runner's own 124 is a red suite, not a stall ----
 # `timeout 600 npm test` is an ordinary runner. Routing its timeout as
 # infrastructure would skip the retest and the re-brief a red suite is owed.
