@@ -1,6 +1,6 @@
 ---
-status: accepted    # accepted | done | superseded
-delivered:          # commit or tag ref — filled when acceptance passes
+status: done        # accepted | done | superseded
+delivered: fca8f6c  # commit or tag ref — filled when acceptance passes
 depends: []         # milestone slugs that must land first
 ---
 
@@ -15,7 +15,7 @@ On 2026-09-10 fifteen cf contracts passed while four phases of the diagnose work
 
 ## Concrete enough to build on
 
-- **Input.** The audit reads every milestone under `docs/milestones/` whose `status` is not `superseded`. The milestone frontmatter fields are fixed at `spiral/commands/spiral.md:356-362`.
+- **Input.** The audit reads every milestone file directly under `docs/milestones/` that starts with frontmatter and whose `status` is neither `superseded` nor `abandoned`. Files without frontmatter and subdirectories are companion material and are skipped (`audit/scripts/milestones.sh`). The milestone frontmatter fields are fixed at `spiral/commands/spiral.md:356-362`.
 - **It reads the text of each commitment, not a heading.** On 2026-10-06, only 3 of this repo's 6 milestones had an `## Acceptance criteria` heading, and one of those 3 was superseded. The other repos that have milestones (cyris, investment-base, tw-politic-war, cc-mobile, cc-mobile-launch-proto) had none. The motivating requirement sits in body text (`docs/milestones/diagnose-plugin-and-prototype-role.md:22`).
 - **Milestones reached the motivating case.** That requirement was written down before the work: `:22` comes from 2223751 (2026-09-09), and the diagnose work is a330148 (2026-09-10). The motivating requirement is guarded now (`diagnose/tests/method-loops.test.sh:74-77`). A run on today's tree therefore will not reproduce the incident, and checking the audit needs a constructed case.
 - **Out of scope.** The audit does not trace spec entries, doc rules, or README claims. `spec.sh verify` already prints `DEBT -- prose only` for every spec entry that has no check (`spec/scripts/spec.sh:30-48`). The docs-classifier already labels each doc rule as test-backed, partly backed, or prose only (`audit/agents/docs-classifier.md:32-33`).
