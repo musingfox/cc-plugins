@@ -21,7 +21,6 @@ cat > "$tmp/reports/alpha.md" <<'R'
 R
 printf -- '- **unguarded** L5 "does the thing" — searched t/\n' > "$tmp/reports/beta.md"
 printf 'I could not read the milestone.\n' > "$tmp/reports/psi.md"
-printf 'x\n' > "$tmp/gamma-unused"
 
 out="$(bash "$S" "$tmp/inv" "$tmp/reports")" || fail "T1 exit"
 section() { printf '%s\n' "$2" | awk -v h="$1" '$0==h{p=1; next} p && /^## /{exit} p'; }
@@ -65,9 +64,12 @@ want_n="$(wc -l < "$tmp/seam/ex.md" | tr -d ' ')"
 [ "$want_n" -ge 7 ] || fail "Counts T3 example lines extracted: $want_n"
 printf 'trace\tdone\tdocs/milestones/ex.md\n' > "$tmp/seam/inv"
 tot="$(bash "$S" "$tmp/seam/inv" "$tmp/seam" | grep '^| total' )"
-sum="$(printf '%s' "$tot" | tr '|' '\n' | sed -n '3,$p' | tr -d ' ' | grep -E '^[0-9]+$' | paste -sd+ - | bc)"
+cols="$(printf '%s' "$tot" | tr '|' '\n' | sed '1,2d' | tr -d ' ' | grep -E '^[0-9]+$')"
+n_verdicts="$(printf '%s\n' "$out" | grep -F '| milestone |' | tr '|' '\n' | sed '1,2d' | grep -c '[a-z]')"
+[ "$(printf '%s\n' "$cols" | wc -l | tr -d ' ')" = "$n_verdicts" ] || fail "Counts T3 column count != $n_verdicts ($tot)"
+sum="$(printf '%s\n' "$cols" | paste -sd+ - | bc)"
 [ "$sum" = "$want_n" ] || fail "Counts T3 total $sum != $want_n lines ($tot)"
-printf '%s' "$tot" | tr '|' '\n' | sed -n '3,9p' | tr -d ' ' | while read -r c; do [ "$c" -ge 1 ] || fail "Counts T3 a verdict column is 0"; done
+printf '%s\n' "$cols" | while read -r c; do [ "$c" -ge 1 ] || fail "Counts T3 a verdict column is 0"; done
 
 # CfHandoffLine T1: only the done milestone, only its partly and unguarded clauses, in report order
 [ "$(printf '%s\n' "$out" | grep -c '^/cf ')" = 1 ] || fail "CfHandoff T1 exactly one /cf line"
@@ -88,6 +90,11 @@ printf -- '- **unguarded** L3 "exits 0 | 1 on success" — searched t/\n' > "$tm
 out6="$(bash "$S" "$tmp/pipe/inv" "$tmp/pipe")"
 printf '%s\n' "$out6" | grep -Fqx '/cf Add tests that guard these commitments of docs/milestones/a.md: L3 "exits 0 | 1 on success"' \
   || fail "CfHandoff T3 a pipe inside a clause is kept"
+
+# UnguardedList T5: a directory is not an inventory
+rc=0; err="$(bash "$S" "$tmp" "$tmp/reports" 2>&1 >/dev/null)" || rc=$?
+[ "$rc" = 1 ] || fail "T5 directory inventory exit 1, got $rc"
+case "$err" in 'usage: assemble.sh'*) ;; *) fail "T5 usage: $err";; esac
 
 # UnguardedList T4: a report's own headings sit below the list's, and fenced lines are untouched
 mkdir "$tmp/head"

@@ -59,8 +59,11 @@ done
   || fail "ClauseVerdicts example has no two clause lines sharing a start line"
 printf '%s\n' "$lines" | grep -F -- '- **guarded**' | grep -Eq '`[^`]+`.*`[^`]+`' \
   || fail "ClauseVerdicts example has no guarded line with two quoted spans"
-printf '%s\n' "$lines" | grep -E '^- \*\*(guarded|contradicted)\*\* ' | grep -vqE ' — [^ ]+:[0-9]+[^`]*`[^`]+`' \
+printf '%s\n' "$lines" | grep -E '^- \*\*(guarded|contradicted)\*\* ' | grep -vqE ' — .*[^ ]+:[0-9]+[^`]*`[^`]+`' \
   && fail "ClauseVerdicts example has a guarded or contradicted line without path:line and a quoted span"
+
+printf '%s\n' '- **guarded** L1 "x" — see t.sh:3 asserts it' | grep -vqE ' — .*[^ ]+:[0-9]+[^`]*`[^`]+`' \
+  || fail "ClauseVerdicts evidence regex accepts a guarded line with no quote"
 
 # ClauseVerdicts T8: the agent file holds no wording from the fixtures.
 for w in export overwrite dashboard '200 ms' responsive 'status line' 'attached to the PR' timeout \

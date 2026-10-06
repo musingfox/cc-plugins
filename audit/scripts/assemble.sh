@@ -2,7 +2,7 @@
 # Assemble the tracers' reports into one list: counts, cf hand-off, sections, skipped.
 set -euo pipefail
 
-[ $# -ge 2 ] && [ -r "$1" ] || { echo "usage: assemble.sh <inventory-file> <reports-dir>" >&2; exit 1; }
+[ $# -ge 2 ] && [ -f "$1" ] && [ -r "$1" ] || { echo "usage: assemble.sh <inventory-file> <reports-dir>" >&2; exit 1; }
 inventory="$1"
 reports="$2"
 

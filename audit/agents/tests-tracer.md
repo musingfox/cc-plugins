@@ -112,7 +112,7 @@ Write one line per clause, in milestone order, in this grammar:
 
 - **<verdict>** L<start>[-<end>] "<clause>" — <evidence>
 
-`<verdict>` is one of the seven tokens above. `<clause>` is quoted from the milestone and
+`<verdict>` is one of the verdict tokens above. `<clause>` is quoted from the milestone and
 contains no double quote. The report may hold other markdown around the clause lines,
 but exactly one clause line per clause. Only clause lines start with `- **`: write any
 other bullet without that prefix.
