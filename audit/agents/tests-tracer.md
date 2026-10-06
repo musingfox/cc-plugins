@@ -38,7 +38,13 @@ Leave out:
 - work the milestone declares outside itself, carried to another milestone.
 
 One clause is one obligation. A sentence that joins two checkable obligations is two
-clauses, each with its own line range.
+clauses, each with its own line range. That holds when a qualifier that names a second
+artifact or condition rides on "plus", "and" or "with": "rejects a row with a bad date,
+with the row number in the message" is one clause about rejecting and one about the
+message.
+
+Judge each clause on its own text. An obligation stated in another clause
+never makes it partly.
 
 ## Where to look
 
@@ -57,13 +63,20 @@ the name of the test around it.
 Give every clause exactly one verdict.
 
 - **guarded** — a cited assertion checks the clause. Cite `<test path>:<line>` and quote
-  the asserting line.
+  the asserting line in backticks on every `guarded` line,
+  even when an earlier line quoted it. When that line compares a variable, quote
+  the line that computes the variable too.
 - **partly** — an assertion checks some of the clause. Cite the test line and say what
   part of the clause no assertion checks. A header or test name alone makes a clause
   `partly`, never `guarded`: a comment that says what a test is for proves nothing was
   asserted.
 - **unguarded** — no assertion touches the clause. Say where you looked.
 - **too loose** — see below.
+- **contradicted** — an existing assertion checks the opposite of the clause. Cite
+  `<test path>:<line>` and quote the contradicting line in backticks. This is debt for the
+  milestone's author, not a missing test. A clause the milestone itself retracts is
+  `retracted`, never `contradicted`. Otherwise `contradicted` wins over `guarded` and
+  `partly`: an assertion that would fail on work meeting the clause settles it.
 - **not test-guardable** — see below.
 - **retracted** — see below.
 
@@ -75,7 +88,8 @@ not show as unguarded forever. The evidence is the class, and exactly one of the
 - `real-run receipt` — a run on a real system whose log or result is attached or recorded;
 - `action outside the repo` — something done in a service, a settings screen or a PR;
 - `negative or process clause` — a commitment about what the team will not do or how it works;
-- `meta clause` — a clause about the milestone or its own documents.
+- `meta clause` — a clause about the milestone or its own documents, including its
+  acceptance bookkeeping: that its tests pass, that its specs are accepted.
 
 A clause that only lacks a test is `unguarded`, not `not test-guardable`.
 
@@ -98,19 +112,22 @@ Write one line per clause, in milestone order, in this grammar:
 
 - **<verdict>** L<start>[-<end>] "<clause>" — <evidence>
 
-`<verdict>` is one of the six tokens above. `<clause>` is quoted from the milestone and
+`<verdict>` is one of the seven tokens above. `<clause>` is quoted from the milestone and
 contains no double quote. The report may hold other markdown around the clause lines,
-but exactly one clause line per clause.
+but exactly one clause line per clause. Only clause lines start with `- **`: write any
+other bullet without that prefix.
 
 ## Report example
 
 ```
-- **guarded** L11 "refuses to overwrite an existing file" — tests/export.test.sh:6 `grep -q 'exists' <<<"$err"`
-- **partly** L12-13 "exits 3 on a locked file" — tests/lock.test.sh:2 names the case, but no assertion checks the exit code
-- **unguarded** L14 "renders in under 200 ms" — searched tests/ and the render code for a timing assertion; none
-- **too loose** L15 "feels responsive" — the missing specific: a time or a threshold
-- **not test-guardable** L16 "one real run is attached to the PR" — real-run receipt
-- **retracted** L17 "prints a status line on every turn" — retracted at L23
+- **guarded** L8 "renews a loan for 14 days" — tests/loan.test.sh:12 `[ "$due" = "$want" ]`, where `want=$(date -d '+14 days' +%F)` at tests/loan.test.sh:9
+- **partly** L9-10 "rejects a fourth renewal" — tests/loan.test.sh:20 names the case, but no assertion checks the message shown to the member
+- **unguarded** L11 "emails the member a receipt" — searched tests/ and the mail code for a send assertion; none
+- **partly** L11 "adds a line to the audit log" — tests/log.test.sh:4 checks the line exists, but no assertion checks that it names the loan
+- **too loose** L12 "renewal feels quick" — the missing specific: a time or a threshold
+- **contradicted** L13 "a loan lasts 21 days" — tests/loan.test.sh:5 `[ "$days" = 14 ]` asserts 14 days
+- **not test-guardable** L14 "the librarian signs off on the rollout" — action outside the repo
+- **retracted** L15 "sends a text message for every renewal" — retracted at L22
 ```
 
 ## Return

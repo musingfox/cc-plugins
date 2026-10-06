@@ -23,30 +23,50 @@ printf 'name: x\nmodel: opus\n' | tools_ok && fail "T2 broken predicate: accepte
 frontmatter "$a" | tools_ok || fail "T1 tools must be exactly Read, Grep, Glob, Write"
 grep -Fq 'The report is the only file you write' "$a" || fail "T3 the report-only sentence"
 
-# ClauseVerdicts T1: the grammar sits in prose, not in a fence; all six verdicts; the example heading.
+# One verdict list and one clause-line regex for the whole file.
+verdicts=(guarded partly unguarded 'too loose' contradicted 'not test-guardable' retracted)
+alt="$(printf '%s|' "${verdicts[@]}")"
+clause_re='^- \*\*('"${alt%|}"')\*\* L[0-9]+(-[0-9]+)? "[^"]*" — '
+
+# ClauseVerdicts T1: the grammar sits in prose, not in a fence; all seven verdicts; the example heading.
 outside="$(awk '/^```/{f=!f; next} !f' "$a")"
 printf '%s\n' "$outside" | grep -Fqx -- '- **<verdict>** L<start>[-<end>] "<clause>" — <evidence>' || fail "ClauseVerdicts T1 grammar line outside any fenced block"
-for v in guarded partly unguarded 'too loose' 'not test-guardable' retracted; do
+for v in "${verdicts[@]}"; do
   grep -Fq "**$v**" "$a" || fail "ClauseVerdicts T1 verdict token $v"
 done
 grep -Fqx '## Report example' "$a" || fail "ClauseVerdicts T1 ## Report example heading"
-grep -Fq 'header or test name alone' "$a" || fail "ClauseVerdicts T1 header-or-test-name rule"
+for p in 'header or test name alone' 'checks the opposite' 'even when an earlier line quoted it' \
+  'the line that computes' 'never makes it partly' 'Only clause lines start with'; do
+  grep -Fq "$p" "$a" || fail "ClauseVerdicts T1 anchor: $p"
+done
+grep -Fqi 'qualifier that names a second' "$a" || fail "ClauseVerdicts T1 anchor: qualifier that names a second"
 
 # ClauseVerdicts T2: pinned seat.
 frontmatter "$a" | grep -qx 'name: tests-tracer' || fail "ClauseVerdicts T2 name"
 frontmatter "$a" | grep -qx 'model: opus' || fail "ClauseVerdicts T2 model"
 frontmatter "$a" | grep -qx 'effort: xhigh' || fail "ClauseVerdicts T2 effort"
 
-# The example is the first fenced block after the heading, one line per verdict, no quote inside a clause.
+# ClauseVerdicts T7: the example is the first fenced block after the heading and shows every rule.
 example="$(awk '/^## Report example$/{p=1; next} p && /^```/{n++; if (n==2) exit; next} p && n==1' "$a")"
 [ -n "$example" ] || fail "ClauseVerdicts example block empty"
-for v in guarded partly unguarded 'too loose' 'not test-guardable' retracted; do
-  printf '%s\n' "$example" | grep -Fq -- "- **$v** L" || fail "ClauseVerdicts example lacks a $v line"
-done
-printf '%s\n' "$example" | grep -E '^- \*\*' | grep -Eq '^- \*\*[a-z -]+\*\* L[0-9]+(-[0-9]+)? "[^"]*" — ' \
-  || fail "ClauseVerdicts example line off grammar"
-bad="$(printf '%s\n' "$example" | grep -E '^- \*\*' | grep -Evc '^- \*\*[a-z -]+\*\* L[0-9]+(-[0-9]+)? "[^"]*" — ' || true)"
+lines="$(printf '%s\n' "$example" | grep -E '^- \*\*' || true)"
+bad="$(printf '%s\n' "$lines" | grep -Evc "$clause_re" || true)"
 [ "$bad" = 0 ] || fail "ClauseVerdicts example has $bad lines off grammar"
+for v in "${verdicts[@]}"; do
+  printf '%s\n' "$lines" | grep -Fq -- "- **$v** L" || fail "ClauseVerdicts example lacks a $v line"
+done
+[ -n "$(printf '%s\n' "$lines" | sed -E 's/^- \*\*[a-z -]+\*\* (L[0-9]+)(-[0-9]+)? .*/\1/' | sort | uniq -d)" ] \
+  || fail "ClauseVerdicts example has no two clause lines sharing a start line"
+printf '%s\n' "$lines" | grep -F -- '- **guarded**' | grep -Eq '`[^`]+`.*`[^`]+`' \
+  || fail "ClauseVerdicts example has no guarded line with two quoted spans"
+printf '%s\n' "$lines" | grep -E '^- \*\*(guarded|contradicted)\*\* ' | grep -vqE ' — [^ ]+:[0-9]+[^`]*`[^`]+`' \
+  && fail "ClauseVerdicts example has a guarded or contradicted line without path:line and a quoted span"
+
+# ClauseVerdicts T8: the agent file holds no wording from the fixtures.
+for w in export overwrite dashboard '200 ms' responsive 'status line' 'attached to the PR' timeout \
+  'confirmed cause' 'failing test' "caller's model"; do
+  grep -Fqi -- "$w" "$a" && fail "ClauseVerdicts T8 fixture wording in the agent file: $w"
+done
 
 # CommitmentSelection T1
 grep -Fq 'by what it says, not by its heading' "$a" || fail "CommitmentSelection T1 selection phrase"
@@ -55,7 +75,8 @@ for w in 'left open' 'would overturn' 'history'; do
 done
 
 # NotTestGuardableClauses T1
-for c in 'real-run receipt' 'action outside the repo' 'negative or process clause' 'meta clause'; do
+for c in 'real-run receipt' 'action outside the repo' 'negative or process clause' 'meta clause' \
+  'acceptance bookkeeping' 'its specs are accepted'; do
   grep -Fq "$c" "$a" || fail "NotTestGuardableClauses T1 names $c"
 done
 
