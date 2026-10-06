@@ -1,6 +1,6 @@
 ---
 name: tests
-description: Audit whether a repo's tests guard what its delivered milestones committed to — trace each commitment clause in docs/milestones/ to the assertion that checks it, and list the clauses no test guards.
+description: Audit whether a repo's tests guard what its standing milestones committed to — trace each commitment clause in docs/milestones/ to the assertion that checks it, and list the clauses no test guards.
 disable-model-invocation: true
 argument-hint: "[repo path]"
 ---
@@ -11,23 +11,23 @@ A milestone's commitments are the one source of what the delivered work must do.
 audit traces each commitment clause to the tests meant to guard it and says which clauses
 nothing guards. It works at the requirement level: it reads assertions and judges them.
 The skill never edits the repo and never runs the repo's tests, and the receipt in step 6
-checks that on every run.
+checks on every run that the working tree is unchanged.
 
 ## 1. Resolve the repo
 
 Take the repo from the argument and resolve a relative path to an absolute one. With no
 argument, use `git rev-parse --show-toplevel` of the session's cwd. Make the scratch
-directory outside the repo with `mktemp -d`.
+directory outside the repo with `mktemp -d`, and a `reports/` directory inside it.
 
 Save `git -C <repo> status --porcelain` to `<scratch>/before.txt`.
 
-Done when the repo is an absolute path, the scratch directory exists outside it and
+Done when the repo is an absolute path, `<scratch>/reports` exists outside it and
 `before.txt` exists.
 
 ## 2. List the milestones
 
-Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/milestones.sh" <repo>`. Each line is
-`<action>\t<status>\t<path>`.
+Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/milestones.sh" <repo>` into
+`<scratch>/inventory.tsv` and read that file. Each line is `<action>\t<status>\t<path>`.
 
 - When the script exits 2, relay its stderr and stop.
 - When it exits 1, print its stderr and stop.
@@ -52,16 +52,15 @@ Dispatch one `audit:tests-tracer` per `trace` line, in parallel, each with:
 - `Milestone: <repo>/<path>`
 - `Repo: <repo>`
 - `Tests: <scratch>/tests.txt`
-- `Report path: <scratch>/<slug>.md`, where the slug is the milestone filename without `.md`
+- `Report path: <scratch>/reports/<slug>.md`, where the slug is the milestone filename without `.md`
 
-Each tracer is one opus xhigh seat, so the cost scales with the number of milestones.
+Each tracer is one agent seat, so the cost scales with the number of milestones.
 
 Done when every tracer has returned.
 
 ## 5. Assemble
 
-Save the inventory from step 2 to `<scratch>/inventory.tsv`, then run
-`bash "${CLAUDE_PLUGIN_ROOT}/scripts/assemble.sh" <scratch>/inventory.tsv <scratch>`
+Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/assemble.sh" <scratch>/inventory.tsv <scratch>/reports`
 into `<scratch>/tests-audit.md`. A tracer that failed shows as `not traced`, and
 a missing report is never read as a clean milestone.
 

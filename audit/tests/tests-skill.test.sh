@@ -37,3 +37,19 @@ done
 for w in 'status --porcelain' 'repo untouched' 'repo changed during the audit:' 'never edits' "never runs the repo's tests"; do
   grep -Fq -- "$w" "$s" || fail "AuditLeavesRepoUntouched T1 body names $w"
 done
+
+# TestsAuditCommand T1: the description says standing, not delivered
+desc="$(frontmatter "$s" | grep '^description:')"
+printf '%s' "$desc" | grep -Fq 'standing milestones' || fail "T1 description says standing milestones"
+printf '%s' "$desc" | grep -Fq 'delivered' && fail "T1 description must not say delivered"
+
+# T7: the seat's model and effort live only in the agent file
+grep -Eq 'opus|xhigh' "$s" && fail "T7 SKILL.md restates the seat's model or effort"
+
+step() { awk -v a="$1" -v b="$2" 'index($0, a) == 1 { p = 1; next } index($0, b) == 1 { p = 0 } p' "$s"; }
+
+# T8, T9: the inventory and the reports have homes in the scratch dir
+step '## 2.' '## 3.' | grep -Fq '<scratch>/inventory.tsv' || fail "T8 step 2 saves <scratch>/inventory.tsv"
+step '## 1.' '## 2.' | grep -Fq '<scratch>/reports' || fail "T9 step 1 makes <scratch>/reports"
+grep -Fq '<scratch>/reports/<slug>.md' "$s" || fail "T9 report path under reports/"
+grep -Fq '<scratch>/inventory.tsv <scratch>/reports' "$s" || fail "T9 assemble reads inventory and reports"
