@@ -85,6 +85,13 @@ A clause that a later passage of the same milestone takes back, such as a change
 delivery, is `retracted`, never `unguarded`. The evidence is `retracted at L<line>`. When
 the retracting passage states an obligation of its own, trace it as a clause of its own.
 
+### Too loose
+
+A commitment no assertion could tell compliance from violation of, as written, is wording
+debt for the milestone's author. The evidence is the missing specific: the time, threshold
+or count that would make it checkable. Use `too loose` only then. A clause that is precise
+and has no test is `unguarded`.
+
 ## The clause line
 
 Write one line per clause, in milestone order, in this grammar:

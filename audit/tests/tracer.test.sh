@@ -61,3 +61,6 @@ done
 
 # RetractedClausesSetAside T1
 grep -Fq 'retracted at L' "$a" || fail "RetractedClausesSetAside T1 retracted at L"
+
+# TooLooseClauses T1
+grep -Fq 'the missing specific' "$a" || fail "TooLooseClauses T1 the missing specific"
