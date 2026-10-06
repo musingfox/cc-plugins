@@ -65,3 +65,16 @@ tot="$(bash "$S" "$tmp/seam/inv" "$tmp/seam" | grep '^| total' )"
 sum="$(printf '%s' "$tot" | tr '|' '\n' | sed -n '3,$p' | tr -d ' ' | grep -E '^[0-9]+$' | paste -sd+ - | bc)"
 [ "$sum" = "$want_n" ] || fail "Counts T3 total $sum != $want_n lines ($tot)"
 printf '%s' "$tot" | tr '|' '\n' | sed -n '3,8p' | tr -d ' ' | while read -r c; do [ "$c" -ge 1 ] || fail "Counts T3 a verdict column is 0"; done
+
+# CfHandoffLine T1: only the done milestone, only its partly and unguarded clauses, in report order
+[ "$(printf '%s\n' "$out" | grep -c '^/cf ')" = 1 ] || fail "CfHandoff T1 exactly one /cf line"
+printf '%s\n' "$out" | grep -Fqx '/cf Add tests that guard these commitments of docs/milestones/alpha.md: L14-15 "refuses to overwrite"; L16 "exits 3 on a locked file"' || fail "CfHandoff T1 line text"
+
+# CfHandoffLine T2: nothing unguarded or partly
+mkdir "$tmp/ok"
+printf 'trace\tdone\tdocs/milestones/alpha.md\n' > "$tmp/ok/inv"
+printf -- '- **guarded** L1 "a" — t:1 `x`\n- **retracted** L2 "b" — retracted at L9\n' > "$tmp/ok/alpha.md"
+out4="$(bash "$S" "$tmp/ok/inv" "$tmp/ok")"
+[ "$(printf '%s\n' "$out4" | grep -c '^/cf ')" = 0 ] || fail "CfHandoff T2 no /cf lines"
+section() { printf '%s\n' "$out4" | awk -v h="$1" '$0==h{p=1; next} p && /^## /{exit} p'; }
+section '## Hand to cf' | grep -Fqx 'nothing to hand to cf' || fail "CfHandoff T2 nothing line"

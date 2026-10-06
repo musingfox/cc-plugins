@@ -52,8 +52,26 @@ counts_block() {
   echo
 }
 
+handoff_block() {
+  local action status path slug report clauses n=0
+  echo '## Hand to cf'
+  echo
+  while IFS=$'\t' read -r action status path slug; do
+    [ "$action" = trace ] && [ "$status" = done ] || continue
+    report="$reports/$slug.md"
+    [ -f "$report" ] || continue
+    clauses="$(clause_lines "$report" | { grep -E '^- \*\*(partly|unguarded)\*\* ' || true; } \
+      | sed -E 's/^- \*\*[a-z -]+\*\* (L[0-9]+(-[0-9]+)? "[^"]*") — .*$/\1/' | paste -sd'|' - | sed 's/|/; /g')"
+    [ -n "$clauses" ] || continue
+    echo "/cf Add tests that guard these commitments of $path: $clauses"
+    n=$((n + 1))
+  done < <(inventory_rows)
+  [ "$n" -gt 0 ] || echo 'nothing to hand to cf'
+  echo
+}
+
 counts_block
-echo '## Hand to cf'
+handoff_block
 echo
 
 while IFS=$'\t' read -r action status path slug; do
