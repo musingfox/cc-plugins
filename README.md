@@ -251,8 +251,9 @@ Upcoming Google Calendar events inside the session, as a Claude Mod (needs Claud
 
 Mini games to play while Claude works, as a Claude Mod (tested on Claude Code 2.1.291):
 - **`/2048`**: opens a 2048 pane that takes the keys at once, even mid-turn; `w` `a` `s` `d` move, `n` starts over, `q` closes
-- **Esc**: hands the keys back to the prompt and leaves the board in place; `/2048` takes them again
-- **Best score**: kept across sessions
+- **`/mines`**: opens a 9×9 Minesweeper pane the same way; `w` `a` `s` `d` move the cursor, `e` digs, `f` flags
+- **Esc**: hands the keys back to the prompt and leaves the board in place; the game's command takes them again
+- **Best score**: 2048's is kept across sessions
 
 **Installation:**
 ```bash

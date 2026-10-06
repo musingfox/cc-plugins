@@ -1,43 +1,8 @@
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, test } from 'claude-code/testing'
+import { paneProps, run, SESSION, world } from './fixtures/world.ts'
 
-const SESSION = { surface: 'terminal', isInteractive: true, cwd: '/work' } as const
-
-const PANE_PROPS = {
-  title: '2048',
-  isFocused: true,
-  bodyColumns: 40,
-  placement: 'inline',
-  scroll: { offset: 0, bodyRows: 12 },
-  view: {},
-} as const
-
-// /2048 typed at the prompt, as the engine stamps it.
-const RUN = {
-  command: '2048',
-  args: '',
-  origin: { kind: 'composer' },
-  presentation: { isFullscreen: false, columns: 120 },
-} as const
-
-// A stub world beneath the plugin, recording what it asks of the engine.
-function world(on: any, store: Record<string, unknown> = {}) {
-  const seen = { commands: [] as any[], opened: [] as any[], closed: [] as any[] }
-  on('session.start', ($: any, e: any) => ({ cwd: e.cwd }))
-  mock.store(on, store)
-  on('command.register', ($: any, e: any) => {
-    seen.commands.push(e)
-    return { value: { command: e.name } }
-  })
-  on('ui.open', ($: any, e: any) => {
-    seen.opened.push(e)
-    return { value: { isPlaced: true } }
-  })
-  on('ui.close', ($: any, e: any) => {
-    seen.closed.push(e)
-    return { value: undefined }
-  })
-  return seen
-}
+const PANE_PROPS = paneProps('2048')
+const RUN = run('2048')
 
 async function boardOf(ui: any): Promise<number[]> {
   const cells: number[] = []
@@ -55,7 +20,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     test('registers a command that runs mid-turn', async ($, on) => {
       const seen = world(on)
       await $.session.start(SESSION)
-      expect(seen.commands).toEqual([expect.objectContaining({ name: '2048', immediate: true })])
+      expect(seen.commands).toContainEqual(expect.objectContaining({ name: '2048', immediate: true }))
     })
 
     test('opens a focused pane on a fresh board of two tiles', async ($, on) => {

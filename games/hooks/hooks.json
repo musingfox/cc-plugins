@@ -1,4 +1,4 @@
 {
-  "description": "Mini games to play while Claude works: /2048 opens a 2048 pane",
+  "description": "Mini games to play while Claude works: /2048 and /mines each open a game pane",
   "modules": ["./register.ts"]
 }

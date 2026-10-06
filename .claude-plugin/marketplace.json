@@ -96,7 +96,7 @@
     {
       "name": "games",
       "source": "./games",
-      "description": "[Experimental] Mini games to play while Claude works — /2048 opens a 2048 pane you drive with w/a/s/d, even mid-turn (Claude Mod; tested on Claude Code 2.1.291)"
+      "description": "[Experimental] Mini games to play while Claude works — /2048 and /mines (Minesweeper) open a pane you drive with w/a/s/d, even mid-turn (Claude Mod; tested on Claude Code 2.1.291)"
     },
     {
       "name": "audit",
