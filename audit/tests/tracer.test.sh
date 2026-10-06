@@ -58,3 +58,6 @@ done
 for c in 'real-run receipt' 'action outside the repo' 'negative or process clause' 'meta clause'; do
   grep -Fq "$c" "$a" || fail "NotTestGuardableClauses T1 names $c"
 done
+
+# RetractedClausesSetAside T1
+grep -Fq 'retracted at L' "$a" || fail "RetractedClausesSetAside T1 retracted at L"

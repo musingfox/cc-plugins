@@ -79,6 +79,12 @@ not show as unguarded forever. The evidence is the class, and exactly one of the
 
 A clause that only lacks a test is `unguarded`, not `not test-guardable`.
 
+### Retracted
+
+A clause that a later passage of the same milestone takes back, such as a change after
+delivery, is `retracted`, never `unguarded`. The evidence is `retracted at L<line>`. When
+the retracting passage states an obligation of its own, trace it as a clause of its own.
+
 ## The clause line
 
 Write one line per clause, in milestone order, in this grammar:
