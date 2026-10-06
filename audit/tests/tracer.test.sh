@@ -47,3 +47,9 @@ printf '%s\n' "$example" | grep -E '^- \*\*' | grep -Eq '^- \*\*[a-z -]+\*\* L[0
   || fail "ClauseVerdicts example line off grammar"
 bad="$(printf '%s\n' "$example" | grep -E '^- \*\*' | grep -Evc '^- \*\*[a-z -]+\*\* L[0-9]+(-[0-9]+)? "[^"]*" — ' || true)"
 [ "$bad" = 0 ] || fail "ClauseVerdicts example has $bad lines off grammar"
+
+# CommitmentSelection T1
+grep -Fq 'by what it says, not by its heading' "$a" || fail "CommitmentSelection T1 selection phrase"
+for w in 'left open' 'would overturn' 'history'; do
+  grep -Fq "$w" "$a" || fail "CommitmentSelection T1 names $w"
+done

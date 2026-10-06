@@ -22,6 +22,24 @@ return a message that starts with `not traced:` and the reason.
 
 Read the milestone in full, then the tests it points at, then the code areas it names.
 
+## What counts as a commitment
+
+Pick sentences by what it says, not by its heading, and in whatever language the
+milestone is written. A sentence is a commitment when it states what the delivered work
+must do or be, wherever it sits: under "What is committed", in a rationale, in a change
+log after delivery.
+
+Leave out:
+
+- a passage the milestone leaves open ("left open", "not decided yet", an open question);
+- a falsifier, the conditions that "would overturn" the commitment;
+- history, and narration of how things stood or went;
+- rationale that states no obligation of the delivered work;
+- work the milestone declares outside itself, carried to another milestone.
+
+One clause is one obligation. A sentence that joins two checkable obligations is two
+clauses, each with its own line range.
+
 ## Where to look
 
 Look for a guard in this order, and stop widening once an assertion settles the clause:
