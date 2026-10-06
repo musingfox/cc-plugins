@@ -19,8 +19,40 @@ inventory_rows() {
 
 clause_lines() { grep -E "$CLAUSE" "$1" || true; }
 
-echo '## Counts'
-echo
+counts_block() {
+  local verdicts=(guarded partly unguarded "too loose" "not test-guardable" retracted)
+  local -a total=(0 0 0 0 0 0)
+  local untraced=() action status path slug report i n row
+  echo '## Counts'
+  echo
+  echo '| milestone | guarded | partly | unguarded | too loose | not test-guardable | retracted |'
+  echo '|---|---|---|---|---|---|---|'
+  while IFS=$'\t' read -r action status path slug; do
+    [ "$action" = trace ] || continue
+    report="$reports/$slug.md"
+    if [ ! -f "$report" ] || [ -z "$(clause_lines "$report")" ]; then
+      untraced+=("$slug")
+      continue
+    fi
+    row="| $slug"
+    for i in "${!verdicts[@]}"; do
+      n="$(clause_lines "$report" | grep -cF -- "- **${verdicts[$i]}** L" || true)"
+      total[$i]=$((total[$i] + n))
+      row="$row | $n"
+    done
+    echo "$row |"
+  done < <(inventory_rows)
+  row="| total"
+  for i in "${!verdicts[@]}"; do row="$row | ${total[$i]}"; done
+  echo "$row |"
+  if [ ${#untraced[@]} -gt 0 ]; then
+    echo
+    echo "not traced: $(printf '%s, ' "${untraced[@]}" | sed 's/, $//')"
+  fi
+  echo
+}
+
+counts_block
 echo '## Hand to cf'
 echo
 

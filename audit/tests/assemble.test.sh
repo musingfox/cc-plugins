@@ -40,3 +40,28 @@ out2="$(bash "$S" "$tmp/inv" "$tmp/no-such-dir")" || fail "T2 exit 0"
 rc=0; err="$(bash "$S" 2>&1 >/dev/null)" || rc=$?
 [ "$rc" = 1 ] || fail "T3 exit 1, got $rc"
 case "$err" in 'usage: assemble.sh'*) ;; *) fail "T3 usage: $err";; esac
+
+# VerdictCounts T1
+printf '%s\n' "$out" | grep -Fqx '| milestone | guarded | partly | unguarded | too loose | not test-guardable | retracted |' || fail "Counts header"
+printf '%s\n' "$out" | grep -Fqx '| alpha | 1 | 1 | 1 | 1 | 1 | 1 |' || fail "Counts alpha row"
+printf '%s\n' "$out" | grep -Fqx '| beta | 0 | 0 | 1 | 0 | 0 | 0 |' || fail "Counts beta row"
+printf '%s\n' "$out" | grep -Fqx '| total | 1 | 1 | 2 | 1 | 1 | 1 |' || fail "Counts total row"
+printf '%s\n' "$out" | grep -Fqx 'not traced: omega, psi' || fail "Counts not traced line"
+
+# VerdictCounts T2: a line off the verdict set is not counted
+cp "$tmp/reports/alpha.md" "$tmp/alpha.bak"
+printf -- '- **maybe** L3 "x" — y\n' >> "$tmp/reports/alpha.md"
+out3="$(bash "$S" "$tmp/inv" "$tmp/reports")"
+printf '%s\n' "$out3" | grep -Fqx '| total | 1 | 1 | 2 | 1 | 1 | 1 |' || fail "Counts T2 total unchanged"
+cp "$tmp/alpha.bak" "$tmp/reports/alpha.md"
+
+# VerdictCounts T3 (seam): the tracer's own example report must be counted by this assembler
+mkdir "$tmp/seam"
+awk '/^## Report example$/{p=1; next} p && /^```/{n++; if (n==2) exit; next} p && n==1' audit/agents/tests-tracer.md | grep '^- \*\*' > "$tmp/seam/ex.md"
+want_n="$(wc -l < "$tmp/seam/ex.md" | tr -d ' ')"
+[ "$want_n" -ge 6 ] || fail "Counts T3 example lines extracted: $want_n"
+printf 'trace\tdone\tdocs/milestones/ex.md\n' > "$tmp/seam/inv"
+tot="$(bash "$S" "$tmp/seam/inv" "$tmp/seam" | grep '^| total' )"
+sum="$(printf '%s' "$tot" | tr '|' '\n' | sed -n '3,$p' | tr -d ' ' | grep -E '^[0-9]+$' | paste -sd+ - | bc)"
+[ "$sum" = "$want_n" ] || fail "Counts T3 total $sum != $want_n lines ($tot)"
+printf '%s' "$tot" | tr '|' '\n' | sed -n '3,8p' | tr -d ' ' | while read -r c; do [ "$c" -ge 1 ] || fail "Counts T3 a verdict column is 0"; done
