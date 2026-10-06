@@ -96,7 +96,7 @@
     {
       "name": "games",
       "source": "./games",
-      "description": "[Experimental] Mini games to play while Claude works — /2048, /mines (Minesweeper) and /dino (Chrome's offline runner) each open a game pane, even mid-turn (Claude Mod; tested on Claude Code 2.1.291)"
+      "description": "[Experimental] Mini games to play while Claude works — /2048, /mines (Minesweeper), /dino (Chrome's offline runner) and /gomoku (online Gomoku with a friend) each open a game pane, even mid-turn (Claude Mod; tested on Claude Code 2.1.291)"
     },
     {
       "name": "audit",

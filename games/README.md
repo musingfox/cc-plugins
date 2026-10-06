@@ -6,6 +6,7 @@ Mini games to play while Claude works, as one Claude Mod (a function-hooks modul
 - **`/2048`**: opens a 2048 pane and gives it the keys.
 - **`/mines`**: opens a 9×9 Minesweeper pane with 10 mines and gives it the keys.
 - **`/dino`**: opens Chrome's offline dino runner; it needs one click before it takes the keys.
+- **`/gomoku`**: online Gomoku with a friend on another machine, by room code.
 
 Built and tested against Claude Code 2.1.291.
 
@@ -73,3 +74,44 @@ The field is pixel art in half blocks (`▀` `▄` `█`): each cell is one pixe
 tall, so a pixel comes out square. A crash is tested pixel against pixel, so the dino only
 dies on a touch you can see. The half blocks are ambiguous-width characters: a terminal
 set to draw those two columns wide (an East Asian width option) breaks the picture.
+
+## Gomoku
+
+`/gomoku new` opens a room and prints its code; your friend runs `/gomoku join <code>`.
+Black (the room's opener) moves first, and five or more in a row wins. Both commands run
+mid-turn.
+
+| Key | Does |
+|---|---|
+| `w` `a` `s` `d` | Move the cursor |
+| `e` | Place a stone, on your turn |
+| `q` | Close the pane; the game goes on |
+
+`/gomoku` reopens the pane and `/gomoku leave` forgets the game. With the pane closed you
+still get a toast when your friend joins, moves or ends the game.
+
+### How moves travel
+
+A mod can only make one-shot HTTP requests, so both players poll a relay: every 3 s while
+the pane is open, every 30 s while it is closed, and not at all while it is your turn. The
+relay is a Cloudflare Worker in [`relay/`](relay/), one Durable Object per room.
+
+The relay stores nothing. A room lives in the Durable Object's memory and is evicted after
+70 to 140 s with no requests. Each player's client keeps the whole game in the plugin
+store, so a client that finds the room behind it (or gone) puts its game back, and play
+goes on. A game survives both players closing Claude Code; the room comes back with the
+first player to return.
+
+Each client checks every move it receives against the rules and refuses one that is not a
+single legal stone. That stops slips, not a friend who edits their client.
+
+### Settings
+
+| Option | Meaning |
+|---|---|
+| `relay_url` | The relay both players use. Both must set the same one. |
+| `player_name` | The name your friend sees; your login name when empty. |
+
+Set them in `/config` under the games plugin. A player id, random and kept in the plugin
+store, rides on every request and is never shown to the other player; a later win/loss
+record can key on it.

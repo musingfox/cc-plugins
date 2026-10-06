@@ -1,0 +1,293 @@
+import { atom, read, update } from 'claude-code'
+import type { EngineInterface, On } from 'claude-code'
+import { hasOpponent, isMyTurn, isOver, moveCursor, newGame, place, reconcile, SIZE, snapshotOf, STONES, winnerOf } from './gomoku.ts'
+import type { View } from './gomoku.ts'
+import type { Gomoku } from '../types'
+
+const PANE = 'gomoku'
+const STORE_GAME = 'gomoku'
+const STORE_PLAYER = 'gomokuPlayer'
+const TICK_MS = 3000
+// With the pane closed the client polls every tenth tick: 30 s keeps the room alive, as
+// an idle room is evicted after 70 to 140 s.
+const CLOSED_EVERY = 10
+const CODE = /^[a-z0-9]{4,12}$/
+
+export type GomokuOptions = { relay_url?: string; player_name?: string }
+
+export const COMMAND_GOMOKU = {
+  name: 'gomoku',
+  description: 'Play Gomoku online with a friend while Claude works',
+  argumentHint: '[new | join <code> | leave]',
+  immediate: true,
+} as const
+
+const game = atom({ plugin: 'games', key: 'gomoku' } as const, null)
+
+const MOVES = [
+  { dir: 'up', hotkey: 'w', glyph: '↑' },
+  { dir: 'left', hotkey: 'a', glyph: '←' },
+  { dir: 'down', hotkey: 's', glyph: '↓' },
+  { dir: 'right', hotkey: 'd', glyph: '→' },
+] as const
+
+const GLYPHS: Record<string, string> = { '.': '·', x: '●', o: '○' }
+
+type Reply = { status: number; view: View | null; error: string | null }
+
+// Module state: a reload starts it over, and the next prompt or /gomoku starts polling again.
+let relay = ''
+let playerName = ''
+let poll: { cancel(): void } | null = null
+let ticks = 0
+let isPaneOpen = false
+let isBusy = false
+
+async function remember($: EngineInterface, g: Gomoku | null) {
+  await update($, game, () => g)
+  try {
+    await $.store.set(STORE_GAME, g)
+  } catch {
+    // The game still plays this session; only a restart would lose it.
+  }
+}
+
+async function current($: EngineInterface): Promise<Gomoku | null> {
+  const held = await read($, game)
+  if (held) return held
+  try {
+    const stored = (await $.store.get(STORE_GAME)) as Gomoku | null | undefined
+    if (stored) await update($, game, () => stored)
+    return stored ?? null
+  } catch {
+    return null
+  }
+}
+
+async function identity($: EngineInterface): Promise<{ player: string; name: string }> {
+  let player: unknown = null
+  try {
+    player = await $.store.get(STORE_PLAYER)
+  } catch {
+    // A fresh id below; it only has to outlive this game.
+  }
+  if (typeof player !== 'string') {
+    player = crypto.randomUUID()
+    try {
+      await $.store.set(STORE_PLAYER, player)
+    } catch {
+      // Kept for this session only.
+    }
+  }
+  const name = playerName || (await $.env.get('USER')) || 'player'
+  return { player: player as string, name }
+}
+
+async function call($: EngineInterface, method: 'GET' | 'POST', path: string, body?: object): Promise<Reply> {
+  if (!relay) return { status: 0, view: null, error: 'No relay_url is set for the games plugin.' }
+  try {
+    const res = await $.http.fetch(`${relay}${path}`, {
+      method,
+      headers: { 'content-type': 'application/json' },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    })
+    const data = JSON.parse(res.text) as View & { error?: string; view?: View }
+    if (res.ok) return { status: res.status, view: data, error: null }
+    return { status: res.status, view: data.view ?? null, error: data.error ?? `relay answered ${res.status}` }
+  } catch {
+    return { status: 0, view: null, error: 'The relay could not be reached.' }
+  }
+}
+
+function announce($: EngineInterface, before: Gomoku, after: Gomoku) {
+  if (isPaneOpen) return
+  const them = after.names[1 - after.seat] ?? 'Your friend'
+  if (!hasOpponent(before) && hasOpponent(after)) $.ui.toast(`Gomoku: ${them} joined. /gomoku to play.`)
+  else if (isOver(after) && !isOver(before)) $.ui.toast(`Gomoku: the game is over. /gomoku to see it.`)
+  else if (isMyTurn(after) && !isMyTurn(before)) $.ui.toast(`Gomoku: ${them} moved. Your turn, /gomoku.`)
+}
+
+// One round with the room: read it, then join or seed when the room lost what this client holds.
+async function sync($: EngineInterface) {
+  const g = await current($)
+  if (!g || isBusy) return
+  isBusy = true
+  try {
+    const me = await identity($)
+    let reply = await call($, 'GET', `/rooms/${g.code}?player=${me.player}`)
+    if (!reply.view) return void (await remember($, { ...g, note: reply.error }))
+    let step = reconcile(g, reply.view)
+    if (step.send === 'join') {
+      reply = await call($, 'POST', `/rooms/${g.code}/join`, { ...me, seat: g.seat })
+      if (reply.view) step = reconcile(g, reply.view)
+    }
+    if (step.send === 'seed') {
+      const seeded = step.game
+      reply = await call($, 'POST', `/rooms/${g.code}/seed`, {
+        ...me,
+        seat: seeded.seat,
+        seq: seeded.seq,
+        snapshot: snapshotOf(seeded),
+      })
+      step = reply.view ? reconcile(seeded, reply.view) : { game: { ...seeded, note: reply.error }, send: 'none' }
+    }
+    const latest = (await current($)) ?? g
+    // A move made while the round was out wins over what the room said before it.
+    const after = latest.seq > g.seq ? latest : { ...step.game, cursor: latest.cursor }
+    await remember($, after)
+    announce($, g, after)
+  } finally {
+    isBusy = false
+  }
+}
+
+function startPolling($: EngineInterface) {
+  if (poll) return
+  poll = $.clock.every(TICK_MS, async () => {
+    ticks += 1
+    if (!isPaneOpen && ticks % CLOSED_EVERY !== 0) return
+    const g = await read($, game)
+    if (!g || isOver(g)) return
+    if (g.isSynced && isMyTurn(g)) return
+    await sync($)
+  })
+}
+
+async function play($: EngineInterface) {
+  const g = await current($)
+  const moved = g && place(g)
+  if (!g || !moved) return
+  await remember($, moved)
+  const me = await identity($)
+  const reply = await call($, 'POST', `/rooms/${g.code}/move`, { player: me.player, seq: moved.seq, snapshot: snapshotOf(moved) })
+  if (reply.view && reply.status === 200) await remember($, { ...moved, isSynced: true })
+  // Refused or unreached, the move stays here and the next round seeds or corrects it.
+  else await sync($)
+}
+
+async function start($: EngineInterface, code: string, wanted?: 0 | 1): Promise<string | null> {
+  const me = await identity($)
+  const reply = await call($, 'POST', `/rooms/${code}/join`, { ...me, ...(wanted === undefined ? {} : { seat: wanted }) })
+  if (!reply.view || reply.view.you === null) return reply.error ?? 'Could not join the room.'
+  const fresh = newGame(code, reply.view.you, reply.view.names)
+  await remember($, reconcile(fresh, reply.view).game)
+  return null
+}
+
+async function openPane($: EngineInterface) {
+  isPaneOpen = true
+  await $.ui.open({ id: PANE, title: 'Gomoku', focus: true })
+}
+
+// A plugin's own $.ui.close runs only the hooks beneath it, so its ui.close hook never hears it.
+async function closePane($: EngineInterface) {
+  isPaneOpen = false
+  await $.ui.close({ id: PANE })
+}
+
+export function registerGomoku(on: On, options: GomokuOptions) {
+  relay = (options.relay_url ?? '').replace(/\/+$/, '')
+  playerName = options.player_name ?? ''
+
+  on('command.run', { command: 'gomoku' }, async ($, e) => {
+    const [verb = '', arg = ''] = (e.args ?? '').trim().toLowerCase().split(/\s+/)
+    if (verb === 'leave') {
+      await remember($, null)
+      await closePane($)
+      return { text: 'Left the Gomoku game.' }
+    }
+    if (verb === 'new' || verb === 'join') {
+      const code = verb === 'new' ? crypto.randomUUID().replace(/-/g, '').slice(0, 6) : arg
+      if (!CODE.test(code)) return { text: 'usage: /gomoku join <code>, the code your friend got from /gomoku new' }
+      const failed = await start($, code, verb === 'new' ? 0 : undefined)
+      if (failed) return { text: `Gomoku: ${failed}` }
+      startPolling($)
+      await openPane($)
+      return verb === 'new' ? { text: `Gomoku room ${code}. Send your friend: /gomoku join ${code}` } : {}
+    }
+    if (verb !== '') return { text: 'usage: /gomoku [new | join <code> | leave]' }
+    if (!(await current($))) return { text: 'No Gomoku game yet. /gomoku new starts one.' }
+    startPolling($)
+    await openPane($)
+    void sync($)
+    return {}
+  })
+
+  // A game left from an earlier session resumes polling with the first prompt.
+  on('turn.start', async ($, e, next) => {
+    if (!poll && (await current($))) startPolling($)
+    return next(e)
+  })
+
+  // The person's own close (the engine's mark, ctrl+x x) arrives here.
+  on('ui.close', { id: PANE }, async ($, e, next) => {
+    isPaneOpen = false
+    return next(e)
+  })
+
+  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const g = await read($, game)
+    if (!g) return Text({ dimColor: true, children: ['No game. /gomoku new starts one.'] })
+    const me = g.names[g.seat] ?? 'you'
+    const them = g.names[1 - g.seat]
+    const winner = winnerOf(g)
+    const status = !hasOpponent(g)
+      ? { text: `Waiting for a friend: /gomoku join ${g.code}` }
+      : winner !== null
+        ? winner === g.seat
+          ? { text: 'You win!', color: 'success' }
+          : { text: `${them} wins.`, color: 'error' }
+        : isOver(g)
+          ? { text: 'The board is full: a draw.' }
+          : isMyTurn(g)
+            ? { text: 'Your move: e places a stone.', color: 'success' }
+            : { text: `${them}'s move…` }
+    const rows = [...Array(SIZE).keys()].map((r) =>
+      Box({
+        key: `row:${r}`,
+        children: [...Array(SIZE).keys()].map((c) => {
+          const k = r * SIZE + c
+          const cell = g.board[k]!
+          return Text({
+            inverse: k === g.cursor,
+            color: k === g.last ? 'warning' : cell === '.' ? 'subtle' : undefined,
+            bold: k === g.last,
+            children: [` ${GLYPHS[cell]}`],
+          })
+        }),
+      }),
+    )
+    const mine = GLYPHS[STONES[g.seat]]
+    const theirs = GLYPHS[STONES[1 - g.seat]!]
+    return Box({
+      flexDirection: 'column',
+      children: [
+        Box({
+          key: 'players',
+          children: [Text({ children: [`Room ${g.code}   ${mine} ${me} (you)   vs   ${theirs} ${them ?? '…'}`] })],
+        }),
+        Box({ key: 'status', children: [Text({ color: status.color, dimColor: !status.color, children: [status.text] })] }),
+        ...(g.note ? [Text({ color: 'warning', children: [g.note] })] : []),
+        Box({ flexDirection: 'column', children: rows }),
+        Box({
+          flexDirection: 'row',
+          gap: 2,
+          children: [
+            ...MOVES.map((m) =>
+              Button({
+                key: m.dir,
+                label: m.glyph,
+                hotkey: m.hotkey,
+                plain: true,
+                onPress: () => update($, game, (x) => (x ? moveCursor(x, m.dir) : x)),
+              }),
+            ),
+            Button({ key: 'place', label: 'place', hotkey: 'e', plain: true, onPress: () => play($) }),
+            Button({ key: 'close', label: 'close', hotkey: 'q', plain: true, onPress: () => closePane($) }),
+          ],
+        }),
+      ],
+    })
+  })
+}

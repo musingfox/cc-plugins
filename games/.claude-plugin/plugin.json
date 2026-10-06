@@ -1,7 +1,7 @@
 {
   "name": "games",
   "version": "0.1.0",
-  "description": "[Experimental] Mini games to play while Claude works — /2048, /mines (Minesweeper) and /dino (Chrome's offline runner) each open a game pane, even mid-turn (Claude Mod; tested on Claude Code 2.1.291)",
+  "description": "[Experimental] Mini games to play while Claude works — /2048, /mines (Minesweeper), /dino (Chrome's offline runner) and /gomoku (online Gomoku with a friend) each open a game pane, even mid-turn (Claude Mod; tested on Claude Code 2.1.291)",
   "author": {
     "name": "Nick Huang",
     "email": "nick12703990@gmail.com"
@@ -14,5 +14,19 @@
     "claude-mod"
   ],
   "license": "MIT",
-  "types": "./types/index.d.ts"
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "relay_url": {
+      "type": "string",
+      "title": "Gomoku relay URL",
+      "description": "The games relay Worker that passes Gomoku moves between players; both players must use the same one",
+      "default": ""
+    },
+    "player_name": {
+      "type": "string",
+      "title": "Gomoku player name",
+      "description": "The name your opponent sees; your login name when empty",
+      "default": ""
+    }
+  }
 }
