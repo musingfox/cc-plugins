@@ -54,3 +54,20 @@ rc=0; err="$(bash "$S" 2>&1 >/dev/null)" || rc=$?
 mkdir "$tmp/empty"; gitq -C "$tmp/empty" init -q; : > "$tmp/empty/README.md"
 out="$(bash "$S" "$tmp/empty")" || fail "T4 exit 0"
 [ -z "$out" ] || fail "T4 empty stdout"
+
+bare="$tmp/b.git"
+gitq init -q --bare "$bare"
+rc=0; err="$(bash "$S" "$bare" 2>&1 >/dev/null)" || rc=$?
+[ "$rc" = 1 ] && [ "$err" = "not a git repository: $bare" ] || fail "T5 bare repo: $rc $err"
+
+rc=0; err="$(bash "$S" "$r/.git" 2>&1 >/dev/null)" || rc=$?
+[ "$rc" = 1 ] && [ "$err" = "not a git repository: $r/.git" ] || fail "T6 .git dir: $rc $err"
+
+q="$tmp/q"
+mkdir -p "$q/tests"
+gitq -C "$q" init -q
+: > "$q/tests/中文.test.sh"; : > "$q/tests/a\"b.test.sh"
+got="$(GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$S" "$q")" || fail "T7 exit"
+[ "$got" = "tests/a\"b.test.sh
+tests/中文.test.sh" ] || fail "T7 default quotePath: got
+$got"
