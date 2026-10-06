@@ -8,21 +8,23 @@ const PANE = 'gomoku'
 const STORE_GAME = 'gomoku'
 const STORE_PLAYER = 'gomokuPlayer'
 const TICK_MS = 3000
-// With the pane closed the client polls every tenth tick: 30 s keeps the room alive, as
-// an idle room is evicted after 70 to 140 s.
+// With the pane closed the client polls every tenth tick, 30 s, to spend fewer requests.
 const CLOSED_EVERY = 10
+// The lobby drops a waiting player after 30 s without a call, so matching polls every tick.
+const MATCH_TIMEOUT_MS = 5 * 60_000
 const CODE = /^[a-z0-9]{4,12}$/
 
 export type GomokuOptions = { relay_url?: string; player_name?: string }
 
 export const COMMAND_GOMOKU = {
   name: 'gomoku',
-  description: 'Play Gomoku online with a friend while Claude works',
-  argumentHint: '[new | join <code> | leave]',
+  description: 'Play Gomoku online with a friend or a stranger while Claude works',
+  argumentHint: '[new | join <code> | match | leave]',
   immediate: true,
 } as const
 
 const game = atom({ plugin: 'games', key: 'gomoku' } as const, null)
+const matching = atom({ plugin: 'games', key: 'gomokuMatch' } as const, null)
 
 const MOVES = [
   { dir: 'up', hotkey: 'w', glyph: '↑' },
@@ -33,7 +35,7 @@ const MOVES = [
 
 const GLYPHS: Record<string, string> = { '.': '·', x: '●', o: '○' }
 
-type Reply = { status: number; view: View | null; error: string | null }
+type Reply = { status: number; view: View | null; data: Record<string, unknown> | null; error: string | null }
 
 // Module state: a reload starts it over, and the next prompt or /gomoku starts polling again.
 let relay = ''
@@ -84,7 +86,7 @@ async function identity($: EngineInterface): Promise<{ player: string; name: str
 }
 
 async function call($: EngineInterface, method: 'GET' | 'POST', path: string, body?: object): Promise<Reply> {
-  if (!relay) return { status: 0, view: null, error: 'No relay_url is set for the games plugin.' }
+  if (!relay) return { status: 0, view: null, data: null, error: 'No relay_url is set for the games plugin.' }
   try {
     const res = await $.http.fetch(`${relay}${path}`, {
       method,
@@ -92,10 +94,10 @@ async function call($: EngineInterface, method: 'GET' | 'POST', path: string, bo
       ...(body ? { body: JSON.stringify(body) } : {}),
     })
     const data = JSON.parse(res.text) as View & { error?: string; view?: View }
-    if (res.ok) return { status: res.status, view: data, error: null }
-    return { status: res.status, view: data.view ?? null, error: data.error ?? `relay answered ${res.status}` }
+    if (res.ok) return { status: res.status, view: data, data, error: null }
+    return { status: res.status, view: data.view ?? null, data, error: data.error ?? `relay answered ${res.status}` }
   } catch {
-    return { status: 0, view: null, error: 'The relay could not be reached.' }
+    return { status: 0, view: null, data: null, error: 'The relay could not be reached.' }
   }
 }
 
@@ -137,10 +139,41 @@ async function sync($: EngineInterface) {
   }
 }
 
+// One call to the lobby while matching: still waiting, paired (then the game starts), or
+// out of time.
+async function lobbyRound($: EngineInterface) {
+  const waiting = await read($, matching)
+  if (!waiting || isBusy) return
+  isBusy = true
+  try {
+    const me = await identity($)
+    const timedOut = (await $.clock.now()) - waiting.since >= MATCH_TIMEOUT_MS
+    if (timedOut) {
+      await call($, 'POST', '/lobby/leave', { player: me.player })
+      await update($, matching, () => null)
+      if (!isPaneOpen) $.ui.toast('Gomoku: no opponent turned up in 5 minutes.')
+      return
+    }
+    const reply = await call($, 'POST', '/lobby/match', me)
+    const code = reply.data?.code
+    if (typeof code !== 'string') return
+    const room = await call($, 'GET', `/rooms/${code}?player=${me.player}`)
+    if (!room.view || room.view.you === null) return
+    const fresh = reconcile(newGame(code, room.view.you, room.view.names), room.view).game
+    await remember($, fresh)
+    await update($, matching, () => null)
+    const them = fresh.names[1 - fresh.seat] ?? 'someone'
+    if (!isPaneOpen) $.ui.toast(`Gomoku: matched with ${them}. /gomoku to play.`)
+  } finally {
+    isBusy = false
+  }
+}
+
 function startPolling($: EngineInterface) {
   if (poll) return
   poll = $.clock.every(TICK_MS, async () => {
     ticks += 1
+    if (await read($, matching)) return void (await lobbyRound($))
     if (!isPaneOpen && ticks % CLOSED_EVERY !== 0) return
     const g = await read($, game)
     if (!g || g.isClosed || isOver(g)) return
@@ -187,9 +220,24 @@ export function registerGomoku(on: On, options: GomokuOptions) {
   on('command.run', { command: 'gomoku' }, async ($, e) => {
     const [verb = '', arg = ''] = (e.args ?? '').trim().toLowerCase().split(/\s+/)
     if (verb === 'leave') {
+      if (await read($, matching)) {
+        await call($, 'POST', '/lobby/leave', { player: (await identity($)).player })
+        await update($, matching, () => null)
+      }
       await remember($, null)
       await closePane($)
       return { text: 'Left the Gomoku game.' }
+    }
+    if (verb === 'match') {
+      const g = await current($)
+      if (g && !g.isClosed && !isOver(g)) return { text: 'Gomoku: finish this game first, or /gomoku leave.' }
+      await remember($, null)
+      const since = await $.clock.now()
+      await update($, matching, () => ({ since }))
+      startPolling($)
+      await openPane($)
+      await lobbyRound($)
+      return {}
     }
     if (verb === 'new' || verb === 'join') {
       const code = verb === 'new' ? crypto.randomUUID().replace(/-/g, '').slice(0, 6) : arg
@@ -200,8 +248,9 @@ export function registerGomoku(on: On, options: GomokuOptions) {
       await openPane($)
       return verb === 'new' ? { text: `Gomoku room ${code}. Send your friend: /gomoku join ${code}` } : {}
     }
-    if (verb !== '') return { text: 'usage: /gomoku [new | join <code> | leave]' }
-    if (!(await current($))) return { text: 'No Gomoku game yet. /gomoku new starts one.' }
+    if (verb !== '') return { text: 'usage: /gomoku [new | join <code> | match | leave]' }
+    if (!(await current($)) && !(await read($, matching)))
+      return { text: 'No Gomoku game yet. /gomoku match finds an opponent; /gomoku new opens a room for a friend.' }
     startPolling($)
     await openPane($)
     void sync($)
@@ -222,8 +271,17 @@ export function registerGomoku(on: On, options: GomokuOptions) {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button } = $.ui.resolve(e)
+    if (await read($, matching))
+      return Box({
+        flexDirection: 'column',
+        children: [
+          Box({ key: 'status', children: [Text({ children: ['Looking for an opponent…'] })] }),
+          Text({ dimColor: true, children: ['A toast says when someone joins. /gomoku leave stops looking.'] }),
+          Button({ key: 'close', label: 'close', hotkey: 'q', plain: true, onPress: () => closePane($) }),
+        ],
+      })
     const g = await read($, game)
-    if (!g) return Text({ dimColor: true, children: ['No game. /gomoku new starts one.'] })
+    if (!g) return Text({ dimColor: true, children: ['No game. /gomoku match or /gomoku new starts one.'] })
     const me = g.names[g.seat] ?? 'you'
     const them = g.names[1 - g.seat]
     const winner = winnerOf(g)

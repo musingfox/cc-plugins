@@ -6,7 +6,7 @@ Mini games to play while Claude works, as one Claude Mod (a function-hooks modul
 - **`/2048`**: opens a 2048 pane and gives it the keys.
 - **`/mines`**: opens a 9×9 Minesweeper pane with 10 mines and gives it the keys.
 - **`/dino`**: opens Chrome's offline dino runner; it needs one click before it takes the keys.
-- **`/gomoku`**: online Gomoku with a friend on another machine, by room code.
+- **`/gomoku`**: online Gomoku with a friend by room code, or with whoever is waiting.
 
 Built and tested against Claude Code 2.1.291.
 
@@ -87,6 +87,11 @@ mid-turn.
 | `e` | Place a stone, on your turn |
 | `q` | Close the pane; the game goes on |
 
+`/gomoku match` pairs you with the next player who asks for a match, anyone using the
+same relay. It waits up to 5 minutes, polling every 3 s even with the pane closed, and a
+toast says when someone joins; black goes to either player at random. `/gomoku leave`
+stops looking.
+
 `/gomoku` reopens the pane and `/gomoku leave` forgets the game. With the pane closed you
 still get a toast when your friend joins, moves or ends the game.
 
@@ -108,7 +113,7 @@ single legal stone. That stops slips, not a friend who edits their client.
 
 | Option | Meaning |
 |---|---|
-| `relay_url` | The relay both players use; both must use the same one. Defaults to the shared relay at `https://games-relay.nick12703990.workers.dev`. |
+| `relay_url` | The relay both players use; both must use the same one. Defaults to the shared relay at `https://games-relay.musingfox.com`. |
 | `player_name` | The name your friend sees; your login name when empty. |
 
 Set them in `/config` under the games plugin. A player id, random and kept in the plugin

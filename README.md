@@ -253,7 +253,7 @@ Mini games to play while Claude works, as a Claude Mod (tested on Claude Code 2.
 - **`/2048`**: opens a 2048 pane that takes the keys at once, even mid-turn; `w` `a` `s` `d` move, `n` starts over, `q` closes
 - **`/mines`**: opens a 9×9 Minesweeper pane the same way; `w` `a` `s` `d` move the cursor, `e` digs, `f` flags
 - **`/dino`**: opens Chrome's offline dino runner with cacti and birds; click the pane once, then space or ↑ jumps and ↓ ducks
-- **`/gomoku new`** / **`/gomoku join <code>`**: online Gomoku with a friend through a small Cloudflare relay; a toast says when it is your turn
+- **`/gomoku new`** / **`/gomoku join <code>`**: online Gomoku with a friend through a small Cloudflare relay; **`/gomoku match`** pairs you with whoever is waiting; a toast says when it is your turn
 - **Esc**: hands the keys back to the prompt and leaves the board in place; the game's command takes them again
 - **Best score**: 2048's and the dino's are kept across sessions
 

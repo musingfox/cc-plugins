@@ -1,4 +1,6 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
+import { emptyLobby, handleLobby } from '../relay/src/lobby.ts'
+import type { LobbyState } from '../relay/src/lobby.ts'
 import { emptyRoom, handle } from '../relay/src/room.ts'
 import type { RoomState } from '../relay/src/room.ts'
 import { emptyBoard, SIZE } from '../hooks/gomoku.ts'
@@ -13,6 +15,19 @@ const CENTRE = Math.floor((SIZE * SIZE) / 2)
 // act as the friend and as the platform evicting a room.
 function world(on: any) {
   const rooms = new Map<string, RoomState>()
+  let lobby: LobbyState = emptyLobby()
+  // The lobby seats a pairing in its room, as the Worker does.
+  const lobbyCall = (action: string, body: object) => {
+    const [next, reply, pairing] = handleLobby(lobby, 'POST', action, body, Date.now(), Math.random)
+    lobby = next
+    if (pairing) {
+      for (const [who, seat] of [[pairing.black, 0], [pairing.white, 1]] as const) {
+        const [room] = handle(rooms.get(pairing.code) ?? emptyRoom(), 'POST', 'join', new URLSearchParams(), { ...who, seat })
+        rooms.set(pairing.code, room)
+      }
+    }
+    return reply
+  }
   const seen = { opened: [] as any[], toasts: [] as string[], commands: [] as any[], isDown: false, requests: 0 }
   on('session.start', ($: any, e: any) => ({ cwd: e.cwd }))
   mock.store(on, {})
@@ -35,8 +50,12 @@ function world(on: any) {
     seen.requests += 1
     if (seen.isDown) throw new Error('offline')
     const url = new URL(e.url)
-    const [, , code, action = ''] = url.pathname.split('/')
+    const [, kind, code, action = ''] = url.pathname.split('/')
     const body = e.init?.body ? JSON.parse(e.init.body) : null
+    if (kind === 'lobby') {
+      const reply = lobbyCall(code!, body)
+      return { value: { status: reply.status, ok: reply.status === 200, headers: {}, text: JSON.stringify(reply.body) } }
+    }
     const [next, reply] = handle(rooms.get(code!) ?? emptyRoom(), e.init?.method ?? 'GET', action, url.searchParams, body)
     rooms.set(code!, next)
     const value = { status: reply.status, ok: reply.status === 200, headers: {}, text: JSON.stringify(reply.body) }
@@ -48,7 +67,8 @@ function world(on: any) {
     rooms.set(code, next)
     return reply
   }
-  return { rooms, seen, clock, friend }
+  const stranger = (action: string) => lobbyCall(action, BOB)
+  return { rooms, seen, clock, friend, stranger, lobby: () => lobby }
 }
 
 async function opened($: any, ui: any) {
@@ -218,6 +238,52 @@ describe('/gomoku', () => {
     await $.session.start(SESSION)
     expect((await $.command.run({ ...run('gomoku'), args: 'join X!' })).text).toMatch(/^usage/)
     expect((await $.command.run({ ...run('gomoku'), args: 'play' })).text).toMatch(/^usage/)
-    expect((await $.command.run(run('gomoku'))).text).toBe('No Gomoku game yet. /gomoku new starts one.')
+    expect((await $.command.run(run('gomoku'))).text).toBe(
+      'No Gomoku game yet. /gomoku match finds an opponent; /gomoku new opens a room for a friend.',
+    )
+  })
+
+  test('match waits in the lobby, and a stranger arriving starts the game with a toast', { options: OPTIONS }, async ($, on) => {
+    const w = world(on)
+    await $.session.start(SESSION)
+    expect(await $.command.run({ ...run('gomoku'), args: 'match' })).toEqual({})
+    const ui = await opened($, 'terminal')
+    expect(await text(ui, 'status')).toBe('Looking for an opponent…')
+    expect(w.lobby().waiting?.name).toBe('Ann')
+    await ui.press({ key: 'close' })
+    const paired = w.stranger('match').body as { code: string }
+    await w.clock.advance(3000)
+    expect(w.seen.toasts).toEqual(['Gomoku: matched with Bob. /gomoku to play.'])
+    const players = await text(ui, 'players')
+    expect(players).toMatch(new RegExp(`^Room ${paired.code} .* Ann \\(you\\) +vs +[●○] Bob$`))
+  })
+
+  test('match gives up after 5 minutes alone', { options: OPTIONS }, async ($, on) => {
+    const w = world(on)
+    await $.session.start(SESSION)
+    await $.command.run({ ...run('gomoku'), args: 'match' })
+    const ui = await opened($, 'terminal')
+    await ui.press({ key: 'close' })
+    await w.clock.advance(5 * 60_000)
+    expect(w.seen.toasts).toEqual(['Gomoku: no opponent turned up in 5 minutes.'])
+    expect(w.lobby().waiting).toBe(null)
+    expect(await ui.find({ text: /No game/ })).toBeDefined()
+  })
+
+  test('leave takes the player out of the lobby', { options: OPTIONS }, async ($, on) => {
+    const w = world(on)
+    await $.session.start(SESSION)
+    await $.command.run({ ...run('gomoku'), args: 'match' })
+    expect(w.lobby().waiting?.name).toBe('Ann')
+    await $.command.run({ ...run('gomoku'), args: 'leave' })
+    expect(w.lobby().waiting).toBe(null)
+  })
+
+  test('match is refused while a game is still on', { options: OPTIONS }, async ($, on) => {
+    const w = world(on)
+    await $.session.start(SESSION)
+    await $.command.run({ ...run('gomoku'), args: 'new' })
+    expect((await $.command.run({ ...run('gomoku'), args: 'match' })).text).toBe('Gomoku: finish this game first, or /gomoku leave.')
+    expect(w.lobby().waiting).toBe(null)
   })
 })

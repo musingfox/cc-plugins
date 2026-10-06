@@ -6,11 +6,18 @@ storage, since an idle object hibernates after 10 s and forgets its memory, and 
 deletes the room 15 minutes after its last join or move. The protocol is `src/room.ts`,
 tested in `src/room.spec.ts`.
 
+The lobby is one more Durable Object, `src/lobby.ts`, for everyone. It holds one waiting
+player; the next one to call `match` is paired with them, and the lobby seats both in a
+fresh room before it answers. A waiting player who has not called for 30 s is dropped, and
+a pairing the first player never picks up is forgotten after 5 minutes.
+
 | Request | Body | Does |
 |---|---|---|
 | `GET /rooms/<code>?player=<id>` | | The room as that player sees it |
 | `POST /rooms/<code>/join` | `player`, `name`, optional `seat` | Takes a seat, or keeps the one held |
 | `POST /rooms/<code>/move` | `player`, `seq`, `snapshot` | The next move, in turn order |
+| `POST /lobby/match` | `player`, `name` | Waits, or pairs with the waiting player: answers `{ waiting: true }` or the new room's `{ code }` |
+| `POST /lobby/leave` | `player` | Stops waiting |
 
 Run it locally (`cf dev` serves it on port 5173):
 
@@ -18,8 +25,10 @@ Run it locally (`cf dev` serves it on port 5173):
 cd games/relay && bun install && cf dev
 ```
 
-Deploy it to your account, then set the printed `https://games-relay.<subdomain>.workers.dev`
-as `relay_url` in the games plugin's `/config`:
+The shared relay runs at `https://games-relay.musingfox.com`, the plugin's default
+`relay_url`. To run your own, change `name` and `domains` in `cloudflare.config.ts` to a
+domain on your account, deploy, and set that URL as `relay_url` in the games plugin's
+`/config` on both players' machines:
 
 ```bash
 cd games/relay && cf auth login && cf deploy
