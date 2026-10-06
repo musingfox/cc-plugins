@@ -1,12 +1,15 @@
 import { describe, expect, test } from 'claude-code/testing'
 import {
+  bestMove,
   CLOSED_NOTE,
   emptyBoard,
   isFiveAt,
   isMyTurn,
   moveCursor,
   newGame,
+  newSoloGame,
   place,
+  playSolo,
   reconcile,
   SIZE,
   snapshotOf,
@@ -131,3 +134,59 @@ describe('reconcile', () => {
     expect(reconcile(ready(1), { seq: 1, snapshot: '{"board":"nope","last":0}', names: ['Ann', 'Bob'], you: 1 }).game.seq).toBe(0)
   })
 })
+
+describe('the computer', () => {
+  const row = (r: number, cols: number[], s: string) => cols.map((c): [number, string] => [at(r, c), s])
+
+  test('completes its own five before anything else', () => {
+    const board = boardWith([...row(3, [2, 3, 4, 5], 'o'), ...row(9, [2, 3, 4, 5], 'x')])
+    expect([at(3, 1), at(3, 6)]).toContain(bestMove(board, 'o'))
+  })
+
+  test("blocks the player's four", () => {
+    const board = boardWith([...row(9, [2, 3, 4, 5], 'x'), [at(0, 0), 'o']])
+    expect([at(9, 1), at(9, 6)]).toContain(bestMove(board, 'o'))
+  })
+
+  test('blocks an open three before it becomes an open four', () => {
+    const board = boardWith([...row(7, [5, 6, 7], 'x'), [at(0, 0), 'o']])
+    expect([at(7, 4), at(7, 8)]).toContain(bestMove(board, 'o'))
+  })
+
+  test('plays next to the stones, never far away', () => {
+    const k = bestMove(boardWith([[at(7, 7), 'x']]), 'o')
+    expect(Math.abs(Math.floor(k / SIZE) - 7)).toBeLessThanOrEqual(1)
+    expect(Math.abs((k % SIZE) - 7)).toBeLessThanOrEqual(1)
+  })
+})
+
+describe('solo', () => {
+  test('the player takes black against the computer, and every move gets an answer', () => {
+    const g = newSoloGame('Ann')
+    expect(g).toMatchObject({ isSolo: true, seat: 0, names: ['Ann', 'Computer'] })
+    const after = playSolo(g)!
+    expect(after.seq).toBe(2)
+    expect(after.board.split('').filter((c) => c !== '.').sort()).toEqual(['o', 'x'])
+    expect(isMyTurn(after)).toBe(true)
+  })
+
+  test('a winning move ends the game with no answer', () => {
+    const board = boardWith(row4())
+    const g = { ...newSoloGame('Ann'), board, seq: 8, cursor: at(7, 7) }
+    const after = playSolo(g)!
+    expect(after.seq).toBe(9)
+    expect(winnerOf(after)).toBe(0)
+  })
+
+  test('an occupied cell takes no move', () => {
+    const g = { ...newSoloGame('Ann'), board: boardWith([[at(7, 7), 'o']]) }
+    expect(playSolo(g)).toBe(null)
+  })
+})
+
+function row4(): [number, string][] {
+  return [
+    ...[3, 4, 5, 6].map((c): [number, string] => [at(7, c), 'x']),
+    ...[0, 1, 2, 3].map((c): [number, string] => [at(0, c * 2), 'o']),
+  ]
+}

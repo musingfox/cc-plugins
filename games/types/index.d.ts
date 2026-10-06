@@ -13,7 +13,7 @@ export type Mines = {
   hit: number | null
 }
 
-// One online Gomoku game as this client holds it; `seq` counts the moves made.
+// One Gomoku game as this client holds it; `seq` counts the moves made.
 export type Gomoku = {
   code: string
   seat: 0 | 1
@@ -24,6 +24,8 @@ export type Gomoku = {
   cursor: number
   isSynced: boolean
   isClosed: boolean
+  // Against the computer on this machine: no room, no relay.
+  isSolo: boolean
   note: string | null
 }
 

@@ -1,6 +1,6 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, On } from 'claude-code'
-import { hasOpponent, isMyTurn, isOver, moveCursor, newGame, place, reconcile, SIZE, snapshotOf, STONES, winnerOf } from './gomoku.ts'
+import { hasOpponent, isMyTurn, isOver, moveCursor, newGame, newSoloGame, place, playSolo, reconcile, SIZE, snapshotOf, STONES, winnerOf } from './gomoku.ts'
 import type { View } from './gomoku.ts'
 import type { Gomoku } from '../types'
 
@@ -13,13 +13,15 @@ const CLOSED_EVERY = 10
 // The lobby drops a waiting player after 30 s without a call, so matching polls every tick.
 const MATCH_TIMEOUT_MS = 5 * 60_000
 const CODE = /^[a-z0-9]{4,12}$/
+// What an empty relay_url means, so clearing the option in /config falls back to it.
+export const SHARED_RELAY = 'https://games-relay.musingfox.com'
 
 export type GomokuOptions = { relay_url?: string; player_name?: string }
 
 export const COMMAND_GOMOKU = {
   name: 'gomoku',
-  description: 'Play Gomoku online with a friend or a stranger while Claude works',
-  argumentHint: '[new | join <code> | match | leave]',
+  description: 'Play Gomoku against the computer, a friend or a stranger while Claude works',
+  argumentHint: '[solo | new | join <code> | match | leave]',
   immediate: true,
 } as const
 
@@ -176,7 +178,7 @@ function startPolling($: EngineInterface) {
     if (await read($, matching)) return void (await lobbyRound($))
     if (!isPaneOpen && ticks % CLOSED_EVERY !== 0) return
     const g = await read($, game)
-    if (!g || g.isClosed || isOver(g)) return
+    if (!g || g.isSolo || g.isClosed || isOver(g)) return
     if (g.isSynced && isMyTurn(g)) return
     await sync($)
   })
@@ -184,6 +186,11 @@ function startPolling($: EngineInterface) {
 
 async function play($: EngineInterface) {
   const g = await current($)
+  if (g?.isSolo) {
+    const answered = playSolo(g)
+    if (answered) await remember($, answered)
+    return
+  }
   const moved = g && place(g)
   if (!g || !moved) return
   await remember($, moved)
@@ -214,7 +221,7 @@ async function closePane($: EngineInterface) {
 }
 
 export function registerGomoku(on: On, options: GomokuOptions) {
-  relay = (options.relay_url ?? '').replace(/\/+$/, '')
+  relay = (options.relay_url || SHARED_RELAY).replace(/\/+$/, '')
   playerName = options.player_name ?? ''
 
   on('command.run', { command: 'gomoku' }, async ($, e) => {
@@ -228,9 +235,17 @@ export function registerGomoku(on: On, options: GomokuOptions) {
       await closePane($)
       return { text: 'Left the Gomoku game.' }
     }
+    if (verb === 'solo') {
+      const g = await current($)
+      if (g && !g.isSolo && !g.isClosed && !isOver(g)) return { text: 'Gomoku: finish this game first, or /gomoku leave.' }
+      if (await read($, matching)) return { text: 'Gomoku: still looking for an opponent; /gomoku leave first.' }
+      await remember($, newSoloGame((await identity($)).name))
+      await openPane($)
+      return {}
+    }
     if (verb === 'match') {
       const g = await current($)
-      if (g && !g.isClosed && !isOver(g)) return { text: 'Gomoku: finish this game first, or /gomoku leave.' }
+      if (g && !g.isSolo && !g.isClosed && !isOver(g)) return { text: 'Gomoku: finish this game first, or /gomoku leave.' }
       await remember($, null)
       const since = await $.clock.now()
       await update($, matching, () => ({ since }))
@@ -240,6 +255,9 @@ export function registerGomoku(on: On, options: GomokuOptions) {
       return {}
     }
     if (verb === 'new' || verb === 'join') {
+      const g = await current($)
+      if (g && !g.isSolo && !g.isClosed && !isOver(g)) return { text: 'Gomoku: finish this game first, or /gomoku leave.' }
+      if (await read($, matching)) return { text: 'Gomoku: still looking for an opponent; /gomoku leave first.' }
       const code = verb === 'new' ? crypto.randomUUID().replace(/-/g, '').slice(0, 6) : arg
       if (!CODE.test(code)) return { text: 'usage: /gomoku join <code>, the code your friend got from /gomoku new' }
       const failed = await start($, code, verb === 'new' ? 0 : undefined)
@@ -248,9 +266,11 @@ export function registerGomoku(on: On, options: GomokuOptions) {
       await openPane($)
       return verb === 'new' ? { text: `Gomoku room ${code}. Send your friend: /gomoku join ${code}` } : {}
     }
-    if (verb !== '') return { text: 'usage: /gomoku [new | join <code> | match | leave]' }
+    if (verb !== '') return { text: 'usage: /gomoku [solo | new | join <code> | match | leave]' }
     if (!(await current($)) && !(await read($, matching)))
-      return { text: 'No Gomoku game yet. /gomoku match finds an opponent; /gomoku new opens a room for a friend.' }
+      return {
+        text: 'No Gomoku game yet. /gomoku solo plays the computer, /gomoku match finds an opponent, /gomoku new opens a room for a friend.',
+      }
     startPolling($)
     await openPane($)
     void sync($)
@@ -281,7 +301,7 @@ export function registerGomoku(on: On, options: GomokuOptions) {
         ],
       })
     const g = await read($, game)
-    if (!g) return Text({ dimColor: true, children: ['No game. /gomoku match or /gomoku new starts one.'] })
+    if (!g) return Text({ dimColor: true, children: ['No game. /gomoku solo, /gomoku match or /gomoku new starts one.'] })
     const me = g.names[g.seat] ?? 'you'
     const them = g.names[1 - g.seat]
     const winner = winnerOf(g)
@@ -320,7 +340,7 @@ export function registerGomoku(on: On, options: GomokuOptions) {
       children: [
         Box({
           key: 'players',
-          children: [Text({ children: [`Room ${g.code}   ${mine} ${me} (you)   vs   ${theirs} ${them ?? '…'}`] })],
+          children: [Text({ children: [`${g.isSolo ? 'Solo' : `Room ${g.code}`}   ${mine} ${me} (you)   vs   ${theirs} ${them ?? '…'}`] })],
         }),
         Box({ key: 'status', children: [Text({ color: status.color, dimColor: !status.color, children: [status.text] })] }),
         ...(g.note ? [Text({ color: 'warning', children: [g.note] })] : []),

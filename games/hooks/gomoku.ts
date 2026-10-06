@@ -11,10 +11,16 @@ type Snap = { board: string; last: number | null }
 
 export const emptyBoard = () => EMPTY.repeat(CELLS)
 
+const CENTRE = Math.floor(CELLS / 2)
+
 export function newGame(code: string, seat: 0 | 1, names: Gomoku['names']): Gomoku {
-  const centre = Math.floor(CELLS / 2)
-  return { code, seat, seq: 0, board: emptyBoard(), last: null, names, cursor: centre, isSynced: true, isClosed: false, note: null }
+  return { code, seat, seq: 0, board: emptyBoard(), last: null, names, cursor: CENTRE, isSynced: true, isClosed: false, isSolo: false, note: null }
 }
+
+export const COMPUTER = 'Computer'
+
+// The player takes black and moves first.
+export const newSoloGame = (name: string): Gomoku => ({ ...newGame('', 0, [name, COMPUTER]), isSolo: true })
 
 const DIRS = [
   [0, 1],
@@ -50,10 +56,88 @@ export const isOver = (g: Gomoku) => winnerOf(g) !== null || !g.board.includes(E
 export const hasOpponent = (g: Gomoku) => g.names[1 - g.seat] !== null
 export const isMyTurn = (g: Gomoku) => !g.isClosed && !isOver(g) && hasOpponent(g) && g.seq % 2 === g.seat
 
+const putAt = (g: Gomoku, at: number, stone: string): Gomoku => ({
+  ...g,
+  board: g.board.slice(0, at) + stone + g.board.slice(at + 1),
+  last: at,
+  seq: g.seq + 1,
+  isSynced: false,
+  note: null,
+})
+
 export function place(g: Gomoku): Gomoku | null {
   if (!isMyTurn(g) || g.board[g.cursor] !== EMPTY) return null
-  const board = g.board.slice(0, g.cursor) + STONES[g.seat] + g.board.slice(g.cursor + 1)
-  return { ...g, board, last: g.cursor, seq: g.seq + 1, isSynced: false, note: null }
+  return putAt(g, g.cursor, STONES[g.seat])
+}
+
+// The run `stone` would make through `at` along one direction, and how many of its two
+// ends are open.
+function runAt(board: string, at: number, stone: string, dr: number, dc: number): { length: number; open: number } {
+  const r0 = Math.floor(at / SIZE)
+  const c0 = at % SIZE
+  let length = 1
+  let open = 0
+  for (const sign of [1, -1]) {
+    let r = r0 + dr * sign
+    let c = c0 + dc * sign
+    while (r >= 0 && r < SIZE && c >= 0 && c < SIZE && board[r * SIZE + c] === stone) {
+      length++
+      r += dr * sign
+      c += dc * sign
+    }
+    if (r >= 0 && r < SIZE && c >= 0 && c < SIZE && board[r * SIZE + c] === EMPTY) open++
+  }
+  return { length, open }
+}
+
+// What a run is worth: five wins outright, an open four cannot be stopped, and so down.
+function worth({ length, open }: { length: number; open: number }): number {
+  if (length >= 5) return 1_000_000
+  if (open === 0) return 0
+  const table: Record<number, [number, number]> = { 4: [10_000, 100_000], 3: [500, 5_000], 2: [50, 200], 1: [2, 10] }
+  return table[length]![open - 1]!
+}
+
+const valueAt = (board: string, at: number, stone: string) =>
+  DIRS.reduce((sum, [dr, dc]) => sum + worth(runAt(board, at, stone, dr, dc)), 0)
+
+// The computer's move: the empty cell near the stones that best builds its own lines or
+// breaks the player's, ties going to the cell nearest the centre.
+export function bestMove(board: string, stone: string): number {
+  const other = stone === STONES[0] ? STONES[1] : STONES[0]
+  const near = (k: number) => {
+    const r = Math.floor(k / SIZE)
+    const c = k % SIZE
+    for (let dr = -2; dr <= 2; dr++)
+      for (let dc = -2; dc <= 2; dc++) {
+        const rr = r + dr
+        const cc = c + dc
+        if (rr >= 0 && rr < SIZE && cc >= 0 && cc < SIZE && board[rr * SIZE + cc] !== EMPTY) return true
+      }
+    return false
+  }
+  const centreDistance = (k: number) =>
+    Math.abs(Math.floor(k / SIZE) - Math.floor(CENTRE / SIZE)) + Math.abs((k % SIZE) - (CENTRE % SIZE))
+  let best = -1
+  let bestScore = -1
+  for (let k = 0; k < CELLS; k++) {
+    if (board[k] !== EMPTY || !near(k)) continue
+    const score = valueAt(board, k, stone) * 1.1 + valueAt(board, k, other)
+    if (score > bestScore || (score === bestScore && centreDistance(k) < centreDistance(best))) {
+      best = k
+      bestScore = score
+    }
+  }
+  return best === -1 ? CENTRE : best
+}
+
+// The player's stone at the cursor, then the computer's answer unless the game is over.
+export function playSolo(g: Gomoku): Gomoku | null {
+  const mine = place(g)
+  if (!mine) return null
+  if (isOver(mine)) return { ...mine, isSynced: true }
+  const stone = STONES[1 - g.seat]!
+  return { ...putAt(mine, bestMove(mine.board, stone), stone), isSynced: true }
 }
 
 export function moveCursor(g: Gomoku, dir: 'up' | 'down' | 'left' | 'right'): Gomoku {

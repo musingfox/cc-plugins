@@ -28,7 +28,7 @@ function world(on: any) {
     }
     return reply
   }
-  const seen = { opened: [] as any[], toasts: [] as string[], commands: [] as any[], isDown: false, requests: 0 }
+  const seen = { opened: [] as any[], toasts: [] as string[], commands: [] as any[], isDown: false, requests: 0, urls: [] as string[] }
   on('session.start', ($: any, e: any) => ({ cwd: e.cwd }))
   mock.store(on, {})
   mock.env(on, { USER: 'ann' })
@@ -48,6 +48,7 @@ function world(on: any) {
   })
   on('http.fetch', ($: any, e: any) => {
     seen.requests += 1
+    seen.urls.push(e.url)
     if (seen.isDown) throw new Error('offline')
     const url = new URL(e.url)
     const [, kind, code, action = ''] = url.pathname.split('/')
@@ -218,6 +219,7 @@ describe('/gomoku', () => {
     w.friend('room01', 'join', {})
     expect(await $.command.run({ ...run('gomoku'), args: 'join room01' })).toEqual({})
     expect(w.rooms.get('room01')?.seats[1]?.name).toBe('Ann')
+    await $.command.run({ ...run('gomoku'), args: 'leave' })
     w.rooms.set('full01', { seats: [{ player: 'p-one-000', name: 'X' }, { player: 'p-two-000', name: 'Y' }], seq: 0, snapshot: null })
     expect((await $.command.run({ ...run('gomoku'), args: 'join full01' })).text).toBe('Gomoku: room full')
   })
@@ -239,7 +241,7 @@ describe('/gomoku', () => {
     expect((await $.command.run({ ...run('gomoku'), args: 'join X!' })).text).toMatch(/^usage/)
     expect((await $.command.run({ ...run('gomoku'), args: 'play' })).text).toMatch(/^usage/)
     expect((await $.command.run(run('gomoku'))).text).toBe(
-      'No Gomoku game yet. /gomoku match finds an opponent; /gomoku new opens a room for a friend.',
+      'No Gomoku game yet. /gomoku solo plays the computer, /gomoku match finds an opponent, /gomoku new opens a room for a friend.',
     )
   })
 
@@ -285,5 +287,36 @@ describe('/gomoku', () => {
     await $.command.run({ ...run('gomoku'), args: 'new' })
     expect((await $.command.run({ ...run('gomoku'), args: 'match' })).text).toBe('Gomoku: finish this game first, or /gomoku leave.')
     expect(w.lobby().waiting).toBe(null)
+  })
+
+  test('solo plays the computer with no relay at all', { options: OPTIONS }, async ($, on) => {
+    const w = world(on)
+    await $.session.start(SESSION)
+    expect(await $.command.run({ ...run('gomoku'), args: 'solo' })).toEqual({})
+    const ui = await opened($, 'terminal')
+    expect(await text(ui, 'players')).toBe('Solo   ● Ann (you)   vs   ○ Computer')
+    await ui.press({ key: 'place' })
+    const stones = (await Promise.all([...Array(SIZE).keys()].map((r) => text(ui, `row:${r}`)))).join('')
+    expect([...stones].filter((c) => c === '●')).toHaveLength(1)
+    expect([...stones].filter((c) => c === '○')).toHaveLength(1)
+    expect(await text(ui, 'status')).toBe('Your move: e places a stone.')
+    await w.clock.advance(30000)
+    expect(w.seen.requests).toBe(0)
+  })
+
+  test('an empty relay_url uses the shared relay', { options: { relay_url: '', player_name: 'Ann' } }, async ($, on) => {
+    const w = world(on)
+    await $.session.start(SESSION)
+    await $.command.run({ ...run('gomoku'), args: 'new' })
+    expect(w.seen.urls[0]).toMatch(/^https:\/\/games-relay\.musingfox\.com\/rooms\/[a-z0-9]{6}\/join$/)
+  })
+
+  test('new and join are refused while a game is still on', { options: OPTIONS }, async ($, on) => {
+    world(on)
+    await $.session.start(SESSION)
+    await $.command.run({ ...run('gomoku'), args: 'new' })
+    const refused = 'Gomoku: finish this game first, or /gomoku leave.'
+    expect((await $.command.run({ ...run('gomoku'), args: 'new' })).text).toBe(refused)
+    expect((await $.command.run({ ...run('gomoku'), args: 'join abcd12' })).text).toBe(refused)
   })
 })
