@@ -1,6 +1,6 @@
 {
   "name": "mermaid-inline",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "[Experimental] Every ```mermaid block Claude writes drawn as plain box art in place in the transcript — flowchart, sequence, class, state and xychart; CJK labels aligned (Claude Mod fork of claude-mermaid; needs Claude Code 2.1.287+)",
   "author": {
     "name": "Nick Huang",

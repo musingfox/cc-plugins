@@ -253,6 +253,7 @@ Every ```` ```mermaid ```` block Claude writes drawn as plain box art in place i
 - **Drawn**: flowchart, sequence, class, state and xychart; every other kind, and ER, keeps its fence
 - **Wide characters**: CJK labels count as two columns, so box borders line up
 - **`/mermaid-inline ascii|lr on|off`**: plain ASCII art, and whether top-down diagrams may be laid out sideways
+- **Too wide**: drawn again with compact padding; still too wide, it is cut and **`/mermaid-inline open`** shows it in the browser
 
 **Installation:**
 ```bash

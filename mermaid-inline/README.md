@@ -22,7 +22,14 @@ interactive session. Built and tested against Claude Code 2.1.289.
 - `/mermaid-inline ascii on|off` switches to plain ASCII art, for a font without
   box-drawing characters. Default off.
 - `/mermaid-inline lr on|off` allows or forbids the sideways layout. Default on.
+- `/mermaid-inline open` writes the diagrams the transcript had to cut to an HTML page in
+  `$TMPDIR` and opens it in the browser, where mermaid itself draws them (from the
+  jsDelivr CDN).
 - `/mermaid-inline reset` restores the defaults.
+
+A diagram wider than the transcript is drawn again with the renderer's tightest padding,
+which is often a third of the width and half the height. One that still does not fit is
+cut at the edge, and its last line points to `/mermaid-inline open`.
 
 Settings are kept in the plugin's store under the key `prefs` and read at session start.
 

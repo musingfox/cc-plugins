@@ -165,14 +165,18 @@ const encodedWide = (source: string): Encoded | null => {
   }
 }
 
-export const renderOf = (source: string, useAscii: boolean): Rendered => {
+// the renderer's tightest padding: a fraction of the default width and height,
+// for a diagram that does not fit the transcript at the default
+const COMPACT = { paddingX: 1, paddingY: 0, boxBorderPadding: 0 } as const
+
+export const renderOf = (source: string, useAscii: boolean, compact = false): Rendered => {
   const kind = kindOf(source)
   if (!DRAWN_KINDS.has(kind)) return { error: `${kind} diagrams are not drawn yet` }
   if (source.length > MAX_SOURCE_CHARS) return { error: `too big to draw (${source.length} characters)` }
   const encoded = encodedWide(source)
   if (!encoded) return { error: 'wide characters could not be measured' }
   try {
-    const art = encoded.decode(renderMermaidAscii(encoded.source, { useAscii, colorMode: 'none' }))
+    const art = encoded.decode(renderMermaidAscii(encoded.source, { useAscii, colorMode: 'none', ...(compact ? COMPACT : {}) }))
     if (art === null) return { error: 'wide characters could not be measured' }
     const lines = art.split('\n').map(line => line.replace(/ +$/, ''))
     while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop()
@@ -225,3 +229,20 @@ export const inlineTextOf = (
   }
   return out + text.slice(cursor)
 }
+
+const escapeHtml = (text: string): string => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+// a page that draws each source with mermaid in the browser, for a diagram the
+// transcript had to cut
+export const htmlOf = (sources: readonly string[]): string =>
+  [
+    '<!doctype html>',
+    '<html><head><meta charset="utf-8"><title>mermaid-inline</title>',
+    '<style>body{font-family:system-ui,sans-serif;margin:24px} pre.mermaid{margin:0 0 48px}</style>',
+    '</head><body>',
+    ...sources.map(source => `<pre class="mermaid">\n${escapeHtml(source)}\n</pre>`),
+    // the single-file build: the ESM one loads each diagram kind as another chunk
+    '<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>',
+    '<script>mermaid.initialize({ startOnLoad: true })</script>',
+    '</body></html>',
+  ].join('\n')

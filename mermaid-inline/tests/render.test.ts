@@ -98,3 +98,47 @@ test('/mermaid-inline answers its settings, with no colour setting', async ($, o
   expect(answer.text).toContain('lr on')
   expect(answer.text).not.toContain('color')
 })
+
+// a left-to-right chain of N steps: 8 overflows a 100-column viewport at the
+// renderer's default padding and fits with the compact one; 16 fits neither
+const chainOf = (n: number) =>
+  'flowchart LR\n' + Array.from({ length: n }, (_, i) => `  N${i}[Step ${i}] --> N${i + 1}[Step ${i + 1}]`).join('\n')
+
+describe('a diagram wider than the transcript', () => {
+  test('is drawn with compact padding when that fits, and not cut', async ($, on) => {
+    const art = artOf(await drawnText($, on, 'terminal', fenced(chainOf(8))))
+    expect(art.join('\n')).not.toContain('columns cut')
+    expect(art.join('\n')).toContain('Step 8')
+  })
+
+  test('that still does not fit is cut, and the cut line offers the browser', async ($, on) => {
+    const art = artOf(await drawnText($, on, 'terminal', fenced(chainOf(16))))
+    expect(art[art.length - 1]).toContain('columns cut')
+    expect(art[art.length - 1]).toContain('/mermaid-inline open')
+  })
+
+  test('/mermaid-inline open writes the cut diagram as HTML and opens it', async ($, on) => {
+    const writes: { path: string; text: string }[] = []
+    const runs: string[][] = []
+    on('fs.write', ($: any, e: any) => { writes.push(e); return { value: undefined } })
+    on('process.run', ($: any, e: any) => { runs.push([...e.argv]); return { value: { exitCode: 0, stdout: '', stderr: '' } } })
+    mock.env(on, { TMPDIR: '/tmp/x/' })
+    await drawnText($, on, 'terminal', fenced(chainOf(16)))
+    const answer: any = await $.command.run({ command: 'mermaid-inline', args: 'open' } as any)
+    expect(writes).toHaveLength(1)
+    expect(writes[0]!.path).toMatch(/^\/tmp\/x\/mermaid-inline-[\w-]+\.html$/)
+    expect(writes[0]!.text).toContain('class="mermaid"')
+    expect(writes[0]!.text).toContain('N15[Step 15] --&gt; N16[Step 16]')
+    expect(runs).toEqual([['open', writes[0]!.path]])
+    expect(answer.text).toContain(writes[0]!.path)
+  })
+
+  test('/mermaid-inline open with nothing cut says so and opens nothing', async ($, on) => {
+    const runs: string[][] = []
+    on('process.run', ($: any, e: any) => { runs.push([...e.argv]); return { value: { exitCode: 0, stdout: '', stderr: '' } } })
+    await drawnText($, on, 'terminal', fenced(SOURCES.flowchart))
+    const answer: any = await $.command.run({ command: 'mermaid-inline', args: 'open' } as any)
+    expect(runs).toEqual([])
+    expect(answer.text).toContain('no diagram')
+  })
+})
