@@ -266,7 +266,9 @@ Repository audits that put each piece of knowledge where it cannot drift. Each a
 - **`/audit:docs`**: sorts every section of the repo's docs — `README.md`, `CONTRIBUTING.md`, `CLAUDE.md` and `AGENTS.md` at every level, `docs/`, spec and ADR entries — into history, constraint, decision or current state; current state is a cache of the code, so it is replaced by a pointer to its source, rules move into the directory they govern, decisions go to `/adr:adr` and silent invariants to `/spec:spec`
 - **Core plus modules**: every repo gets the core (`README.md`, `CLAUDE.md`); architecture, contributing, nested directories, UI design and operations are modules whose guidance loads only when the repo shows their signal, and a signal with no content gets a question, never an empty file
 - **`docs-classifier` agent**: classifies one long doc, samples its claims against the code, and writes a report; its output is a lead list the skill verifies before acting
-- More audits (tests, infrastructure config) are planned as further skills
+- **`/audit:tests`**: traces each commitment clause of the repo's standing milestones in `docs/milestones/` to the tests meant to guard it, and lists the clauses nothing guards, with one `/cf` line per delivered milestone to get those tests written; it reads assertions and never runs the repo's tests
+- **`tests-tracer` agent**: traces one milestone's clauses and writes a verdict per clause to a report; the skill assembles the reports into one list
+- More audits (infrastructure config) are planned as further skills
 
 **Installation:**
 ```bash
@@ -293,7 +295,7 @@ cc-plugins/
 ├── adr/                skills: adr
 ├── agent-browser/      skills: agent-browser, playwright, web-test
 ├── apple-podcasts/     skills: apple-podcasts-fetch
-├── audit/              skills: docs · agents: docs-classifier · tests
+├── audit/              skills: docs, tests · agents: docs-classifier, tests-tracer · scripts, tests
 ├── calendar/          hooks: register (Claude Mod) · tests
 ├── context-flow/       commands: cf  · agents: research, plan, implement, review · scripts, tests
 ├── deepen/             skills: survey · agents: explorer · scripts, docs, tests
