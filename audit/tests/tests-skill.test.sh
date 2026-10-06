@@ -32,3 +32,8 @@ done
 for w in 'exits 2' 'No standing milestones' 'mktemp -d'; do
   grep -Fq "$w" "$s" || fail "T5 body names $w"
 done
+
+# AuditLeavesRepoUntouched T1
+for w in 'status --porcelain' 'repo untouched' 'repo changed during the audit:' 'never edits' "never runs the repo's tests"; do
+  grep -Fq -- "$w" "$s" || fail "AuditLeavesRepoUntouched T1 body names $w"
+done

@@ -10,6 +10,8 @@ argument-hint: "[repo path]"
 A milestone's commitments are the one source of what the delivered work must do. This
 audit traces each commitment clause to the tests meant to guard it and says which clauses
 nothing guards. It works at the requirement level: it reads assertions and judges them.
+The skill never edits the repo and never runs the repo's tests, and the receipt in step 6
+checks that on every run.
 
 ## 1. Resolve the repo
 
@@ -17,7 +19,10 @@ Take the repo from the argument and resolve a relative path to an absolute one. 
 argument, use `git rev-parse --show-toplevel` of the session's cwd. Make the scratch
 directory outside the repo with `mktemp -d`.
 
-Done when the repo is an absolute path and the scratch directory exists outside it.
+Save `git -C <repo> status --porcelain` to `<scratch>/before.txt`.
+
+Done when the repo is an absolute path, the scratch directory exists outside it and
+`before.txt` exists.
 
 ## 2. List the milestones
 
@@ -64,6 +69,11 @@ Done when `<scratch>/tests-audit.md` exists.
 
 ## 6. Report
 
-Print the list path, the `## Counts` and `## Hand to cf` blocks from the list.
+Run `git -C <repo> status --porcelain` again and compare it with `before.txt`. When the two
+match, print `repo untouched`. Otherwise print `repo changed during the audit:` followed by
+the differing lines. The receipt reports and never aborts.
 
-Done when the user has the list path and both blocks.
+Print the list path, the `## Counts` and `## Hand to cf` blocks from the list, and the
+receipt.
+
+Done when the user has the list path, both blocks and the receipt.
