@@ -33,3 +33,9 @@ err="$(bash "$S" 2>&1 >/dev/null)" && fail "T3 no argument must exit non-zero"
 rc=0; bash "$S" >/dev/null 2>&1 || rc=$?
 [ "$rc" = 1 ] || fail "T3 exit 1, got $rc"
 case "$err" in 'usage: milestones.sh'*) ;; *) fail "T3 usage message: $err";; esac
+
+mkdir -p "$tmp/n"; printf 'x\n' > "$tmp/n/README.md"
+rc=0; out="$(bash "$S" "$tmp/n" 2>"$tmp/n.err")" || rc=$?
+[ "$rc" = 2 ] || fail "NoMilestones T1 exit 2, got $rc"
+[ -z "$out" ] || fail "NoMilestones T1 stdout empty"
+[ "$(cat "$tmp/n.err")" = "no docs/milestones/ in $tmp/n: nothing to trace" ] || fail "NoMilestones T1 stderr: $(cat "$tmp/n.err")"

@@ -6,6 +6,7 @@ usage() { echo "usage: milestones.sh <repo>" >&2; exit 1; }
 [ $# -ge 1 ] && [ -d "$1" ] || usage
 repo="$1"
 dir="$repo/docs/milestones"
+[ -d "$dir" ] || { echo "no docs/milestones/ in $repo: nothing to trace" >&2; exit 2; }
 
 # Prints "nofm" without frontmatter, else the raw status value ("" when no key).
 status_of() {
