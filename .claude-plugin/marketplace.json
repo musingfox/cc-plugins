@@ -96,7 +96,7 @@
     {
       "name": "audit",
       "source": "./audit",
-      "description": "[Experimental] Repository audits that put each piece of knowledge where it cannot drift — the repo's docs, from README to CLAUDE.md, sorted into what is a cache of the code, a rule or a decision, and its delivered milestones' commitments traced to the tests that guard them"
+      "description": "[Experimental] Repository audits that put each piece of knowledge where it cannot drift — the repo's docs, from README to CLAUDE.md, sorted into what is a cache of the code, a rule or a decision, and its standing milestones' commitments traced to the tests that guard them"
     }
   ]
 }
