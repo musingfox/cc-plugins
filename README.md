@@ -247,6 +247,18 @@ Upcoming Google Calendar events inside the session, as a Claude Mod (needs Claud
 /plugin install calendar
 ```
 
+### games
+
+Mini games to play while Claude works, as a Claude Mod (tested on Claude Code 2.1.291):
+- **`/2048`**: opens a 2048 pane that takes the keys at once, even mid-turn; `w` `a` `s` `d` move, `n` starts over, `q` closes
+- **Esc**: hands the keys back to the prompt and leaves the board in place; `/2048` takes them again
+- **Best score**: kept across sessions
+
+**Installation:**
+```bash
+/plugin install games
+```
+
 ### mermaid-inline
 
 Every ```` ```mermaid ```` block Claude writes drawn as plain box art in place in the transcript, as a Claude Mod (needs Claude Code 2.1.287 or later); a fork of [claude-mermaid](https://github.com/galElmalah/claude-mermaid) (MIT):
@@ -301,6 +313,7 @@ cc-plugins/
 ├── deepen/             skills: survey · agents: explorer · scripts, docs, tests
 ├── diagnose/           skills: diagnose, diagnose-now · docs, scripts, tests
 ├── fizzy/              skills: fizzy
+├── games/             hooks: register (Claude Mod) · tests
 ├── hook-guard/         skills: hook-guard
 ├── mermaid-inline/     hooks: register (Claude Mod) · tests
 ├── obsidian-workspace/ skills: init, jot, pm · templates, tests · hooks: register (Claude Mod)

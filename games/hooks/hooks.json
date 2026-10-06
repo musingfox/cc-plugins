@@ -1,0 +1,4 @@
+{
+  "description": "Mini games to play while Claude works: /2048 opens a 2048 pane",
+  "modules": ["./register.ts"]
+}

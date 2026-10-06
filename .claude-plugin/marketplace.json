@@ -94,6 +94,11 @@
       "description": "[Experimental] Every ```mermaid block Claude writes drawn as plain box art in place in the transcript — flowchart, sequence, class, state and xychart; CJK labels aligned (Claude Mod fork of claude-mermaid; needs Claude Code 2.1.287+)"
     },
     {
+      "name": "games",
+      "source": "./games",
+      "description": "[Experimental] Mini games to play while Claude works — /2048 opens a 2048 pane you drive with w/a/s/d, even mid-turn (Claude Mod; tested on Claude Code 2.1.291)"
+    },
+    {
       "name": "audit",
       "source": "./audit",
       "description": "[Experimental] Repository audits that put each piece of knowledge where it cannot drift — the repo's docs, from README to CLAUDE.md, sorted into what is a cache of the code, a rule or a decision, and its standing milestones' commitments traced to the tests that guard them"
