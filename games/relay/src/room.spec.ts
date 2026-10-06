@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { emptyRoom, handle, join, MAX_SNAPSHOT, move, seed, viewOf } from './room.ts'
+import { emptyRoom, handle, join, MAX_SNAPSHOT, move, viewOf } from './room.ts'
 import type { RoomState } from './room.ts'
 
 const A = { player: 'player-a', name: 'Ann' }
@@ -59,32 +59,6 @@ describe('move', () => {
   })
 })
 
-describe('seed', () => {
-  test('puts a game back into an evicted room and seats the seeder', () => {
-    const [state, r] = seed(emptyRoom(), { ...B, seat: 1, seq: 7, snapshot: 's7' })
-    expect(r.body).toEqual({ seq: 7, snapshot: 's7', names: [null, 'Bob'], you: 1 })
-    const [, again] = join(state, { ...A, seat: 0 })
-    expect(again.body).toMatchObject({ you: 0, seq: 7 })
-  })
-
-  test('play goes on from the seeded seq', () => {
-    const [state] = seed(seated(), { ...A, seat: 0, seq: 4, snapshot: 's4' })
-    expect(move(state, { player: A.player, seq: 5, snapshot: 's5' })[1].status).toBe(200)
-  })
-
-  test('refuses a seed that is not ahead of the room', () => {
-    const [state] = move(seated(), { player: A.player, seq: 1, snapshot: 's1' })
-    expect(seed(state, { ...B, seat: 1, seq: 1, snapshot: 'x' })[1].status).toBe(409)
-  })
-
-  test('refuses a seat held by the other player', () => {
-    expect(seed(seated(), { ...B, seat: 0, seq: 3, snapshot: 'x' })[1]).toEqual({
-      status: 403,
-      body: { error: 'seat taken' },
-    })
-  })
-})
-
 describe('handle', () => {
   const q = (s = '') => new URLSearchParams(s)
 
@@ -100,8 +74,7 @@ describe('handle', () => {
     expect(handle(emptyRoom(), 'GET', '', q('player=short'), null)[1].status).toBe(400)
     expect(handle(emptyRoom(), 'POST', 'join', q(), { player: 'player-a', seat: 2 })[1].status).toBe(400)
     expect(handle(seated(), 'POST', 'move', q(), { player: A.player, seq: 1.5, snapshot: 's' })[1].status).toBe(400)
-    expect(handle(seated(), 'POST', 'seed', q(), { player: A.player, seq: 2, snapshot: 's' })[1].status).toBe(400)
-    expect(handle(seated(), 'POST', 'nope', q(), { player: A.player, seq: 2, snapshot: 's' })[1].status).toBe(404)
+    expect(handle(seated(), 'POST', 'seed', q(), { player: A.player, seq: 2, snapshot: 's' })[1].status).toBe(404)
     expect(handle(seated(), 'DELETE', '', q(), null)[1].status).toBe(405)
   })
 })

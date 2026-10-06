@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 import {
+  CLOSED_NOTE,
   emptyBoard,
   isFiveAt,
   isMyTurn,
@@ -102,10 +103,17 @@ describe('reconcile', () => {
     expect(reconcile(mine, view(white, { you: 1 })).game.seq).toBe(0)
   })
 
-  test('a room behind the client gets seeded; a room that lost the seat gets a join', () => {
+  test('a room one move behind gets the unsent move again', () => {
     const moved = place(ready(0))!
-    expect(reconcile(moved, view(ready(0))).send).toBe('seed')
-    expect(reconcile(moved, view(moved, { you: null })).send).toBe('join')
+    expect(reconcile(moved, view(ready(0))).send).toBe('move')
+  })
+
+  test('a room that no longer seats the client, or lost its moves, has closed', () => {
+    const moved = place(ready(0))!
+    expect(reconcile(moved, view(moved, { you: null })).game).toMatchObject({ isClosed: true, note: CLOSED_NOTE })
+    const far = { ...moved, seq: 3, isSynced: true }
+    expect(reconcile(far, view(ready(0))).game.isClosed).toBe(true)
+    expect(isMyTurn({ ...ready(0), isClosed: true })).toBe(false)
   })
 
   test('a room in step marks the client synced and carries the names', () => {

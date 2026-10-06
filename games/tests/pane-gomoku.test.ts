@@ -13,7 +13,7 @@ const CENTRE = Math.floor((SIZE * SIZE) / 2)
 // act as the friend and as the platform evicting a room.
 function world(on: any) {
   const rooms = new Map<string, RoomState>()
-  const seen = { opened: [] as any[], toasts: [] as string[], commands: [] as any[], isDown: false }
+  const seen = { opened: [] as any[], toasts: [] as string[], commands: [] as any[], isDown: false, requests: 0 }
   on('session.start', ($: any, e: any) => ({ cwd: e.cwd }))
   mock.store(on, {})
   mock.env(on, { USER: 'ann' })
@@ -32,6 +32,7 @@ function world(on: any) {
     return { value: undefined }
   })
   on('http.fetch', ($: any, e: any) => {
+    seen.requests += 1
     if (seen.isDown) throw new Error('offline')
     const url = new URL(e.url)
     const [, , code, action = ''] = url.pathname.split('/')
@@ -104,7 +105,24 @@ describe('/gomoku', () => {
     expect(await text(ui, 'status')).toBe('Your move: e places a stone.')
   })
 
-  test('a room the platform evicted is seeded back from this client', { options: OPTIONS }, async ($, on) => {
+  test('a move the relay never got is sent again on the next round', { options: OPTIONS }, async ($, on) => {
+    const w = world(on)
+    await $.session.start(SESSION)
+    const out = await $.command.run({ ...run('gomoku'), args: 'new' })
+    const code = /room ([a-z0-9]+)/.exec(out.text ?? '')?.[1]!
+    const ui = await opened($, 'terminal')
+    w.friend(code, 'join', {})
+    await w.clock.advance(3000)
+    w.seen.isDown = true
+    await ui.press({ key: 'place' })
+    expect(w.rooms.get(code)!.seq).toBe(0)
+    w.seen.isDown = false
+    await w.clock.advance(3000)
+    expect(w.rooms.get(code)!.seq).toBe(1)
+    expect(await text(ui, 'status')).toBe("Bob's move…")
+  })
+
+  test('a room that closed says so and stops the game', { options: OPTIONS }, async ($, on) => {
     const w = world(on)
     await $.session.start(SESSION)
     const out = await $.command.run({ ...run('gomoku'), args: 'new' })
@@ -115,10 +133,11 @@ describe('/gomoku', () => {
     await ui.press({ key: 'place' })
     w.rooms.delete(code)
     await w.clock.advance(3000)
-    const room = w.rooms.get(code)!
-    expect(room.seq).toBe(1)
-    expect(room.seats[0]?.name).toBe('Ann')
-    expect(w.friend(code, 'join', { seat: 1 }).body).toMatchObject({ you: 1, seq: 1 })
+    expect(await text(ui, 'status')).toBe('Closed. /gomoku new starts another game.')
+    expect(await ui.find({ text: /closed after 15 minutes/ })).toBeDefined()
+    const asked = w.seen.requests
+    await w.clock.advance(30000)
+    expect(w.seen.requests).toBe(asked)
   })
 
   test('with the pane closed, a friend move polls slower and arrives as a toast', { options: OPTIONS }, async ($, on) => {

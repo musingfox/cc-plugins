@@ -10,7 +10,7 @@ export default defineConfig({
     env: {
       ROOMS: bindings.durableObject({ worker: 'games-relay', exportName: 'Room' }),
     },
-    // The Free plan runs Durable Objects only on the SQLite backend; the room never writes to it.
+    // The Free plan runs Durable Objects only on the SQLite backend.
     exports: {
       Room: exports.durableObject({ storage: 'sqlite' }),
     },

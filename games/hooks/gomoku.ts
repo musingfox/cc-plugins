@@ -13,7 +13,7 @@ export const emptyBoard = () => EMPTY.repeat(CELLS)
 
 export function newGame(code: string, seat: 0 | 1, names: Gomoku['names']): Gomoku {
   const centre = Math.floor(CELLS / 2)
-  return { code, seat, seq: 0, board: emptyBoard(), last: null, names, cursor: centre, isSynced: true, note: null }
+  return { code, seat, seq: 0, board: emptyBoard(), last: null, names, cursor: centre, isSynced: true, isClosed: false, note: null }
 }
 
 const DIRS = [
@@ -48,7 +48,7 @@ export function winnerOf(g: Pick<Gomoku, 'board' | 'last'>): 0 | 1 | null {
 
 export const isOver = (g: Gomoku) => winnerOf(g) !== null || !g.board.includes(EMPTY)
 export const hasOpponent = (g: Gomoku) => g.names[1 - g.seat] !== null
-export const isMyTurn = (g: Gomoku) => !isOver(g) && hasOpponent(g) && g.seq % 2 === g.seat
+export const isMyTurn = (g: Gomoku) => !g.isClosed && !isOver(g) && hasOpponent(g) && g.seq % 2 === g.seat
 
 export function place(g: Gomoku): Gomoku | null {
   if (!isMyTurn(g) || g.board[g.cursor] !== EMPTY) return null
@@ -84,14 +84,18 @@ function isOneMove(before: string, after: Snap, stone: string): boolean {
   return true
 }
 
-export type Step = { game: Gomoku; send: 'none' | 'join' | 'seed' }
+export type Step = { game: Gomoku; send: 'none' | 'move' }
 
-// What the room says against what this client holds. The client is the one that keeps the
-// game: a room behind it gets seeded, a room one move ahead is checked against the rules.
+export const CLOSED_NOTE = 'The room closed after 15 minutes without a move.'
+
+// What the room says against what this client holds. A room one move behind missed this
+// client's last move and gets it again; a room one move ahead is checked against the rules;
+// a room that no longer seats this client has closed.
 export function reconcile(g: Gomoku, view: View): Step {
-  if (view.you === null) return { game: g, send: 'join' }
+  if (view.you === null) return { game: { ...g, isClosed: true, note: CLOSED_NOTE }, send: 'none' }
   const named = { ...g, names: view.names }
-  if (view.seq < g.seq) return { game: named, send: 'seed' }
+  if (view.seq === g.seq - 1 && !g.isSynced) return { game: named, send: 'move' }
+  if (view.seq < g.seq) return { game: { ...named, isClosed: true, note: CLOSED_NOTE }, send: 'none' }
   if (view.seq === g.seq) return { game: { ...named, isSynced: true }, send: 'none' }
   const snap = parseSnap(view.snapshot)
   const mover = STONES[(view.seq - 1) % 2]!

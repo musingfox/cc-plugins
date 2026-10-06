@@ -102,12 +102,18 @@ async function call($: EngineInterface, method: 'GET' | 'POST', path: string, bo
 function announce($: EngineInterface, before: Gomoku, after: Gomoku) {
   if (isPaneOpen) return
   const them = after.names[1 - after.seat] ?? 'Your friend'
-  if (!hasOpponent(before) && hasOpponent(after)) $.ui.toast(`Gomoku: ${them} joined. /gomoku to play.`)
+  if (after.isClosed && !before.isClosed) $.ui.toast('Gomoku: the room closed after 15 minutes without a move.')
+  else if (!hasOpponent(before) && hasOpponent(after)) $.ui.toast(`Gomoku: ${them} joined. /gomoku to play.`)
   else if (isOver(after) && !isOver(before)) $.ui.toast(`Gomoku: the game is over. /gomoku to see it.`)
   else if (isMyTurn(after) && !isMyTurn(before)) $.ui.toast(`Gomoku: ${them} moved. Your turn, /gomoku.`)
 }
 
-// One round with the room: read it, then join or seed when the room lost what this client holds.
+async function sendMove($: EngineInterface, g: Gomoku): Promise<Reply> {
+  const me = await identity($)
+  return call($, 'POST', `/rooms/${g.code}/move`, { player: me.player, seq: g.seq, snapshot: snapshotOf(g) })
+}
+
+// One round with the room: read it, and send again a move of this client's it missed.
 async function sync($: EngineInterface) {
   const g = await current($)
   if (!g || isBusy) return
@@ -117,19 +123,9 @@ async function sync($: EngineInterface) {
     let reply = await call($, 'GET', `/rooms/${g.code}?player=${me.player}`)
     if (!reply.view) return void (await remember($, { ...g, note: reply.error }))
     let step = reconcile(g, reply.view)
-    if (step.send === 'join') {
-      reply = await call($, 'POST', `/rooms/${g.code}/join`, { ...me, seat: g.seat })
-      if (reply.view) step = reconcile(g, reply.view)
-    }
-    if (step.send === 'seed') {
-      const seeded = step.game
-      reply = await call($, 'POST', `/rooms/${g.code}/seed`, {
-        ...me,
-        seat: seeded.seat,
-        seq: seeded.seq,
-        snapshot: snapshotOf(seeded),
-      })
-      step = reply.view ? reconcile(seeded, reply.view) : { game: { ...seeded, note: reply.error }, send: 'none' }
+    if (step.send === 'move') {
+      reply = await sendMove($, step.game)
+      step = reply.view ? reconcile(step.game, reply.view) : { game: { ...step.game, note: reply.error }, send: 'none' }
     }
     const latest = (await current($)) ?? g
     // A move made while the round was out wins over what the room said before it.
@@ -147,7 +143,7 @@ function startPolling($: EngineInterface) {
     ticks += 1
     if (!isPaneOpen && ticks % CLOSED_EVERY !== 0) return
     const g = await read($, game)
-    if (!g || isOver(g)) return
+    if (!g || g.isClosed || isOver(g)) return
     if (g.isSynced && isMyTurn(g)) return
     await sync($)
   })
@@ -158,10 +154,9 @@ async function play($: EngineInterface) {
   const moved = g && place(g)
   if (!g || !moved) return
   await remember($, moved)
-  const me = await identity($)
-  const reply = await call($, 'POST', `/rooms/${g.code}/move`, { player: me.player, seq: moved.seq, snapshot: snapshotOf(moved) })
+  const reply = await sendMove($, moved)
   if (reply.view && reply.status === 200) await remember($, { ...moved, isSynced: true })
-  // Refused or unreached, the move stays here and the next round seeds or corrects it.
+  // Refused or unreached, the move stays here and the next round sends it again or corrects it.
   else await sync($)
 }
 
@@ -232,7 +227,9 @@ export function registerGomoku(on: On, options: GomokuOptions) {
     const me = g.names[g.seat] ?? 'you'
     const them = g.names[1 - g.seat]
     const winner = winnerOf(g)
-    const status = !hasOpponent(g)
+    const status = g.isClosed
+    ? { text: 'Closed. /gomoku new starts another game.' }
+    : !hasOpponent(g)
       ? { text: `Waiting for a friend: /gomoku join ${g.code}` }
       : winner !== null
         ? winner === g.seat

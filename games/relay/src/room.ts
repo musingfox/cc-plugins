@@ -1,6 +1,5 @@
 // One room of a two-player turn relay. The room only passes snapshots along: each client
-// keeps the whole game and checks the rules, and the room lives in memory alone, so a
-// client re-seeds a room the platform evicted.
+// keeps the whole game and checks the rules.
 
 export type Seat = { player: string; name: string } | null
 
@@ -57,20 +56,6 @@ export function move(state: RoomState, a: { player: string; seq: number; snapsho
   return [next, ok(next, a.player)]
 }
 
-// A client whose game is ahead of the room puts it back, claiming its own seat.
-export function seed(
-  state: RoomState,
-  a: { player: string; name: string; seat: 0 | 1; seq: number; snapshot: string },
-): [RoomState, Reply] {
-  if (a.snapshot.length > MAX_SNAPSHOT) return [state, refuse(413, 'snapshot too large')]
-  const holder = state.seats[a.seat]
-  if (holder && holder.player !== a.player) return [state, refuse(403, 'seat taken')]
-  if (seatOf(state, a.player) === 1 - a.seat) return [state, refuse(403, 'seated elsewhere')]
-  if (a.seq <= state.seq) return [state, refuse(409, 'room is not behind', viewOf(state, a.player))]
-  const next = { ...withSeat(state, a.seat, a.player, a.name), seq: a.seq, snapshot: a.snapshot }
-  return [next, ok(next, a.player)]
-}
-
 const PLAYER = /^[A-Za-z0-9_-]{8,64}$/
 
 const isSeat = (v: unknown): v is 0 | 1 => v === 0 || v === 1
@@ -99,9 +84,5 @@ export function handle(
   }
   if (!isSeq(b.seq) || snapshot === null) return [state, refuse(400, 'bad seq or snapshot')]
   if (action === 'move') return move(state, { player: b.player, seq: b.seq, snapshot })
-  if (action === 'seed') {
-    if (!isSeat(b.seat)) return [state, refuse(400, 'bad seat')]
-    return seed(state, { player: b.player, name, seat: b.seat, seq: b.seq, snapshot })
-  }
   return [state, refuse(404, 'no such action')]
 }

@@ -96,11 +96,10 @@ A mod can only make one-shot HTTP requests, so both players poll a relay: every 
 the pane is open, every 30 s while it is closed, and not at all while it is your turn. The
 relay is a Cloudflare Worker in [`relay/`](relay/), one Durable Object per room.
 
-The relay stores nothing. A room lives in the Durable Object's memory and is evicted after
-70 to 140 s with no requests. Each player's client keeps the whole game in the plugin
-store, so a client that finds the room behind it (or gone) puts its game back, and play
-goes on. A game survives both players closing Claude Code; the room comes back with the
-first player to return.
+The relay keeps a room in its Durable Object's storage, because an idle Durable Object
+hibernates after 10 s and forgets its memory. A room with no join or move for 15 minutes is
+deleted, polls not counting; the client then shows the game as closed. A move a client
+sent while the relay was unreachable is sent again on its next poll.
 
 Each client checks every move it receives against the rules and refuses one that is not a
 single legal stone. That stops slips, not a friend who edits their client.
@@ -109,7 +108,7 @@ single legal stone. That stops slips, not a friend who edits their client.
 
 | Option | Meaning |
 |---|---|
-| `relay_url` | The relay both players use. Both must set the same one. |
+| `relay_url` | The relay both players use; both must use the same one. Defaults to the shared relay at `https://games-relay.nick12703990.workers.dev`. |
 | `player_name` | The name your friend sees; your login name when empty. |
 
 Set them in `/config` under the games plugin. A player id, random and kept in the plugin

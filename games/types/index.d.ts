@@ -23,6 +23,7 @@ export type Gomoku = {
   names: [string | null, string | null]
   cursor: number
   isSynced: boolean
+  isClosed: boolean
   note: string | null
 }
 
