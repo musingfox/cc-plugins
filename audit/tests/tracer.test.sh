@@ -53,3 +53,8 @@ grep -Fq 'by what it says, not by its heading' "$a" || fail "CommitmentSelection
 for w in 'left open' 'would overturn' 'history'; do
   grep -Fq "$w" "$a" || fail "CommitmentSelection T1 names $w"
 done
+
+# NotTestGuardableClauses T1
+for c in 'real-run receipt' 'action outside the repo' 'negative or process clause' 'meta clause'; do
+  grep -Fq "$c" "$a" || fail "NotTestGuardableClauses T1 names $c"
+done

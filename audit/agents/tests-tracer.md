@@ -67,6 +67,18 @@ Give every clause exactly one verdict.
 - **not test-guardable** — see below.
 - **retracted** — see below.
 
+### Not test-guardable
+
+A commitment no test could ever guard is set apart from debt, so a one-off receipt does
+not show as unguarded forever. The evidence is the class, and exactly one of these:
+
+- `real-run receipt` — a run on a real system whose log or result is attached or recorded;
+- `action outside the repo` — something done in a service, a settings screen or a PR;
+- `negative or process clause` — a commitment about what the team will not do or how it works;
+- `meta clause` — a clause about the milestone or its own documents.
+
+A clause that only lacks a test is `unguarded`, not `not test-guardable`.
+
 ## The clause line
 
 Write one line per clause, in milestone order, in this grammar:
