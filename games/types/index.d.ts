@@ -15,6 +15,6 @@ export type Mines = {
 
 declare module 'claude-code' {
   interface PluginState {
-    games: { game2048: Game | null; best2048: number; mines: Mines | null }
+    games: { game2048: Game | null; best2048: number; mines: Mines | null; bestDino: number }
   }
 }
