@@ -125,8 +125,9 @@ into a single pass:
   a plan; the first hard thing it hits is where it stops. Several directions may be probed at
   once, and that is the point — comparing what two paths actually run into beats comparing two
   descriptions of them. What a probe reports is largely det (§2) — what a path hits has a
-  right answer — so probing is mechanism work and deserves little judgment, however many
-  probes run at once.
+  right answer — but a wrong answer is costly: a false wall retires a live candidate without a
+  vote, and a missed wall sends a dead one back to the decision-maker. So a probe still gets a
+  seat that finds walls reliably, however many probes run at once.
 - **Prototype** — what a probe escalates to when the collision cannot be *read*. Some questions
   have no answer until the thing exists and runs: the probe reports that it cannot get there by
   reading, or — without any probe — the decision-maker asks to see the candidates built, or the
@@ -136,8 +137,8 @@ into a single pass:
   recommendation, and its code is evidence rather than a deliverable — throwaway in the same
   sense a probe is. **Running it is det; deciding what would count as red is not** — that line is
   a threshold seam (§2), so it is anchored in the question the prototype is handed and never
-  redrawn by the prototype itself. With the seam anchored above it, the prototype is mechanism
-  work and deserves little judgment, exactly as probing does. Sending one is no more the
+  redrawn by the prototype itself. With the seam anchored above it, the prototype reports an
+  observation with a right answer, and gets the same reliable seat a probe does. Sending one is no more the
   decision-maker's to approve than sending a probe: both walk a direction the round already
   chose, and this one simply walks it past what reading can reach.
 - **The residual choice** — what is still open once the walk reports. A direction that
