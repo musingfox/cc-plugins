@@ -1,0 +1,4 @@
+{
+  "description": "mermaid-inline: draws Claude's ```mermaid blocks as box art in place in the transcript",
+  "modules": ["./register.ts"]
+}

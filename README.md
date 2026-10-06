@@ -247,6 +247,18 @@ Upcoming Google Calendar events inside the session, as a Claude Mod (needs Claud
 /plugin install calendar
 ```
 
+### mermaid-inline
+
+Every ```` ```mermaid ```` block Claude writes drawn as plain box art in place in the transcript, as a Claude Mod (needs Claude Code 2.1.287 or later); a fork of [claude-mermaid](https://github.com/galElmalah/claude-mermaid) (MIT):
+- **Drawn**: flowchart, sequence, class, state and xychart; every other kind, and ER, keeps its fence
+- **Wide characters**: CJK labels count as two columns, so box borders line up
+- **`/mermaid-inline ascii|lr on|off`**: plain ASCII art, and whether top-down diagrams may be laid out sideways
+
+**Installation:**
+```bash
+/plugin install mermaid-inline
+```
+
 ### Audit (Experimental)
 
 Repository audits that put each piece of knowledge where it cannot drift. Each audit is a skill you type by hand (`disable-model-invocation: true`), so none costs context until you run it:
@@ -287,6 +299,7 @@ cc-plugins/
 ├── diagnose/           skills: diagnose, diagnose-now · docs, scripts, tests
 ├── fizzy/              skills: fizzy
 ├── hook-guard/         skills: hook-guard
+├── mermaid-inline/     hooks: register (Claude Mod) · tests
 ├── obsidian-workspace/ skills: init, jot, pm · templates, tests · hooks: register (Claude Mod)
 ├── omp-quota/          hooks: register (Claude Mod) · tests
 ├── pi-dispatch/        skills: pi-dispatch · agents: builder, reviewer · scripts, shims, extensions, tests

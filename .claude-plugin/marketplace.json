@@ -89,6 +89,11 @@
       "description": "[Experimental] Upcoming Google Calendar events in-session — /cal toggles a band above the prompt with the next 7 days, /cal N for N days (Claude Mod; needs Claude Code 2.1.287+ and the claude.ai Google Calendar connector)"
     },
     {
+      "name": "mermaid-inline",
+      "source": "./mermaid-inline",
+      "description": "[Experimental] Every ```mermaid block Claude writes drawn as plain box art in place in the transcript — flowchart, sequence, class, state and xychart; CJK labels aligned (Claude Mod fork of claude-mermaid; needs Claude Code 2.1.287+)"
+    },
+    {
       "name": "audit",
       "source": "./audit",
       "description": "[Experimental] Repository audits that put each piece of knowledge where it cannot drift — starting with the repo's docs, from README to CLAUDE.md: what is a cache of the code, what is a rule, what is a decision, and where each belongs"
