@@ -69,6 +69,14 @@ This is the two loads applied to a skill:
 Pick model-invocation when the agent must reach the skill on its own, or another skill
 must. A skill that only ever fires by hand should be user-invoked and pay nothing.
 
+A model-invoked description is a trigger, and a trigger is measured, not argued. When
+the plugin has an `evals/` suite, run
+`claude plugin eval <plugin> --runs 1 --ablation none --trust-plugin` before and after
+changing the description, and keep the change only if the should-fire and should-not
+cases hold. The eval sandbox loads only the plugin under test, so a plugin with a
+`dependencies` list does not load at all and its numbers mean nothing: run it on a copy
+outside the repo with `dependencies` removed.
+
 Every skill in this repo is currently model-invoked. Treat that as an unexamined
 default, not a settled decision: `/obw:init` and this skill are the sort you always
 type by hand.
