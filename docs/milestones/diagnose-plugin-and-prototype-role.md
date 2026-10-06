@@ -101,3 +101,7 @@ its quota pattern matches rolling-window usage limits that reset in hours under 
 genuine exhaustion. Both are live defects in a published component, independent of anything
 decided here and of each other. Neither is this milestone's work; both are worth fixing on their
 own.
+
+## Changes after delivery
+
+- **2026-09-10: the dependency names the marketplace entry `context-flow`** (33b3be1), which is the same string as cf's directory, because a dependency resolves by marketplace entry name. This supersedes "The declaration names the *plugin*, which is not the same string as its directory."

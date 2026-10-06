@@ -81,3 +81,10 @@ Two asymmetries are known and accepted: a failed view listing draws its text wit
 the listing, while the same text arriving through the query does not, and a listing whose lines
 parse but whose names are all unusable is an error while a listing with no lines is empty — a
 boundary no spec states.
+
+## Changes after delivery
+
+- **As delivered, the left-out notice counts rows without naming them** (bbd98f6). It reads how many rows of the chosen view are not cards under `pm/<project>` and were left out. This supersedes "counted and named in a notice".
+- **2026-09-22: a bare `/issue` opens the All Tasks view** (03a18b2), so editing the Active view changes what `/issue Active` lists, not what a bare `/issue` lists.
+- **2026-09-22: All Tasks groups rows by a fixed status order and sorts each group by priority** (c69587e, 31ff830). The order lives in `STATUS_ORDER` in `obsidian-workspace/hooks/list.ts`, so the module now imposes a status vocabulary on that view. First-seen grouping, CLI order inside a group and the absence of status comparison still hold for every other view.
+- **2026-09-22: a dashboard missing the All Tasks view gets a refresh hint instead of the `/obw:pm` line** (706bb88). The failed-query line pointing at `/obw:pm` still holds for every other failure.

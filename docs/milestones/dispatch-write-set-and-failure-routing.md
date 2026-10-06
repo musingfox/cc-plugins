@@ -86,3 +86,8 @@ Restoring `~/.pi/dispatch/settings.json` from `settings.json.bak` is a machine a
 - **pi ships its own write-scope or sandbox option** that covers both shell writes and tool writes. The knob would then pass through to it instead of duplicating it in two layers.
 - **A pre-dispatch headroom signal appears for the providers in use.** Stopping the batch reactively would then no longer be the only defence against paying for the same wall twice.
 - **A fallback chain is reinstated.** Batches would then span providers, and every batch stop, in pi-agent.sh and in cf, would have to compare `RUNDIR/routing` before stopping a sibling.
+
+## Changes after delivery
+
+- **2026-09-24: routing became a required `PI_DISPATCH_CMD`** (00e2e17). With it unset, `pi-dispatch.sh` refuses with exit 2 and launches nothing. This supersedes, in slice 6, the launch warning about a missing `settings.json` and "It warns rather than refuses", and the launch check named under *Outside the repo*.
+- **2026-09-29: `reviewer.md` is pinned on `opus`** (7c5d7e0). This supersedes "drops its `sonnet` pin and inherits the caller's model" under the defaults taken on two-way doors.
