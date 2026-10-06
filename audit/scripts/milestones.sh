@@ -8,13 +8,13 @@ repo="$1"
 dir="$repo/docs/milestones"
 [ -d "$dir" ] || { echo "no docs/milestones/ in $repo: nothing to trace" >&2; exit 2; }
 
-# Prints "nofm" without frontmatter, else the raw status value ("" when no key).
+# Prints "no-frontmatter" without frontmatter, else "fm:<raw status value>" ("fm:" when no key).
 status_of() {
   awk '
-    NR == 1 { if ($0 != "---") { print "nofm"; found = 1; exit } ; next }
-    /^---$/ { closed = 1; print "fm:" s; found = 1; exit }
+    NR == 1 { if ($0 != "---") { print "no-frontmatter"; found = 1; exit } ; next }
+    /^---$/ { print "fm:" s; found = 1; exit }
     /^status:/ && !seen { seen = 1; s = substr($0, 8) }
-    END { if (!found) print "nofm" }
+    END { if (!found) print "no-frontmatter" }
   ' "$1"
 }
 
@@ -32,7 +32,7 @@ done
 while IFS= read -r name; do
   raw="$(status_of "$dir/$name")"
   rel="docs/milestones/$name"
-  if [ "$raw" = nofm ]; then
+  if [ "$raw" = no-frontmatter ]; then
     printf 'skip\tno-frontmatter\t%s\n' "$rel"
     continue
   fi
