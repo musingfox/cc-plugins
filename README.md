@@ -249,11 +249,12 @@ Upcoming Google Calendar events inside the session, as a Claude Mod (needs Claud
 
 ### games
 
-Mini games to play while Claude works, as a Claude Mod (tested on Claude Code 2.1.291):
+Mini games to play in a pane while Claude works, as a Claude Mod (tested on Claude Code 2.1.291); see [games/README.md](games/README.md) for how to play each:
 - **`/2048`**: opens a 2048 pane that takes the keys at once, even mid-turn; `w` `a` `s` `d` move, `n` starts over, `q` closes
 - **`/mines`**: opens a 9×9 Minesweeper pane the same way; `w` `a` `s` `d` move the cursor, `e` digs, `f` flags
 - **`/dino`**: opens Chrome's offline dino runner with cacti and birds; click the pane once, then space or ↑ jumps and ↓ ducks
-- **`/gomoku new`** / **`/gomoku join <code>`**: online Gomoku with a friend through a small Cloudflare relay; **`/gomoku match`** pairs you with whoever is waiting; a toast says when it is your turn
+- **`/gomoku solo`**: Gomoku against the computer, offline
+- **`/gomoku new`** / **`/gomoku join <code>`** / **`/gomoku match`**: Gomoku against a friend by room code, or whoever is waiting, through the shared relay at `games-relay.musingfox.com`; a toast says when it is your turn
 - **Esc**: hands the keys back to the prompt and leaves the board in place; the game's command takes them again
 - **Best score**: 2048's and the dino's are kept across sessions
 

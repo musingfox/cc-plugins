@@ -19,14 +19,15 @@ a pairing the first player never picks up is forgotten after 5 minutes.
 | `POST /lobby/match` | `player`, `name` | Waits, or pairs with the waiting player: answers `{ waiting: true }` or the new room's `{ code }` |
 | `POST /lobby/leave` | `player` | Stops waiting |
 
-Run it locally (`cf dev` serves it on port 5173):
+Run it on your own machine, then set `relay_url` to `http://localhost:5173` (`cf dev`
+serves it on that port); only players who can reach that address can join:
 
 ```bash
 cd games/relay && bun install && cf dev
 ```
 
-The shared relay runs at `https://games-relay.musingfox.com`, the plugin's default
-`relay_url`. To run your own, change `name` and `domains` in `cloudflare.config.ts` to a
+The shared relay runs at `https://games-relay.musingfox.com`, which an empty `relay_url`
+uses. To run your own, change `name` and `domains` in `cloudflare.config.ts` to a
 domain on your account, deploy, and set that URL as `relay_url` in the games plugin's
 `/config` on both players' machines:
 
