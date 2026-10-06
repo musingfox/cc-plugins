@@ -22,3 +22,28 @@ printf 'name: x\nmodel: opus\n' | tools_ok && fail "T2 broken predicate: accepte
 
 frontmatter "$a" | tools_ok || fail "T1 tools must be exactly Read, Grep, Glob, Write"
 grep -Fq 'The report is the only file you write' "$a" || fail "T3 the report-only sentence"
+
+# ClauseVerdicts T1: the grammar sits in prose, not in a fence; all six verdicts; the example heading.
+outside="$(awk '/^```/{f=!f; next} !f' "$a")"
+printf '%s\n' "$outside" | grep -Fqx -- '- **<verdict>** L<start>[-<end>] "<clause>" — <evidence>' || fail "ClauseVerdicts T1 grammar line outside any fenced block"
+for v in guarded partly unguarded 'too loose' 'not test-guardable' retracted; do
+  grep -Fq "**$v**" "$a" || fail "ClauseVerdicts T1 verdict token $v"
+done
+grep -Fqx '## Report example' "$a" || fail "ClauseVerdicts T1 ## Report example heading"
+grep -Fq 'header or test name alone' "$a" || fail "ClauseVerdicts T1 header-or-test-name rule"
+
+# ClauseVerdicts T2: pinned seat.
+frontmatter "$a" | grep -qx 'name: tests-tracer' || fail "ClauseVerdicts T2 name"
+frontmatter "$a" | grep -qx 'model: opus' || fail "ClauseVerdicts T2 model"
+frontmatter "$a" | grep -qx 'effort: xhigh' || fail "ClauseVerdicts T2 effort"
+
+# The example is the first fenced block after the heading, one line per verdict, no quote inside a clause.
+example="$(awk '/^## Report example$/{p=1; next} p && /^```/{n++; if (n==2) exit; next} p && n==1' "$a")"
+[ -n "$example" ] || fail "ClauseVerdicts example block empty"
+for v in guarded partly unguarded 'too loose' 'not test-guardable' retracted; do
+  printf '%s\n' "$example" | grep -Fq -- "- **$v** L" || fail "ClauseVerdicts example lacks a $v line"
+done
+printf '%s\n' "$example" | grep -E '^- \*\*' | grep -Eq '^- \*\*[a-z -]+\*\* L[0-9]+(-[0-9]+)? "[^"]*" — ' \
+  || fail "ClauseVerdicts example line off grammar"
+bad="$(printf '%s\n' "$example" | grep -E '^- \*\*' | grep -Evc '^- \*\*[a-z -]+\*\* L[0-9]+(-[0-9]+)? "[^"]*" — ' || true)"
+[ "$bad" = 0 ] || fail "ClauseVerdicts example has $bad lines off grammar"
