@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { PANE, clientNode, elementsIn, expectDrawn, nodesOf, press, runsOf, shown, stringsIn, uvxRuns, vizWorld } from './fixtures/pane.ts'
+import { PANE, clientNode, elementsIn, browserButtons, expectDrawn, nodesOf, press, runsOf, shown, stringsIn, uvxRuns, vizWorld } from './fixtures/pane.ts'
 import { AB, CARD, DIAGRAM, MERMAID_CARD, SESSION, world } from './fixtures/world.ts'
 
 const MERMAID_BODY = '# m\n\n```mermaid\ngraph LR\nA-->B\n```\n\ntail\n'
@@ -216,9 +216,9 @@ describe('a drawn diagram swaps in', () => {
     const w = vizWorld(on, { read: MERMAID_CARD })
     await shown($, w, 'm')
     const tree = await $.ui.render(PANE)
-    expect(nodesOf(tree, 'Button').length).toBe(1)
-    const order = elementsIn(tree).map((node) => node.type)
-    expect(order.indexOf('Button')).toBeLessThan(order.indexOf('Code'))
+    expect(browserButtons(tree).length).toBe(1)
+    const order = elementsIn(tree)
+    expect(order.findIndex((node) => node.props?.key === 'open-in-browser')).toBeLessThan(order.findIndex((node) => node.type === 'Code'))
     await press($, w)
     expect(w.writes[0].text).toBe(MERMAID_BODY)
     expect(nodesOf(await $.ui.render(PANE), 'Code').length).toBe(1)

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { CONFIG_PATH, HOME_MANIFEST, PANE, PRESS, ROOT, clientNode, expectDrawn, issue, mounted, nodesOf, press, renderRuns, runsOf, stringsIn, vizWorld } from './fixtures/pane.ts'
+import { CONFIG_PATH, HOME_MANIFEST, PANE, PRESS, ROOT, clientNode, browserButtons, expectDrawn, issue, mounted, nodesOf, press, renderRuns, runsOf, stringsIn, vizWorld } from './fixtures/pane.ts'
 import { AB, CONFIG, manifest, world } from './fixtures/world.ts'
 
 const MOD = 'mod-obw-issue-pane'
@@ -58,7 +58,7 @@ describe('the Open in browser button', () => {
   test('a shown card with viz found carries one Open in browser button', async ($, on) => {
     vizWorld(on)
     await issue($, MOD)
-    const buttons = nodesOf(await $.ui.render(PANE), 'Button')
+    const buttons = browserButtons(await $.ui.render(PANE))
     expect(buttons.length).toBe(1)
     expect(buttons[0].props.key).toBe('open-in-browser')
     expect(buttons[0].props.label).toBe('Open in browser')
@@ -76,7 +76,7 @@ describe('the Open in browser button', () => {
     world(on, { env: { HOME: '/Users/u' } })
     await issue($, MOD)
     const tree = await $.ui.render(PANE)
-    expect(nodesOf(tree, 'Button').length).toBe(0)
+    expect(browserButtons(tree).length).toBe(0)
     expect(nodesOf(tree, 'Markdown').length).toBe(1)
     await expect($.ui.press(PRESS)).rejects.toThrow()
   })
@@ -86,14 +86,14 @@ describe('the Open in browser button', () => {
     const two = JSON.stringify({ version: 2, plugins: { 'viz@a': entry, 'viz@b': entry } })
     vizWorld(on, { files: { [CONFIG_PATH]: CONFIG, [HOME_MANIFEST]: two } })
     await issue($, MOD)
-    expect(nodesOf(await $.ui.render(PANE), 'Button').length).toBe(0)
+    expect(browserButtons(await $.ui.render(PANE)).length).toBe(0)
   })
 
   test('a manifest that is not JSON draws no button and no engine fallback', async ($, on) => {
     vizWorld(on, { files: { [CONFIG_PATH]: CONFIG, [HOME_MANIFEST]: 'not json' } })
     await issue($, MOD)
     const tree = await $.ui.render(PANE)
-    expect(nodesOf(tree, 'Button').length).toBe(0)
+    expect(browserButtons(tree).length).toBe(0)
     expect(nodesOf(tree, 'Markdown').length).toBe(1)
     expectDrawn(tree)
   })
@@ -101,13 +101,13 @@ describe('the Open in browser button', () => {
   test('an environment that cannot be read draws no button', async ($, on) => {
     world(on)
     await issue($, MOD)
-    expect(nodesOf(await $.ui.render(PANE), 'Button').length).toBe(0)
+    expect(browserButtons(await $.ui.render(PANE)).length).toBe(0)
   })
 
   test('the list alone draws no button', async ($, on) => {
     vizWorld(on)
     await issue($, '')
-    expect(nodesOf(await $.ui.render(PANE), 'Button').length).toBe(0)
+    expect(browserButtons(await $.ui.render(PANE)).length).toBe(0)
   })
 })
 
@@ -116,14 +116,14 @@ describe('the button surface', () => {
     vizWorld(on)
     await issue($, MOD)
     const tree = await $.ui.render({ ...PANE, surface: 'desktop' })
-    expect(nodesOf(tree, 'Button').length).toBe(0)
+    expect(browserButtons(tree).length).toBe(0)
     expect(nodesOf(tree, 'Markdown').length).toBe(1)
   })
 
   test('the terminal draws the button', async ($, on) => {
     vizWorld(on)
     await issue($, MOD)
-    expect(nodesOf(await $.ui.render(PANE), 'Button').length).toBe(1)
+    expect(browserButtons(await $.ui.render(PANE)).length).toBe(1)
   })
 })
 
@@ -235,7 +235,7 @@ describe('the press outcome', () => {
     await press($, w)
     const tree = await $.ui.render(PANE)
     expect(stringsIn(tree)).toContain('Rendering in the browser…')
-    expect(nodesOf(tree, 'Button').length).toBe(1)
+    expect(browserButtons(tree).length).toBe(1)
   })
 
   test('a finished render shows the opened page', async ($, on) => {

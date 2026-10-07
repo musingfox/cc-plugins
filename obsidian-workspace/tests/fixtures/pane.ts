@@ -23,6 +23,9 @@ export function nodesOf(node: any, type: string): any[] {
   return [...(node.type === type ? [node] : []), ...kids.flatMap((kid) => nodesOf(kid, type))]
 }
 
+// The Open in browser Buttons: a terminal argument card also carries Bind and Unbind Buttons.
+export const browserButtons = (tree: any) => nodesOf(tree, 'Button').filter((node: any) => node.props.key === 'open-in-browser')
+
 // The header line: one Text whose spans read `status: … · priority: …`.
 export function headerIn(tree: any) {
   return nodesOf(tree, 'Text').find((node) => stringsIn(node).join('').startsWith('status: '))
@@ -85,4 +88,15 @@ export async function press($: any, w: any, key = PRESS.key) {
   const pressed = await $.ui.press({ plugin: 'obw', key })
   await w.clock.settle()
   return pressed
+}
+
+// The world answers ui.invalidate itself, so a mounted drawing redraws only when asked.
+export async function openFirstRow($: any, w: any) {
+  await issue($, '')
+  const m = await mounted($)
+  await m.key({ key: 'down', in: 'board' })
+  await m.key({ key: 'return', in: 'board' })
+  await w.clock.settle()
+  await m.redraw()
+  return m
 }

@@ -39,6 +39,7 @@ type CardRegion =
       vizRoot: string | null
       browser: Browser | null
       diagrams: (string | undefined)[]
+      bindLine: Line | null
     }
 
 type Shown = Extract<CardRegion, { kind: 'shown' }>
@@ -141,7 +142,7 @@ async function show($: any, path: string, origin: Origin = 'argument') {
   const vizRoot = origin === 'list' ? null : await findViz($)
   const header = headerOf(output.frontmatter)
   const segments = splitFences(bounded(output.body).text)
-  put({ kind: 'shown', path, header, body: output.body, segments, vizRoot, browser: null, diagrams: [] })
+  put({ kind: 'shown', path, header, body: output.body, segments, vizRoot, browser: null, diagrams: [], bindLine: null })
   if (origin === 'list') return
   // termaid never holds /issue: an offline uvx can take seconds, and the card is already drawn.
   void drawDiagrams($, request, segments).catch(() => {})
@@ -194,6 +195,15 @@ async function openInBrowser($: any) {
   const status = await runProcess($, SERVE_STATUS_ARGV, SERVE_TIMEOUT_MS)
   const tailnet = status.kind === 'exited' && status.exitCode === 0 ? tailnetUrl(outcome.url, status.stdout) : null
   if (tailnet) showBrowser($, request, { ...outcome, tailnet })
+}
+
+async function bindShown($: any) {
+  const card = state.card
+  const scope = state.scope
+  if (card?.kind !== 'shown' || !scope) return
+  const request = requests
+  const outcome = await writeBinding($, { cardPath: card.path, vault: scope.vault, project: scope.project })
+  patchShown($, request, card => ({ ...card, bindLine: outcome.ok ? null : { kind: 'error', text: `Could not bind: ${outcome.reason}` } }))
 }
 
 // A block without a drawn diagram stays inside the markdown around it, so a pending or failed block reads as code.
@@ -580,6 +590,10 @@ async function drawPane($: any, e: any) {
         ],
       }),
     )
+    if (e.surface === 'terminal' && card.origin === 'argument') {
+      region.push(Button({ key: 'bind', label: 'Bind this session', onPress: () => { void bindShown($).catch(() => {}) } }))
+      if (card.bindLine) region.push(line(card.bindLine))
+    }
     // Only the terminal can run render.sh: `process` is CLI only.
     if (card.vizRoot && e.surface === 'terminal') {
       region.push(

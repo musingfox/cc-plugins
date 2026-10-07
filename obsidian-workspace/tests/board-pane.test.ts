@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { PANE, REFRESH_HINT as HINT, cardSelect, clientNode, expectDrawn, headerIn, issue, mounted, nodesOf, runsOf, stringsIn, uvxRuns, viewSelect, vizWorld } from './fixtures/pane.ts'
+import { PANE, REFRESH_HINT as HINT, cardSelect, clientNode, expectDrawn, headerIn, issue, mounted, nodesOf, openFirstRow, runsOf, stringsIn, uvxRuns, viewSelect, vizWorld } from './fixtures/pane.ts'
 import { CARD, MERMAID_CARD, SESSION, world } from './fixtures/world.ts'
 import { MIX, P } from './fixtures/rows.ts'
 import { RED } from '../hooks/style.ts'
@@ -168,17 +168,6 @@ describe('the /issue result', () => {
     expect(JSON.stringify(result).includes('面板顯示')).toBe(false)
   })
 })
-
-// The world answers ui.invalidate itself, so a mounted drawing redraws only when asked.
-async function openFirstRow($: any, w: any) {
-  await issue($, '')
-  const m = await mounted($)
-  await m.key({ key: 'down', in: 'board' })
-  await m.key({ key: 'return', in: 'board' })
-  await w.clock.settle()
-  await m.redraw()
-  return m
-}
 
 describe('a card opened from the list', () => {
   const TITLE = 'Claude Mod：面板顯示 obw 的 task 與 issue'
