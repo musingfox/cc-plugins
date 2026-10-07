@@ -316,7 +316,7 @@ async function writeBinding($: any, card: Binding): Promise<Outcome> {
   } catch (error) {
     return { ok: false, reason: reasonOf(error) }
   }
-  void showBinding($, card).catch(() => {})
+  await showBinding($, card).catch(() => {})
   return { ok: true }
 }
 

@@ -154,3 +154,47 @@ test('AU7 a done in another vault keeps the binding', async ($, on) => {
   const { w } = await bash($, on, DONE_A.replace('vault=obsidian', 'vault=other'), DONE_OUT, boundTo())
   expect(rmRuns(w)).toEqual([])
 })
+
+test('PT1 a Bash result passes through unchanged', async ($, on) => {
+  const answer = { result: { stdout: 'x', stderr: '', interrupted: false }, text: 'x' }
+  const { result } = await bash($, on, 'echo x', answer)
+  expect(result).toEqual(answer)
+})
+
+test('PT2 an error result passes through unchanged', async ($, on) => {
+  const answer = { isError: true, result: { stdout: '', stderr: 'boom' }, text: 'boom' }
+  const { result } = await bash($, on, 'echo x', answer)
+  expect(result).toEqual(answer)
+})
+
+test('PT3 a denial passes through and writes nothing', async ($, on) => {
+  const { w, result } = await bash($, on, SET_IN_PROGRESS_VIA_VARS, { deny: 'blocked' })
+  expect(result).toEqual({ deny: 'blocked' })
+  expect(w.writes).toEqual([])
+})
+
+test('PT4 a fault in the binding work does not reach the caller', async ($, on) => {
+  const answer = ok(SET('in-progress'))
+  const handler = handlerOf('tool.call', { tool: 'Bash' })
+  const faulty = { session: { cwd: async () => '/work' }, fs: { exists: async () => { throw new Error('EIO') } } }
+  expect(await handler(faulty, { tool: 'Bash', command: 'obsidian property:set name=status value=in-progress file=a | cat' }, async () => answer)).toEqual(answer)
+  await Promise.resolve()
+})
+
+test('PT5 the result does not wait for the binding work', async ($, on) => {
+  const answer = ok(SET('in-progress'))
+  world(on, { env: { HOME: '/Users/u' }, sessionId: 'sid-1', beneath: BENEATH, reads: { 'pm/cc-plugins/tasks/mod-obw-bind-and-band.md': 'defer' } })
+  on('tool.call', { tool: 'Bash' }, () => answer)
+  await $.session.start(SESSION)
+  expect(await $.tool.call({ tool: 'Bash', command: SET_IN_PROGRESS_VIA_VARS })).toEqual(answer)
+})
+
+test('R1 a confirmation only in text is not read when stdout is a string', async ($, on) => {
+  const { w } = await bash($, on, setIn('a'), { result: { stdout: '', stderr: '', interrupted: false }, text: 'Set status: in-progress' })
+  expect(w.writes).toEqual([])
+})
+
+test('AU-R1 a done only in text does not unbind when stdout is a string', async ($, on) => {
+  const { w } = await bash($, on, DONE_A, { result: { stdout: '', stderr: '', interrupted: false }, text: 'Set status: done' }, boundTo())
+  expect(rmRuns(w)).toEqual([])
+})
