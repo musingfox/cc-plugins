@@ -69,7 +69,7 @@ export const EVENTS: Record<string, object> = {
     timeZone: 'UTC',
   },
   'holiday@group.example.test': {
-    events: [{ id: 'e5', summary: '中秋節', status: 'confirmed', start: { date: '2026-09-26' }, end: { date: '2026-09-27' } }],
+    events: [{ id: 'e5', summary: '中秋節', status: 'confirmed', start: { date: '2026-09-26T00:00:00Z' }, end: { date: '2026-09-27T00:00:00Z' } }],
     timeZone: 'Asia/Taipei',
   },
 }

@@ -1,6 +1,6 @@
 {
   "name": "calendar",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "[Experimental] Upcoming Google Calendar events in-session — /cal toggles a band above the prompt with the next 7 days, /cal N for N days (Claude Mod; needs Claude Code 2.1.287+ and the claude.ai Google Calendar connector)",
   "author": {
     "name": "Nick Huang",

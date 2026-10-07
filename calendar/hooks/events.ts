@@ -31,8 +31,10 @@ function timeOf(raw: unknown): CalTime | null {
     const ms = Date.parse(dateTime)
     return Number.isFinite(ms) ? { kind: 'time', ms } : null
   }
+  // The connector spells an all-day date as midnight UTC (`2026-10-09T00:00:00Z`); the
+  // calendar day is the date part, which parsing it as a time would shift west of UTC.
   const date = stringOf(field(raw, 'date'))
-  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? { kind: 'date', date } : null
+  return /^\d{4}-\d{2}-\d{2}(T|$)/.test(date) ? { kind: 'date', date: date.slice(0, 10) } : null
 }
 
 export function calendarsOf(payload: unknown): Calendar[] | null {

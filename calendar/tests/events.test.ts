@@ -41,6 +41,12 @@ describe('eventsOf', () => {
     expect(eventsOf(EVENTS['holiday@group.example.test'])![0]!.start).toEqual({ kind: 'date', date: '2026-09-26' })
   })
 
+  test('an all-day date reads the same bare or spelled as midnight UTC', () => {
+    const startOf = (date: string) => eventsOf({ events: [{ id: 'x', summary: 'A', start: { date } }] })![0]!.start
+    expect(startOf('2026-10-09')).toEqual({ kind: 'date', date: '2026-10-09' })
+    expect(startOf('2026-10-09T00:00:00Z')).toEqual({ kind: 'date', date: '2026-10-09' })
+  })
+
   test('a calendar with no events answers an empty list, not a failure', () => {
     expect(eventsOf({ timeZone: TZ })).toEqual([])
   })
