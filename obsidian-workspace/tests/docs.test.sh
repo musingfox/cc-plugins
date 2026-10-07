@@ -93,3 +93,8 @@ n="$(grep -cF 'termaid@0.9.0' docs/milestones/obw-issue-pane.md || true)"
 [ "$n" -ge 1 ] || fail "obw issue pane milestone must mention termaid@0.9.0"
 n="$(grep -cF "The only other process it starts is the viz plugin's" docs/milestones/obw-issue-pane.md || true)"
 [ "$n" -eq 0 ] || fail "obw issue pane milestone still says render.sh is the only other process"
+
+n="$(awk '/^## Session Writeback/,/^## Prerequisites/' obsidian-workspace/README.md | grep -c '/issue' || true)"
+[ "$n" -ge 1 ] || fail "obw README Session Writeback must mention /issue"
+n="$(awk '/^## Session Writeback/,/^## Prerequisites/' obsidian-workspace/README.md | grep -c 'in-progress' || true)"
+[ "$n" -ge 1 ] || fail "obw README Session Writeback must mention in-progress"

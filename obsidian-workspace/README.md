@@ -41,7 +41,7 @@ The pane needs Claude Code 2.1.287 or later, where Claude Mods are on by default
 
 ## Session Writeback
 
-When cc-mobile starts a Claude session for a task card, it writes `~/.claude-mobile/launches/<session_id>.json` (`cardPath`, `vault`, `project`, `paneId`, `createdAt`). Three hooks in `hooks/hooks.json` run `hooks/writeback.sh` on every prompt, stop and permission prompt of every session; a session without that file leaves in a few milliseconds and touches nothing. For a bound session they write to the card:
+A session is bound to a task card by a file at `~/.claude-mobile/launches/<session_id>.json` (`cardPath`, `vault`, `project`, `createdAt`, plus `paneId` from cc-mobile), or under `$OBW_LAUNCHES_DIR` when that is set. Three things write it: cc-mobile when it starts a session for a card, the **Bind this session** Button under a card opened with `/issue <card>`, and Claude setting a `pm/<project>/tasks/` card's status to `in-progress` once the CLI confirms it. The **Unbind this session** Button, or a confirmed `done` of the bound card, removes it. While bound, the band above the prompt shows the card's name, title and AC x/y, reread after each turn. Three hooks in `hooks/hooks.json` run `hooks/writeback.sh` on every prompt, stop and permission prompt of every session; a session without that file leaves in a few milliseconds and touches nothing. For a bound session they write to the card:
 
 - the first prompt sets `session` and appends `工作中` to `## Agent`;
 - each stop appends the reply's first line, and a longer reply's full text goes to `pm/<project>/runs/<card>.md`, linked from that line;
