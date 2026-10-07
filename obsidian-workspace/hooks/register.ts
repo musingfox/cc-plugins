@@ -618,20 +618,24 @@ export function register(on: On) {
     }
   })
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (!bound) return next(e)
+    if (!bound || e.props?.hasSurvey) return next(e)
     const beneath = await next(e)
-    const { Box, Text } = await $.ui.resolve(e)
-    const { cardPath, card } = bound
-    const title = card?.title
-    const line = Text({
-      wrap: 'truncate-end',
-      children: [
-        Text({ color: 'success', children: ['●'] }),
-        ` ${bounded(cardName(cardPath)).text}`,
-        ...(title ? [`  ${title}`] : []),
-        ...(card?.ac ? [`  ${card.ac}`] : []),
-      ],
-    })
-    return Box({ flexDirection: 'column', children: [line, beneath] })
+    try {
+      const { Box, Text } = await $.ui.resolve(e)
+      const { cardPath, card } = bound
+      const title = card?.title
+      const line = Text({
+        wrap: 'truncate-end',
+        children: [
+          Text({ color: 'success', children: ['●'] }),
+          ` ${bounded(cardName(cardPath)).text}`,
+          ...(title ? [`  ${title}`] : []),
+          ...(card?.ac ? [`  ${card.ac}`] : []),
+        ],
+      })
+      return Box({ flexDirection: 'column', children: [line, beneath] })
+    } catch {
+      return beneath
+    }
   })
 }

@@ -117,3 +117,29 @@ test('BL7 a denied card read draws the name alone', async ($, on) => {
   const w = world(on, boundToA({ beneath: BENEATH, reads: { [A]: { deny: 'process is CLI only' } } }))
   expect(await band($, w)).toEqual(['● a', 'beneath'])
 })
+
+test('BP1 without a binding the band is what the others drew', async ($, on) => {
+  world(on, { env: { HOME: '/Users/u' }, sessionId: 'sid-1', beneath: BENEATH })
+  await $.session.start(SESSION)
+  expect(await $.ui.render(BAND)).toEqual(BENEATH)
+})
+
+test('BP2 during a survey the band is what the others drew', async ($, on) => {
+  const w = world(on, boundToA({ beneath: BENEATH }))
+  await started($, w)
+  expect(await $.ui.render({ ...BAND, props: { ...BAND.props, hasSurvey: true } })).toEqual(BENEATH)
+})
+
+test('BP3 a fault while drawing the line leaves what the others drew', async () => {
+  const faulty = {
+    command: { register: async () => {} },
+    env: { get: async (key: string) => (key === 'HOME' ? '/Users/u' : undefined) },
+    session: { id: async () => 'sid-1' },
+    fs: { exists: async () => true, read: async () => RECORD_A },
+    process: { run: async () => ({ exitCode: 0, stdout: CARD, stderr: '' }) },
+    ui: { invalidate: () => {}, resolve: async () => ({ Box: () => ({}), Text: () => { throw new Error('boom') } }) },
+  }
+  await handlerOf('session.start')(faulty, SESSION, async () => ({}))
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  expect(await handlerOf('ui.render', { component: 'AbovePrompt' })(faulty, BAND, async () => BENEATH)).toEqual(BENEATH)
+})
