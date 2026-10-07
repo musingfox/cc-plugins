@@ -31,3 +31,5 @@ test('a hung dashboard read answers the template views after 60 s', async ($, on
   await done
   expect(viewSelect(await $.ui.render(PANE)).props.options.map((option: any) => option.value)).toEqual(VIEW_NAMES)
 })
+
+test('accepts sessionId, beneath and rm world options', async ($, on) => { expect(() => world(on, { sessionId: 'sid-1', beneath: { type: 'Text', children: ['x'] }, rm: { exitCode: 1 } })).not.toThrow() })

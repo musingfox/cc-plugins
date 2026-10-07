@@ -80,9 +80,9 @@ export async function pick($: any, w: any, key: string, value: string) {
 }
 
 // The kit presses only a Button a render has drawn; the press's async work finishes on settle.
-export async function press($: any, w: any) {
+export async function press($: any, w: any, key = PRESS.key) {
   await $.ui.render(PANE)
-  const pressed = await $.ui.press(PRESS)
+  const pressed = await $.ui.press({ plugin: 'obw', key })
   await w.clock.settle()
   return pressed
 }

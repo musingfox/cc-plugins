@@ -18,6 +18,8 @@ import { vizManifestPath, vizInstallPath, renderTarget, renderArgv, renderOutcom
 import { splitFences, termaidHeaderAllowed, diagramOutcome, TERMAID_ARGV, TERMAID_TIMEOUT_MS } from './mermaid.ts'
 import type { Segment } from './mermaid.ts'
 import { priorityColor, statusColor, RED } from './style.ts'
+import { bindingOf, bindingPath, sameBinding } from './bind.ts'
+import type { Binding } from './bind.ts'
 
 const PANE = { id: PANE_ID, title: 'obw issue', focus: true, closeOnEscape: true } as const
 
@@ -80,6 +82,13 @@ const LOADING: PaneState = {
 let state: PaneState = LOADING
 // A CLI call can settle after a newer /issue or card read started; only the latest request writes the state.
 let requests = 0
+
+// A binding file may carry no project, which a card path can still name.
+type Stored = Omit<Binding, 'project'> & { project: string | null }
+type Bound = Stored & { card: { title: string | null; ac: string | null } | null }
+
+// The session's binding as loaded from its file; null while the session has none.
+let bound: Bound | null = null
 
 async function runProcess($: any, argv: string[], timeoutMs = OBSIDIAN_TIMEOUT_MS, stdin?: string): Promise<Run> {
   try {
@@ -249,6 +258,51 @@ async function resolveConfig($: any): Promise<Config> {
     if (await $.fs.exists(path)) return readConfig($, path)
     if (dir === '/') return { error: `No .obsidian.yaml in ${cwd} or any directory above it.` }
   }
+}
+
+const NO_BINDING_DIR = 'neither OBW_LAUNCHES_DIR nor HOME is set.'
+const RELATIVE_BINDING_DIR = 'OBW_LAUNCHES_DIR or HOME is not an absolute path.'
+
+async function bindingFile($: any): Promise<{ path: string | null; reason: string }> {
+  const launchesDir = await $.env.get('OBW_LAUNCHES_DIR')
+  const home = await $.env.get('HOME')
+  const path = bindingPath(launchesDir || undefined, home || undefined, await $.session.id())
+  return { path, reason: launchesDir || home ? RELATIVE_BINDING_DIR : NO_BINDING_DIR }
+}
+
+function clearBinding($: any) {
+  if (!bound) return
+  bound = null
+  invalidate($)
+}
+
+// The card read patches only the binding it was started for: a later binding, or none, drops it.
+async function showBinding($: any, record: Stored) {
+  const mine: Bound = { ...record, card: bound && sameBinding(bound, record) ? bound.card : null }
+  bound = mine
+  invalidate($)
+  if (!record.project) return
+  const built = cardPathArgv({ vault: record.vault, project: record.project }, record.cardPath)
+  if (!('argv' in built)) return
+  const output = readOutput(await runProcess($, built.argv))
+  if (bound !== mine) return
+  if (output.kind !== 'card') {
+    bound = { ...mine, card: null }
+    invalidate($)
+    return
+  }
+  const title = headerOf(output.frontmatter).title
+  bound = { ...mine, card: { title: title ? bounded(title).text || null : null, ac: acLabel(output.body) } }
+  invalidate($)
+}
+
+async function loadBinding($: any) {
+  const { path } = await bindingFile($)
+  if (!path) return
+  if (!(await $.fs.exists(path))) return clearBinding($)
+  const record = bindingOf(await $.fs.read(path))
+  if (!record) return clearBinding($)
+  await showBinding($, record)
 }
 
 // The only writer of this hint: a dashboard the CLI could not read may simply not exist yet, while a
@@ -516,6 +570,7 @@ export function register(on: On) {
     } catch {
       // A refused /issue must not stop the session.
     }
+    void loadBinding($).catch(() => {})
     return next(e)
   })
 

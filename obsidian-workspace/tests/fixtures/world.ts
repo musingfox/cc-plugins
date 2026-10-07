@@ -57,11 +57,15 @@ export type WorldOptions = {
   render?: CliAnswer
   termaid?: CliAnswer
   serve?: CliAnswer
+  sessionId?: string
+  beneath?: unknown
+  rm?: CliAnswer
 }
 
 export function kindOf(argv: string[]) {
   if (argv[0] === 'uvx') return 'termaid'
   if (argv[0] === 'tailscale') return 'serve'
+  if (argv[0] === 'rm') return 'rm'
   if (argv[0] !== 'obsidian') return 'render'
   if (argv[2] === 'read' && argv[3]?.startsWith('path=') && argv[3].endsWith('/dashboard.base')) return 'views'
   return argv[2]
@@ -77,9 +81,11 @@ function readAnswer(reads: Record<string, CliAnswer>, argv: string[]): CliAnswer
 // A stub world beneath the plugin: every $ call it makes is answered and recorded here.
 // A dashboard `read` of `…/dashboard.base` is answered by `views` (before `reads`), `base:query` by `query`,
 // other `read` runs by `read`/`reads`, `uvx` by `termaid`, `tailscale` by `serve` (denied unless given), any other run by `render`.
-// `$.env.get` is answered only when `env` is given; without it the call rejects.
+// `$.env.get` is answered only when `env` is given; without it the call rejects; `$.session.id` likewise answers only with `sessionId`.
+// `rm` runs are answered by `rm` (exit 0 by default) and an exit-0 answer deletes argv[2] from `files`, which is live.
+// `beneath` is what the AbovePrompt hooks below the plugin draw.
 export function world(on: any, options: WorldOptions = {}) {
-  for (const key of Object.keys(options)) if (!['cwd', 'files', 'exists', 'views', 'query', 'read', 'reads', 'register', 'open', 'env', 'write', 'render', 'termaid', 'serve'].includes(key)) throw new Error(`stale world option: ${key}`)
+  for (const key of Object.keys(options)) if (!['cwd', 'files', 'exists', 'views', 'query', 'read', 'reads', 'register', 'open', 'env', 'write', 'render', 'termaid', 'serve', 'sessionId', 'beneath', 'rm'].includes(key)) throw new Error(`stale world option: ${key}`)
   const runs: any[] = []
   const existsCalls: string[] = []
   const readCalls: string[] = []
@@ -88,12 +94,13 @@ export function world(on: any, options: WorldOptions = {}) {
   const writes: { path: string; text: string }[] = []
   const state = { invalidates: 0 }
   const deferred = new Map<number, (stdout: string) => void>()
-  const files = options.files ?? { '/work/.obsidian.yaml': CONFIG }
+  const files: Record<string, string | { deny: string }> = { ...(options.files ?? { '/work/.obsidian.yaml': CONFIG }) }
   const answers: Record<string, CliAnswer> = {
     views: options.views ?? VIEWS,
     'base:query': options.query ?? LIST,
     read: options.read ?? CARD,
     render: options.render ?? RENDERED,
+    rm: options.rm ?? '',
     termaid: options.termaid ?? DIAGRAM,
     ...(options.serve === undefined ? {} : { serve: options.serve }),
   }
@@ -102,6 +109,9 @@ export function world(on: any, options: WorldOptions = {}) {
   on('session.start', ($: any, e: any) => ({ cwd: e.cwd }))
   const clock = mock.clock(on)
   if (options.env) mock.env(on, options.env)
+  if (options.sessionId !== undefined) on('session.id', () => ({ value: options.sessionId }))
+  on('turn.complete', () => ({ text: '' }))
+  on('ui.render', { component: 'AbovePrompt' }, () => options.beneath ?? { type: 'Box', children: [] })
   on('session.cwd', () => ({ value: options.cwd ?? '/work' }))
   on('fs.exists', ($: any, e: any) => {
     existsCalls.push(e.path)
@@ -116,7 +126,9 @@ export function world(on: any, options: WorldOptions = {}) {
   })
   on('fs.write', ($: any, e: any) => {
     writes.push({ path: e.path, text: e.text })
-    return options.write ?? { value: undefined }
+    if (options.write) return options.write
+    files[e.path] = e.text
+    return { value: undefined }
   })
   on('command.register', ($: any, e: any) => {
     registered.push(e)
@@ -143,8 +155,12 @@ export function world(on: any, options: WorldOptions = {}) {
       await clock.sleep(60000)
       return { value: { exitCode: 0, stdout: defaults[verb], stderr: '' } }
     }
-    if (typeof answer === 'string') return { value: { exitCode: 0, stdout: answer, stderr: '' } }
+    if (typeof answer === 'string') {
+      if (verb === 'rm') delete files[e.argv[2]]
+      return { value: { exitCode: 0, stdout: answer, stderr: '' } }
+    }
     if ('deny' in answer) return { deny: answer.deny }
+    if (verb === 'rm' && answer.exitCode === 0) delete files[e.argv[2]]
     return { value: { stdout: '', stderr: '', ...answer } }
   })
 
@@ -156,6 +172,7 @@ export function world(on: any, options: WorldOptions = {}) {
     opened,
     registered,
     writes,
+    files,
     release(run: number, stdout: string) {
       deferred.get(run)!(stdout)
     },
