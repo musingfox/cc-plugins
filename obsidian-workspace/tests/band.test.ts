@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
-import { CONFIG_PATH } from './fixtures/pane.ts'
+import { BAND, bandLines, bandRows, handlerOf } from './fixtures/band.ts'
+import { CONFIG_PATH, nodesOf, stringsIn } from './fixtures/pane.ts'
 import { CARD, CONFIG, SESSION, world } from './fixtures/world.ts'
 
 const BIND = '/Users/u/.claude-mobile/launches/sid-1.json'
@@ -11,6 +12,10 @@ const boundToA = (extra: any = {}) => ({
   reads: { 'pm/cc-plugins/tasks/a.md': CARD },
   ...extra,
 })
+const BENEATH = { type: 'Text', children: ['beneath'] }
+const A = 'pm/cc-plugins/tasks/a.md'
+const TITLE = 'Claude Mod：面板顯示 obw 的 task 與 issue'
+
 const started = async ($: any, w: any) => {
   await $.session.start(SESSION)
   await w.clock.settle()
@@ -62,4 +67,53 @@ test('S7 the path is not built before the session id resolves', async ($, on) =>
   const w = world(on, { env: { HOME: '/Users/u' } })
   await started($, w)
   expect(w.existsCalls).toEqual([])
+})
+
+const BOUND_LINES = [`● a  ${TITLE}  AC 0/1`, 'beneath']
+const band = async ($: any, w: any) => {
+  await started($, w)
+  return bandLines($)
+}
+
+test('BL1 a bound session draws its card above the prompt', async ($, on) => {
+  const w = world(on, boundToA({ beneath: BENEATH }))
+  expect(await band($, w)).toEqual(BOUND_LINES)
+  const tree = await $.ui.render(BAND)
+  expect(nodesOf(tree, 'Text').find((node) => stringsIn(node).join('') === '●').props.color).toBe('success')
+  expect(bandRows(tree)[0].props.wrap).toBe('truncate-end')
+})
+
+test('BL2 a failed card read draws the name alone', async ($, on) => {
+  const w = world(on, boundToA({ beneath: BENEATH, reads: {} }))
+  expect(await band($, w)).toEqual(['● a', 'beneath'])
+})
+
+test('BL3 a card without AC draws its title alone', async ($, on) => {
+  const w = world(on, boundToA({ beneath: BENEATH, reads: { [A]: '---\ntitle: t\n---\n# t\n' } }))
+  expect(await band($, w)).toEqual(['● a  t', 'beneath'])
+})
+
+test('BL4 a card read still running draws the name, then the card', async ($, on) => {
+  const w = world(on, boundToA({ beneath: BENEATH, reads: { [A]: 'defer' } }))
+  await started($, w)
+  expect(await bandLines($)).toEqual(['● a', 'beneath'])
+  w.release(0, CARD)
+  await w.clock.settle()
+  expect(await bandLines($)).toEqual(BOUND_LINES)
+})
+
+test('BL5 control characters in a title are stripped', async ($, on) => {
+  const w = world(on, boundToA({ beneath: BENEATH, reads: { [A]: CARD.replace(TITLE, 'x\u0007y') } }))
+  expect((await band($, w))[0]).toMatch(/^● a {2}xy/)
+})
+
+test('BL6 a cc-mobile binding with extra fields draws the same line', async ($, on) => {
+  const record = '{"cardPath":"pm/cc-plugins/tasks/a.md","vault":"obsidian","project":"cc-plugins","paneId":"%12","createdAt":"2026-10-07T01:00:00Z"}'
+  const w = world(on, boundToA({ beneath: BENEATH, files: { [CONFIG_PATH]: CONFIG, [BIND]: record } }))
+  expect(await band($, w)).toEqual(BOUND_LINES)
+})
+
+test('BL7 a denied card read draws the name alone', async ($, on) => {
+  const w = world(on, boundToA({ beneath: BENEATH, reads: { [A]: { deny: 'process is CLI only' } } }))
+  expect(await band($, w)).toEqual(['● a', 'beneath'])
 })
