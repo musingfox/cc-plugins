@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 import { BAND, bandLines, bandRows, handlerOf } from './fixtures/band.ts'
-import { CONFIG_PATH, nodesOf, stringsIn } from './fixtures/pane.ts'
+import { CONFIG_PATH, nodesOf, runsOf, stringsIn } from './fixtures/pane.ts'
 import { CARD, CONFIG, SESSION, world } from './fixtures/world.ts'
 
 const BIND = '/Users/u/.claude-mobile/launches/sid-1.json'
@@ -142,4 +142,92 @@ test('BP3 a fault while drawing the line leaves what the others drew', async () 
   await handlerOf('session.start')(faulty, SESSION, async () => ({}))
   await new Promise((resolve) => setTimeout(resolve, 0))
   expect(await handlerOf('ui.render', { component: 'AbovePrompt' })(faulty, BAND, async () => BENEATH)).toEqual(BENEATH)
+})
+
+test('BL-R2 a card re-read of the same binding still running keeps the previous title and AC', async ($, on) => {
+  const reads: Record<string, string> = { [A]: CARD }
+  const w = world(on, boundToA({ beneath: BENEATH, reads }))
+  await started($, w)
+  reads[A] = 'defer'
+  await $.turn.complete(TURN)
+  await w.clock.settle()
+  expect(await bandLines($)).toEqual(BOUND_LINES)
+})
+
+test('BL-R2 a card read of a different binding still running draws the name alone', async ($, on) => {
+  const reads: Record<string, string> = { [A]: CARD }
+  const w = world(on, boundToA({ beneath: BENEATH, reads }))
+  await started($, w)
+  reads['pm/cc-plugins/tasks/b.md'] = 'defer'
+  w.files[BIND] = RECORD_A.replace('tasks/a.md', 'tasks/b.md')
+  await $.turn.complete(TURN)
+  await w.clock.settle()
+  expect(await bandLines($)).toEqual(['● b', 'beneath'])
+})
+
+test('S-R1 a repeated session start whose card read fails draws the name alone', async ($, on) => {
+  const reads: Record<string, string> = { [A]: CARD }
+  const w = world(on, boundToA({ beneath: BENEATH, reads }))
+  await started($, w)
+  delete reads[A]
+  await started($, w)
+  expect(await bandLines($)).toEqual(['● a', 'beneath'])
+})
+
+const TURN = { answer: '', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' } as const
+const CARD_DONE = CARD.replace('- [ ] one', '- [x] one')
+
+test('R1 a turn reloads the card so AC follows it', async ($, on) => {
+  const reads: Record<string, string> = { [A]: CARD }
+  const w = world(on, boundToA({ beneath: BENEATH, reads }))
+  await started($, w)
+  reads[A] = CARD_DONE
+  await $.turn.complete(TURN)
+  await w.clock.settle()
+  expect((await bandLines($))[0]).toMatch(/AC 1\/1$/)
+})
+
+test('RT-R2 a subagent turn reloads nothing', async ($, on) => {
+  const reads: Record<string, string> = { [A]: CARD }
+  const w = world(on, boundToA({ beneath: BENEATH, reads }))
+  await started($, w)
+  const before = runsOf(w, 'read').length
+  reads[A] = CARD_DONE
+  await $.turn.complete({ ...TURN, agentId: 'sub-1' })
+  await w.clock.settle()
+  expect(runsOf(w, 'read')).toHaveLength(before)
+  expect((await bandLines($))[0]).toMatch(/AC 0\/1$/)
+})
+
+test('R3 a turn result passes through', async ($, on) => {
+  world(on, boundToA())
+  expect(await $.turn.complete(TURN)).toEqual({ text: '' })
+})
+
+test('R4 a binding file removed between turns clears the band', async ($, on) => {
+  const w = world(on, boundToA({ beneath: BENEATH }))
+  await started($, w)
+  delete w.files[BIND]
+  await $.turn.complete(TURN)
+  await w.clock.settle()
+  expect(await $.ui.render(BAND)).toEqual(BENEATH)
+})
+
+test('R5 a binding file written between turns shows on the next turn', async ($, on) => {
+  const w = world(on, boundToA({ beneath: BENEATH, files: { [CONFIG_PATH]: CONFIG } }))
+  await started($, w)
+  w.files[BIND] = RECORD_A
+  await $.turn.complete(TURN)
+  await w.clock.settle()
+  expect(await bandLines($)).toEqual(BOUND_LINES)
+})
+
+test('R6 a turn whose card re-read fails draws the name alone', async ($, on) => {
+  const reads: Record<string, string> = { [A]: CARD }
+  const w = world(on, boundToA({ beneath: BENEATH, reads }))
+  await started($, w)
+  delete reads[A]
+  await $.turn.complete(TURN)
+  await w.clock.settle()
+  expect(await bandLines($)).toEqual(['● a', 'beneath'])
 })

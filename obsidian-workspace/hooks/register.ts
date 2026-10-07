@@ -617,6 +617,12 @@ export function register(on: On) {
       }
     }
   })
+  on('turn.complete', async ($, e, next) => {
+    const result = await next(e)
+    if (e.agentId === undefined) void loadBinding($).catch(() => {})
+    return result
+  })
+
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (!bound || e.props?.hasSurvey) return next(e)
     const beneath = await next(e)
