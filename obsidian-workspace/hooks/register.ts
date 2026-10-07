@@ -206,6 +206,12 @@ async function bindShown($: any) {
   patchShown($, request, card => ({ ...card, bindLine: outcome.ok ? null : { kind: 'error', text: `Could not bind: ${outcome.reason}` } }))
 }
 
+async function unbindShown($: any) {
+  const request = requests
+  const outcome = await removeBinding($)
+  patchShown($, request, card => ({ ...card, bindLine: outcome.ok ? null : { kind: 'error', text: `Could not unbind: ${outcome.reason}` } }))
+}
+
 // A block without a drawn diagram stays inside the markdown around it, so a pending or failed block reads as code.
 function bodyParts(segments: Segment[], diagrams: (string | undefined)[]): ({ markdown: string } | { diagram: string })[] {
   if (!diagrams.some(Boolean)) return [{ markdown: segments.map(segment => segment.text).join('') }]
@@ -592,6 +598,9 @@ async function drawPane($: any, e: any) {
     )
     if (e.surface === 'terminal' && card.origin === 'argument') {
       region.push(Button({ key: 'bind', label: 'Bind this session', onPress: () => { void bindShown($).catch(() => {}) } }))
+      if (bound && state.scope && sameBinding(bound, { cardPath: card.path, vault: state.scope.vault })) {
+        region.push(Button({ key: 'unbind', label: 'Unbind this session', onPress: () => { void unbindShown($).catch(() => {}) } }))
+      }
       if (card.bindLine) region.push(line(card.bindLine))
     }
     // Only the terminal can run render.sh: `process` is CLI only.
