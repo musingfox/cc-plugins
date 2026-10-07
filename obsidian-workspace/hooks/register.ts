@@ -18,7 +18,7 @@ import { vizManifestPath, vizInstallPath, renderTarget, renderArgv, renderOutcom
 import { splitFences, termaidHeaderAllowed, diagramOutcome, TERMAID_ARGV, TERMAID_TIMEOUT_MS } from './mermaid.ts'
 import type { Segment } from './mermaid.ts'
 import { priorityColor, statusColor, RED } from './style.ts'
-import { bindingOf, bindingPath, sameBinding } from './bind.ts'
+import { bindingAction, bindingOf, bindingPath, sameBinding, statusChanges } from './bind.ts'
 import type { Binding } from './bind.ts'
 
 const PANE = { id: PANE_ID, title: 'obw issue', focus: true, closeOnEscape: true } as const
@@ -303,6 +303,41 @@ async function loadBinding($: any) {
   const record = bindingOf(await $.fs.read(path))
   if (!record) return clearBinding($)
   await showBinding($, record)
+}
+
+type Outcome = { ok: true } | { ok: false; reason: string }
+
+async function writeBinding($: any, card: Binding): Promise<Outcome> {
+  try {
+    const { path, reason } = await bindingFile($)
+    if (!path) return { ok: false, reason }
+    const createdAt = new Date(await $.clock.now()).toISOString()
+    await $.fs.write(path, `${JSON.stringify({ cardPath: card.cardPath, vault: card.vault, project: card.project, createdAt })}\n`)
+  } catch (error) {
+    return { ok: false, reason: reasonOf(error) }
+  }
+  void showBinding($, card).catch(() => {})
+  return { ok: true }
+}
+
+// What Claude's Bash result says: the tool's stdout, or the text the model reads when stdout is not a string.
+function outputOf(result: any): string {
+  const stdout = result?.result?.stdout
+  if (typeof stdout === 'string') return stdout
+  return typeof result?.text === 'string' ? result.text : ''
+}
+
+async function followStatus($: any, command: unknown, output: string) {
+  if (typeof command !== 'string') return
+  const changes = statusChanges(command, output)
+  if (!changes.length) return
+  let config: Scope | null = null
+  if (changes.some(change => change.vault === null || 'file' in change.target)) {
+    const found = await resolveConfig($)
+    if (!('error' in found)) config = { vault: found.vault, project: found.project }
+  }
+  const action = bindingAction(changes, config, bound)
+  if (action?.kind === 'bind') await writeBinding($, action.card)
 }
 
 // The only writer of this hint: a dashboard the CLI could not read may simply not exist yet, while a
@@ -617,6 +652,12 @@ export function register(on: On) {
       }
     }
   })
+  on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
+    const result = await next(e)
+    void followStatus($, e.command, outputOf(result)).catch(() => {})
+    return result
+  })
+
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
     if (e.agentId === undefined) void loadBinding($).catch(() => {})
