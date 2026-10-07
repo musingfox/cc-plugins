@@ -327,6 +327,22 @@ function outputOf(result: any): string {
   return typeof result?.text === 'string' ? result.text : ''
 }
 
+async function removeBinding($: any): Promise<Outcome> {
+  let file: { path: string | null; reason: string }
+  try {
+    file = await bindingFile($)
+  } catch (error) {
+    return { ok: false, reason: reasonOf(error) }
+  }
+  const { path } = file
+  if (!path) return { ok: false, reason: file.reason }
+  const run = await runProcess($, ['rm', '-f', path])
+  if (run.kind === 'rejected') return { ok: false, reason: 'rm did not run.' }
+  if (run.exitCode !== 0) return { ok: false, reason: run.stderr.trim() || `rm exited ${run.exitCode}` }
+  clearBinding($)
+  return { ok: true }
+}
+
 async function followStatus($: any, command: unknown, output: string) {
   if (typeof command !== 'string') return
   const changes = statusChanges(command, output)
@@ -338,6 +354,7 @@ async function followStatus($: any, command: unknown, output: string) {
   }
   const action = bindingAction(changes, config, bound)
   if (action?.kind === 'bind') await writeBinding($, action.card)
+  else if (action?.kind === 'unbind') await removeBinding($)
 }
 
 // The only writer of this hint: a dashboard the CLI could not read may simply not exist yet, while a

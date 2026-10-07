@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 import { BAND, bandLines, handlerOf } from './fixtures/band.ts'
-import { SESSION, world } from './fixtures/world.ts'
+import { CARD, SESSION, world } from './fixtures/world.ts'
 
 const BIND = '/Users/u/.claude-mobile/launches/sid-1.json'
 const BENEATH = { type: 'Text', children: ['beneath'] }
@@ -97,4 +97,60 @@ test('AB10 an error result that still printed the confirmation binds', async ($,
 test('AB11 OBW_LAUNCHES_DIR moves the binding file', async ($, on) => {
   const { w } = await bash($, on, SET_IN_PROGRESS_VIA_VARS, ok(SET('in-progress')), { env: { HOME: '/Users/u', OBW_LAUNCHES_DIR: '/alt' } })
   expect(w.writes.map((write: any) => write.path)).toEqual(['/alt/sid-1.json'])
+})
+
+const RECORD_A = '{"cardPath":"pm/cc-plugins/tasks/a.md","vault":"obsidian","project":"cc-plugins","createdAt":"2026-10-07T00:00:00.000Z"}'
+const DONE_A = 'obsidian vault=obsidian property:set path="pm/cc-plugins/tasks/a.md" name=status value=done | cat'
+const DONE_OUT = ok('Set status: done\nSet completed: 2026-10-06\n')
+const RM = ['rm', '-f', BIND]
+// A world already bound to card a.
+const boundTo = (options: any = {}) => ({ files: { '/work/.obsidian.yaml': 'vault: obsidian\npm:\n  project: cc-plugins\n', [BIND]: RECORD_A }, ...options })
+const rmRuns = (w: any) => w.runs.filter((run: any) => run.argv[0] === 'rm')
+
+test('AU1 a confirmed done on the bound card removes the binding', async ($, on) => {
+  const { w } = await bash($, on, DONE_A, DONE_OUT, boundTo())
+  expect(w.runs.map((run: any) => run.argv)).toContainEqual(RM)
+  expect(await $.ui.render(BAND)).toEqual(BENEATH)
+  expect(BIND in w.files).toBe(false)
+})
+
+test('AU2 a confirmed done on another card keeps the binding', async ($, on) => {
+  const { w } = await bash($, on, DONE_A.replace('/a.md', '/b.md'), DONE_OUT, boundTo())
+  expect(rmRuns(w)).toEqual([])
+  expect((await bandLines($))[0]).toMatch(/^● a {2}Claude Mod：面板顯示 obw 的 task 與 issue {2}AC 0\/1$/)
+})
+
+test('AU3 an unconfirmed done keeps the binding', async ($, on) => {
+  const { w } = await bash($, on, DONE_A, ok('Error: File "pm/cc-plugins/tasks/a.md" not found.\n'), boundTo())
+  expect(rmRuns(w)).toEqual([])
+})
+
+test('AU4 a move without a confirmed done keeps the binding', async ($, on) => {
+  const { w } = await bash($, on, 'obsidian vault=obsidian move path="pm/cc-plugins/tasks/a.md" to="pm/cc-plugins/tasks/archive"', ok('Moved to: pm/cc-plugins/tasks/archive/a.md\n'), boundTo())
+  expect(rmRuns(w)).toEqual([])
+})
+
+test('AU5 a failed rm keeps the binding', async ($, on) => {
+  await bash($, on, DONE_A, DONE_OUT, boundTo({ rm: { exitCode: 1, stderr: 'denied' } }))
+  expect((await bandLines($))[0]).toMatch(/^● a/)
+})
+
+test('AU6 a card read still running cannot restore an unbound session', async ($, on) => {
+  const w = world(on, { env: { HOME: '/Users/u' }, sessionId: 'sid-1', beneath: BENEATH, reads: { 'pm/cc-plugins/tasks/a.md': 'defer' } })
+  let answer: any = ok(SET('in-progress'))
+  on('tool.call', { tool: 'Bash' }, () => answer)
+  await $.session.start(SESSION)
+  await $.tool.call({ tool: 'Bash', command: setIn('a') })
+  await w.clock.settle()
+  answer = DONE_OUT
+  await $.tool.call({ tool: 'Bash', command: DONE_A })
+  await w.clock.settle()
+  w.release(0, CARD)
+  await w.clock.settle()
+  expect(await $.ui.render(BAND)).toEqual(BENEATH)
+})
+
+test('AU7 a done in another vault keeps the binding', async ($, on) => {
+  const { w } = await bash($, on, DONE_A.replace('vault=obsidian', 'vault=other'), DONE_OUT, boundTo())
+  expect(rmRuns(w)).toEqual([])
 })
