@@ -1,5 +1,5 @@
 import type { On } from 'claude-code'
-import { calModelOf } from './cal-model.ts'
+import { CALENDAR_BUTTON, calModelOf, URL_BUTTON } from './cal-model.ts'
 import type { CalView } from './cal-model.ts'
 import { calendarsOf, eventsOf, payloadOf, wantedOf } from './events.ts'
 import type { CalEvent } from './events.ts'
@@ -100,25 +100,35 @@ async function showBand($: any, on: boolean) {
 const DAY_COLOR = '#5b9cf5'
 const NEXT_COLOR = '#46a758'
 
+// The engine has no call that opens a URL, and a Link the terminal cannot open prints its URL.
+function openUrl($: any, url: string) {
+  return $.process.run(['open', url]).catch(() => $.process.run(['xdg-open', url]))
+}
+
 async function renderBand($: any, e: any, beneath: unknown) {
-  const { Box, Text, Link } = await $.ui.resolve(e)
-  const linked = (text: string, href: string | null) => (href ? Link({ href, children: [text] }) : text)
+  const { Box, Text, Link, Button } = await $.ui.resolve(e)
+  // Only the terminal can run a command: `process` is CLI only.
+  const button = (key: string, label: string, href: string) =>
+    e.surface === 'terminal'
+      ? Button({ key, label, onPress: () => void openUrl($, href).catch(() => {}) })
+      : Text({ children: [Link({ href, children: [`[ ${label} ]`] })] })
   const tz = (await $.env.get('TZ')) || Intl.DateTimeFormat().resolvedOptions().timeZone
   const model = calModelOf(view, await $.clock.now(), tz)
   const room = Math.max(1, (e.props.maxRows ?? 10) - (model.notice ? 1 : 0))
   const hidden = model.rows.length > room ? model.rows.length - room + 1 : 0
   const lines = []
   if (model.notice) lines.push(Text({ dimColor: true, wrap: 'truncate-end', children: [model.notice] }))
-  for (const row of hidden ? model.rows.slice(0, room - 1) : model.rows) {
-    const title = linked(row.title, row.eventHref)
+  for (const [i, row] of (hidden ? model.rows.slice(0, room - 1) : model.rows).entries()) {
     const children = [
-      Text({ color: DAY_COLOR, children: [linked(row.day, row.dayHref)] }),
+      Text({ color: DAY_COLOR, children: [row.day] }),
       `  ${row.span}  `,
-      row.isNext ? Text({ color: NEXT_COLOR, bold: true, children: [title] }) : title,
+      row.isNext ? Text({ color: NEXT_COLOR, bold: true, children: [row.title] }) : row.title,
     ]
-    if (row.location) children.push(Text({ dimColor: true, children: ['  ', linked(`@${row.location}`, row.locationHref)] }))
+    if (row.location) children.push(Text({ dimColor: true, children: [`  @${row.location}`] }))
     if (row.note) children.push(Text({ color: NEXT_COLOR, children: [`  ${row.note}`] }))
-    lines.push(Text({ wrap: 'truncate-end', children }))
+    const buttons = [button(`calendar-${i}`, CALENDAR_BUTTON, row.calendarHref)]
+    if (row.urlHref) buttons.push(button(`url-${i}`, URL_BUTTON, row.urlHref))
+    lines.push(Box({ flexDirection: 'row', gap: 2, children: [Text({ wrap: 'truncate-end', children }), ...buttons] }))
   }
   if (hidden) lines.push(Text({ dimColor: true, children: [`… ${hidden} more`] }))
   if (beneath) lines.push(beneath)

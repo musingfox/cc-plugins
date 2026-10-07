@@ -1,6 +1,6 @@
 export type CalTime = { kind: 'date'; date: string } | { kind: 'time'; ms: number }
 
-export type CalEvent = { id: string; title: string; location: string; link: string; start: CalTime; end: CalTime | null }
+export type CalEvent = { id: string; title: string; location: string; link: string; url: string; start: CalTime; end: CalTime | null }
 
 export type Calendar = { id: string; name: string }
 
@@ -37,6 +37,14 @@ function timeOf(raw: unknown): CalTime | null {
   return /^\d{4}-\d{2}-\d{2}(T|$)/.test(date) ? { kind: 'date', date: date.slice(0, 10) } : null
 }
 
+// A meeting's join link, or a location that is itself a link.
+function urlOf(raw: unknown): string {
+  const entryPoints = field(field(raw, 'conferenceData'), 'entryPoints')
+  const video = Array.isArray(entryPoints) ? entryPoints.find((p) => field(p, 'entryPointType') === 'video') : undefined
+  const location = stringOf(field(raw, 'location'))
+  return stringOf(field(raw, 'hangoutLink')) || stringOf(field(video, 'uri')) || (/^https:\/\//.test(location) ? location : '')
+}
+
 export function calendarsOf(payload: unknown): Calendar[] | null {
   const list = field(payload, 'calendars')
   if (!Array.isArray(list)) return null
@@ -60,6 +68,7 @@ export function eventsOf(payload: unknown): CalEvent[] | null {
         title: stringOf(field(raw, 'summary')) || '(no title)',
         location: stringOf(field(raw, 'location')),
         link: stringOf(field(raw, 'htmlLink')),
+        url: urlOf(raw),
         start,
         end: timeOf(field(raw, 'end')),
       },

@@ -46,6 +46,7 @@ export const EVENTS: Record<string, object> = {
       {
         id: 'e2',
         summary: 'Trip',
+        location: 'https://zoom.example.test/j/123',
         status: 'confirmed',
         start: { dateTime: '2026-09-27T22:00:00+08:00' },
         end: { dateTime: '2026-09-28T01:30:00+08:00' },
@@ -61,6 +62,7 @@ export const EVENTS: Record<string, object> = {
         id: 'e4',
         summary: 'Dinner',
         location: 'Home',
+        hangoutLink: 'https://meet.google.com/abc-defg-hij',
         status: 'confirmed',
         start: { dateTime: '2026-09-28T10:00:00Z' },
         end: { dateTime: '2026-09-28T13:00:00Z' },
@@ -75,10 +77,10 @@ export const EVENTS: Record<string, object> = {
 }
 
 export const BAND_LINES = [
-  '今天      14:00–15:00        Dentist  @Clinic  還有 4h',
-  '明天      全天               中秋節',
-  '09/27 日  22:00–09/28 01:30  Trip',
-  '09/28 一  18:00–21:00        Dinner  @Home',
+  '今天      14:00–15:00        Dentist  @Clinic  還有 4h  [ 日曆 ]',
+  '明天      全天               中秋節  [ 日曆 ]',
+  '09/27 日  22:00–09/28 01:30  Trip  [ 日曆 ]  [ 連結 ]',
+  '09/28 一  18:00–21:00        Dinner  @Home  [ 日曆 ]  [ 連結 ]',
 ]
 
 export function answer(payload: unknown) {
@@ -97,6 +99,7 @@ export type WorldOptions = {
 // A stub world beneath the plugin: every $ call it makes is answered and recorded here.
 export function world(on: any, options: WorldOptions = {}) {
   const calls: any[] = []
+  const runs: string[][] = []
   const state = { invalidates: 0 }
 
   on('session.start', ($: any, e: any) => ({ cwd: e.cwd }))
@@ -118,6 +121,10 @@ export function world(on: any, options: WorldOptions = {}) {
       }),
   )
   on('ui.render', { component: 'AbovePrompt' }, () => options.beneath ?? { type: 'Box', children: [] })
+  on('process.run', ($: any, e: any) => {
+    runs.push([...e.argv])
+    return { value: { exitCode: 0, stdout: '', stderr: '' } }
+  })
   on('ui.invalidate', () => {
     state.invalidates += 1
     return { value: undefined }
@@ -126,6 +133,7 @@ export function world(on: any, options: WorldOptions = {}) {
   return {
     clock,
     calls,
+    runs,
     get invalidates() {
       return state.invalidates
     },

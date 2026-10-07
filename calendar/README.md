@@ -32,10 +32,10 @@ that in mind.
 One line per event, soonest first, in the machine's time zone (`TZ` when set):
 
 ```
-今天      14:00–15:00        Dentist  @Clinic  還有 4h
-明天      全天               中秋節
-09/27 日  22:00–09/28 01:30  Trip
-09/28 一  18:00–21:00        Dinner  @Home
+今天      14:00–15:00        Dentist  @Clinic  還有 4h  [ 日曆 ]
+明天      全天               中秋節  [ 日曆 ]
+09/27 日  22:00–09/28 01:30  Trip  [ 日曆 ]  [ 連結 ]
+09/28 一  18:00–21:00        Dinner  @Home  [ 日曆 ]  [ 連結 ]
 ```
 
 - The day reads `今天`, `明天`, or `MM/DD <weekday>`, in blue.
@@ -44,10 +44,12 @@ One line per event, soonest first, in the machine's time zone (`TZ` when set):
 - The first timed event (the one under way, or the next to start) has its title in bold
   green. Today's timed events end in a green countdown, `還有 3h 45m`, or `進行中` once
   started; the band redraws every minute so it keeps moving.
-- `@<location>` follows the title, dimmed, when the event has one.
-- Three parts are links (OSC 8 on the terminal; a terminal without it prints the URL dimmed
-  after the text): the day opens that day in Google Calendar, the title opens the event,
-  and the location opens a Google Maps search for it.
+- `@<location>` follows the title, dimmed, when the event has one and it is not a link.
+- Each line ends in buttons that open a page in the browser without printing its URL.
+  `[ 日曆 ]` opens the event in Google Calendar, or its day when the event has no link.
+  `[ 連結 ]` opens the event's meeting (Google Meet or another conference's video link), or
+  its location when the location is an https link. On the terminal a button runs `open`
+  (`xdg-open` where there is no `open`); the desktop app draws them as links.
 - Cancelled events are left out, and an event shared into several calendars shows once.
 - A dim notice line says `Fetching calendar events`, `Unavailable: <reason>` before any
   fetch succeeded, `Stale: <reason>; showing data from <age> ago` after a failed one, or

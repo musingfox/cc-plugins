@@ -10,9 +10,8 @@ export type CalRow = {
   location: string
   note: string
   isNext: boolean
-  dayHref: string
-  eventHref: string | null
-  locationHref: string | null
+  calendarHref: string
+  urlHref: string | null
 }
 
 export type CalModel = { notice: string | null; rows: CalRow[] }
@@ -22,6 +21,8 @@ const HOUR = 60 * MINUTE
 const DAY_MS = 24 * HOUR
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 const ALL_DAY = '全天'
+export const CALENDAR_BUTTON = '日曆'
+export const URL_BUTTON = '連結'
 
 type Local = { date: string; time: string }
 
@@ -87,11 +88,6 @@ function dayHrefOf(date: string): string {
   return `https://calendar.google.com/calendar/r/day/${y}/${m}/${d}`
 }
 
-function mapHrefOf(location: string): string | null {
-  if (!location) return null
-  return httpsHref(`https://www.google.com/maps/search/?${new URLSearchParams({ api: '1', query: location })}`)
-}
-
 function durationOf(ms: number): string {
   const h = Math.floor(ms / HOUR)
   const m = Math.floor((ms % HOUR) / MINUTE)
@@ -104,7 +100,8 @@ function noteOf(event: CalEvent, start: Local, today: string, nowMs: number): st
 }
 
 export function lineOf(row: CalRow): string {
-  return [row.day, row.span, row.title, row.location && `@${row.location}`, row.note].filter(Boolean).join('  ')
+  const buttons = [CALENDAR_BUTTON, row.urlHref && URL_BUTTON].filter(Boolean).map((label) => `[ ${label} ]`)
+  return [row.day, row.span, row.title, row.location && `@${row.location}`, row.note, ...buttons].filter(Boolean).join('  ')
 }
 
 function rowsOf(events: CalEvent[], nowMs: number, tz: string): CalRow[] {
@@ -130,17 +127,19 @@ function rowsOf(events: CalEvent[], nowMs: number, tz: string): CalRow[] {
   const dayWidth = Math.max(0, ...lines.map((l) => cellsOf(l.day)))
   const spanWidth = Math.max(0, ...lines.map((l) => cellsOf(l.span)))
   const next = lines.findIndex((l) => l.event.start.kind === 'time')
-  return lines.map(({ date, day, span, event, note }, i) => ({
-    day: padCells(day, dayWidth),
-    span: padCells(span, spanWidth),
-    title: event.title,
-    location: event.location,
-    note,
-    isNext: i === next,
-    dayHref: dayHrefOf(date),
-    eventHref: event.link ? httpsHref(event.link) : null,
-    locationHref: mapHrefOf(event.location),
-  }))
+  return lines.map(({ date, day, span, event, note }, i) => {
+    const urlHref = event.url ? httpsHref(event.url) : null
+    return {
+      day: padCells(day, dayWidth),
+      span: padCells(span, spanWidth),
+      title: event.title,
+      location: event.location === event.url && urlHref ? '' : event.location,
+      note,
+      isNext: i === next,
+      calendarHref: (event.link && httpsHref(event.link)) || dayHrefOf(date),
+      urlHref,
+    }
+  })
 }
 
 export function calModelOf(view: CalView, nowMs: number, tz: string): CalModel {

@@ -3,6 +3,7 @@ import { answer, BAND, BAND_LINES, CALENDARS, EVENTS, NOW, SESSION, world } from
 
 function stringsIn(node: any): string[] {
   if (typeof node === 'string') return [node]
+  if (node?.type === 'Button') return [`[ ${node.props.label} ]`]
   if (!node || typeof node !== 'object') return []
   return [...(node.children ?? []), ...(node.props?.children ?? [])].flatMap(stringsIn)
 }
@@ -14,8 +15,19 @@ function rowsOf(tree: any): any[] {
   )
 }
 
+function childrenOf(node: any): any[] {
+  return node.props?.children ?? node.children
+}
+
+// An event row is a row Box: its text, then its buttons, two cells apart.
+function lineText(line: any): string {
+  if (line?.type === 'Box' && line.props?.flexDirection === 'row')
+    return childrenOf(line).map((part: any) => stringsIn(part).join('')).join('  ')
+  return stringsIn(line).join('')
+}
+
 function linesOf(tree: any): string[] {
-  return rowsOf(tree).map((line: any) => stringsIn(line).join(''))
+  return rowsOf(tree).map(lineText)
 }
 
 const BENEATH = { type: 'Text', children: ['beneath'] }
@@ -117,7 +129,7 @@ describe('fetching', () => {
     const before = w.invalidates
     await w.clock.advance(60000)
     expect(w.invalidates).toBe(before + 1)
-    expect(linesOf(await $.ui.render(BAND))[0]).toEndWith('還有 3h 59m')
+    expect(linesOf(await $.ui.render(BAND))[0]).toContain('還有 3h 59m')
   })
 
   test('an unconnected connector shows why, and never throws', async ($, on) => {
@@ -188,7 +200,7 @@ describe('fetching', () => {
     await w.clock.advance(900000)
     expect(linesOf(await $.ui.render(BAND))).toEqual([
       'Stale: could not read Personal; showing data from 15m ago',
-      '今天  14:00–15:00  Dentist  還有 3h 45m',
+      '今天  14:00–15:00  Dentist  還有 3h 45m  [ 日曆 ]',
     ])
   })
 
@@ -206,7 +218,7 @@ describe('fetching', () => {
     await w.clock.settle()
     const tree: any = await $.ui.render(BAND)
     const spans = (line: any) =>
-      (line.props?.children ?? line.children)
+      childrenOf(childrenOf(line)[0])
         .filter((span: any) => typeof span === 'object')
         .map((span: any) => [stringsIn(span).join(''), span.props.color ?? (span.props.dimColor ? 'dim' : '')])
     const lines = tree.props?.children ?? tree.children
@@ -222,11 +234,28 @@ describe('fetching', () => {
     ])
   })
 
-  test('the day, the title, and the location are links', async ($, on) => {
+  test('the buttons open their page without drawing its URL', async ($, on) => {
     const w = world(on, { store: { band: true } })
     await $.session.start(SESSION)
     await w.clock.settle()
-    const tree: any = await $.ui.render(BAND)
+    const tree = await $.ui.render(BAND)
+    expect(JSON.stringify(tree)).not.toContain('https://')
+    for (const key of ['calendar-0', 'calendar-2', 'url-2']) {
+      await $.ui.press({ plugin: 'calendar', key })
+      await w.clock.settle()
+    }
+    expect(w.runs).toEqual([
+      ['open', 'https://www.google.com/calendar/event?eid=ZTE'],
+      ['open', 'https://calendar.google.com/calendar/r/day/2026/9/27'],
+      ['open', 'https://zoom.example.test/j/123'],
+    ])
+  })
+
+  test('a surface with no host commands draws the buttons as links', async ($, on) => {
+    const w = world(on, { store: { band: true } })
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    const tree = await $.ui.render({ ...BAND, surface: 'desktop' })
     const links = (node: any): string[][] =>
       !node || typeof node !== 'object'
         ? []
@@ -234,10 +263,9 @@ describe('fetching', () => {
             ...(node.type === 'Link' ? [[stringsIn(node).join(''), node.props.href]] : []),
             ...[...(node.children ?? []), ...(node.props?.children ?? [])].flatMap(links),
           ]
-    expect(links((tree.props?.children ?? tree.children)[0])).toEqual([
-      ['今天    ', 'https://calendar.google.com/calendar/r/day/2026/9/25'],
-      ['Dentist', 'https://www.google.com/calendar/event?eid=ZTE'],
-      ['@Clinic', 'https://www.google.com/maps/search/?api=1&query=Clinic'],
+    expect(links(childrenOf(tree)[2])).toEqual([
+      ['[ 日曆 ]', 'https://calendar.google.com/calendar/r/day/2026/9/27'],
+      ['[ 連結 ]', 'https://zoom.example.test/j/123'],
     ])
   })
 

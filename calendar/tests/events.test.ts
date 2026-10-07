@@ -83,24 +83,47 @@ describe('calModelOf', () => {
     expect(calModelOf({ ...good, events }, NOW, TZ).rows[0]!.note).toBe('還有 45m')
   })
 
-  test('links the day to its day view, the title to the event, and the location to a map search', () => {
-    const [dentist, holiday, trip] = calModelOf(good, NOW, TZ).rows
-    expect(dentist!.dayHref).toBe('https://calendar.google.com/calendar/r/day/2026/9/25')
-    expect(dentist!.eventHref).toBe('https://www.google.com/calendar/event?eid=ZTE')
-    expect(dentist!.locationHref).toBe('https://www.google.com/maps/search/?api=1&query=Clinic')
-    expect(holiday!.dayHref).toBe('https://calendar.google.com/calendar/r/day/2026/9/26')
-    expect([trip!.eventHref, trip!.locationHref]).toEqual([null, null])
+  test('the calendar button opens the event, or its day when the event has no link', () => {
+    const [dentist, holiday] = calModelOf(good, NOW, TZ).rows
+    expect(dentist!.calendarHref).toBe('https://www.google.com/calendar/event?eid=ZTE')
+    expect(holiday!.calendarHref).toBe('https://calendar.google.com/calendar/r/day/2026/9/26')
   })
 
-  test('a location is encoded into the map link, and a link that is not https is dropped', () => {
+  test('the link button opens the meeting, or a location that is a link and then is not shown as a place', () => {
+    const [dentist, , trip, dinner] = calModelOf(good, NOW, TZ).rows
+    expect([dentist!.urlHref, dentist!.location]).toEqual([null, 'Clinic'])
+    expect([trip!.urlHref, trip!.location]).toEqual(['https://zoom.example.test/j/123', ''])
+    expect([dinner!.urlHref, dinner!.location]).toEqual(['https://meet.google.com/abc-defg-hij', 'Home'])
+  })
+
+  test('a conference video entry point is the meeting link', () => {
     const events = eventsOf({
       events: [
-        { id: 'x', summary: 'A', location: '怡 家 @1', htmlLink: 'javascript:alert(1)', start: { dateTime: '2026-09-25T12:00:00+08:00' } },
+        {
+          id: 'x',
+          summary: 'A',
+          conferenceData: {
+            entryPoints: [
+              { entryPointType: 'phone', uri: 'tel:+1-555-0100' },
+              { entryPointType: 'video', uri: 'https://teams.example.test/l/meetup' },
+            ],
+          },
+          start: { dateTime: '2026-09-25T12:00:00+08:00' },
+        },
+      ],
+    })!
+    expect(calModelOf({ ...good, events }, NOW, TZ).rows[0]!.urlHref).toBe('https://teams.example.test/l/meetup')
+  })
+
+  test('a link that is not https gets no button', () => {
+    const events = eventsOf({
+      events: [
+        { id: 'x', summary: 'A', location: 'http://x.example.test', htmlLink: 'javascript:alert(1)', start: { dateTime: '2026-09-25T12:00:00+08:00' } },
       ],
     })!
     const [row] = calModelOf({ ...good, events }, NOW, TZ).rows
-    expect(row!.locationHref).toBe('https://www.google.com/maps/search/?api=1&query=%E6%80%A1+%E5%AE%B6+%401')
-    expect(row!.eventHref).toBeNull()
+    expect(row!.calendarHref).toBe('https://calendar.google.com/calendar/r/day/2026/9/25')
+    expect([row!.urlHref, row!.location]).toEqual([null, 'http://x.example.test'])
   })
 
   test('says it is fetching before any fetch settles', () => {
