@@ -1,12 +1,13 @@
 {
   "name": "cf",
-  "version": "0.8.7",
-  "description": "[Experimental] Contract-driven development pipeline with human-in-the-loop decision gating — agents defined by Context + Goal + Tools, not roles",
+  "version": "0.8.8",
+  "description": "[Experimental] Contract-driven development pipeline with human-in-the-loop decision gating — agents defined by Context + Goal + Tools, not roles; a live flow-progress band above the prompt (Claude Mod; needs Claude Code 2.1.293+)",
   "author": {
     "name": "Nick Huang"
   },
   "dependencies": [
     "pi-dispatch"
   ],
-  "commands": ["./commands/"]
+  "commands": ["./commands/"],
+  "types": "./types/index.d.ts"
 }

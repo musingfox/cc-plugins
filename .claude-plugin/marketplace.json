@@ -21,7 +21,7 @@
     {
       "name": "context-flow",
       "source": "./context-flow",
-      "description": "[Experimental] Contract-driven development pipeline with human-in-the-loop decision gating — agents defined by Context + Goal + Tools, not roles"
+      "description": "[Experimental] Contract-driven development pipeline with human-in-the-loop decision gating — agents defined by Context + Goal + Tools, not roles; a live flow-progress band above the prompt (Claude Mod; needs Claude Code 2.1.293+)"
     },
     {
       "name": "spiral",
