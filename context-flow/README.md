@@ -53,6 +53,14 @@ The default implementer is the Claude `cf:implement` agent. OMP, a worker outsid
 - **Spec upkeep**: After a PASS, the orchestrator writes a `proposed` spec entry only when the flow left something the next flow must know — a deliberate non-goal, an interface to reuse, or a spec that proved stale. Most flows write none; the human promotes what they keep.
 - **Pluggable agents**: The flow defines contracts, not agents. Specialized agents can substitute defaults if they satisfy the same contract.
 
+## Progress Band
+
+While a `/cf` flow runs, one line above the prompt shows `● cf <name> · <phase> · <elapsed>`: the flow's slug, the phase it is in (setup, research, plan, implement, review), and whole minutes since the flow started. During implement it adds the shards passed over the total, the round in progress and the retries left; while a question to you is open it adds `waiting for you` and turns the dot to the warning colour. The band reads cf's own files and Bash commands, never changes them, and redraws every 10 seconds.
+
+When a flow ends, a record of how its time split across the six totals (setup, research, plan, implement, review, waiting) is kept in the plugin store under the key `flows`, newest 100 only. Its outcome is `cleanup` (the flow ran its cleanup script), `abandoned` (a different flow replaced it) or `session-end` (the Claude session ended first).
+
+The band is a Claude Mod and needs Claude Code 2.1.293+.
+
 ## Installation
 
 ```

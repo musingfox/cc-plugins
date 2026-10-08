@@ -59,6 +59,7 @@ Experimental agentic workflow based on the **Context + Goal + Tools** principle:
 - **Minimal Agent Definitions**: Agent prompts are 1-16 lines; constraints come from context isolation and tool restrictions
 - **Human Gate**: Plan review before implementation — the highest-leverage review point
 - **Single Command**: `/cf "goal"` runs the full pipeline
+- **Progress Band** (Claude Mod, Claude Code 2.1.293+): a line above the prompt shows the running flow's name, phase and elapsed time, and keeps each ended flow's per-phase durations
 
 **Installation:**
 ```bash
@@ -313,7 +314,7 @@ cc-plugins/
 ├── apple-podcasts/     skills: apple-podcasts-fetch
 ├── audit/              skills: docs, tests · agents: docs-classifier, tests-tracer · scripts, tests
 ├── calendar/          hooks: register (Claude Mod) · tests
-├── context-flow/       commands: cf  · agents: research, plan, implement, review · scripts, tests
+├── context-flow/       commands: cf · agents: research, plan, implement, review · hooks: register (Claude Mod) · scripts, tests
 ├── deepen/             skills: survey · agents: explorer · scripts, docs, tests
 ├── diagnose/           skills: diagnose, diagnose-now · docs, scripts, tests
 ├── fizzy/              skills: fizzy
