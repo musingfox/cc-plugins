@@ -147,6 +147,21 @@ test('ImplementFiguresPolled T4 outside implement the shard files are not read',
   expect(w.readCalls.filter((path) => /(shards|dispatch-state|loop-budget)\.json$/.test(path))).toEqual([])
 })
 
+for (const id of ['__proto__', 'toString', 'constructor', 'hasOwnProperty']) {
+  test(`ImplementFiguresPolled R1 a shard group named ${id} is counted by its outcome file`, async ($, on) => {
+    const { w, bash } = await openFlow($, on)
+    bash.answer = ok('')
+    w.files[`${ROOT}/shards.json`] = `{"groups":{"${id}":{}}}`
+    await $.tool.call({ tool: 'Bash', command: 'cf-pi-shard.sh /tmp/cf-1008-Rez6' })
+    await w.clock.advance(10_000)
+    expect(await first($)).toBe('● cf mod-band · implement · 0/1 shards · round 1 · 0m')
+    w.files[`${ROOT}/shards/${id}/outcome.md`] = PASSED
+    w.files[`${ROOT}/dispatch-state.json`] = '{"current_round":1}'
+    await w.clock.advance(10_000)
+    expect(await first($)).toBe('● cf mod-band · implement · 1/1 shards · round 1 · 0m')
+  })
+}
+
 test('ImplementFiguresPolled T5 figures of the old root are not drawn under a new one', async ($, on) => {
   const { w, bash } = await openFlow($, on, { files: { [`${ROOT}/env.sh`]: ENV, [`${ROOT}/shards.json`]: TWO_SHARDS, [`${ROOT}/shards/A/outcome.md`]: PASSED, [`${ROOT}/loop-budget.json`]: '{"retries_used":0}' } })
   bash.answer = ok('')

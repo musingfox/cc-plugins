@@ -72,8 +72,8 @@ async function poll($: any) {
     } catch {
       // implementFiguresOf reports the unreadable file as no shards.
     }
-    const outcomes: Record<string, string | null> = {}
-    await Promise.all(ids.map(async (id) => (outcomes[id] = await readText($, `${root}/shards/${id}/outcome.md`))))
+    // fromEntries defines own keys, so a group id like __proto__ is an entry, not a prototype write.
+    const outcomes = Object.fromEntries(await Promise.all(ids.map(async (id) => [id, await readText($, `${root}/shards/${id}/outcome.md`)] as const)))
     figures = implementFiguresOf({ shardsJson, outcomes, dispatchStateJson: await readText($, `${root}/dispatch-state.json`), loopBudgetJson: await readText($, `${root}/loop-budget.json`) })
   }
   // A poll that outlived its flow must not overwrite the new flow's detail.
