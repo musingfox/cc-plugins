@@ -107,6 +107,10 @@ test('ImplementFigures T1 passed over total, round from outcome presence, retrie
   expect(implementFiguresOf({ shardsJson: SHARDS, outcomes: { A: PASS, B: FAIL, C: null }, dispatchStateJson: null, loopBudgetJson: '{"retries_used":1}' })).toEqual({ shards: { passed: 1, total: 3 }, round: 1, retriesLeft: 3 })
 })
 
+test('ImplementFigures R1 a group id named like an inherited member counts as running, never throws', () => {
+  expect(implementFiguresOf({ shardsJson: '{"groups":{"toString":{}}}', outcomes: {}, dispatchStateJson: null, loopBudgetJson: null })).toEqual({ shards: { passed: 0, total: 1 }, round: 1, retriesLeft: null })
+})
+
 test('ImplementFigures T2 a running shard on top of a finished round is the next round', () => {
   const figures = implementFiguresOf({ shardsJson: SHARDS, outcomes: { A: PASS, B: null, C: PASS }, dispatchStateJson: '{"current_round":1}', loopBudgetJson: null })
   expect(figures.round).toBe(2)

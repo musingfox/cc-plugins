@@ -65,7 +65,7 @@ export function implementFiguresOf(input: {
   const retriesLeft = typeof retries === 'number' ? Math.max(0, 4 - retries) : null
   if (!shardsFile) return { shards: null, round: null, retriesLeft }
   const ids = Object.keys(shardsFile.groups ?? {})
-  const outcomeOf = (id: string) => input.outcomes[id] ?? null
+  const outcomeOf = (id: string) => Object.hasOwn(input.outcomes, id) ? (input.outcomes[id] ?? null) : null
   const currentRound = parse(input.dispatchStateJson)?.current_round
   const running = ids.some((id) => outcomeOf(id) === null)
   return {
