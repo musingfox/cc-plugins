@@ -11,7 +11,7 @@ export function sessionRootOf(stdout: string): string | null {
 function executedPattern(name: string, runner: 'optional' | 'source', prefix: boolean): RegExp {
   const position = '(?:^|(?<=[\\n;&|()])|(?<=\\{)(?=\\s)|(?<!\\w)(?:do|then|else)(?!\\w))'
   const assignments = `(?:\\w+=(?:'[^']*'|"[^"]*"|[^\\s;&|]*)[ \\t]+)*`
-  const runnerWord = runner === 'source' ? '(?:\\.|source)[ \\t]+(?!-)' : '(?:(?:bash|sh|\\.|source)[ \\t]+(?!-))?'
+  const runnerWord = runner === 'source' ? '(?:\\.|source)[ \\t]+(?!["\']?-)' : '(?:(?:bash|sh|\\.|source)[ \\t]+(?!["\']?-))?'
   const path = prefix ? '(?:[^\\s"\';&|()]*\\/)?' : ''
   return new RegExp(`${position}[ \\t]*${assignments}${runnerWord}["']?${path}${name}["']?(?=[\\s;&|)<>]|$)`, 'g')
 }

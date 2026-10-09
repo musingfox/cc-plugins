@@ -490,3 +490,19 @@ test('SetupRunOpensFlow R1 a flag-led setup path opens nothing', async ($, on) =
   await bash($, w, 'bash -x/cf-pi-setup.sh')
   expect(await $.ui.render(BAND)).toEqual(BENEATH)
 })
+
+test('ImplementOnlyWhenExecuted R2 a runner followed by a quoted flag-led path executes nothing', async ($, on) => {
+  const { w, bash: answer } = await openFlow($, on)
+  answer.answer = ok('')
+  await bash($, w, 'bash "-x/cf-pi-run.sh"')
+  expect(await first($)).toBe('● cf mod-band · setup · 0m')
+  expect(isImplementCommand('bash "-x/cf-pi-run.sh"')).toBe(false)
+  expect(isImplementCommand("bash '-x/cf-pi-run.sh'")).toBe(false)
+})
+
+test('SetupRunOpensFlow R2 a quoted flag-led setup path opens nothing', async ($, on) => {
+  const w = await bareBash($, on, ok('/tmp/cf-1008-Rez6\n'))
+  await bash($, w, 'bash "-x/cf-pi-setup.sh"')
+  await bash($, w, "bash '-x/cf-pi-setup.sh'")
+  expect(await $.ui.render(BAND)).toEqual(BENEATH)
+})
