@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { On } from 'claude-code'
 import type { EndedFlow, FlowDetail, FlowEvent, FlowRecord, FlowTracker } from '../types/index.d.ts'
-import { cleanupTargetOf, implementFiguresOf, isImplementCommand, phaseOfAgent, sessionRootOf, slugOf, sourcedRootOf } from './cf-signals.ts'
+import { cleanupTargetOf, implementFiguresOf, isImplementCommand, isSetupCommand, phaseOfAgent, sessionRootOf, setupRootOf, slugOf, sourcedRootOf } from './cf-signals.ts'
 import { appendFlowRecord, bandLineOf, reduceFlow } from './flow-model.ts'
 
 const POLL_MS = 10_000
@@ -36,7 +36,8 @@ async function applyEvents($: any, steps: Step[]): Promise<{ ended: EndedFlow[];
       if (!event) continue
       const reduced = reduceFlow(current, event)
       current = reduced.tracker
-      if (reduced.ended) ended.push(reduced.ended)
+      // A flow opened and closed inside this one batch never outlived the command: it is no record.
+      if (reduced.ended && reduced.ended.root === before.flow?.root) ended.push(reduced.ended)
     }
     opened = current.flow !== null && current.flow.root !== before.flow?.root
     return current
@@ -122,8 +123,9 @@ export function register(on: On) {
 
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
     if (e.agentId !== undefined) return next(e)
+    let command = ''
     try {
-      const command = String(e.command ?? '')
+      command = String(e.command ?? '')
       const root = sourcedRootOf(command)
       const target = cleanupTargetOf(command)
       const implement = isImplementCommand(command)
@@ -140,7 +142,8 @@ export function register(on: On) {
     }
     const result = await next(e)
     void (async () => {
-      const root = sessionRootOf(outputOf(result))
+      const output = outputOf(result)
+      const root = sessionRootOf(output) ?? (isSetupCommand(command) ? setupRootOf(output) : null)
       if (root) settle($, await applyEvents($, [{ kind: 'root', root, at: await $.clock.now() }]))
     })().catch(() => {})
     return result

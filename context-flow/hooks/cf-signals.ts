@@ -7,9 +7,19 @@ export function sessionRootOf(stdout: string): string | null {
   return stdout.match(new RegExp(`^SESSION=(${ROOT})$`, 'm'))?.[1] ?? null
 }
 
+// A command runs `name` only when it sits at an execution position: the start of the text, after a newline or one of ;&|(),
+// after a `{` that opens a group, or after do/then/else. Quoted separators and heredoc bodies are accepted residuals.
+function executedPattern(name: string, runner: 'optional' | 'source', prefix: boolean): RegExp {
+  const position = '(?:^|(?<=[\\n;&|()])|(?<=\\{)(?=\\s)|(?<!\\w)(?:do|then|else)(?!\\w))'
+  const assignments = `(?:\\w+=(?:'[^']*'|"[^"]*"|[^\\s;&|]*)[ \\t]+)*`
+  const runnerWord = runner === 'source' ? '(?:\\.|source)[ \\t]+' : '(?:(?:bash|sh|\\.|source)[ \\t]+)?'
+  const path = prefix ? '(?:[^\\s"\';&|()]*\\/)?' : ''
+  return new RegExp(`${position}[ \\t]*${assignments}${runnerWord}["']?${path}${name}["']?(?=[\\s;&|)<>]|$)`, 'g')
+}
+
 // Every cf Bash after setup starts with `. "<root>/env.sh"`; a shard's env.sh sits one level deeper and does not match.
 export function sourcedRootOf(command: string): string | null {
-  const found = [...command.matchAll(new RegExp(`(?:^|[\\s;&|(])(?:\\.|source)\\s+"?(${ROOT})/env\\.sh"?`, 'g'))]
+  const found = [...command.matchAll(executedPattern(`(${ROOT})/env\\.sh`, 'source', false))]
   return found.at(-1)?.[1] ?? null
 }
 
@@ -23,12 +33,17 @@ export function phaseOfAgent(subagentType: unknown): Exclude<FlowPhase, 'setup'>
   }
 }
 
-export const isImplementCommand = (command: string): boolean => /\bcf-pi-(?:worktree|shard|run)\.sh\b/.test(command)
+export const isImplementCommand = (command: string): boolean => executedPattern('cf-pi-(?:worktree|shard|run)\\.sh', 'optional', true).test(command)
+
+export const isSetupCommand = (command: string): boolean => executedPattern('cf-pi-setup\\.sh', 'optional', true).test(command)
+
+// A setup whose output has no SESSION= line alone still prints the root; the first root not followed by more name wins.
+export const setupRootOf = (output: string): string | null => output.match(new RegExp(`(${ROOT})(?![A-Za-z0-9])`))?.[1] ?? null
 
 // 'any' when the command runs whatever env.sh's CLEANUP_SCRIPT names; else the root of a literal <root>/cleanup.sh.
 export function cleanupTargetOf(command: string): 'any' | string | null {
-  if (command.includes('CLEANUP_SCRIPT')) return 'any'
-  return command.match(new RegExp(`(${ROOT})/cleanup\\.sh`))?.[1] ?? null
+  if (executedPattern('\\$(?:CLEANUP_SCRIPT|\\{CLEANUP_SCRIPT\\})', 'optional', false).test(command)) return 'any'
+  return executedPattern(`(${ROOT})/cleanup\\.sh`, 'optional', false).exec(command)?.[1] ?? null
 }
 
 // The last CF_SLUG line wins: cf-pi-worktree.sh appends a collision-bumped one.

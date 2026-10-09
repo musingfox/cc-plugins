@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import { BAND, bandLines, nodesOf, stringsIn } from './fixtures/band.ts'
 import { BENEATH, ENV, ENV2, ROOT, ROOT2, SESSION, SETUP_OUT, ok, openFlow, world } from './fixtures/world.ts'
+import { isImplementCommand, sourcedRootOf } from '../hooks/cf-signals.ts'
 
 const first = async ($: any) => (await bandLines($))[0]
 const colorOf = (node: any) => node.props?.color ?? node.color
@@ -306,4 +307,180 @@ test('IdleCostsNothing T2 ticks with no flow touch no file or store', async ($, 
   await $.session.start(SESSION)
   await w.clock.advance(60_000)
   expect([w.readCalls.length, w.storeCalls.length]).toEqual([0, 0])
+})
+
+test('ImplementOnlyWhenExecuted T2 a sourced env then a quoted script path executes', () => {
+  expect(isImplementCommand('. "$SESSION/env.sh"\n"$SCRIPTS/cf-pi-worktree.sh" "$SESSION" >/dev/null')).toBe(true)
+})
+
+test('ImplementOnlyWhenExecuted T3 a loop body line executes', () => {
+  expect(isImplementCommand('for id in A B; do\n  "$SCRIPTS/cf-pi-run.sh" --prepare-only "$SESSION/shards/$id" \'g\' \'c\' "$SHARD_TEST_RUNNER" > x 2>&1\ndone')).toBe(true)
+})
+
+test('ImplementOnlyWhenExecuted T4 do on one line executes', () => {
+  expect(isImplementCommand('for id in J P; do "$SC/cf-pi-run.sh" --prepare-only x; done')).toBe(true)
+})
+
+test('ImplementOnlyWhenExecuted T5 leading assignments execute', () => {
+  expect(isImplementCommand('PI_PROVIDER=x PI_MODEL=y BASH_MAX_TIMEOUT_MS=5400000 /Users/n/scripts/cf-pi-run.sh /tmp/cf-1008-Rez6/shards/A g c t')).toBe(true)
+})
+
+test('ImplementOnlyWhenExecuted T6 a chain after && executes', () => {
+  expect(isImplementCommand('. /tmp/cf-1008-Rez6/env.sh && echo "A returned $(date +%s)" >> x.log && $SCRIPTS/cf-pi-run.sh --gates-only /tmp/cf-1008-Rez6/shards/A \'g\' \'c\' "$SHARD_TEST_RUNNER" > g.out 2>&1')).toBe(true)
+})
+
+test('ImplementOnlyWhenExecuted T7 a braced variable prefix executes', () => {
+  expect(isImplementCommand('"${SCRIPTS}/cf-pi-shard.sh" "$S"')).toBe(true)
+})
+
+test('ImplementOnlyWhenExecuted T8 bash runner executes', () => {
+  expect(isImplementCommand('bash "$SCRIPTS/cf-pi-run.sh" x')).toBe(true)
+})
+
+test('ImplementOnlyWhenExecuted T9 a bare name executes', () => {
+  expect(isImplementCommand('cf-pi-shard.sh /tmp/cf-1008-Rez6')).toBe(true)
+})
+
+test('ImplementOnlyWhenExecuted T10 then executes', () => {
+  expect(isImplementCommand('if true; then "$SCRIPTS/cf-pi-shard.sh" "$SESSION"; fi')).toBe(true)
+})
+
+test('ImplementOnlyWhenExecuted T11 a .bak name is not the script', () => {
+  expect(isImplementCommand('cat cf-pi-run.sh.bak')).toBe(false)
+})
+
+test('ImplementOnlyWhenExecuted T12 grep does not execute', () => {
+  expect(isImplementCommand('grep -n cf-pi-run.sh scripts/')).toBe(false)
+})
+
+test('ImplementOnlyWhenExecuted T13 sed does not execute', () => {
+  expect(isImplementCommand('sed -n 1,20p "$SCRIPTS/cf-pi-run.sh"')).toBe(false)
+})
+
+test('ImplementOnlyWhenExecuted T14 bash -n does not execute', () => {
+  expect(isImplementCommand('bash -n scripts/cf-pi-run.sh')).toBe(false)
+})
+
+test('ImplementOnlyWhenExecuted T15 cat of a braced path does not execute', () => {
+  expect(isImplementCommand('cat "${SCRIPTS}/cf-pi-run.sh"')).toBe(false)
+})
+
+test('ImplementOnlyWhenExecuted T16 another cf script is not implement', () => {
+  expect(isImplementCommand('bash "$SCRIPTS/cf-pi-status.sh" /tmp/cf-1008-Rez6')).toBe(false)
+})
+
+test('ImplementOnlyWhenExecuted T17 git add does not execute', () => {
+  expect(isImplementCommand('git add context-flow/scripts/cf-pi-shard.sh')).toBe(false)
+})
+
+test('ImplementOnlyWhenExecuted T1 grepping a runner name leaves the phase', async ($, on) => {
+  const { w, bash: answer } = await openFlow($, on)
+  answer.answer = ok('')
+  await bash($, w, 'grep -n cf-pi-run.sh context-flow/scripts/')
+  expect(await first($)).toContain('· setup ·')
+})
+
+const SETUP = 'SESSION=$("$SCRIPTS/cf-pi-setup.sh" "mod-band")\necho "$SESSION"'
+
+test('SetupRunOpensFlow T1 a bare root on stdout opens the band', async ($, on) => {
+  const w = await bareBash($, on, ok('/tmp/cf-1008-Rez6\n'))
+  await bash($, w, SETUP)
+  expect(await first($)).toBe('● cf mod-band · setup · 0m')
+})
+
+test('SetupRunOpensFlow T2 a SESSION= line followed by other words opens the band', async ($, on) => {
+  const w = await bareBash($, on, ok('SESSION=/tmp/cf-1008-Rez6 PI_AVAILABLE=1 PI_DESC=pi\n'))
+  await bash($, w, SETUP)
+  expect(await first($)).toBe('● cf mod-band · setup · 0m')
+})
+
+test('SetupRunOpensFlow T3 a SESSION= line after other output opens the band', async ($, on) => {
+  const w = await bareBash($, on, ok('## main...origin/main\nSESSION=/tmp/cf-1008-Rez6 CF_IMPLEMENTER=claude\n'))
+  await bash($, w, SETUP)
+  expect(await first($)).toBe('● cf mod-band · setup · 0m')
+})
+
+test('SetupRunOpensFlow T4 a /private/tmp root opens the band', async ($, on) => {
+  const w = await bareBash($, on, ok('/private/tmp/cf-1008-Rez6\n'))
+  await bash($, w, SETUP)
+  expect(await first($)).toBe('● cf mod-band · setup · 0m')
+})
+
+test('SetupRunOpensFlow T5 the text opens the band when stdout is not a string', async ($, on) => {
+  const w = await bareBash($, on, { result: {}, text: '/tmp/cf-1008-Rez6' })
+  await bash($, w, SETUP)
+  expect(await first($)).toBe('● cf mod-band · setup · 0m')
+})
+
+test('SetupRunOpensFlow T6 setup under an env prefix opens the band', async ($, on) => {
+  const w = await bareBash($, on, ok('/tmp/cf-1008-Rez6\n'))
+  await bash($, w, 'SESSION=$(CF_IMPLEMENTER=omp PI_DISPATCH_CMD=\'pi --model x\' "$SCRIPTS/cf-pi-setup.sh" "mod-band")\necho "$SESSION"')
+  expect(await first($)).toBe('● cf mod-band · setup · 0m')
+})
+
+test('SetupRunOpensFlow T7 a direct setup run opens the band', async ($, on) => {
+  const w = await bareBash($, on, ok('/tmp/cf-1008-Rez6\n'))
+  await bash($, w, '"$SCRIPTS/cf-pi-setup.sh" mod-band')
+  expect(await first($)).toBe('● cf mod-band · setup · 0m')
+})
+
+test('SetupRunOpensFlow T8 the SESSION line wins over an earlier root', async ($, on) => {
+  const w = await bareBash($, on, ok('/tmp/cf-0101-Zz99\nSESSION=/tmp/cf-1008-Rez6\n'))
+  await bash($, w, SETUP)
+  expect(await first($)).toBe('● cf mod-band · setup · 0m')
+  expect(w.storeCalls).toEqual([])
+})
+
+test('SetupRunOpensFlow T9 a root with a longer tail opens nothing', async ($, on) => {
+  const w = await bareBash($, on, ok('/tmp/cf-1008-Rez6xyz\n'))
+  await bash($, w, SETUP)
+  expect(await $.ui.render(BAND)).toEqual(BENEATH)
+})
+
+test('SetupRunOpensFlow T10 empty output opens nothing', async ($, on) => {
+  const w = await bareBash($, on, ok(''))
+  await bash($, w, SETUP)
+  expect(await $.ui.render(BAND)).toEqual(BENEATH)
+})
+
+test('SetupRunOpensFlow T11 grepping the setup name opens nothing', async ($, on) => {
+  const w = await bareBash($, on, ok('/tmp/cf-1008-Rez6\n'))
+  await bash($, w, 'grep -rn "cf-pi-setup.sh" tests/')
+  expect(await $.ui.render(BAND)).toEqual(BENEATH)
+})
+
+test('SetupRunOpensFlow T12 echoing a braced setup path opens nothing', async ($, on) => {
+  const w = await bareBash($, on, ok('/tmp/cf-1008-Rez6\n'))
+  await bash($, w, 'echo "${SCRIPTS}/cf-pi-setup.sh"')
+  expect(await $.ui.render(BAND)).toEqual(BENEATH)
+})
+
+test('SetupRunOpensFlow T13 bash -n of the setup opens nothing', async ($, on) => {
+  const w = await bareBash($, on, ok('/tmp/cf-1008-Rez6\n'))
+  await bash($, w, 'bash -n "$SCRIPTS/cf-pi-setup.sh"')
+  expect(await $.ui.render(BAND)).toEqual(BENEATH)
+})
+
+test('SetupRunOpensFlow T14 a non-setup command opens nothing', async ($, on) => {
+  const w = await bareBash($, on, ok('/tmp/cf-1008-Rez6\n'))
+  await bash($, w, 'cf setup')
+  expect(await $.ui.render(BAND)).toEqual(BENEATH)
+})
+
+test('SourcedRootOnlyWhenExecuted T1 ls with a dot argument opens nothing', async ($, on) => {
+  const w = await bareBash($, on, ok(''))
+  await bash($, w, 'ls -la . /tmp/cf-1008-Rez6/env.sh')
+  expect(await $.ui.render(BAND)).toEqual(BENEATH)
+})
+
+test('SourcedRootOnlyWhenExecuted T2 echoing source yields no root', () => {
+  expect(sourcedRootOf('echo source /tmp/cf-1008-Rez6/env.sh')).toBeNull()
+})
+
+test('SourcedRootOnlyWhenExecuted T3 the last executed source wins', () => {
+  expect(sourcedRootOf('. /tmp/cf-1008-Rez6/env.sh && . "/tmp/cf-1008-Ab12/env.sh"')).toBe('/tmp/cf-1008-Ab12')
+})
+
+test('SourcedRootOnlyWhenExecuted T4 a loop body source counts', () => {
+  expect(sourcedRootOf('for f in 1; do . "/tmp/cf-1008-Rez6/env.sh"; done')).toBe('/tmp/cf-1008-Rez6')
 })

@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 import { BAND, bandLines } from './fixtures/band.ts'
+import { cleanupTargetOf } from '../hooks/cf-signals.ts'
 import { BENEATH, ENV, ENV2, NOW, ROOT, ROOT2, SESSION, ok, openFlow, world } from './fixtures/world.ts'
 
 const first = async ($: any) => (await bandLines($))[0]
@@ -126,5 +127,110 @@ test('FlowHistoryBounded T3 a refused store leaves the band cleared', async ($, 
   const { w, bash: answer } = await openFlow($, on, { store: 'refuse' })
   answer.answer = ok('')
   await bash($, w, CLEANUP)
+  expect(await $.ui.render(BAND)).toEqual(BENEATH)
+})
+
+test('CleanupScriptOnlyWhenExecuted T1 grepping the variable name leaves the flow open', async ($, on) => {
+  const { w, bash: answer } = await openFlow($, on)
+  answer.answer = ok('')
+  await bash($, w, 'grep -n CLEANUP_SCRIPT "/tmp/cf-1008-Rez6/env.sh"')
+  expect(await first($)).toBe('● cf mod-band · setup · 0m')
+  expect(w.hasStoreKey('flows')).toBe(false)
+})
+
+test('CleanupScriptOnlyWhenExecuted T2 a guarded bash of the variable is any', () => {
+  expect(cleanupTargetOf('. "/tmp/cf-1008-Rez6/env.sh"\n[ -n "${CLEANUP_SCRIPT:-}" ] && [ -x "$CLEANUP_SCRIPT" ] && bash "$CLEANUP_SCRIPT"')).toBe('any')
+})
+
+test('CleanupScriptOnlyWhenExecuted T3 a case arm bash of the variable is any', () => {
+  expect(cleanupTargetOf('case "$R" in OK*|NOOP*) bash "$CLEANUP_SCRIPT" >/dev/null 2>&1;; esac')).toBe('any')
+})
+
+test('CleanupScriptOnlyWhenExecuted T4 a braced group bash of the variable is any', () => {
+  expect(cleanupTargetOf('. /tmp/cf-1008-Rez6/env.sh && { [ -x "${CLEANUP_SCRIPT:-}" ] && bash "$CLEANUP_SCRIPT" >/dev/null 2>&1; }')).toBe('any')
+})
+
+test('CleanupScriptOnlyWhenExecuted T5 test operands are not an execution', () => {
+  expect(cleanupTargetOf('[ -n "${CLEANUP_SCRIPT:-}" ] && [ -x "$CLEANUP_SCRIPT" ]')).toBe(null)
+})
+
+test('CleanupScriptOnlyWhenExecuted T6 an assignment is not an execution', () => {
+  expect(cleanupTargetOf('CLEANUP_SCRIPT="$FLOW/cleanup.sh"')).toBe(null)
+})
+
+test('CleanupScriptOnlyWhenExecuted T7 an assignment prefix is not an execution', () => {
+  expect(cleanupTargetOf('X=1 CLEANUP_SCRIPT=$S/cleanup.sh bash t.sh')).toBe(null)
+})
+
+test('CleanupScriptOnlyWhenExecuted T8 prose is not an execution', () => {
+  expect(cleanupTargetOf('echo "exposes PI_PROTOCOL, CLEANUP_SCRIPT, thresholds"')).toBe(null)
+})
+
+test('CleanupScriptOnlyWhenExecuted T9 bash -n is not an execution', () => {
+  expect(cleanupTargetOf('bash -n "$CLEANUP_SCRIPT"')).toBe(null)
+})
+
+test('LiteralCleanupOnlyWhenExecuted T1 reading cleanup.sh leaves the flow open', async ($, on) => {
+  const { w, bash: answer } = await openFlow($, on)
+  answer.answer = ok('')
+  await bash($, w, 'cat /tmp/cf-1008-Rez6/cleanup.sh | head -60')
+  expect(await first($)).toBe('● cf mod-band · setup · 0m')
+  expect(w.hasStoreKey('flows')).toBe(false)
+})
+
+test('LiteralCleanupOnlyWhenExecuted T2 bash of the literal path yields its root', () => {
+  expect(cleanupTargetOf('bash /tmp/cf-1008-Rez6/cleanup.sh')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('LiteralCleanupOnlyWhenExecuted T3 a direct run with redirects yields its root', () => {
+  expect(cleanupTargetOf('/tmp/cf-1008-Rez6/cleanup.sh >/dev/null 2>&1')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('LiteralCleanupOnlyWhenExecuted T4 ls of the path yields nothing', () => {
+  expect(cleanupTargetOf('ls /tmp/cf-1008-Rez6/cleanup.sh')).toBe(null)
+})
+
+test('LiteralCleanupOnlyWhenExecuted T5 the pi cleanup script yields nothing', () => {
+  expect(cleanupTargetOf('"$SCRIPTS/cf-pi-cleanup.sh" "/tmp/cf-1008-Rez6" "$CF_SLUG"')).toBe(null)
+})
+
+const NOFLOW_CLEANUP = (root: string) => `. "${root}/env.sh"\n[ -n "\${CLEANUP_SCRIPT:-}" ] && [ -x "$CLEANUP_SCRIPT" ] && bash "$CLEANUP_SCRIPT"`
+
+test('OpenAndCloseInOneCommandStoresNothing T1 a source-and-cleanup command stores nothing', async ($, on) => {
+  const w = world(on, { beneath: BENEATH, files: { [`${ROOT}/env.sh`]: ENV } })
+  on('tool.call', { tool: 'Bash' }, () => ok(''))
+  await $.session.start(SESSION)
+  await w.clock.settle()
+  await bash($, w, NOFLOW_CLEANUP(ROOT))
+  expect(await $.ui.render(BAND)).toEqual(BENEATH)
+  expect(w.storeCalls).toEqual([])
+})
+
+test('OpenAndCloseInOneCommandStoresNothing T2 a source and literal cleanup stores nothing', async ($, on) => {
+  const w = world(on, { beneath: BENEATH, files: { [`${ROOT}/env.sh`]: ENV } })
+  on('tool.call', { tool: 'Bash' }, () => ok(''))
+  await $.session.start(SESSION)
+  await w.clock.settle()
+  await bash($, w, `. ${ROOT}/env.sh && bash ${ROOT}/cleanup.sh`)
+  expect(await $.ui.render(BAND)).toEqual(BENEATH)
+  expect(w.storeCalls).toEqual([])
+})
+
+test('OpenAndCloseInOneCommandStoresNothing T3 the closed root does not reopen', async ($, on) => {
+  const w = world(on, { beneath: BENEATH, files: { [`${ROOT}/env.sh`]: ENV } })
+  on('tool.call', { tool: 'Bash' }, () => ok(''))
+  await $.session.start(SESSION)
+  await w.clock.settle()
+  await bash($, w, NOFLOW_CLEANUP(ROOT))
+  await bash($, w, `. "${ROOT}/env.sh" && ls`)
+  expect(await $.ui.render(BAND)).toEqual(BENEATH)
+})
+
+test('OpenAndCloseInOneCommandStoresNothing T4 an open flow abandoned by the batch is still stored', async ($, on) => {
+  const { w, bash: answer } = await openFlow($, on, { files: { [`${ROOT}/env.sh`]: ENV, [`${ROOT2}/env.sh`]: ENV2 } })
+  answer.answer = ok('')
+  await w.clock.advance(90_000)
+  await bash($, w, NOFLOW_CLEANUP(ROOT2))
+  expect(w.flows()).toEqual([{ v: 1, root: ROOT, slug: 'mod-band', startedAt: NOW, endedAt: NOW + 90000, outcome: 'abandoned', phases: { ...ZERO, setup: 90000 } }])
   expect(await $.ui.render(BAND)).toEqual(BENEATH)
 })
