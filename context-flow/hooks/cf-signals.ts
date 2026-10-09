@@ -7,12 +7,11 @@ export function sessionRootOf(stdout: string): string | null {
   return stdout.match(new RegExp(`^SESSION=(${ROOT})$`, 'm'))?.[1] ?? null
 }
 
-// A command runs `name` only when it sits at an execution position: the start of the text, after a newline or one of ;&|(),
-// after a `{` that opens a group, or after do/then/else. Quoted separators and heredoc bodies are accepted residuals.
+// A regex cannot see quoting or heredocs, so a separator inside a quoted string or a heredoc body still counts as a position.
 function executedPattern(name: string, runner: 'optional' | 'source', prefix: boolean): RegExp {
   const position = '(?:^|(?<=[\\n;&|()])|(?<=\\{)(?=\\s)|(?<!\\w)(?:do|then|else)(?!\\w))'
   const assignments = `(?:\\w+=(?:'[^']*'|"[^"]*"|[^\\s;&|]*)[ \\t]+)*`
-  const runnerWord = runner === 'source' ? '(?:\\.|source)[ \\t]+' : '(?:(?:bash|sh|\\.|source)[ \\t]+)?'
+  const runnerWord = runner === 'source' ? '(?:\\.|source)[ \\t]+(?!-)' : '(?:(?:bash|sh|\\.|source)[ \\t]+(?!-))?'
   const path = prefix ? '(?:[^\\s"\';&|()]*\\/)?' : ''
   return new RegExp(`${position}[ \\t]*${assignments}${runnerWord}["']?${path}${name}["']?(?=[\\s;&|)<>]|$)`, 'g')
 }

@@ -1,21 +1,12 @@
 import { expect, test } from 'claude-code/testing'
 import { BAND, bandLines, nodesOf, stringsIn } from './fixtures/band.ts'
-import { BENEATH, ENV, ENV2, ROOT, ROOT2, SESSION, SETUP_OUT, ok, openFlow, world } from './fixtures/world.ts'
+import { BENEATH, ENV, ENV2, ROOT, ROOT2, SESSION, SETUP_OUT, bareBash, ok, openFlow, world } from './fixtures/world.ts'
 import { isImplementCommand, sourcedRootOf } from '../hooks/cf-signals.ts'
 
 const first = async ($: any) => (await bandLines($))[0]
 const colorOf = (node: any) => node.props?.color ?? node.color
-const ASYNC = { result: { status: 'async_launched', agentId: 'a1', description: 'd', prompt: 'p', outputFile: '/o' } }
 const ENV_FILES = { [`${ROOT}/env.sh`]: ENV }
-
-// A world with nothing open yet: the Bash tool answers `answer`.
-async function bareBash($: any, on: any, answer: unknown, options: any = {}) {
-  const w = world(on, { beneath: BENEATH, files: ENV_FILES, ...options })
-  on('tool.call', { tool: 'Bash' }, () => answer)
-  await $.session.start(SESSION)
-  await w.clock.settle()
-  return w
-}
+const ASYNC = { result: { status: 'async_launched', agentId: 'a1', description: 'd', prompt: 'p', outputFile: '/o' } }
 
 const bash = async ($: any, w: any, command: string, extra: object = {}) => {
   const result = await $.tool.call({ tool: 'Bash', command, ...extra })
@@ -483,4 +474,19 @@ test('SourcedRootOnlyWhenExecuted T3 the last executed source wins', () => {
 
 test('SourcedRootOnlyWhenExecuted T4 a loop body source counts', () => {
   expect(sourcedRootOf('for f in 1; do . "/tmp/cf-1008-Rez6/env.sh"; done')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('ImplementOnlyWhenExecuted R1 a runner followed by a flag-led path executes nothing', async ($, on) => {
+  const { w, bash: answer } = await openFlow($, on)
+  answer.answer = ok('')
+  await bash($, w, 'bash -x/cf-pi-run.sh')
+  expect(await first($)).toBe('● cf mod-band · setup · 0m')
+  expect(isImplementCommand('bash -x/cf-pi-run.sh')).toBe(false)
+  expect(isImplementCommand('sh -n/x/cf-pi-shard.sh')).toBe(false)
+})
+
+test('SetupRunOpensFlow R1 a flag-led setup path opens nothing', async ($, on) => {
+  const w = await bareBash($, on, ok('/tmp/cf-1008-Rez6\n'))
+  await bash($, w, 'bash -x/cf-pi-setup.sh')
+  expect(await $.ui.render(BAND)).toEqual(BENEATH)
 })

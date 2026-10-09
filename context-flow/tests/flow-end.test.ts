@@ -1,10 +1,11 @@
 import { expect, test } from 'claude-code/testing'
 import { BAND, bandLines } from './fixtures/band.ts'
 import { cleanupTargetOf } from '../hooks/cf-signals.ts'
-import { BENEATH, ENV, ENV2, NOW, ROOT, ROOT2, SESSION, ok, openFlow, world } from './fixtures/world.ts'
+import { BENEATH, ENV, ENV2, NOW, ROOT, ROOT2, SESSION, bareBash, ok, openFlow, world } from './fixtures/world.ts'
 
 const first = async ($: any) => (await bandLines($))[0]
-const CLEANUP = '. "/tmp/cf-1008-Rez6/env.sh"\n[ -n "${CLEANUP_SCRIPT:-}" ] && [ -x "$CLEANUP_SCRIPT" ] && bash "$CLEANUP_SCRIPT"'
+const cleanupAt = (root: string) => `. "${root}/env.sh"\n[ -n "\${CLEANUP_SCRIPT:-}" ] && [ -x "$CLEANUP_SCRIPT" ] && bash "$CLEANUP_SCRIPT"`
+const CLEANUP = cleanupAt(ROOT)
 const ZERO = { setup: 0, research: 0, plan: 0, implement: 0, review: 0, waiting: 0 }
 const ASYNC = { result: { status: 'async_launched', agentId: 'a1', description: 'd', prompt: 'p', outputFile: '/o' } }
 
@@ -139,7 +140,7 @@ test('CleanupScriptOnlyWhenExecuted T1 grepping the variable name leaves the flo
 })
 
 test('CleanupScriptOnlyWhenExecuted T2 a guarded bash of the variable is any', () => {
-  expect(cleanupTargetOf('. "/tmp/cf-1008-Rez6/env.sh"\n[ -n "${CLEANUP_SCRIPT:-}" ] && [ -x "$CLEANUP_SCRIPT" ] && bash "$CLEANUP_SCRIPT"')).toBe('any')
+  expect(cleanupTargetOf(CLEANUP)).toBe('any')
 })
 
 test('CleanupScriptOnlyWhenExecuted T3 a case arm bash of the variable is any', () => {
@@ -194,34 +195,23 @@ test('LiteralCleanupOnlyWhenExecuted T5 the pi cleanup script yields nothing', (
   expect(cleanupTargetOf('"$SCRIPTS/cf-pi-cleanup.sh" "/tmp/cf-1008-Rez6" "$CF_SLUG"')).toBe(null)
 })
 
-const NOFLOW_CLEANUP = (root: string) => `. "${root}/env.sh"\n[ -n "\${CLEANUP_SCRIPT:-}" ] && [ -x "$CLEANUP_SCRIPT" ] && bash "$CLEANUP_SCRIPT"`
-
 test('OpenAndCloseInOneCommandStoresNothing T1 a source-and-cleanup command stores nothing', async ($, on) => {
-  const w = world(on, { beneath: BENEATH, files: { [`${ROOT}/env.sh`]: ENV } })
-  on('tool.call', { tool: 'Bash' }, () => ok(''))
-  await $.session.start(SESSION)
-  await w.clock.settle()
-  await bash($, w, NOFLOW_CLEANUP(ROOT))
+  const w = await bareBash($, on, ok(''))
+  await bash($, w, cleanupAt(ROOT))
   expect(await $.ui.render(BAND)).toEqual(BENEATH)
   expect(w.storeCalls).toEqual([])
 })
 
 test('OpenAndCloseInOneCommandStoresNothing T2 a source and literal cleanup stores nothing', async ($, on) => {
-  const w = world(on, { beneath: BENEATH, files: { [`${ROOT}/env.sh`]: ENV } })
-  on('tool.call', { tool: 'Bash' }, () => ok(''))
-  await $.session.start(SESSION)
-  await w.clock.settle()
+  const w = await bareBash($, on, ok(''))
   await bash($, w, `. ${ROOT}/env.sh && bash ${ROOT}/cleanup.sh`)
   expect(await $.ui.render(BAND)).toEqual(BENEATH)
   expect(w.storeCalls).toEqual([])
 })
 
 test('OpenAndCloseInOneCommandStoresNothing T3 the closed root does not reopen', async ($, on) => {
-  const w = world(on, { beneath: BENEATH, files: { [`${ROOT}/env.sh`]: ENV } })
-  on('tool.call', { tool: 'Bash' }, () => ok(''))
-  await $.session.start(SESSION)
-  await w.clock.settle()
-  await bash($, w, NOFLOW_CLEANUP(ROOT))
+  const w = await bareBash($, on, ok(''))
+  await bash($, w, cleanupAt(ROOT))
   await bash($, w, `. "${ROOT}/env.sh" && ls`)
   expect(await $.ui.render(BAND)).toEqual(BENEATH)
 })
@@ -230,7 +220,7 @@ test('OpenAndCloseInOneCommandStoresNothing T4 an open flow abandoned by the bat
   const { w, bash: answer } = await openFlow($, on, { files: { [`${ROOT}/env.sh`]: ENV, [`${ROOT2}/env.sh`]: ENV2 } })
   answer.answer = ok('')
   await w.clock.advance(90_000)
-  await bash($, w, NOFLOW_CLEANUP(ROOT2))
+  await bash($, w, cleanupAt(ROOT2))
   expect(w.flows()).toEqual([{ v: 1, root: ROOT, slug: 'mod-band', startedAt: NOW, endedAt: NOW + 90000, outcome: 'abandoned', phases: { ...ZERO, setup: 90000 } }])
   expect(await $.ui.render(BAND)).toEqual(BENEATH)
 })

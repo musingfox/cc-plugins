@@ -80,3 +80,12 @@ export async function openFlow($: any, on: any, options: WorldOptions = {}) {
   await w.clock.settle()
   return { w, bash }
 }
+
+// A world with nothing open yet: the Bash tool answers `answer`.
+export async function bareBash($: any, on: any, answer: unknown, options: any = {}) {
+  const w = world(on, { beneath: BENEATH, files: { [`${ROOT}/env.sh`]: ENV }, ...options })
+  on('tool.call', { tool: 'Bash' }, () => answer)
+  await $.session.start(SESSION)
+  await w.clock.settle()
+  return w
+}
