@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import { BAND, bandLines, nodesOf, stringsIn } from './fixtures/band.ts'
 import { BENEATH, ENV, ENV2, ROOT, ROOT2, SESSION, SETUP_OUT, bareBash, ok, openFlow, world } from './fixtures/world.ts'
-import { isImplementCommand, sourcedRootOf } from '../hooks/cf-signals.ts'
+import { isImplementCommand, isSetupCommand, sourcedRootOf } from '../hooks/cf-signals.ts'
 
 const first = async ($: any) => (await bandLines($))[0]
 const colorOf = (node: any) => node.props?.color ?? node.color
@@ -504,5 +504,23 @@ test('SetupRunOpensFlow R2 a quoted flag-led setup path opens nothing', async ($
   const w = await bareBash($, on, ok('/tmp/cf-1008-Rez6\n'))
   await bash($, w, 'bash "-x/cf-pi-setup.sh"')
   await bash($, w, "bash '-x/cf-pi-setup.sh'")
+  expect(await $.ui.render(BAND)).toEqual(BENEATH)
+})
+
+test('ImplementOnlyWhenExecuted R3 an assignment value cannot hide a mention or backtrack', () => {
+  expect(isImplementCommand('OUT=$(bash -x/cf-pi-run.sh)')).toBe(false)
+  expect(isImplementCommand('X=$(cat "$SCRIPTS/cf-pi-run.sh")')).toBe(false)
+  expect(isImplementCommand('X="a cf-pi-run.sh" make')).toBe(false)
+  expect(isImplementCommand('X=$(date) cf-pi-run.sh')).toBe(true)
+  const t = Date.now()
+  expect(isImplementCommand("A='' ".repeat(200) + 'make')).toBe(false)
+  expect(Date.now() - t).toBeLessThan(50)
+})
+
+test('SetupRunOpensFlow R3 a substitution that only names the setup script opens nothing', async ($, on) => {
+  expect(isSetupCommand('B=$(basename "$SCRIPTS/cf-pi-setup.sh")')).toBe(false)
+  expect(isSetupCommand("SESSION=$(CF_IMPLEMENTER=omp PI_DISPATCH_CMD='pi --model x' \"$SCRIPTS/cf-pi-setup.sh\" s)")).toBe(true)
+  const w = await bareBash($, on, ok('/tmp/cf-1008-Rez6\n'))
+  await bash($, w, 'B=$(basename "$SCRIPTS/cf-pi-setup.sh")')
   expect(await $.ui.render(BAND)).toEqual(BENEATH)
 })

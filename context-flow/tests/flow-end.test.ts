@@ -224,3 +224,13 @@ test('OpenAndCloseInOneCommandStoresNothing T4 an open flow abandoned by the bat
   expect(w.flows()).toEqual([{ v: 1, root: ROOT, slug: 'mod-band', startedAt: NOW, endedAt: NOW + 90000, outcome: 'abandoned', phases: { ...ZERO, setup: 90000 } }])
   expect(await $.ui.render(BAND)).toEqual(BENEATH)
 })
+
+test('CleanupScriptOnlyWhenExecuted R1 a substitution that only reads the script closes nothing', async ($, on) => {
+  const { w, bash: answer } = await openFlow($, on)
+  answer.answer = ok('')
+  const command = 'D=$(dirname "$CLEANUP_SCRIPT")'
+  expect(cleanupTargetOf(command)).toBe(null)
+  await bash($, w, command)
+  expect(await first($)).toBe('● cf mod-band · setup · 0m')
+  expect(w.hasStoreKey('flows')).toBe(false)
+})

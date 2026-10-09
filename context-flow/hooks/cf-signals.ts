@@ -10,7 +10,7 @@ export function sessionRootOf(stdout: string): string | null {
 // A regex cannot see quoting or heredocs, so a separator inside a quoted string or a heredoc body still counts as a position.
 function executedPattern(name: string, runner: 'optional' | 'source', prefix: boolean): RegExp {
   const position = '(?:^|(?<=[\\n;&|()])|(?<=\\{)(?=\\s)|(?<!\\w)(?:do|then|else)(?!\\w))'
-  const assignments = `(?:\\w+=(?:'[^']*'|"[^"]*"|[^\\s;&|]*)[ \\t]+)*`
+  const assignments = `(?:\\w+=(?:'[^']*'|"[^"]*"|(?!['"])[^\\s;&|()]*)[ \\t]+)*`
   const runnerWord = runner === 'source' ? '(?:\\.|source)[ \\t]+(?!["\']?-)' : '(?:(?:bash|sh|\\.|source)[ \\t]+(?!["\']?-))?'
   const path = prefix ? '(?:[^\\s"\';&|()]*\\/)?' : ''
   return new RegExp(`${position}[ \\t]*${assignments}${runnerWord}["']?${path}${name}["']?(?=[\\s;&|)<>]|$)`, 'g')
