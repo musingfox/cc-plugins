@@ -66,3 +66,39 @@ fx_report valid
 fx_run --gates-only "$SHARD" goal none "$RUNNER"
 assert_eq "0" "$RC" "T6 rewritten report passes"
 fx_clean
+
+# T7-T8: a re-run of a shard that already passed. A declared contract found in
+# no Completed or Unresolved bullet is a report-format miss, not unfinished
+# work: the re-brief names it instead of the run ending incomplete-contracts.
+fx_rerun_shard() {
+  fx_build
+  cat > "$FLOW/shards.json" <<'JSON'
+{"groups": {"A": {"contracts": ["C1", "C2", "C3"], "files": ["src/x.ts"]}}}
+JSON
+  cat > "$FLOW/contracts.json" <<'JSON'
+{"schema_version": 1, "contracts": [{"name": "C1", "touches_files": ["src/x.ts"]}, {"name": "C2", "touches_files": ["src/x.ts"]}, {"name": "C3", "touches_files": ["src/x.ts"]}]}
+JSON
+  printf '{"checkpoints": {"A": "cf-test-A-r1"}}\n' > "$FLOW/dispatch-state.json"
+}
+
+# T7: only the fixed contract in Completed; C2 only under Concerns, C3 nowhere
+fx_rerun_shard
+printf '## Summary\nFixed C1.\n\n## Completed\n- C1 now works _(contract: C1)_\n\n## Concerns\n- C2 is fragile _(contract: C2)_\n' > "$SHARD/implement-report.md"
+fx_run --gates-only "$SHARD" goal none "$RUNNER"
+assert_eq "3" "$RC" "T7 exit"
+assert_eq "REBRIEF report $SHARD/report-re-brief.md" "$(fx_last)" "T7 last stdout line"
+assert_eq absent "$(fx_exists "$SHARD/outcome.md")" "T7 no outcome.md"
+assert_contains "$(cat "$SHARD/report-re-brief.md" 2>/dev/null)" '`C2`, `C3`' "T7 re-brief names the unlisted contracts"
+printf '## Summary\nAll three.\n\n## Completed\n- C1 now works _(contract: C1)_\n- C2 works _(contract: C2)_\n- C3 works _(contract: C3)_\n' > "$SHARD/implement-report.md"
+fx_run --gates-only "$SHARD" goal none "$RUNNER"
+case "$(fx_last)" in REBRIEF*) assert_eq "no REBRIEF" "$(fx_last)" "T7 rewritten report" ;; *) assert_eq ok ok "T7 rewritten report clears gate 1" ;; esac
+case "$(reason_of)" in incomplete-contracts) assert_eq "not incomplete-contracts" "$(reason_of)" "T7 rewritten report Reason" ;; *) assert_eq ok ok "T7 rewritten report is not incomplete-contracts" ;; esac
+fx_clean
+
+# T8: a contract under Unresolved is reported, so it still routes to replan
+fx_rerun_shard
+printf '## Summary\nFixed C1.\n\n## Completed\n- C1 now works _(contract: C1)_\n- C3 works _(contract: C3)_\n\n## Unresolved\n- C2 blocked _(contract: C2)_\n' > "$SHARD/implement-report.md"
+fx_run --gates-only "$SHARD" goal none "$RUNNER"
+assert_eq "2" "$RC" "T8 exit"
+assert_eq "incomplete-contracts" "$(reason_of)" "T8 Reason"
+fx_clean

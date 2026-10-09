@@ -43,8 +43,10 @@
 #                            (plain only)
 #   6-13 run in the plain form and in --gates-only.
 #   6. escalation detect     $ESCALATE_FILE present => NEEDS_REPLAN
-#   7. gate 1 report         head -20 contains ## Summary && ## Completed, and each
-#                            Completed tag names one contract of this shard;
+#   7. gate 1 report         head -20 contains ## Summary && ## Completed, each
+#                            Completed tag names one contract of this shard, and
+#                            on a re-run of a passed shard every contract is in a
+#                            Completed or Unresolved bullet;
 #                            one report-only re-dispatch before failing
 #   8. survivors set         contracts this shard both declared and reported done
 #   9. gate 3 test execute   cf-pi-test.sh; one in-shard re-dispatch on fail
@@ -319,15 +321,16 @@ shard_contract_names() {
   jq -r --arg sid "$SHARD_ID" '.groups[$sid].contracts[]' "$SHARDS_FILE"
 }
 
-# Extract Completed-claimed contract names from $REPORT_FILE.
-# OMP protocol uses "_(contract: Name)_" suffix on each Completed bullet.
-completed_contracts() {
-  # Pull only the lines inside ## Completed section.
-  sed -n '/^## Completed/,/^## /p' "$REPORT_FILE" \
+# Extract the contract names one ## section of $REPORT_FILE tags.
+# OMP protocol uses "_(contract: Name)_" suffix on each bullet.
+section_contracts() {
+  sed -n "/^## $1/,/^## /p" "$REPORT_FILE" \
     | grep -oE '_\(contract: [^)]+\)_' \
     | sed -E 's/^_\(contract: (.+)\)_$/\1/' \
     | awk '!seen[$0]++'
 }
+
+completed_contracts() { section_contracts Completed; }
 
 # Run cf-pi-postmortem.sh and stash output as a file path. Returns the path.
 do_postmortem() {
@@ -606,7 +609,8 @@ report_ok() {
   local head_lines; head_lines=$(head -20 "$REPORT_FILE")
   echo "$head_lines" | grep -q '^## Summary' || return 1
   echo "$head_lines" | grep -q '^## Completed' || return 1
-  [ -z "$(bad_contract_tags)" ]
+  [ -z "$(bad_contract_tags)" ] || return 1
+  [ -z "$(unlisted_contracts)" ]
 }
 
 # Completed tags that name no single contract of this shard: a count
@@ -616,6 +620,19 @@ bad_contract_tags() {
   local cname
   completed_contracts | while IFS= read -r cname; do
     echo "$declared_names" | grep -qxF "$cname" || echo "$cname"
+  done
+}
+
+# On a re-run of a shard that already passed, builders report only the contracts
+# they touched this round, even with the schema saying otherwise; left to step 12
+# the rest read as unimplemented and send passed work to replan. Declared
+# contracts in no Completed or Unresolved bullet; empty on a first run.
+unlisted_contracts() {
+  jq -e --arg sid "$SHARD_ID" '.checkpoints[$sid] // empty' "$DISPATCH_STATE_FILE" >/dev/null 2>&1 || return 0
+  local listed cname
+  listed=$(completed_contracts; section_contracts Unresolved)
+  for cname in $declared_names; do
+    echo "$listed" | grep -qxF "$cname" || echo "$cname"
   done
 }
 
@@ -682,6 +699,10 @@ write_report_rebrief() {
     if [ -n "$bad" ]; then
       printf 'These `_(contract: ...)_` tags under `## Completed` name no single contract of this shard: %s. Each Completed bullet carries exactly one contract name from the brief; a contract finished in an earlier round still gets its own bullet.\n\n' "$(printf '%s\n' "$bad" | sed 's/.*/`&`/' | paste -sd, - | sed 's/,/, /g')"
     fi
+    local unlisted; unlisted=$(unlisted_contracts 2>/dev/null || true)
+    if [ -n "$unlisted" ]; then
+      printf 'This shard already passed in an earlier round, and these of its contracts appear in no `## Completed` or `## Unresolved` bullet: %s. List every contract of this shard, not only the ones this round touched: under `## Completed` when it is implemented on the branch, including a contract finished in an earlier round or one that also has a Concern; under `## Unresolved` when it is not.\n\n' "$(printf '%s\n' "$unlisted" | sed 's/.*/`&`/' | paste -sd, - | sed 's/,/, /g')"
+    fi
     printf 'Read `%s` (its `## Output Requirements` section holds the exact Report Schema, and `## Behavioral Contracts` names the contracts) and inspect what is already committed on this branch: `git -C %s log --stat %s..HEAD`.\n\n' "$BRIEF_FILE" "$WORK" "$BASE_HEAD"
     printf 'Then write `%s` in that schema — it must start with `## Summary`, followed by `## Completed` with one bullet per contract that is actually implemented on the branch, each carrying its `_(contract: Name)_` suffix. Report only what the commits support; do not claim a contract you cannot point at. Then print DONE.\n' "$REPORT_FILE"
   } > "$REPORT_REBRIEF"
@@ -718,7 +739,7 @@ fi
 
 if ! report_ok; then
   pm=$(do_postmortem)
-  write_outcome FAIL report-malformed "" "(all): report missing, missing ## Summary / ## Completed in head -20, or a Completed tag naming no single contract of this shard, after a report-only re-dispatch" "$pm" "-"
+  write_outcome FAIL report-malformed "" "(all): report missing, missing ## Summary / ## Completed in head -20, a Completed tag naming no single contract of this shard, or a passed shard's contract left unlisted, after a report-only re-dispatch" "$pm" "-"
   say "FAIL gate1 report missing/malformed"
   exit 1
 fi
