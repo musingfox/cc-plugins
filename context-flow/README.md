@@ -57,7 +57,7 @@ The default implementer is the Claude `cf:implement` agent. OMP, a worker outsid
 
 While a `/cf` flow runs, one line above the prompt shows `● cf <name> · <phase> · <elapsed>`: the flow's slug, the phase it is in (setup, research, plan, implement, review), and whole minutes since the flow started. During implement it adds the shards passed over the total, the round in progress and the retries left; while a question to you is open it adds `waiting for you` and turns the dot to the warning colour. The band reads cf's own files and Bash commands, never changes them, and redraws every 10 seconds.
 
-When a flow ends, a record of how its time split across the six totals (setup, research, plan, implement, review, waiting) is kept in the plugin store under the key `flows`, newest 100 only. Its outcome is `cleanup` (the flow ran its cleanup script), `abandoned` (a different flow replaced it) or `session-end` (the Claude session ended first).
+When a flow ends, a record of how its time split across the six totals (setup, research, plan, implement, review, waiting) is kept in the plugin store under the key `flows`, newest 100 only. Its outcome is `cleanup` (the flow ran its cleanup script), `abandoned` (a different flow replaced it) or `session-end` (the Claude session ended first). A flow that one command both opens and closes, such as a fresh session's first command sourcing `env.sh` and then running cleanup, keeps no record, because it has no timing to report.
 
 The band is a Claude Mod and needs Claude Code 2.1.293+.
 
