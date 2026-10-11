@@ -1,3 +1,16 @@
+// Limits of the scanner, each one true of the code:
+// - A variable binds only from a plain NAME=<literal> that is the whole of an assignment-only command; export, declare, local and readonly do not bind.
+// - Bindings leak out of subshells and function bodies, since the scanner models neither scope.
+// - Only $NAME and ${NAME} expand, and only when bound; every other expansion stays raw and dynamic.
+// - Assignment-value substitutions are data unless the caller asks for 'commands'.
+// - Heredocs are recognised outside substitutions only; a function body is scanned, but its calls are not tracked.
+// - $'...' escapes are not decoded.
+// - No aliases, glob or brace expansion.
+// - Command-start keywords are only {, do, then and else.
+// - Nesting caps: 32 levels of double-quote and $(...) recursion, and 8 levels of descent into bash -c, sh -c, eval and 'commands' substitutions; text past a cap is data.
+// - An unterminated quote, $(, backtick or ${ makes the rest of the text data.
+// - A bash -c or eval body inherits the bindings in effect at the invoking command.
+
 export type Word = { text: string; dynamic: boolean }
 export type Assignment = { name: string; value: Word }
 export type SimpleCommand = { assignments: Assignment[]; words: Word[] }

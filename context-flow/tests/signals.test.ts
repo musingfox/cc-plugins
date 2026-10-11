@@ -673,3 +673,24 @@ test('SetupCommand T5 a setup name in a heredoc body does not run it, through ba
   expect(isSetupCommand('cat <<EOF\n"$SCRIPTS/cf-pi-setup.sh" s\nEOF')).toBe(false)
   expect(isSetupCommand('bash -c \'"$SCRIPTS/cf-pi-setup.sh" s\'')).toBe(true)
 })
+
+test('ScannerLimits T1 an export does not bind a variable for a source path', () => {
+  expect(sourcedRootOf('export S=/tmp/cf-1008-Rez6; . $S/env.sh')).toBeNull()
+})
+
+test('ScannerLimits T2 a default or a substitution in the path is not resolved', () => {
+  expect(sourcedRootOf('S=/tmp/cf-1008-Rez6; . ${S:-x}/env.sh')).toBeNull()
+  expect(sourcedRootOf('. $(echo /tmp/cf-1008-Rez6)/env.sh')).toBeNull()
+})
+
+test('ScannerLimits T3 a function body is scanned as commands, its calls are not tracked', () => {
+  expect(sourcedRootOf('f() { . /tmp/cf-1008-Rez6/env.sh; }')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('ScannerLimits T4 a bash -c body inherits the bindings in effect', () => {
+  expect(sourcedRootOf("S=/tmp/cf-1008-Rez6; bash -c '. $S/env.sh'")).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('ScannerLimits T5 a heredoc inside a substitution does not derail the scan after it', () => {
+  expect(sourcedRootOf('X=$(cat <<E2\nls\nE2\n)\n. /tmp/cf-1008-Rez6/env.sh')).toBe('/tmp/cf-1008-Rez6')
+})
