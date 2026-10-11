@@ -5,7 +5,7 @@
 // - Only $NAME and ${NAME} expand, and only when bound; every other expansion stays raw and dynamic.
 // - No word splitting of a bound unquoted value: CMD=". <root>/env.sh"; $CMD is one word, and no root is found.
 // - Assignment-value substitutions are data unless the caller asks for 'commands'; a $(...) inside ${...} is not scanned in 'commands' mode.
-// - Heredocs are recognised outside substitutions only.
+// - A heredoc inside $(...) is read as one outside it: its body is skipped when the closing ) is searched for, and a body with no terminator leaves that $(...) unterminated.
 // - $"..." keeps a literal $, so . $"<root>/env.sh" finds no root.
 // - $'...' escapes are not decoded.
 // - In $(...) and in ${...}, quotes and escapes are skipped as they are outside. A # starts a comment in $(...) only at a token start, after an unescaped separator or at the start of $(...); an escaped character or a closed nested $(...) before it does not count, and a backslash-newline does not change it. An escaped space before # is not a token start, as in POSIX; bash 3.2 reads it as a comment.
@@ -361,6 +361,7 @@ class Lexer {
     let depth = 1
     let j = from
     let start = true
+    let heredocs: { delimiter: string; strip: boolean }[] = []
     while (j < s.length) {
       const c = s[j]
       if (c === '#' && start) {
@@ -369,6 +370,22 @@ class Lexer {
         j = nl
       } else if (c === '\\' && s[j + 1] === '\n') {
         j += 2
+      } else if (c === '<' && s[j + 1] === '<') {
+        start = false
+        if (s[j + 2] === '<') {
+          j += 3
+          continue
+        }
+        const strip = s[j + 2] === '-'
+        const d = this.heredocDelimiter(j + (strip ? 3 : 2), nest)
+        if (d.end < 0) return -1
+        heredocs.push({ delimiter: d.text, strip })
+        j = d.end
+      } else if (c === '\n' && heredocs.length) {
+        j = this.skipHeredocBodies(j + 1, heredocs)
+        if (j < 0) return -1
+        heredocs = []
+        start = true
       } else if (c === '(') {
         depth++
         j++
@@ -387,6 +404,41 @@ class Lexer {
       }
     }
     return -1
+  }
+
+  // The delimiter word of a heredoc read inside $(...), with quotes removed, and the index just past it (-1 when unterminated).
+  private heredocDelimiter(from: number, nest: number): { text: string; end: number } {
+    const s = this.s
+    let j = from
+    let text = ''
+    while (s[j] === ' ' || s[j] === '\t') j++
+    while (j < s.length && !SEPARATOR.test(s[j])) {
+      const k = this.skipUnit(j, nest)
+      if (k < 0) return { text, end: -1 }
+      const quoted = s[j] === "'" || s[j] === '"' || (s[j] === '$' && s[j + 1] === "'")
+      if (s[j] === '\\') text += s.slice(j + 1, k)
+      else if (quoted) text += s.slice(s[j] === '$' ? j + 2 : j + 1, k - 1)
+      else text += s.slice(j, k)
+      j = k
+    }
+    return { text, end: j }
+  }
+
+  // Index just past the last heredoc body line that starts at from, or -1 when a terminator is missing.
+  private skipHeredocBodies(from: number, heredocs: { delimiter: string; strip: boolean }[]): number {
+    const s = this.s
+    let j = from
+    for (const { delimiter, strip } of heredocs) {
+      for (;;) {
+        if (j >= s.length) return -1
+        const nl = s.indexOf('\n', j)
+        const eol = nl < 0 ? s.length : nl
+        const line = strip ? s.slice(j, eol).replace(/^\t+/, '') : s.slice(j, eol)
+        j = eol + 1
+        if (line === delimiter) break
+      }
+    }
+    return j
   }
 
   // Index just past the closing '"' of a double quote opened before from, or -1 when unterminated.

@@ -759,8 +759,16 @@ test('SourcedRootOf R5 a variable in the same command resolves for a later value
   expect(sourcedRootOf('S=/tmp/cf-1008-Rez6 E=$S/env.sh; . $E')).toBe('/tmp/cf-1008-Rez6')
 })
 
+test('SourcedRootOf R6 a heredoc with an apostrophe inside a substitution does not hide the source', () => {
+  expect(sourcedRootOf(`echo "$(cat <<'EOF'\nfix: don't x\nEOF\n)"\n. /tmp/cf-1008-Rez6/env.sh`)).toBe('/tmp/cf-1008-Rez6')
+})
+
 test('ImplementCommand R3 a hash right after a nested substitution does not hide the script', () => {
   expect(isImplementCommand('X=$(echo $(echo a)#c); cf-pi-run.sh x')).toBe(true)
+})
+
+test('ImplementCommand R4 a heredoc with an apostrophe inside a substitution does not hide the script', () => {
+  expect(isImplementCommand(`echo "$(cat <<'EOF'\nfix: don't x\nEOF\n)"; "$SCRIPTS/cf-pi-run.sh" x`)).toBe(true)
 })
 
 test('SetupCommand R3 a hash right after a nested substitution does not hide the setup', () => {

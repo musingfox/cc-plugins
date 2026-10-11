@@ -317,3 +317,7 @@ test('CleanupTargetOf R3 a variable in the heredoc delimiter keeps the cleanup i
 test('CleanupTargetOf R4 a hash right after a nested substitution does not hide the cleanup', () => {
   expect(cleanupTargetOf('X=$(echo $(echo a)#c); bash "$CLEANUP_SCRIPT"')).toEqual({ kind: 'any' })
 })
+
+test('CleanupTargetOf R5 a heredoc with an apostrophe inside a substitution does not hide the cleanup', () => {
+  expect(cleanupTargetOf(`. /tmp/cf-1008-Rez6/env.sh && echo "$(cat <<'EOF'\nfix: don't x\nEOF\n)"\nbash "$CLEANUP_SCRIPT"`)).toEqual({ kind: 'any' })
+})
