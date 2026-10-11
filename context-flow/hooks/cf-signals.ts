@@ -1,4 +1,5 @@
 import type { CleanupTarget, FlowPhase, ImplementFiguresResult } from '../types/index.d.ts'
+import { scanCommands } from './shell-scan.ts'
 
 const ROOT_SUFFIX_CHARS = 'A-Za-z0-9'
 const ROOT = `/tmp/cf-\\d{4}-[${ROOT_SUFFIX_CHARS}]{4}`
@@ -19,8 +20,14 @@ function executedPattern(name: string, runner: 'optional' | 'source', prefix: bo
 
 // Every cf Bash after setup starts with `. "<root>/env.sh"`; a shard's env.sh sits one level deeper and does not match.
 export function sourcedRootOf(command: string): string | null {
-  const found = [...command.matchAll(executedPattern(`(${ROOT})/env\\.sh`, 'source', false))]
-  return found.at(-1)?.[1] ?? null
+  let root: string | null = null
+  for (const { words } of scanCommands(command)) {
+    const [first, next] = words
+    if ((first?.text === '.' || first?.text === 'source') && next && !next.text.startsWith('-')) {
+      root = next.text.match(new RegExp(`^(${ROOT})/env\\.sh$`))?.[1] ?? root
+    }
+  }
+  return root
 }
 
 export function phaseOfAgent(subagentType: unknown): Exclude<FlowPhase, 'setup'> | null {

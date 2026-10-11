@@ -569,3 +569,48 @@ test('ScanTotalAndLinear T4 isImplementCommand returns false for two hundred emp
   expect(isImplementCommand("A='' ".repeat(200) + 'make')).toBe(false)
   expect(performance.now() - t).toBeLessThan(50)
 })
+
+test('SourcedRootOf T1 a sourced env.sh resolves a variable, quoted or braced', () => {
+  expect(sourcedRootOf('S=/tmp/cf-1008-Rez6; . $S/env.sh')).toBe('/tmp/cf-1008-Rez6')
+  expect(sourcedRootOf('S="/tmp/cf-1008-Rez6"; . "$S/env.sh"')).toBe('/tmp/cf-1008-Rez6')
+  expect(sourcedRootOf("S='/tmp/cf-1008-Rez6'; source ${S}/env.sh")).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SourcedRootOf T2 a plain assignment beside the source still resolves', () => {
+  expect(sourcedRootOf("A=$'x y'; . /tmp/cf-1008-Rez6/env.sh")).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SourcedRootOf T3 a source inside bash -c, eval or sh -c runs and resolves', () => {
+  expect(sourcedRootOf("bash -c '. /tmp/cf-1008-Rez6/env.sh'")).toBe('/tmp/cf-1008-Rez6')
+  expect(sourcedRootOf('eval ". /tmp/cf-1008-Rez6/env.sh"')).toBe('/tmp/cf-1008-Rez6')
+  expect(sourcedRootOf('sh -c ". /tmp/cf-1008-Rez6/env.sh"')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SourcedRootOf T4 an unresolved variable source yields null and a literal one yields the root', () => {
+  expect(sourcedRootOf('. $S/env.sh')).toBeNull()
+  expect(sourcedRootOf('. "$SESSION/env.sh"')).toBeNull()
+  expect(sourcedRootOf('S=/tmp/cf-1008-Rez6; . $S/env.sh')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SourcedRootOf T5 a source inside quotes yields null and a real one yields the root', () => {
+  expect(sourcedRootOf('echo "x; . /tmp/cf-1008-Rez6/env.sh"')).toBeNull()
+  expect(sourcedRootOf("echo 'x'; . /tmp/cf-1008-Rez6/env.sh")).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SourcedRootOf T6 a source inside a heredoc body yields null and one after it yields the root', () => {
+  expect(sourcedRootOf('cat <<EOF\n. /tmp/cf-1008-Rez6/env.sh\nEOF')).toBeNull()
+  expect(sourcedRootOf('cat <<EOF\nx\nEOF\n. /tmp/cf-1008-Rez6/env.sh')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SourcedRootOf T7 a shard env.sh one level deeper is not a root', () => {
+  expect(sourcedRootOf('S=/tmp/cf-1008-Rez6; . $S/shards/A/env.sh')).toBeNull()
+  expect(sourcedRootOf('. /tmp/cf-1008-Rez6/shards/A/env.sh')).toBeNull()
+})
+
+test('SourcedRootOf T8 the last executed source wins', () => {
+  expect(sourcedRootOf('S=/tmp/cf-1008-Ab12; . $S/env.sh && . /tmp/cf-1008-Rez6/env.sh')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SourcedRootOf T9 a source inside a substitution assignment yields null', () => {
+  expect(sourcedRootOf('X=$(. /tmp/cf-1008-Rez6/env.sh)')).toBeNull()
+})
