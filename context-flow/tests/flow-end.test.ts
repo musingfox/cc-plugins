@@ -300,3 +300,11 @@ test('CleanupTargetOf T7 a braced cleanup name is any, a defaulted one is null',
   expect(cleanupTargetOf('bash "${CLEANUP_SCRIPT}"')).toEqual({ kind: 'any' })
   expect(cleanupTargetOf('bash "${CLEANUP_SCRIPT:-}"')).toBeNull()
 })
+
+test("CleanupTargetOf R1 a comment with an apostrophe inside a substitution does not hide the cleanup", () => {
+  expect(cleanupTargetOf("X=$(ls # don't\n)\nbash \"$CLEANUP_SCRIPT\"")).toEqual({ kind: 'any' })
+})
+
+test('CleanupTargetOf R2 a comment holding ")" inside a data substitution keeps the cleanup as data', () => {
+  expect(cleanupTargetOf('X=$(echo hi # a ) b\nbash "$CLEANUP_SCRIPT"\n)')).toBe(null)
+})

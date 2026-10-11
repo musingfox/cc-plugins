@@ -1,13 +1,18 @@
 // Limits of the scanner, each one true of the code:
-// - A variable binds only from a plain NAME=<literal> that is the whole of an assignment-only command; export, declare, local and readonly do not bind.
+// - A variable binds only from a plain NAME=<literal> that is the whole of an assignment-only command; export, declare, local, readonly, for, read and unset do not bind or unbind, so an earlier binding stays in force past them.
+// - A value longer than 1024 characters does not bind, and a binding that is later replaced by a non-literal value is removed.
 // - Bindings leak out of subshells and function bodies, since the scanner models neither scope.
 // - Only $NAME and ${NAME} expand, and only when bound; every other expansion stays raw and dynamic.
 // - Assignment-value substitutions are data unless the caller asks for 'commands'.
 // - Heredocs are recognised outside substitutions only; a function body is scanned, but its calls are not tracked.
+// - In $(...) and in ${...}, quotes and escapes are skipped as they are outside; a # starts a comment in $(...) only at a token start.
+// - A << inside (( )) is read as a heredoc.
+// - A case pattern's ) inside $(...) closes the substitution.
 // - $'...' escapes are not decoded.
 // - No aliases, glob or brace expansion.
 // - Command-start keywords are only {, do, then and else.
-// - Nesting caps: 32 levels of double-quote and $(...) recursion, and 8 levels of descent into bash -c, sh -c, eval and 'commands' substitutions; text past a cap is data.
+// - bash and sh take only single-dash flags before -c; --long options are not skipped, so bash --norc -c is not descended.
+// - Nesting caps: 32 levels of double-quote and $(...) recursion, and 8 levels of descent into bash -c, sh -c, eval and 'commands' substitutions. Past the 32-level cap, the outer $( or quote and everything after it is data; past the descent cap, the body stays one word.
 // - An unterminated quote, $(, backtick or ${ makes the rest of the text data.
 // - A bash -c or eval body inherits the bindings in effect at the invoking command.
 
@@ -16,6 +21,7 @@ export type Assignment = { name: string; value: Word }
 export type SimpleCommand = { assignments: Assignment[]; words: Word[] }
 
 const MAX_NEST = 32
+const MAX_VALUE = 1024
 const SEPARATOR = /[ \t\n;&|()<>]/
 const KEYWORDS = new Set(['{', 'do', 'then', 'else'])
 
@@ -26,6 +32,24 @@ export type ScanOptions = { assignmentSubstitutions?: 'data' | 'commands' }
 const MAX_DESCENT = 8
 type Piece = { text: string; dynamic: boolean; end: number }
 
+// The bindings of one scan. A nested scan reads its parents and writes only its own entries, so nothing is copied; null marks an unbound name.
+class Scope {
+  private readonly own = new Map<string, string | null>()
+
+  constructor(private readonly parent: Scope | null) {}
+
+  get(name: string): string | undefined {
+    for (let scope: Scope | null = this; scope; scope = scope.parent) {
+      if (scope.own.has(name)) return scope.own.get(name) ?? undefined
+    }
+    return undefined
+  }
+
+  set(name: string, value: string | null): void {
+    this.own.set(name, value)
+  }
+}
+
 class Lexer {
   private i = 0
   private cmd: SimpleCommand = { assignments: [], words: [] }
@@ -35,7 +59,7 @@ class Lexer {
 
   constructor(
     private readonly s: string,
-    private readonly bindings: Map<string, string>,
+    private readonly bindings: Scope,
     private readonly commands: boolean,
     private readonly descent: number,
   ) {}
@@ -63,8 +87,7 @@ class Lexer {
     const { assignments, words } = this.cmd
     if (words.length === 0) {
       for (const { name, value } of assignments) {
-        if (value.dynamic) this.bindings.delete(name)
-        else this.bindings.set(name, value.text)
+        this.bindings.set(name, value.dynamic || value.text.length > MAX_VALUE ? null : value.text)
       }
     }
     if (assignments.length || words.length) {
@@ -81,7 +104,7 @@ class Lexer {
 
   // Scans a substitution or a -c/eval body with a copy of the bindings, so its bindings do not leak out.
   private nested(text: string): SimpleCommand[] {
-    return new Lexer(text, new Map(this.bindings), this.commands, this.descent + 1).run()
+    return new Lexer(text, new Scope(this.bindings), this.commands, this.descent + 1).run()
   }
 
   private word(): void {
@@ -158,8 +181,7 @@ class Lexer {
         plain = false
         bare = false
         const k = s.indexOf("'", this.i + 1)
-        const end = k < 0 ? s.length : k
-        text += s.slice(this.i + 1, end)
+        text += s.slice(this.i + 1, k < 0 ? s.length : k)
         this.i = k < 0 ? s.length : k + 1
         continue
       }
@@ -175,10 +197,9 @@ class Lexer {
       if (c === '$' && s[this.i + 1] === "'") {
         plain = false
         bare = false
-        let j = this.i + 2
-        while (j < s.length && s[j] !== "'") j += s[j] === '\\' ? 2 : 1
-        text += s.slice(this.i + 2, Math.min(j, s.length))
-        this.i = Math.min(j + 1, s.length)
+        const k = this.ansiEnd(this.i + 2)
+        text += s.slice(this.i + 2, k < 0 ? s.length : k)
+        this.i = k < 0 ? s.length : k + 1
         continue
       }
       const p = c === '$' || c === '`' ? this.expansionAt(this.i) : null
@@ -235,8 +256,8 @@ class Lexer {
     const s = this.s
     if (s[j] === '`') {
       const k = this.backtickEnd(j + 1)
-      const end = Math.min(k + 1, s.length)
-      if (k < s.length) this.subs.push(s.slice(j + 1, k))
+      const end = k < 0 ? s.length : k + 1
+      if (k >= 0) this.subs.push(s.slice(j + 1, k))
       return { text: s.slice(j, end), dynamic: true, end }
     }
     const n = s[j + 1]
@@ -247,7 +268,7 @@ class Lexer {
       return { text: s.slice(j, end), dynamic: true, end }
     }
     if (n === '{') {
-      const k = this.braceEnd(j + 2)
+      const k = this.braceEnd(j + 2, 0)
       const end = k < 0 ? s.length : k
       return this.resolved(k < 0 ? '' : s.slice(j + 2, k - 1), s.slice(j, end), end)
     }
@@ -266,12 +287,46 @@ class Lexer {
     return value === undefined ? { text: raw, dynamic: true, end } : { text: value, dynamic: false, end }
   }
 
-  // Index of the closing backtick, or s.length when unterminated.
+  // Index of the closing backtick, or -1 when unterminated.
   private backtickEnd(from: number): number {
     const s = this.s
     let j = from
     while (j < s.length && s[j] !== '`') j += s[j] === '\\' ? 2 : 1
-    return Math.min(j, s.length)
+    return j < s.length ? j : -1
+  }
+
+  // Index of the closing quote of an ANSI-C string whose body starts at from, or -1 when unterminated.
+  private ansiEnd(from: number): number {
+    const s = this.s
+    let j = from
+    while (j < s.length && s[j] !== "'") j += s[j] === '\\' ? 2 : 1
+    return j < s.length ? j : -1
+  }
+
+  // Index just past the quoted, escaped or nested unit that starts at j, or -1 when unterminated. Shared by every boundary finder so that quoting is read the same way everywhere.
+  private skipUnit(j: number, nest: number): number {
+    const s = this.s
+    const c = s[j]
+    if (c === '\\') return j + 2
+    if (c === "'") {
+      const k = s.indexOf("'", j + 1)
+      return k < 0 ? -1 : k + 1
+    }
+    if (c === '$' && s[j + 1] === "'") {
+      const k = this.ansiEnd(j + 2)
+      return k < 0 ? -1 : k + 1
+    }
+    if (c === '`') {
+      const k = this.backtickEnd(j + 1)
+      return k < 0 ? -1 : k + 1
+    }
+    if (c === '"' || c === '$') {
+      if (c === '$' && s[j + 1] !== '(' && s[j + 1] !== '{') return j + 1
+      if (nest >= MAX_NEST) return -1
+      if (c === '"') return this.skipDq(j + 1, nest + 1)
+      return s[j + 1] === '(' ? this.closeParen(j + 2, nest + 1) : this.braceEnd(j + 2, nest + 1)
+    }
+    return j + 1
   }
 
   // Index just past the ')' that closes a $( opened before from, or -1 when unterminated.
@@ -281,24 +336,20 @@ class Lexer {
     let j = from
     while (j < s.length) {
       const c = s[j]
-      if (c === '\\') j += 2
-      else if (c === "'") {
-        const k = s.indexOf("'", j + 1)
-        if (k < 0) return -1
-        j = k + 1
-      } else if (c === '"') {
-        if (nest >= MAX_NEST) return -1
-        j = this.skipDq(j + 1, nest + 1)
-        if (j < 0) return -1
-      } else if (c === '`') {
-        const k = this.backtickEnd(j + 1)
-        if (k >= s.length) return -1
-        j = k + 1
-      } else {
-        if (c === '(') depth++
-        else if (c === ')' && --depth === 0) return j + 1
+      if (c === '#' && (j === from || SEPARATOR.test(s[j - 1]))) {
+        const nl = s.indexOf('\n', j)
+        if (nl < 0) return -1
+        j = nl
+      } else if (c === '(') {
+        depth++
         j++
-      }
+      } else if (c === ')') {
+        if (--depth === 0) return j + 1
+        j++
+      } else if (c === '\\' || c === "'" || c === '"' || c === '`' || c === '$') {
+        j = this.skipUnit(j, nest)
+        if (j < 0) return -1
+      } else j++
     }
     return -1
   }
@@ -309,15 +360,9 @@ class Lexer {
     let j = from
     while (j < s.length) {
       const c = s[j]
-      if (c === '\\') j += 2
-      else if (c === '"') return j + 1
-      else if (c === '`') {
-        const k = this.backtickEnd(j + 1)
-        if (k >= s.length) return -1
-        j = k + 1
-      } else if (c === '$' && s[j + 1] === '(') {
-        if (nest >= MAX_NEST) return -1
-        j = this.closeParen(j + 2, nest + 1)
+      if (c === '"') return j + 1
+      if (c === '\\' || c === '`' || (c === '$' && (s[j + 1] === '(' || s[j + 1] === '{'))) {
+        j = this.skipUnit(j, nest)
         if (j < 0) return -1
       } else j++
     }
@@ -325,18 +370,22 @@ class Lexer {
   }
 
   // Index just past the '}' that closes a ${ opened before from, or -1 when unterminated.
-  private braceEnd(from: number): number {
+  private braceEnd(from: number, nest: number): number {
     const s = this.s
     let depth = 1
     let j = from
     while (j < s.length) {
       const c = s[j]
-      if (c === '\\') j += 2
-      else {
-        if (c === '{') depth++
-        else if (c === '}' && --depth === 0) return j + 1
+      if (c === '}') {
+        if (--depth === 0) return j + 1
         j++
-      }
+      } else if (c === '{') {
+        depth++
+        j++
+      } else if (c === '\\' || c === "'" || c === '"' || c === '`' || c === '$') {
+        j = this.skipUnit(j, nest)
+        if (j < 0) return -1
+      } else j++
     }
     return -1
   }
@@ -356,5 +405,5 @@ function bodyOf(words: Word[]): string | null {
 }
 
 export function scanCommands(text: string, options: ScanOptions = {}): SimpleCommand[] {
-  return new Lexer(text, new Map(), options.assignmentSubstitutions === 'commands', 0).run()
+  return new Lexer(text, new Scope(null), options.assignmentSubstitutions === 'commands', 0).run()
 }

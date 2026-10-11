@@ -694,3 +694,19 @@ test('ScannerLimits T4 a bash -c body inherits the bindings in effect', () => {
 test('ScannerLimits T5 a heredoc inside a substitution does not derail the scan after it', () => {
   expect(sourcedRootOf('X=$(cat <<E2\nls\nE2\n)\n. /tmp/cf-1008-Rez6/env.sh')).toBe('/tmp/cf-1008-Rez6')
 })
+
+test("ImplementOnlyWhenExecuted R4 an ANSI-C quote with an escaped quote in a substitution still runs the script", () => {
+  expect(isImplementCommand("X=$(echo $'it\\'s') cf-pi-run.sh")).toBe(true)
+})
+
+test("SetupRunOpensFlow R4 a comment with an apostrophe inside SESSION=$(...) still opens the flow", () => {
+  expect(isSetupCommand('SESSION=$("$SCRIPTS/cf-pi-setup.sh" s # it\'s the setup\n)')).toBe(true)
+})
+
+test("SourcedRootFollowsVariables R1 an ANSI-C quote with an escaped quote before the source still resolves it", () => {
+  expect(sourcedRootOf("X=$(echo $'it\\'s'); . /tmp/cf-1008-Rez6/env.sh")).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SourcedRootFollowsVariables R2 a source inside a substitution with a ")" comment is data', () => {
+  expect(sourcedRootOf('X=$(echo hi # a ) b\n. /tmp/cf-1008-Rez6/env.sh\n)')).toBe(null)
+})

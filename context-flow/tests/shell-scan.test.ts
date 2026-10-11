@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 import { scanCommands, type SimpleCommand } from '../hooks/shell-scan.ts'
+import { sourcedRootOf } from '../hooks/cf-signals.ts'
 
 const argv = (commands: SimpleCommand[]) => commands.map((c) => c.words.map((w) => w.text)).filter((words) => words.length > 0)
 const assigns = (c: SimpleCommand) => c.assignments.map((a) => [a.name, a.value.text])
@@ -316,4 +317,54 @@ test('ScanTotalAndLinear T3 large inputs finish in under one second each', () =>
 test('ScanTotalAndLinear T1 scanCommands returns for empty and lone-delimiter inputs', () => {
   const inputs = ['', ' ', '"', "'", '`', '$(', '${', '\\', '<<', '<<EOF', 'a=', '=', '(', ')', '$((', ';;', '\u0000']
   for (const text of inputs) expect(() => scanCommands(text)).not.toThrow()
+})
+
+test("ScanAssignmentPrefix R1 an ANSI-C quote with an escaped quote in a substitution keeps the command word", () => {
+  const [c] = scanCommands("X=$(echo $'it\\'s') cf-pi-run.sh")
+  expect(c.words.map((w) => w.text)).toEqual(['cf-pi-run.sh'])
+})
+
+test('ScanAssignmentSubstitutions R1 a comment holding ")" does not end a data substitution', () => {
+  expect(argv(scanCommands('X=$(echo hi # a ) b\n. /tmp/cf-1008-Rez6/env.sh\n)'))).toEqual([])
+})
+
+test("ScanCommandPositions R1 an escaped quote in an ANSI-C string inside a substitution ends it", () => {
+  expect(scanCommands("X=$(echo $'it\\'s'); ls").length).toBe(2)
+})
+
+test('ScanCommandPositions R2 a quoted brace inside a default expansion ends the expansion', () => {
+  expect(scanCommands('echo ${X:-"}"}; ls').length).toBe(2)
+})
+
+test("ScanCommandPositions R3 an apostrophe in a comment inside a substitution ends at the closing paren", () => {
+  expect(scanCommands("X=$(ls # don't\n)\nls").length).toBe(2)
+})
+
+test('ScanTotalAndLinear R1 chained doubling assignments finish quickly and do not throw', () => {
+  let text = 'V0=xx'
+  for (let i = 1; i <= 30; i++) text += `; V${i}=$V${i - 1}$V${i - 1}`
+  const t0 = performance.now()
+  scanCommands(text)
+  sourcedRootOf(text)
+  expect(performance.now() - t0).toBeLessThan(50)
+})
+
+test('ScanTotalAndLinear R2 many bindings do not make a long script superlinear', () => {
+  const build = (k: number) => {
+    let s = ''
+    for (let i = 0; i < k; i++) s += `A${i}=1; `
+    return s + 'eval x; '.repeat(k)
+  }
+  const best = (s: string) => {
+    let m = Infinity
+    for (let r = 0; r < 3; r++) {
+      const t0 = performance.now()
+      scanCommands(s)
+      m = Math.min(m, performance.now() - t0)
+    }
+    return m
+  }
+  const small = build(6000)
+  const large = build(24000)
+  expect(best(large)).toBeLessThan(8 * best(small))
 })
