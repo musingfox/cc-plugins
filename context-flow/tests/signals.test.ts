@@ -551,14 +551,14 @@ test('SharedHelpers T4 first is the top band line, not the whole list', async ($
   expect((await bandLines($))[0]).toBe('● cf mod-band · setup · 0m')
 })
 
-test('ScanTotalAndLinear T1 the exports return for empty and lone-delimiter inputs', () => {
+test('ScanTotalAndLinear T5 the exports return for empty and lone-delimiter inputs', () => {
   const inputs = ['', ' ', '"', "'", '`', '$(', '${', '\\', '<<', '<<EOF', 'a=', '=', '(', ')', '$((', ';;', '\u0000']
   for (const text of inputs) {
     expect(() => [isImplementCommand(text), isSetupCommand(text), sourcedRootOf(text), cleanupTargetOf(text)]).not.toThrow()
   }
 })
 
-test('ScanTotalAndLinear T2 the exports return null for deeply nested input', () => {
+test('ScanTotalAndLinear T6 the exports return null for deeply nested input', () => {
   for (const text of ['$('.repeat(100000), '('.repeat(100000), '"$('.repeat(50000), 'bash -c "'.repeat(50000)]) {
     expect(sourcedRootOf(text)).toBeNull()
   }
@@ -699,14 +699,29 @@ test("ImplementOnlyWhenExecuted R4 an ANSI-C quote with an escaped quote in a su
   expect(isImplementCommand("X=$(echo $'it\\'s') cf-pi-run.sh")).toBe(true)
 })
 
+test('ImplementCommand R2 a variable in the heredoc delimiter keeps the script name in the body as data', () => {
+  expect(isImplementCommand('S=EOF; cat <<$S\nEOF\ncf-pi-run.sh x\n$S')).toBe(false)
+  expect(isImplementCommand('S=EOF; cat <<$S\nEOF\n$S\ncf-pi-run.sh x')).toBe(true)
+})
+
 test("SetupRunOpensFlow R4 a comment with an apostrophe inside SESSION=$(...) still opens the flow", () => {
   expect(isSetupCommand('SESSION=$("$SCRIPTS/cf-pi-setup.sh" s # it\'s the setup\n)')).toBe(true)
 })
 
-test("SourcedRootFollowsVariables R1 an ANSI-C quote with an escaped quote before the source still resolves it", () => {
+test('SetupCommand R2 a variable in the heredoc delimiter keeps the setup name in the body as data', () => {
+  expect(isSetupCommand('S=EOF; cat <<$S\nEOF\n"$SCRIPTS/cf-pi-setup.sh" s\n$S')).toBe(false)
+  expect(isSetupCommand('S=EOF; cat <<$S\nEOF\n$S\n"$SCRIPTS/cf-pi-setup.sh" s')).toBe(true)
+})
+
+test("SourcedRootOf R1 an ANSI-C quote with an escaped quote before the source still resolves it", () => {
   expect(sourcedRootOf("X=$(echo $'it\\'s'); . /tmp/cf-1008-Rez6/env.sh")).toBe('/tmp/cf-1008-Rez6')
 })
 
-test('SourcedRootFollowsVariables R2 a source inside a substitution with a ")" comment is data', () => {
+test('SourcedRootOf R2 a source inside a substitution with a ")" comment is data', () => {
   expect(sourcedRootOf('X=$(echo hi # a ) b\n. /tmp/cf-1008-Rez6/env.sh\n)')).toBe(null)
+})
+
+test('SourcedRootOf R3 a variable in the heredoc delimiter keeps the source in the body as data', () => {
+  expect(sourcedRootOf('S=EOF; cat <<$S\nEOF\n. /tmp/cf-1008-Rez6/env.sh\n$S')).toBe(null)
+  expect(sourcedRootOf('S=EOF; cat <<$S\nEOF\n$S\n. /tmp/cf-1008-Rez6/env.sh')).toBe('/tmp/cf-1008-Rez6')
 })

@@ -12,6 +12,7 @@
 // - No aliases, glob or brace expansion.
 // - Command-start keywords are only {, do, then and else.
 // - bash and sh take only single-dash flags before -c; --long options are not skipped, so bash --norc -c is not descended.
+// - Bound values resolved in one scan total at most four times the scanned text's length; once that budget is spent, further references stay raw and dynamic.
 // - Nesting caps: 32 levels of double-quote and $(...) recursion, and 8 levels of descent into bash -c, sh -c, eval and 'commands' substitutions. Past the 32-level cap, the outer $( or quote and everything after it is data; past the descent cap, the body stays one word.
 // - An unterminated quote, $(, backtick or ${ makes the rest of the text data.
 // - A bash -c or eval body inherits the bindings in effect at the invoking command.
@@ -62,6 +63,7 @@ class Lexer {
     private readonly bindings: Scope,
     private readonly commands: boolean,
     private readonly descent: number,
+    private readonly budget: { left: number },
   ) {}
 
   run(): SimpleCommand[] {
@@ -102,9 +104,9 @@ class Lexer {
     for (const c of commands) this.out.push(c)
   }
 
-  // Scans a substitution or a -c/eval body with a copy of the bindings, so its bindings do not leak out.
+  // Scans a substitution or a -c/eval body in a child scope that reads the parent's bindings and keeps its own writes, so its bindings do not leak out.
   private nested(text: string): SimpleCommand[] {
-    return new Lexer(text, new Scope(this.bindings), this.commands, this.descent + 1).run()
+    return new Lexer(text, new Scope(this.bindings), this.commands, this.descent + 1, this.budget).run()
   }
 
   private word(): void {
@@ -126,7 +128,7 @@ class Lexer {
     else if (s.startsWith('<<', this.i)) {
       const strip = s[this.i + 2] === '-'
       this.i += strip ? 3 : 2
-      const delimiter = this.target()
+      const delimiter = this.target(true)
       this.heredocs.push({ delimiter: delimiter?.text ?? '', strip })
     } else {
       this.i += ['<&', '>&', '>>', '<>', '>|'].includes(s.slice(this.i, this.i + 2)) ? 2 : 1
@@ -135,9 +137,9 @@ class Lexer {
   }
 
   // The redirect target is a word of its own and is not a command word.
-  private target(): Read | null {
+  private target(literal = false): Read | null {
     while (this.s[this.i] === ' ' || this.s[this.i] === '\t') this.i++
-    return this.i < this.s.length && !SEPARATOR.test(this.s[this.i]) ? this.readWord() : null
+    return this.i < this.s.length && !SEPARATOR.test(this.s[this.i]) ? this.readWord(literal) : null
   }
 
   // A heredoc body starts after the newline that ends its command and ends at a line equal to its delimiter.
@@ -155,7 +157,8 @@ class Lexer {
     this.heredocs = []
   }
 
-  private readWord(): Read {
+  // A literal word takes quote removal only; its $ and backticks are not expanded, as for a heredoc delimiter.
+  private readWord(literal = false): Read {
     const s = this.s
     this.subs = []
     let text = ''
@@ -188,7 +191,7 @@ class Lexer {
       if (c === '"') {
         plain = false
         bare = false
-        const r = this.dq(this.i + 1)
+        const r = this.dq(this.i + 1, literal)
         text += r.text
         dynamic ||= r.dynamic
         this.i = r.end
@@ -202,7 +205,7 @@ class Lexer {
         this.i = k < 0 ? s.length : k + 1
         continue
       }
-      const p = c === '$' || c === '`' ? this.expansionAt(this.i) : null
+      const p = !literal && (c === '$' || c === '`') ? this.expansionAt(this.i) : null
       if (p) {
         plain = false
         bare = false
@@ -225,7 +228,7 @@ class Lexer {
     return { text, dynamic, plain, eqAt, fd: false, subs: this.subs }
   }
 
-  private dq(from: number): Piece {
+  private dq(from: number, literal: boolean): Piece {
     const s = this.s
     let text = ''
     let dynamic = false
@@ -238,7 +241,7 @@ class Lexer {
         j += 2
         continue
       }
-      const p = c === '$' || c === '`' ? this.expansionAt(j) : null
+      const p = !literal && (c === '$' || c === '`') ? this.expansionAt(j) : null
       if (p) {
         text += p.text
         dynamic ||= p.dynamic
@@ -284,7 +287,9 @@ class Lexer {
   // Only a name the same text assigned a literal value to is replaced; anything else stays raw and dynamic.
   private resolved(name: string, raw: string, end: number): Piece {
     const value = this.bindings.get(name)
-    return value === undefined ? { text: raw, dynamic: true, end } : { text: value, dynamic: false, end }
+    if (value === undefined || value.length > this.budget.left) return { text: raw, dynamic: true, end }
+    this.budget.left -= value.length
+    return { text: value, dynamic: false, end }
   }
 
   // Index of the closing backtick, or -1 when unterminated.
@@ -405,5 +410,5 @@ function bodyOf(words: Word[]): string | null {
 }
 
 export function scanCommands(text: string, options: ScanOptions = {}): SimpleCommand[] {
-  return new Lexer(text, new Scope(null), options.assignmentSubstitutions === 'commands', 0).run()
+  return new Lexer(text, new Scope(null), options.assignmentSubstitutions === 'commands', 0, { left: 4 * text.length }).run()
 }

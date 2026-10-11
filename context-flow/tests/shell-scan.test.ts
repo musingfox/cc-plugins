@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 import { scanCommands, type SimpleCommand } from '../hooks/shell-scan.ts'
-import { sourcedRootOf } from '../hooks/cf-signals.ts'
+import { cleanupTargetOf, isImplementCommand, isSetupCommand, sourcedRootOf } from '../hooks/cf-signals.ts'
 
 const argv = (commands: SimpleCommand[]) => commands.map((c) => c.words.map((w) => w.text)).filter((words) => words.length > 0)
 const assigns = (c: SimpleCommand) => c.assignments.map((a) => [a.name, a.value.text])
@@ -185,6 +185,12 @@ test('ScanHeredocBodies T7 a command after the heredoc operator on the same line
   expect(argv(scanCommands('cat <<EOF; ls\nbody\nEOF'))).toEqual([['cat'], ['ls']])
 })
 
+test('ScanHeredocBodies R1 a variable in the delimiter is literal, so the body ends only at that text', () => {
+  expect(argv(scanCommands('S=EOF; cat <<$S\nEOF\n. /tmp/cf-1008-Rez6/env.sh\n$S'))).toEqual([['cat']])
+  expect(argv(scanCommands('S=EOF; cat <<"$S"\nEOF\n. /tmp/cf-1008-Rez6/env.sh\n$S'))).toEqual([['cat']])
+  expect(argv(scanCommands('S=EOF; cat <<$S\nEOF\n$S\n. /tmp/cf-1008-Rez6/env.sh'))).toEqual([['cat'], ['.', '/tmp/cf-1008-Rez6/env.sh']])
+})
+
 test('ScanVariableResolution T1 a plainly assigned literal replaces $S in the same text', () => {
   const [, c] = scanCommands('S=/tmp/cf-1008-Rez6; echo $S/env.sh')
   expect(argv([c])).toEqual([['echo', '/tmp/cf-1008-Rez6/env.sh']])
@@ -367,4 +373,13 @@ test('ScanTotalAndLinear R2 many bindings do not make a long script superlinear'
   const small = build(6000)
   const large = build(24000)
   expect(best(large)).toBeLessThan(8 * best(small))
+})
+
+test('ScanTotalAndLinear R3 eval re-expansion of held references returns within 50 ms', () => {
+  let text = `V0=${'x'.repeat(1000)}`
+  for (let i = 1; i <= 4; i++) text += `; V${i}='${`$V${i - 1}`.repeat(60)}'`
+  text += '; eval eval eval eval $V4'
+  const t0 = performance.now()
+  expect(() => [scanCommands(text), isImplementCommand(text), isSetupCommand(text), sourcedRootOf(text), cleanupTargetOf(text)]).not.toThrow()
+  expect(performance.now() - t0).toBeLessThan(50)
 })
