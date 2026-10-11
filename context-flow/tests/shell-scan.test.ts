@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import { scanCommands, type SimpleCommand } from '../hooks/shell-scan.ts'
 
-const argv = (commands: SimpleCommand[]) => commands.map((c) => c.words.map((w) => w.text))
+const argv = (commands: SimpleCommand[]) => commands.map((c) => c.words.map((w) => w.text)).filter((words) => words.length > 0)
 const assigns = (c: SimpleCommand) => c.assignments.map((a) => [a.name, a.value.text])
 const dynamics = (c: SimpleCommand) => c.words.map((w) => w.dynamic)
 
@@ -182,4 +182,46 @@ test('ScanHeredocBodies T6 a missing terminator makes the rest of the text the b
 
 test('ScanHeredocBodies T7 a command after the heredoc operator on the same line still runs', () => {
   expect(argv(scanCommands('cat <<EOF; ls\nbody\nEOF'))).toEqual([['cat'], ['ls']])
+})
+
+test('ScanVariableResolution T1 a plainly assigned literal replaces $S in the same text', () => {
+  const [, c] = scanCommands('S=/tmp/cf-1008-Rez6; echo $S/env.sh')
+  expect(argv([c])).toEqual([['echo', '/tmp/cf-1008-Rez6/env.sh']])
+  expect(dynamics(c)).toEqual([false, false])
+})
+
+test('ScanVariableResolution T2 braced and double-quoted uses resolve, single quotes do not', () => {
+  const [, c] = scanCommands('S="/tmp/cf-1008-Rez6"; echo ${S}/x "$S" \'$S\'')
+  expect(argv([c])).toEqual([['echo', '/tmp/cf-1008-Rez6/x', '/tmp/cf-1008-Rez6', '$S']])
+})
+
+test('ScanVariableResolution T3 an unbound variable stays raw and dynamic', () => {
+  const [c] = scanCommands('echo $S/x')
+  expect(argv([c])).toEqual([['echo', '$S/x']])
+  expect(dynamics(c)).toEqual([false, true])
+})
+
+test('ScanVariableResolution T4 a substitution value leaves the name unbound', () => {
+  expect(argv(scanCommands('S=$(pwd); echo $S'))).toEqual([['echo', '$S']])
+  expect(argv(scanCommands('S=a; S=$(pwd); echo $S'))).toEqual([['echo', '$S']])
+})
+
+test('ScanVariableResolution T5 a prefix assignment on a command does not bind', () => {
+  expect(argv(scanCommands('S=a echo $S'))).toEqual([['echo', '$S']])
+})
+
+test('ScanVariableResolution T6 each name resolves to its own value', () => {
+  expect(argv(scanCommands('S=a; S2=b; echo $S2'))).toEqual([['echo', 'b']])
+})
+
+test('ScanVariableResolution T7 a value that uses an earlier binding resolves too', () => {
+  expect(argv(scanCommands('A=/x; B=$A/y; echo $B'))).toEqual([['echo', '/x/y']])
+})
+
+test('ScanVariableResolution T8 export is a limit: its assignment does not bind', () => {
+  expect(argv(scanCommands('export S=/tmp/cf-1008-Rez6; echo $S'))).toEqual([['export', 'S=/tmp/cf-1008-Rez6'], ['echo', '$S']])
+})
+
+test('ScanVariableResolution T9 a default-value expansion is never resolved', () => {
+  expect(argv(scanCommands('S=a; echo ${S:-d}'))).toEqual([['echo', '${S:-d}']])
 })

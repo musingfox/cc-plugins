@@ -15,7 +15,7 @@ class Lexer {
   private readonly out: SimpleCommand[] = []
   private heredocs: { delimiter: string; strip: boolean }[] = []
 
-  constructor(private readonly s: string) {}
+  constructor(private readonly s: string, private readonly bindings: Map<string, string>) {}
 
   run(): SimpleCommand[] {
     const s = this.s
@@ -38,6 +38,12 @@ class Lexer {
 
   private end(): void {
     const { assignments, words } = this.cmd
+    if (words.length === 0) {
+      for (const { name, value } of assignments) {
+        if (value.dynamic) this.bindings.delete(name)
+        else this.bindings.set(name, value.text)
+      }
+    }
     if (assignments.length || words.length) this.out.push({ assignments, words })
     this.cmd = { assignments: [], words: [] }
   }
@@ -203,15 +209,21 @@ class Lexer {
     if (n === '{') {
       const k = this.braceEnd(j + 2)
       const end = k < 0 ? s.length : k
-      return { text: s.slice(j, end), dynamic: true, end }
+      return this.resolved(k < 0 ? '' : s.slice(j + 2, k - 1), s.slice(j, end), end)
     }
     if (n !== undefined && /[A-Za-z_]/.test(n)) {
       let k = j + 1
       while (k < s.length && /\w/.test(s[k])) k++
-      return { text: s.slice(j, k), dynamic: true, end: k }
+      return this.resolved(s.slice(j + 1, k), s.slice(j, k), k)
     }
     if (n !== undefined && /[0-9?$!#@*-]/.test(n)) return { text: s.slice(j, j + 2), dynamic: true, end: j + 2 }
     return null
+  }
+
+  // Only a name the same text assigned a literal value to is replaced; anything else stays raw and dynamic.
+  private resolved(name: string, raw: string, end: number): Piece {
+    const value = this.bindings.get(name)
+    return value === undefined ? { text: raw, dynamic: true, end } : { text: value, dynamic: false, end }
   }
 
   // Index of the closing backtick, or s.length when unterminated.
@@ -291,5 +303,5 @@ class Lexer {
 }
 
 export function scanCommands(text: string): SimpleCommand[] {
-  return new Lexer(text).run()
+  return new Lexer(text, new Map()).run()
 }
