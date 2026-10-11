@@ -750,3 +750,19 @@ test('SourcedRootOf R3 a variable in the heredoc delimiter keeps the source in t
   expect(sourcedRootOf('S=EOF; cat <<$S\nEOF\n. /tmp/cf-1008-Rez6/env.sh\n$S')).toBe(null)
   expect(sourcedRootOf('S=EOF; cat <<$S\nEOF\n$S\n. /tmp/cf-1008-Rez6/env.sh')).toBe('/tmp/cf-1008-Rez6')
 })
+
+test('SourcedRootOf R4 a hash right after a nested substitution does not hide the source', () => {
+  expect(sourcedRootOf('X=$(echo $(echo a)#c); . /tmp/cf-1008-Rez6/env.sh')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SourcedRootOf R5 a variable in the same command resolves for a later value', () => {
+  expect(sourcedRootOf('S=/tmp/cf-1008-Rez6 E=$S/env.sh; . $E')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('ImplementCommand R3 a hash right after a nested substitution does not hide the script', () => {
+  expect(isImplementCommand('X=$(echo $(echo a)#c); cf-pi-run.sh x')).toBe(true)
+})
+
+test('SetupCommand R3 a hash right after a nested substitution does not hide the setup', () => {
+  expect(isSetupCommand('X=$(echo $(echo a)#c); "$SCRIPTS/cf-pi-setup.sh" s')).toBe(true)
+})

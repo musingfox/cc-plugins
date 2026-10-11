@@ -1,5 +1,5 @@
 // Limits of the scanner, each one true of the code:
-// - A variable binds only from a plain NAME=<literal> that is the whole of an assignment-only command; export, declare, local, readonly, for, read and unset do not bind or unbind, so an earlier binding stays in force past them.
+// - A variable binds only from a plain NAME=<literal> that is the whole of an assignment-only command; export, declare, local, readonly, for, read and unset do not bind or unbind, so an earlier binding stays in force past them. A later value in the same command reads the earlier ones, which bash does only for an assignment-only command; no caller reads prefix values.
 // - A value longer than 1024 characters does not bind, and a binding that is later replaced by a non-literal value is removed.
 // - Bindings leak out of subshells and function bodies, since the scanner models neither scope.
 // - Only $NAME and ${NAME} expand, and only when bound; every other expansion stays raw and dynamic.
@@ -8,7 +8,7 @@
 // - Heredocs are recognised outside substitutions only.
 // - $"..." keeps a literal $, so . $"<root>/env.sh" finds no root.
 // - $'...' escapes are not decoded.
-// - In $(...) and in ${...}, quotes and escapes are skipped as they are outside; a # starts a comment in $(...) only at a token start.
+// - In $(...) and in ${...}, quotes and escapes are skipped as they are outside. A # starts a comment in $(...) only at a token start, after an unescaped separator or at the start of $(...); an escaped character or a closed nested $(...) before it does not count, and a backslash-newline does not change it. An escaped space before # is not a token start, as in POSIX; bash 3.2 reads it as a comment.
 // - A << inside (( )) is read as a heredoc.
 // - A case pattern's ) inside $(...) closes the substitution.
 // - No aliases, glob or brace expansion.
@@ -60,6 +60,9 @@ class Lexer {
   private readonly out: SimpleCommand[] = []
   private heredocs: { delimiter: string; strip: boolean }[] = []
   private subs: string[] = []
+  // The values of the current command's assignments, read by later values of the same command.
+  private pending = new Map<string, string | null>()
+  private assigning = false
 
   constructor(
     private readonly s: string,
@@ -101,6 +104,7 @@ class Lexer {
       if (body !== null && this.descent < MAX_DESCENT) this.emit(this.nested(body))
     }
     this.cmd = { assignments: [], words: [] }
+    this.pending.clear()
   }
 
   private emit(commands: SimpleCommand[]): void {
@@ -118,7 +122,10 @@ class Lexer {
     const { cmd } = this
     if (r.plain && cmd.words.length === 0 && cmd.assignments.length === 0 && KEYWORDS.has(r.text)) return
     if (r.eqAt >= 0 && cmd.words.length === 0) {
-      cmd.assignments.push({ name: r.text.slice(0, r.eqAt), value: { text: r.text.slice(r.eqAt + 1), dynamic: r.dynamic } })
+      const name = r.text.slice(0, r.eqAt)
+      const value = { text: r.text.slice(r.eqAt + 1), dynamic: r.dynamic }
+      cmd.assignments.push({ name, value })
+      this.pending.set(name, value.dynamic || value.text.length > MAX_VALUE ? null : value.text)
       if (this.commands && this.descent < MAX_DESCENT) for (const body of r.subs) this.emit(this.nested(body))
       return
     }
@@ -169,6 +176,7 @@ class Lexer {
     let plain = true
     let bare = true
     let eqAt = -1
+    this.assigning = false
     while (this.i < s.length) {
       const c = s[this.i]
       if (SEPARATOR.test(c)) {
@@ -208,6 +216,15 @@ class Lexer {
         this.i = k < 0 ? s.length : k + 1
         continue
       }
+      if (literal && (c === '`' || (c === '$' && (s[this.i + 1] === '(' || s[this.i + 1] === '{')))) {
+        plain = false
+        bare = false
+        const k = this.skipUnit(this.i, 0)
+        const end = k < 0 ? s.length : k
+        text += s.slice(this.i, end)
+        this.i = end
+        continue
+      }
       const p = !literal && (c === '$' || c === '`') ? this.expansionAt(this.i) : null
       if (p) {
         plain = false
@@ -219,6 +236,7 @@ class Lexer {
       }
       if (c === '=' && eqAt < 0 && plain && /^[A-Za-z_][A-Za-z0-9_]*$/.test(text)) {
         eqAt = text.length
+        this.assigning = this.cmd.words.length === 0
         bare = false
         text += c
         this.i++
@@ -289,7 +307,7 @@ class Lexer {
 
   // Only a name the same text assigned a literal value to is replaced; anything else stays raw and dynamic.
   private resolved(name: string, raw: string, end: number): Piece {
-    const value = this.bindings.get(name)
+    const value = this.assigning && this.pending.has(name) ? this.pending.get(name) ?? undefined : this.bindings.get(name)
     if (value === undefined || value.length > this.budget.left) return { text: raw, dynamic: true, end }
     this.budget.left -= value.length
     return { text: value, dynamic: false, end }
@@ -342,22 +360,31 @@ class Lexer {
     const s = this.s
     let depth = 1
     let j = from
+    let start = true
     while (j < s.length) {
       const c = s[j]
-      if (c === '#' && (j === from || SEPARATOR.test(s[j - 1]))) {
+      if (c === '#' && start) {
         const nl = s.indexOf('\n', j)
         if (nl < 0) return -1
         j = nl
+      } else if (c === '\\' && s[j + 1] === '\n') {
+        j += 2
       } else if (c === '(') {
         depth++
         j++
+        start = true
       } else if (c === ')') {
         if (--depth === 0) return j + 1
         j++
+        start = true
       } else if (c === '\\' || c === "'" || c === '"' || c === '`' || c === '$') {
         j = this.skipUnit(j, nest)
         if (j < 0) return -1
-      } else j++
+        start = false
+      } else {
+        start = SEPARATOR.test(c)
+        j++
+      }
     }
     return -1
   }

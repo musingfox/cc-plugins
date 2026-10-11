@@ -191,6 +191,10 @@ test('ScanHeredocBodies R1 a variable in the delimiter is literal, so the body e
   expect(argv(scanCommands('S=EOF; cat <<$S\nEOF\n$S\n. /tmp/cf-1008-Rez6/env.sh'))).toEqual([['cat'], ['.', '/tmp/cf-1008-Rez6/env.sh']])
 })
 
+test('ScanHeredocBodies R2 a substitution inside a heredoc delimiter is part of the delimiter', () => {
+  expect(argv(scanCommands('cat <<E$(x)F\nbody\nE$(x)F\nls'))).toEqual([['cat'], ['ls']])
+})
+
 test('ScanVariableResolution T1 a plainly assigned literal replaces $S in the same text', () => {
   const [, c] = scanCommands('S=/tmp/cf-1008-Rez6; echo $S/env.sh')
   expect(argv([c])).toEqual([['echo', '/tmp/cf-1008-Rez6/env.sh']])
@@ -231,6 +235,10 @@ test('ScanVariableResolution T8 export is a limit: its assignment does not bind'
 
 test('ScanVariableResolution T9 a default-value expansion is never resolved', () => {
   expect(argv(scanCommands('S=a; echo ${S:-d}'))).toEqual([['echo', '${S:-d}']])
+})
+
+test('ScanVariableResolution R1 a value in the same command reads the assignment before it', () => {
+  expect(argv(scanCommands('A=/x B=$A/y; echo $B'))).toEqual([['echo', '/x/y']])
 })
 
 const COMMANDS = { assignmentSubstitutions: 'commands' } as const
@@ -346,6 +354,15 @@ test("ScanCommandPositions R3 an apostrophe in a comment inside a substitution e
   expect(scanCommands("X=$(ls # don't\n)\nls").length).toBe(2)
 })
 
+test('ScanCommandPositions R4 a hash right after a nested substitution is mid-word, not a comment', () => {
+  expect(argv(scanCommands('X=$(echo $(echo a)#c); echo after'))).toEqual([['echo', 'after']])
+})
+
+test('ScanCommandPositions R5 a hash after an escaped separator or a continuation inside a substitution is mid-word', () => {
+  expect(argv(scanCommands('X=$(echo a\\;#c); echo after'))).toEqual([['echo', 'after']])
+  expect(argv(scanCommands('X=$(echo a\\\n#c); echo after'))).toEqual([['echo', 'after']])
+})
+
 test('ScanTotalAndLinear R1 chained doubling assignments finish quickly and do not throw', () => {
   let text = 'V0=xx'
   for (let i = 1; i <= 30; i++) text += `; V${i}=$V${i - 1}$V${i - 1}`
@@ -388,4 +405,8 @@ test('ScannerLimits T11 the resolution budget leaves later references raw and dy
   const colons = scanCommands('V=' + 'a'.repeat(1000) + '; ' + ': $V;'.repeat(10)).filter((c) => c.words[0]?.text === ':')
   expect(colons[0].words[1]).toEqual({ text: 'a'.repeat(1000), dynamic: false })
   expect(colons[colons.length - 1].words[1]).toEqual({ text: '$V', dynamic: true })
+})
+
+test('ScannerLimitsStated R1 a hash after an escaped semicolon inside a substitution is not a comment', () => {
+  expect(argv(scanCommands('X=$(echo a\\;#c); echo after'))).toEqual([['echo', 'after']])
 })
