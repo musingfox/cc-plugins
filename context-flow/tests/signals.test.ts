@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import { BAND, bandLines, nodesOf, stringsIn } from './fixtures/band.ts'
 import { BENEATH, ENV, ENV2, ROOT, ROOT2, SESSION, SETUP_OUT, bareBash, ok, openFlow, world } from './fixtures/world.ts'
 import { ASYNC, bash, colorOf, first } from './fixtures/helpers.ts'
-import { isImplementCommand, isSetupCommand, setupRootOf, sourcedRootOf } from '../hooks/cf-signals.ts'
+import { cleanupTargetOf, isImplementCommand, isSetupCommand, setupRootOf, sourcedRootOf } from '../hooks/cf-signals.ts'
 
 const ENV_FILES = { [`${ROOT}/env.sh`]: ENV }
 
@@ -549,4 +549,23 @@ test('SharedHelpers T4 first is the top band line, not the whole list', async ($
   await openFlow($, on)
   expect(await first($)).toBe('● cf mod-band · setup · 0m')
   expect((await bandLines($))[0]).toBe('● cf mod-band · setup · 0m')
+})
+
+test('ScanTotalAndLinear T1 the exports return for empty and lone-delimiter inputs', () => {
+  const inputs = ['', ' ', '"', "'", '`', '$(', '${', '\\', '<<', '<<EOF', 'a=', '=', '(', ')', '$((', ';;', '\u0000']
+  for (const text of inputs) {
+    expect(() => [isImplementCommand(text), isSetupCommand(text), sourcedRootOf(text), cleanupTargetOf(text)]).not.toThrow()
+  }
+})
+
+test('ScanTotalAndLinear T2 the exports return null for deeply nested input', () => {
+  for (const text of ['$('.repeat(100000), '('.repeat(100000), '"$('.repeat(50000), 'bash -c "'.repeat(50000)]) {
+    expect(sourcedRootOf(text)).toBeNull()
+  }
+})
+
+test('ScanTotalAndLinear T4 isImplementCommand returns false for two hundred empty assignments within 50 ms', () => {
+  const t = performance.now()
+  expect(isImplementCommand("A='' ".repeat(200) + 'make')).toBe(false)
+  expect(performance.now() - t).toBeLessThan(50)
 })

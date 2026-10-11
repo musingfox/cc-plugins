@@ -297,3 +297,23 @@ test('ScanStringBodyDescent T9 descent stops at eight levels and returns', () =>
   for (let k = 0; k < 12; k++) t = 'eval ' + JSON.stringify(t)
   expect(scanCommands(t)[0].words[0].text).toBe('eval')
 })
+
+const LARGE = ['$('.repeat(100000), '('.repeat(100000), '"$('.repeat(50000), 'bash -c "'.repeat(50000)]
+
+test('ScanTotalAndLinear T2 nesting past the caps is data and returns', () => {
+  for (const text of LARGE) expect(() => scanCommands(text)).not.toThrow()
+})
+
+test('ScanTotalAndLinear T3 large inputs finish in under one second each', () => {
+  const inputs = ['a '.repeat(50000), "'x'".repeat(30000), '$(a '.repeat(30000), '<<E\n'.repeat(20000)]
+  for (const text of inputs) {
+    const t = performance.now()
+    scanCommands(text)
+    expect(performance.now() - t).toBeLessThan(1000)
+  }
+})
+
+test('ScanTotalAndLinear T1 scanCommands returns for empty and lone-delimiter inputs', () => {
+  const inputs = ['', ' ', '"', "'", '`', '$(', '${', '\\', '<<', '<<EOF', 'a=', '=', '(', ')', '$((', ';;', '\u0000']
+  for (const text of inputs) expect(() => scanCommands(text)).not.toThrow()
+})
