@@ -383,3 +383,9 @@ test('ScanTotalAndLinear R3 eval re-expansion of held references returns within 
   expect(() => [scanCommands(text), isImplementCommand(text), isSetupCommand(text), sourcedRootOf(text), cleanupTargetOf(text)]).not.toThrow()
   expect(performance.now() - t0).toBeLessThan(50)
 })
+
+test('ScannerLimits T11 the resolution budget leaves later references raw and dynamic', () => {
+  const colons = scanCommands('V=' + 'a'.repeat(1000) + '; ' + ': $V;'.repeat(10)).filter((c) => c.words[0]?.text === ':')
+  expect(colons[0].words[1]).toEqual({ text: 'a'.repeat(1000), dynamic: false })
+  expect(colons[colons.length - 1].words[1]).toEqual({ text: '$V', dynamic: true })
+})

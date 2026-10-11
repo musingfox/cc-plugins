@@ -695,6 +695,31 @@ test('ScannerLimits T5 a heredoc inside a substitution does not derail the scan 
   expect(sourcedRootOf('X=$(cat <<E2\nls\nE2\n)\n. /tmp/cf-1008-Rez6/env.sh')).toBe('/tmp/cf-1008-Rez6')
 })
 
+test('ScannerLimits T6 a bound unquoted value is not word-split into a command', () => {
+  expect(sourcedRootOf('CMD=". /tmp/cf-1008-Rez6/env.sh"; $CMD')).toBeNull()
+  expect(sourcedRootOf('. /tmp/cf-1008-Rez6/env.sh')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('ScannerLimits T7 a binding made in an eval body does not reach later commands', () => {
+  expect(sourcedRootOf('eval S=/tmp/cf-1008-Rez6; . $S/env.sh')).toBeNull()
+  expect(sourcedRootOf('S=/tmp/cf-1008-Rez6; . $S/env.sh')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('ScannerLimits T8 a setup run inside a default expansion is not scanned', () => {
+  expect(isSetupCommand('SESSION=${X:-$("$SCRIPTS/cf-pi-setup.sh" s)}')).toBe(false)
+  expect(isSetupCommand('SESSION=$("$SCRIPTS/cf-pi-setup.sh" s)')).toBe(true)
+})
+
+test('ScannerLimits T9 a locale-quoted path keeps its dollar and finds no root', () => {
+  expect(sourcedRootOf('. $"/tmp/cf-1008-Rez6/env.sh"')).toBeNull()
+  expect(sourcedRootOf('. "/tmp/cf-1008-Rez6/env.sh"')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('ScannerLimits T10 the no-parens function form folds its first body command into the header', () => {
+  expect(sourcedRootOf('function f { . /tmp/cf-1008-Rez6/env.sh; }')).toBeNull()
+  expect(sourcedRootOf('function f() { . /tmp/cf-1008-Rez6/env.sh; }')).toBe('/tmp/cf-1008-Rez6')
+})
+
 test("ImplementOnlyWhenExecuted R4 an ANSI-C quote with an escaped quote in a substitution still runs the script", () => {
   expect(isImplementCommand("X=$(echo $'it\\'s') cf-pi-run.sh")).toBe(true)
 })

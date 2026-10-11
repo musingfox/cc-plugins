@@ -3,19 +3,22 @@
 // - A value longer than 1024 characters does not bind, and a binding that is later replaced by a non-literal value is removed.
 // - Bindings leak out of subshells and function bodies, since the scanner models neither scope.
 // - Only $NAME and ${NAME} expand, and only when bound; every other expansion stays raw and dynamic.
-// - Assignment-value substitutions are data unless the caller asks for 'commands'.
-// - Heredocs are recognised outside substitutions only; a function body is scanned, but its calls are not tracked.
+// - No word splitting of a bound unquoted value: CMD=". <root>/env.sh"; $CMD is one word, and no root is found.
+// - Assignment-value substitutions are data unless the caller asks for 'commands'; a $(...) inside ${...} is not scanned in 'commands' mode.
+// - Heredocs are recognised outside substitutions only.
+// - $"..." keeps a literal $, so . $"<root>/env.sh" finds no root.
+// - $'...' escapes are not decoded.
 // - In $(...) and in ${...}, quotes and escapes are skipped as they are outside; a # starts a comment in $(...) only at a token start.
 // - A << inside (( )) is read as a heredoc.
 // - A case pattern's ) inside $(...) closes the substitution.
-// - $'...' escapes are not decoded.
 // - No aliases, glob or brace expansion.
 // - Command-start keywords are only {, do, then and else.
 // - bash and sh take only single-dash flags before -c; --long options are not skipped, so bash --norc -c is not descended.
 // - Bound values resolved in one scan total at most four times the scanned text's length; once that budget is spent, further references stay raw and dynamic.
+// - f() { ...; } and function f() { ...; } bodies are scanned and their calls are not tracked; in function f { ...; } the first body command folds into the header and is not seen.
 // - Nesting caps: 32 levels of double-quote and $(...) recursion, and 8 levels of descent into bash -c, sh -c, eval and 'commands' substitutions. Past the 32-level cap, the outer $( or quote and everything after it is data; past the descent cap, the body stays one word.
 // - An unterminated quote, $(, backtick or ${ makes the rest of the text data.
-// - A bash -c or eval body inherits the bindings in effect at the invoking command.
+// - A bash -c or eval body inherits the bindings in effect at the invoking command; a binding made inside it does not reach later commands.
 
 export type Word = { text: string; dynamic: boolean }
 export type Assignment = { name: string; value: Word }
