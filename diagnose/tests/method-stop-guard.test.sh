@@ -37,10 +37,10 @@ check_case() {
   grep -q 'T3' "$scratch/out.log" || fail "mutation $name failed without T3 in output"
 }
 
-printf '%s' "${src//"do not apply the fix"/"apply the fix"}" >"$scratch/mutant.md"
+printf '%s' "${src//"do not apply the fix"/apply the fix}" >"$scratch/mutant.md"
 check_case affirmative
 
-printf '%s' "${src//"do not apply the fix"/"do apply the fix"}" >"$scratch/mutant.md"
+printf '%s' "${src//"do not apply the fix"/do apply the fix}" >"$scratch/mutant.md"
 check_case do-apply
 
 awk '{print} /^## Phase 5/{print ""; print "Apply the fix."}' "$method" >"$scratch/mutant.md"
