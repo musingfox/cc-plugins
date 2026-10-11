@@ -1,5 +1,5 @@
 import type { CleanupTarget, FlowPhase, ImplementFiguresResult } from '../types/index.d.ts'
-import { scanCommands } from './shell-scan.ts'
+import { scanCommands, type SimpleCommand, type Word } from './shell-scan.ts'
 
 const ROOT_SUFFIX_CHARS = 'A-Za-z0-9'
 const ROOT = `/tmp/cf-\\d{4}-[${ROOT_SUFFIX_CHARS}]{4}`
@@ -40,7 +40,20 @@ export function phaseOfAgent(subagentType: unknown): Exclude<FlowPhase, 'setup'>
   }
 }
 
-export const isImplementCommand = (command: string): boolean => executedPattern('cf-pi-(?:worktree|shard|run)\\.sh', 'optional', true).test(command)
+const RUNNERS = new Set(['bash', 'sh', '.', 'source'])
+
+// The word a command executes: its first word, or the script after a runner whose next word is not flag-led.
+function executedWordOf({ words }: SimpleCommand): Word | null {
+  const [first, next] = words
+  if (!first) return null
+  if (!RUNNERS.has(first.text)) return first
+  return next && !next.text.startsWith('-') ? next : null
+}
+
+const executesScript = (command: string, script: string): boolean =>
+  scanCommands(command).some((c) => executedWordOf(c)?.text.match(new RegExp(`(^|/)${script}$`)) != null)
+
+export const isImplementCommand = (command: string): boolean => executesScript(command, 'cf-pi-(?:worktree|shard|run)\\.sh')
 
 export const isSetupCommand = (command: string): boolean => executedPattern('cf-pi-setup\\.sh', 'optional', true).test(command)
 

@@ -614,3 +614,38 @@ test('SourcedRootOf T8 the last executed source wins', () => {
 test('SourcedRootOf T9 a source inside a substitution assignment yields null', () => {
   expect(sourcedRootOf('X=$(. /tmp/cf-1008-Rez6/env.sh)')).toBeNull()
 })
+
+test('ImplementCommand T1 a shard script with a prefixed PATH assignment runs', () => {
+  expect(isImplementCommand('PATH="$HOME"/bin:$PATH cf-pi-run.sh /tmp/cf-1008-Rez6/shards/A g c t')).toBe(true)
+})
+
+test('ImplementCommand T2 any assignment quoting before the script still runs it', () => {
+  expect(isImplementCommand("A=$'x y' cf-pi-run.sh a")).toBe(true)
+  expect(isImplementCommand("A=$'it\\'s' cf-pi-run.sh")).toBe(true)
+  expect(isImplementCommand('A=`date` cf-pi-shard.sh')).toBe(true)
+  expect(isImplementCommand("FOO='a'\"b\"c cf-pi-worktree.sh")).toBe(true)
+})
+
+test('ImplementCommand T3 a script name in a heredoc body does not run it, one after the body does', () => {
+  expect(isImplementCommand('cat <<EOF\ncf-pi-run.sh /tmp/cf-1008-Rez6/shards/A\nEOF')).toBe(false)
+  expect(isImplementCommand('cat <<EOF\nx\nEOF\ncf-pi-run.sh /tmp/cf-1008-Rez6/shards/A')).toBe(true)
+})
+
+test('ImplementCommand T4 a script name in quotes or a comment does not run it, after a separator it does', () => {
+  expect(isImplementCommand('echo "x; cf-pi-run.sh"')).toBe(false)
+  expect(isImplementCommand('# cf-pi-run.sh')).toBe(false)
+  expect(isImplementCommand('echo x; cf-pi-run.sh')).toBe(true)
+})
+
+test('ImplementCommand T5 a script run through bash -c runs', () => {
+  expect(isImplementCommand('bash -c \'"$SCRIPTS/cf-pi-run.sh" x\'')).toBe(true)
+})
+
+test('ImplementCommand T6 a script inside an assignment substitution is data', () => {
+  expect(isImplementCommand('X=$("$SCRIPTS/cf-pi-run.sh")')).toBe(false)
+})
+
+test('ImplementCommand T7 the existing ImplementOnlyWhenExecuted cases keep their answers', () => {
+  expect(isImplementCommand('X=$(date) cf-pi-run.sh')).toBe(true)
+  expect(isImplementCommand('bash -x/cf-pi-run.sh')).toBe(false)
+})
