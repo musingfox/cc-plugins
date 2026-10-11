@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { On } from 'claude-code'
 import type { EndedFlow, FlowDetail, FlowEvent, FlowRecord, FlowTracker } from '../types/index.d.ts'
-import { cleanupTargetOf, implementFiguresOf, isImplementCommand, isSetupCommand, phaseOfAgent, sessionRootOf, setupRootOf, slugOf, sourcedRootOf } from './cf-signals.ts'
+import { cleanupTargetOf, implementFiguresOf, isImplementCommand, isSetupCommand, phaseOfAgent, sessionRootOf, setupRootOf, shardIdsOf, slugOf, sourcedRootOf } from './cf-signals.ts'
 import { appendFlowRecord, bandLineOf, reduceFlow } from './flow-model.ts'
 
 const POLL_MS = 10_000
@@ -67,12 +67,7 @@ async function poll($: any) {
   let figures: Pick<FlowDetail, 'shards' | 'round' | 'retriesLeft'> = { shards: null, round: null, retriesLeft: null }
   if (flow.phase === 'implement') {
     const shardsJson = await readText($, `${root}/shards.json`)
-    let ids: string[] = []
-    try {
-      ids = Object.keys(JSON.parse(shardsJson ?? 'null')?.groups ?? {})
-    } catch {
-      // implementFiguresOf reports the unreadable file as no shards.
-    }
+    const ids = shardIdsOf(shardsJson)
     // fromEntries defines own keys, so a group id like __proto__ is an entry, not a prototype write.
     const outcomes = Object.fromEntries(await Promise.all(ids.map(async (id) => [id, await readText($, `${root}/shards/${id}/outcome.md`)] as const)))
     figures = implementFiguresOf({ shardsJson, outcomes, dispatchStateJson: await readText($, `${root}/dispatch-state.json`), loopBudgetJson: await readText($, `${root}/loop-budget.json`) })
@@ -134,7 +129,7 @@ export function register(on: On) {
         const steps: Step[] = []
         if (root) steps.push({ kind: 'root', root, at })
         if (implement) steps.push({ kind: 'phase', phase: 'implement', at })
-        if (target) steps.push((t) => (t.flow && (target === 'any' || target === t.flow.root) ? { kind: 'end', outcome: 'cleanup', at } : null))
+        if (target) steps.push((t) => (t.flow && (target.kind === 'any' || target.roots.includes(t.flow.root)) ? { kind: 'end', outcome: 'cleanup', at } : null))
         settle($, await applyEvents($, steps))
       }
     } catch {

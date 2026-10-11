@@ -1,6 +1,7 @@
-import type { FlowPhase, ImplementFiguresResult } from '../types/index.d.ts'
+import type { CleanupTarget, FlowPhase, ImplementFiguresResult } from '../types/index.d.ts'
 
-const ROOT = '/tmp/cf-\\d{4}-[A-Za-z0-9]{4}'
+const ROOT_SUFFIX_CHARS = 'A-Za-z0-9'
+const ROOT = `/tmp/cf-\\d{4}-[${ROOT_SUFFIX_CHARS}]{4}`
 
 // cf-pi-setup.sh prints the session path alone on stdout; cf.md echoes it again as SESSION=<root>.
 export function sessionRootOf(stdout: string): string | null {
@@ -37,12 +38,13 @@ export const isImplementCommand = (command: string): boolean => executedPattern(
 export const isSetupCommand = (command: string): boolean => executedPattern('cf-pi-setup\\.sh', 'optional', true).test(command)
 
 // A setup whose output has no SESSION= line alone still prints the root; the first root not followed by more name wins.
-export const setupRootOf = (output: string): string | null => output.match(new RegExp(`(${ROOT})(?![A-Za-z0-9])`))?.[1] ?? null
+export const setupRootOf = (output: string): string | null => output.match(new RegExp(`(${ROOT})(?![${ROOT_SUFFIX_CHARS}])`))?.[1] ?? null
 
-// 'any' when the command runs whatever env.sh's CLEANUP_SCRIPT names; else the root of a literal <root>/cleanup.sh.
-export function cleanupTargetOf(command: string): 'any' | string | null {
-  if (executedPattern('\\$(?:CLEANUP_SCRIPT|\\{CLEANUP_SCRIPT\\})', 'optional', false).test(command)) return 'any'
-  return executedPattern(`(${ROOT})/cleanup\\.sh`, 'optional', false).exec(command)?.[1] ?? null
+// 'any' when the command runs whatever env.sh's CLEANUP_SCRIPT names; else the roots of every literal <root>/cleanup.sh it runs.
+export function cleanupTargetOf(command: string): CleanupTarget | null {
+  if (executedPattern('\\$(?:CLEANUP_SCRIPT|\\{CLEANUP_SCRIPT\\})', 'optional', false).test(command)) return { kind: 'any' }
+  const roots = [...new Set([...command.matchAll(executedPattern(`(${ROOT})/cleanup\\.sh`, 'optional', false))].map((match) => match[1]))]
+  return roots.length ? { kind: 'roots', roots } : null
 }
 
 // The last CF_SLUG line wins: cf-pi-worktree.sh appends a collision-bumped one.
@@ -62,23 +64,33 @@ const parse = (text: string | null): any => {
   }
 }
 
+export function shardIdsOf(shardsJson: string | null): string[] {
+  const groups = parse(shardsJson)?.groups
+  return groups !== null && typeof groups === 'object' ? Object.keys(groups) : []
+}
+
 const isPass = (outcome: string | null): boolean => {
   const lines = (outcome ?? '').split('\n')
   const at = lines.findIndex((line) => line.trim() === '## Status')
-  return at >= 0 && lines[at + 1]?.trim() === 'PASS'
+  return at >= 0 && lines[at + 1] === 'PASS'
 }
 
-export function implementFiguresOf(input: {
+// The retry cap of cf.md's Loop Budget; a change there is a change here.
+const RETRY_CAP = 4
+
+type FiguresInput = {
   shardsJson: string | null
   outcomes: Record<string, string | null>
   dispatchStateJson: string | null
   loopBudgetJson: string | null
-}): ImplementFiguresResult {
+}
+
+export function implementFiguresOf(input: FiguresInput): ImplementFiguresResult {
   const shardsFile = parse(input.shardsJson)
   const retries = parse(input.loopBudgetJson)?.retries_used
-  const retriesLeft = typeof retries === 'number' ? Math.max(0, 4 - retries) : null
+  const retriesLeft = typeof retries === 'number' ? Math.max(0, RETRY_CAP - retries) : null
   if (!shardsFile) return { shards: null, round: null, retriesLeft }
-  const ids = Object.keys(shardsFile.groups ?? {})
+  const ids = shardIdsOf(input.shardsJson)
   const outcomeOf = (id: string) => Object.hasOwn(input.outcomes, id) ? (input.outcomes[id] ?? null) : null
   const currentRound = parse(input.dispatchStateJson)?.current_round
   const running = ids.some((id) => outcomeOf(id) === null)

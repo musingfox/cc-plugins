@@ -1,9 +1,7 @@
 import { expect, test } from 'claude-code/testing'
-import { implementFiguresOf } from '../hooks/cf-signals.ts'
+import { implementFiguresOf, shardIdsOf } from '../hooks/cf-signals.ts'
 import { reduceFlow } from '../hooks/flow-model.ts'
-
-const ROOT = '/tmp/cf-1008-Rez6'
-const ROOT2 = '/tmp/cf-1008-Ab12'
+import { ROOT, ROOT2 } from './fixtures/world.ts'
 const EMPTY = { flow: null, lastEndedRoot: null }
 
 function run(events: any[], from: any = EMPTY) {
@@ -144,4 +142,37 @@ test('ImplementFigures T7 only a PASS right after the Status heading counts', ()
 
 test('ImplementFigures T8 total falls back to the number of groups', () => {
   expect(implementFiguresOf({ shardsJson: '{"groups":{"A":{},"B":{}}}', outcomes: {}, dispatchStateJson: null, loopBudgetJson: null }).shards!.total).toBe(2)
+})
+
+test('RetriesLeft T2 nine retries used leaves none', () => {
+  expect(implementFiguresOf({ shardsJson: null, outcomes: {}, dispatchStateJson: null, loopBudgetJson: '{"retries_used":9}' }).retriesLeft).toBe(0)
+})
+
+test('RetriesLeft T3 no loop budget leaves null', () => {
+  expect(implementFiguresOf({ shardsJson: null, outcomes: {}, dispatchStateJson: null, loopBudgetJson: null }).retriesLeft).toBeNull()
+})
+
+test('RetriesLeft T4 no retry used leaves four', () => {
+  expect(implementFiguresOf({ shardsJson: null, outcomes: {}, dispatchStateJson: null, loopBudgetJson: '{"retries_used":0}' }).retriesLeft).toBe(4)
+})
+
+test('ImplementFigures T9 a PASS line counts only when it is exactly PASS', () => {
+  const passed = (outcome: string) => implementFiguresOf({ shardsJson: '{"groups":{"A":{}}}', outcomes: { A: outcome }, dispatchStateJson: null, loopBudgetJson: null }).shards!.passed
+  expect(passed('## Status\nPASS\n')).toBe(1)
+  expect(passed('## Status\n PASS\n')).toBe(0)
+  expect(passed('## Status\nPASS \n')).toBe(0)
+  expect(passed('## Status\nPASS\r\n')).toBe(0)
+  expect(passed('  ## Status  \nPASS\n')).toBe(1)
+})
+
+test('ShardIds T1 group ids are the keys of groups', () => {
+  expect(shardIdsOf('{"groups":{"A":{},"B":{}}}')).toEqual(['A', 'B'])
+})
+
+test('ShardIds T2 input without a groups object yields no ids', () => {
+  for (const json of ['nope', null, '[]', '{"groups":null}']) expect(shardIdsOf(json)).toEqual([])
+})
+
+test('ImplementFigures T10 unparsable shards.json leaves shards null', () => {
+  expect(implementFiguresOf({ shardsJson: 'nope', outcomes: {}, dispatchStateJson: null, loopBudgetJson: null }).shards).toBeNull()
 })

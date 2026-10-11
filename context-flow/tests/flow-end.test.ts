@@ -1,18 +1,12 @@
 import { expect, test } from 'claude-code/testing'
-import { BAND, bandLines } from './fixtures/band.ts'
+import { BAND } from './fixtures/band.ts'
 import { cleanupTargetOf } from '../hooks/cf-signals.ts'
 import { BENEATH, ENV, ENV2, NOW, ROOT, ROOT2, SESSION, bareBash, ok, openFlow, world } from './fixtures/world.ts'
+import { ASYNC, bash, first } from './fixtures/helpers.ts'
 
-const first = async ($: any) => (await bandLines($))[0]
 const cleanupAt = (root: string) => `. "${root}/env.sh"\n[ -n "\${CLEANUP_SCRIPT:-}" ] && [ -x "$CLEANUP_SCRIPT" ] && bash "$CLEANUP_SCRIPT"`
 const CLEANUP = cleanupAt(ROOT)
 const ZERO = { setup: 0, research: 0, plan: 0, implement: 0, review: 0, waiting: 0 }
-const ASYNC = { result: { status: 'async_launched', agentId: 'a1', description: 'd', prompt: 'p', outputFile: '/o' } }
-
-const bash = async ($: any, w: any, command: string) => {
-  await $.tool.call({ tool: 'Bash', command })
-  await w.clock.settle()
-}
 
 test('CleanupClosesFlow T1 the cleanup script clears the band and stores the flow', async ($, on) => {
   on('tool.call', { tool: 'Agent' }, () => ASYNC)
@@ -140,15 +134,15 @@ test('CleanupScriptOnlyWhenExecuted T1 grepping the variable name leaves the flo
 })
 
 test('CleanupScriptOnlyWhenExecuted T2 a guarded bash of the variable is any', () => {
-  expect(cleanupTargetOf(CLEANUP)).toBe('any')
+  expect(cleanupTargetOf(CLEANUP)).toEqual({ kind: 'any' })
 })
 
 test('CleanupScriptOnlyWhenExecuted T3 a case arm bash of the variable is any', () => {
-  expect(cleanupTargetOf('case "$R" in OK*|NOOP*) bash "$CLEANUP_SCRIPT" >/dev/null 2>&1;; esac')).toBe('any')
+  expect(cleanupTargetOf('case "$R" in OK*|NOOP*) bash "$CLEANUP_SCRIPT" >/dev/null 2>&1;; esac')).toEqual({ kind: 'any' })
 })
 
 test('CleanupScriptOnlyWhenExecuted T4 a braced group bash of the variable is any', () => {
-  expect(cleanupTargetOf('. /tmp/cf-1008-Rez6/env.sh && { [ -x "${CLEANUP_SCRIPT:-}" ] && bash "$CLEANUP_SCRIPT" >/dev/null 2>&1; }')).toBe('any')
+  expect(cleanupTargetOf('. /tmp/cf-1008-Rez6/env.sh && { [ -x "${CLEANUP_SCRIPT:-}" ] && bash "$CLEANUP_SCRIPT" >/dev/null 2>&1; }')).toEqual({ kind: 'any' })
 })
 
 test('CleanupScriptOnlyWhenExecuted T5 test operands are not an execution', () => {
@@ -180,11 +174,11 @@ test('LiteralCleanupOnlyWhenExecuted T1 reading cleanup.sh leaves the flow open'
 })
 
 test('LiteralCleanupOnlyWhenExecuted T2 bash of the literal path yields its root', () => {
-  expect(cleanupTargetOf('bash /tmp/cf-1008-Rez6/cleanup.sh')).toBe('/tmp/cf-1008-Rez6')
+  expect(cleanupTargetOf('bash /tmp/cf-1008-Rez6/cleanup.sh')).toEqual({ kind: 'roots', roots: ['/tmp/cf-1008-Rez6'] })
 })
 
 test('LiteralCleanupOnlyWhenExecuted T3 a direct run with redirects yields its root', () => {
-  expect(cleanupTargetOf('/tmp/cf-1008-Rez6/cleanup.sh >/dev/null 2>&1')).toBe('/tmp/cf-1008-Rez6')
+  expect(cleanupTargetOf('/tmp/cf-1008-Rez6/cleanup.sh >/dev/null 2>&1')).toEqual({ kind: 'roots', roots: ['/tmp/cf-1008-Rez6'] })
 })
 
 test('LiteralCleanupOnlyWhenExecuted T4 ls of the path yields nothing', () => {
@@ -231,6 +225,40 @@ test('CleanupScriptOnlyWhenExecuted R1 a substitution that only reads the script
   const command = 'D=$(dirname "$CLEANUP_SCRIPT")'
   expect(cleanupTargetOf(command)).toBe(null)
   await bash($, w, command)
+  expect(await first($)).toBe('● cf mod-band · setup · 0m')
+  expect(w.hasStoreKey('flows')).toBe(false)
+})
+
+test('CleanupTargets T2 every literal cleanup root counts in command order', () => {
+  expect(cleanupTargetOf('bash /tmp/cf-1008-Ab12/cleanup.sh; bash /tmp/cf-1008-Rez6/cleanup.sh')).toEqual({ kind: 'roots', roots: ['/tmp/cf-1008-Ab12', '/tmp/cf-1008-Rez6'] })
+})
+
+test('CleanupTargets T3 a repeated literal cleanup root is listed once', () => {
+  expect(cleanupTargetOf('bash /tmp/cf-1008-Rez6/cleanup.sh; bash /tmp/cf-1008-Rez6/cleanup.sh')).toEqual({ kind: 'roots', roots: ['/tmp/cf-1008-Rez6'] })
+})
+
+test('CleanupTargets T6 a variable cleanup is any even beside a literal root', () => {
+  expect(cleanupTargetOf('bash "$CLEANUP_SCRIPT"')).toEqual({ kind: 'any' })
+  expect(cleanupTargetOf('bash $CLEANUP_SCRIPT; bash /tmp/cf-1008-Rez6/cleanup.sh')).toEqual({ kind: 'any' })
+})
+
+test('CleanupTargets T7 ls names no cleanup target', () => {
+  expect(cleanupTargetOf('ls')).toBe(null)
+})
+
+test('CleanupClosesFlow T6 a command with the open root cleanup among others closes the flow', async ($, on) => {
+  const { w, bash: answer } = await openFlow($, on, { files: { [`${ROOT}/env.sh`]: ENV, [`${ROOT2}/env.sh`]: ENV2 } })
+  answer.answer = ok('')
+  await bash($, w, `bash ${ROOT2}/cleanup.sh; bash ${ROOT}/cleanup.sh`)
+  expect(w.flows()).toHaveLength(1)
+  expect(w.flows()[0]).toMatchObject({ root: ROOT, outcome: 'cleanup' })
+  expect(await $.ui.render(BAND)).toEqual(BENEATH)
+})
+
+test('CleanupClosesFlow T7 a command that cleans only another root leaves the flow open', async ($, on) => {
+  const { w, bash: answer } = await openFlow($, on, { files: { [`${ROOT}/env.sh`]: ENV, [`${ROOT2}/env.sh`]: ENV2 } })
+  answer.answer = ok('')
+  await bash($, w, `bash ${ROOT2}/cleanup.sh`)
   expect(await first($)).toBe('● cf mod-band · setup · 0m')
   expect(w.hasStoreKey('flows')).toBe(false)
 })
