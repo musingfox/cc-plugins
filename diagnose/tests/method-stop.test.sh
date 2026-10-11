@@ -13,7 +13,10 @@ n=$(printf '%s\n' "$range" | grep -ci 'watch it fail' || true)
 n=$(printf '%s\n' "$range" | grep -ci 'watch it pass' || true)
 [ "$n" -eq 0 ] || fail "T2: watch it pass must not appear in Phase 5"
 
-n=$(printf '%s\n' "$range" | grep -ci 'apply the fix' || true)
+n=$(printf '%s\n' "$range" | { grep -oi 'do not apply the fix' || true; } | wc -l | tr -d ' ')
+[ "$n" -eq 1 ] || fail "T3: expected exactly one 'do not apply the fix', got $n"
+
+n=$(printf '%s\n' "$range" | { grep -oi 'apply the fix' || true; } | wc -l | tr -d ' ')
 [ "$n" -eq 1 ] || fail "T3: expected exactly one apply-the-fix guardrail, got $n"
 
 n=$(printf '%s\n' "$range" | grep -c '/cf' || true)
