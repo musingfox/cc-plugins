@@ -145,3 +145,15 @@ test('ImplementFigures T7 only a PASS right after the Status heading counts', ()
 test('ImplementFigures T8 total falls back to the number of groups', () => {
   expect(implementFiguresOf({ shardsJson: '{"groups":{"A":{},"B":{}}}', outcomes: {}, dispatchStateJson: null, loopBudgetJson: null }).shards!.total).toBe(2)
 })
+
+test('RetriesLeft T2 nine retries used leaves none', () => {
+  expect(implementFiguresOf({ shardsJson: null, outcomes: {}, dispatchStateJson: null, loopBudgetJson: '{"retries_used":9}' }).retriesLeft).toBe(0)
+})
+
+test('RetriesLeft T3 no loop budget leaves null', () => {
+  expect(implementFiguresOf({ shardsJson: null, outcomes: {}, dispatchStateJson: null, loopBudgetJson: null }).retriesLeft).toBeNull()
+})
+
+test('RetriesLeft T4 no retry used leaves four', () => {
+  expect(implementFiguresOf({ shardsJson: null, outcomes: {}, dispatchStateJson: null, loopBudgetJson: '{"retries_used":0}' }).retriesLeft).toBe(4)
+})

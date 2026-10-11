@@ -69,15 +69,20 @@ const isPass = (outcome: string | null): boolean => {
   return at >= 0 && lines[at + 1]?.trim() === 'PASS'
 }
 
-export function implementFiguresOf(input: {
+// The retry cap of cf.md's Loop Budget; a change there is a change here.
+const RETRY_CAP = 4
+
+type FiguresInput = {
   shardsJson: string | null
   outcomes: Record<string, string | null>
   dispatchStateJson: string | null
   loopBudgetJson: string | null
-}): ImplementFiguresResult {
+}
+
+export function implementFiguresOf(input: FiguresInput): ImplementFiguresResult {
   const shardsFile = parse(input.shardsJson)
   const retries = parse(input.loopBudgetJson)?.retries_used
-  const retriesLeft = typeof retries === 'number' ? Math.max(0, 4 - retries) : null
+  const retriesLeft = typeof retries === 'number' ? Math.max(0, RETRY_CAP - retries) : null
   if (!shardsFile) return { shards: null, round: null, retriesLeft }
   const ids = Object.keys(shardsFile.groups ?? {})
   const outcomeOf = (id: string) => Object.hasOwn(input.outcomes, id) ? (input.outcomes[id] ?? null) : null
