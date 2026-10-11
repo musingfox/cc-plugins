@@ -13,6 +13,7 @@ class Lexer {
   private i = 0
   private cmd: SimpleCommand = { assignments: [], words: [] }
   private readonly out: SimpleCommand[] = []
+  private heredocs: { delimiter: string; strip: boolean }[] = []
 
   constructor(private readonly s: string) {}
 
@@ -22,7 +23,7 @@ class Lexer {
       const c = s[this.i]
       if (c === ' ' || c === '\t') this.i++
       else if (c === '\\' && s[this.i + 1] === '\n') this.i += 2
-      else if (c === '\n') { this.end(); this.i++ }
+      else if (c === '\n') { this.end(); this.i++; this.heredocBodies() }
       else if (c === '#') { const nl = s.indexOf('\n', this.i); this.i = nl < 0 ? s.length : nl }
       else if (c === '&' && s[this.i + 1] === '>') { this.i += s[this.i + 2] === '>' ? 3 : 2; this.target() }
       else if (c === '<' || c === '>') this.redirect()
@@ -55,16 +56,37 @@ class Lexer {
 
   private redirect(): void {
     const s = this.s
-    if (s.startsWith('<<<', this.i)) this.i += 3
-    else if (s.startsWith('<<', this.i)) this.i += s[this.i + 2] === '-' ? 3 : 2
-    else this.i += ['<&', '>&', '>>', '<>', '>|'].includes(s.slice(this.i, this.i + 2)) ? 2 : 1
-    this.target()
+    if (s.startsWith('<<<', this.i)) { this.i += 3; this.target() }
+    else if (s.startsWith('<<', this.i)) {
+      const strip = s[this.i + 2] === '-'
+      this.i += strip ? 3 : 2
+      const delimiter = this.target()
+      this.heredocs.push({ delimiter: delimiter?.text ?? '', strip })
+    } else {
+      this.i += ['<&', '>&', '>>', '<>', '>|'].includes(s.slice(this.i, this.i + 2)) ? 2 : 1
+      this.target()
+    }
   }
 
   // The redirect target is a word of its own and is not a command word.
-  private target(): void {
+  private target(): Read | null {
     while (this.s[this.i] === ' ' || this.s[this.i] === '\t') this.i++
-    if (this.i < this.s.length && !SEPARATOR.test(this.s[this.i])) this.readWord()
+    return this.i < this.s.length && !SEPARATOR.test(this.s[this.i]) ? this.readWord() : null
+  }
+
+  // A heredoc body starts after the newline that ends its command and ends at a line equal to its delimiter.
+  private heredocBodies(): void {
+    const s = this.s
+    for (const { delimiter, strip } of this.heredocs) {
+      while (this.i < s.length) {
+        const nl = s.indexOf('\n', this.i)
+        const eol = nl < 0 ? s.length : nl
+        const line = strip ? s.slice(this.i, eol).replace(/^\t+/, '') : s.slice(this.i, eol)
+        this.i = Math.min(eol + 1, s.length)
+        if (line === delimiter) break
+      }
+    }
+    this.heredocs = []
   }
 
   private readWord(): Read {

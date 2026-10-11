@@ -155,3 +155,31 @@ test('ScanWordText T7 parameter, arithmetic and command expansions are dynamic w
   expect(argv([c])).toEqual([['echo', '${S:-d}', '$((1+2))', '$(ls)']])
   expect(dynamics(c)).toEqual([false, true, true, true])
 })
+
+test('ScanHeredocBodies T1 a heredoc body is data and the line after its terminator is a command', () => {
+  expect(argv(scanCommands('cat <<EOF\n. /tmp/cf-1008-Rez6/env.sh\nEOF\nls'))).toEqual([['cat'], ['ls']])
+})
+
+test('ScanHeredocBodies T2 a quoted delimiter with a redirect still ends the body', () => {
+  expect(argv(scanCommands("cat <<'EOF' > f\n. /tmp/cf-1008-Rez6/env.sh\nEOF\n. /tmp/cf-1008-Ab12/env.sh"))).toEqual([['cat'], ['.', '/tmp/cf-1008-Ab12/env.sh']])
+})
+
+test('ScanHeredocBodies T3 a dash heredoc matches its terminator after stripping tabs', () => {
+  expect(argv(scanCommands('cat <<-"EOF"\n\t. /tmp/cf-1008-Rez6/env.sh\n\tEOF\nls'))).toEqual([['cat'], ['ls']])
+})
+
+test('ScanHeredocBodies T4 several heredocs on one line consume their bodies in order', () => {
+  expect(argv(scanCommands('cat <<A <<B\nx\nA\ny\nB\nls'))).toEqual([['cat'], ['ls']])
+})
+
+test('ScanHeredocBodies T5 a here-string swallows nothing', () => {
+  expect(argv(scanCommands("cat <<< 'x; y'\nls"))).toEqual([['cat'], ['ls']])
+})
+
+test('ScanHeredocBodies T6 a missing terminator makes the rest of the text the body', () => {
+  expect(argv(scanCommands('cat <<EOF\nls'))).toEqual([['cat']])
+})
+
+test('ScanHeredocBodies T7 a command after the heredoc operator on the same line still runs', () => {
+  expect(argv(scanCommands('cat <<EOF; ls\nbody\nEOF'))).toEqual([['cat'], ['ls']])
+})
