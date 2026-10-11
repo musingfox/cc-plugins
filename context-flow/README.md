@@ -21,7 +21,7 @@ A goal that points at a handoff document carrying explicit, human-approved contr
 
 ## Effort per Seat
 
-Each agent pins its own `model:` and `effort:` in frontmatter; the orchestrator sets neither at dispatch. Effort rises with how much of the seat's work is still undecided, and the model follows it: `cf:implement` executes pinned contracts on `sonnet` at `medium`, while `cf:research`, `cf:plan` and `cf:review` run on `opus` at `xhigh`. `cf:implement` sits at `medium` rather than `low` because Sonnet at `low` sometimes reports a change done without running its check. The `opus` pin keeps the `xhigh` seats off Sonnet when the session runs on it, and keeps the judge at or above the builder.
+Each agent pins its own `model:` and `effort:` in frontmatter; the orchestrator sets neither at dispatch. Effort rises with how much of the seat's work is still undecided, and the model follows it: `cf:implement` executes pinned contracts on `sonnet` at `medium`, while `cf:research`, `cf:plan` and `cf:review` run on `opus` at `high`. `cf:implement` sits at `medium` rather than `low` because Sonnet at `low` sometimes reports a change done without running its check. The `opus` pin keeps the `high` seats off Sonnet when the session runs on it, and keeps the judge at or above the builder.
 
 The default implementer is the Claude `cf:implement` agent. OMP, a worker outside Claude Code, is the opt-in overflow builder (`CF_IMPLEMENTER=omp`); its model and thinking level come from `PI_DISPATCH_CMD`, not from frontmatter.
 

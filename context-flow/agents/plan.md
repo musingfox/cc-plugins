@@ -3,7 +3,7 @@ name: plan
 description: "Design implementation plan with behavioral contracts and test cases"
 color: blue
 model: opus
-effort: xhigh
+effort: high
 tools: Read, Write, Grep, Glob
 ---
 

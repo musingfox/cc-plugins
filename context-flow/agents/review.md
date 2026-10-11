@@ -3,7 +3,7 @@ name: review
 description: "Verify implementation against contracts"
 color: purple
 model: opus
-effort: xhigh
+effort: high
 tools: Read, Write, Grep, Glob, Bash
 ---
 
