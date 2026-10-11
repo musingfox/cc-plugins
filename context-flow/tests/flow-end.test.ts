@@ -262,3 +262,41 @@ test('CleanupClosesFlow T7 a command that cleans only another root leaves the fl
   expect(await first($)).toBe('● cf mod-band · setup · 0m')
   expect(w.hasStoreKey('flows')).toBe(false)
 })
+
+test('CleanupTargetOf T1 a cleanup name inside a substitution or backticks is data, a bare runner is any', () => {
+  expect(cleanupTargetOf('X=$(bash $CLEANUP_SCRIPT)')).toBeNull()
+  expect(cleanupTargetOf('X=`bash $CLEANUP_SCRIPT`')).toBeNull()
+  expect(cleanupTargetOf('bash "$CLEANUP_SCRIPT"')).toEqual({ kind: 'any' })
+})
+
+test('CleanupTargetOf T2 a cleanup name in quotes or a comment does not run', () => {
+  expect(cleanupTargetOf('echo "bash $CLEANUP_SCRIPT"')).toBeNull()
+  expect(cleanupTargetOf('grep -q \'bash "$CLEANUP_SCRIPT"\' f')).toBeNull()
+  expect(cleanupTargetOf('# bash $CLEANUP_SCRIPT')).toBeNull()
+})
+
+test('CleanupTargetOf T3 a cleanup name in a heredoc body is data, one after the body is any', () => {
+  expect(cleanupTargetOf('cat <<EOF\nbash $CLEANUP_SCRIPT\nEOF')).toBeNull()
+  expect(cleanupTargetOf('cat <<EOF\nx\nEOF\nbash $CLEANUP_SCRIPT')).toEqual({ kind: 'any' })
+})
+
+test('CleanupTargetOf T4 a cleanup run after an assignment with a quoted value is any', () => {
+  expect(cleanupTargetOf("A=$'x y'\nbash \"$CLEANUP_SCRIPT\"")).toEqual({ kind: 'any' })
+  expect(cleanupTargetOf('A=$\'x;y\' bash "$CLEANUP_SCRIPT"')).toEqual({ kind: 'any' })
+})
+
+test('CleanupTargetOf T5 a cleanup run through bash -c is any, through eval is the literal root', () => {
+  expect(cleanupTargetOf('bash -c \'bash "$CLEANUP_SCRIPT"\'')).toEqual({ kind: 'any' })
+  expect(cleanupTargetOf('eval "bash /tmp/cf-1008-Rez6/cleanup.sh"')).toEqual({ kind: 'roots', roots: ['/tmp/cf-1008-Rez6'] })
+})
+
+test('CleanupTargetOf T6 a resolved variable names a literal root, another value is null', () => {
+  expect(cleanupTargetOf('D=/tmp/cf-1008-Rez6; bash $D/cleanup.sh')).toEqual({ kind: 'roots', roots: ['/tmp/cf-1008-Rez6'] })
+  expect(cleanupTargetOf('CLEANUP_SCRIPT=/tmp/cf-1008-Rez6/cleanup.sh; bash "$CLEANUP_SCRIPT"')).toEqual({ kind: 'roots', roots: ['/tmp/cf-1008-Rez6'] })
+  expect(cleanupTargetOf('CLEANUP_SCRIPT=/x/y.sh; bash "$CLEANUP_SCRIPT"')).toBeNull()
+})
+
+test('CleanupTargetOf T7 a braced cleanup name is any, a defaulted one is null', () => {
+  expect(cleanupTargetOf('bash "${CLEANUP_SCRIPT}"')).toEqual({ kind: 'any' })
+  expect(cleanupTargetOf('bash "${CLEANUP_SCRIPT:-}"')).toBeNull()
+})

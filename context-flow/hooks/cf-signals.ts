@@ -9,15 +9,6 @@ export function sessionRootOf(stdout: string): string | null {
   return stdout.match(new RegExp(`^SESSION=(${ROOT})$`, 'm'))?.[1] ?? null
 }
 
-// A regex cannot see quoting or heredocs, so a separator inside a quoted string or a heredoc body still counts as a position.
-function executedPattern(name: string, runner: 'optional' | 'source', prefix: boolean): RegExp {
-  const position = '(?:^|(?<=[\\n;&|()])|(?<=\\{)(?=\\s)|(?<!\\w)(?:do|then|else)(?!\\w))'
-  const assignments = `(?:\\w+=(?:'[^']*'|"[^"]*"|(?!['"])[^\\s;&|()]*)[ \\t]+)*`
-  const runnerWord = runner === 'source' ? '(?:\\.|source)[ \\t]+(?!["\']?-)' : '(?:(?:bash|sh|\\.|source)[ \\t]+(?!["\']?-))?'
-  const path = prefix ? '(?:[^\\s"\';&|()]*\\/)?' : ''
-  return new RegExp(`${position}[ \\t]*${assignments}${runnerWord}["']?${path}${name}["']?(?=[\\s;&|)<>]|$)`, 'g')
-}
-
 // Every cf Bash after setup starts with `. "<root>/env.sh"`; a shard's env.sh sits one level deeper and does not match.
 export function sourcedRootOf(command: string): string | null {
   let root: string | null = null
@@ -63,8 +54,9 @@ export const setupRootOf = (output: string): string | null => output.match(new R
 
 // 'any' when the command runs whatever env.sh's CLEANUP_SCRIPT names; else the roots of every literal <root>/cleanup.sh it runs.
 export function cleanupTargetOf(command: string): CleanupTarget | null {
-  if (executedPattern('\\$(?:CLEANUP_SCRIPT|\\{CLEANUP_SCRIPT\\})', 'optional', false).test(command)) return { kind: 'any' }
-  const roots = [...new Set([...command.matchAll(executedPattern(`(${ROOT})/cleanup\\.sh`, 'optional', false))].map((match) => match[1]))]
+  const targets = scanCommands(command).map(executedWordOf).filter((word): word is Word => word !== null)
+  if (targets.some((word) => word.dynamic && (word.text === '$CLEANUP_SCRIPT' || word.text === '${CLEANUP_SCRIPT}'))) return { kind: 'any' }
+  const roots = [...new Set(targets.map((word) => word.text.match(new RegExp(`^(${ROOT})/cleanup\\.sh$`))?.[1]).filter((root): root is string => root !== undefined))]
   return roots.length ? { kind: 'roots', roots } : null
 }
 
