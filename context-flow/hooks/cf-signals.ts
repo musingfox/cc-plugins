@@ -66,7 +66,7 @@ const parse = (text: string | null): any => {
 const isPass = (outcome: string | null): boolean => {
   const lines = (outcome ?? '').split('\n')
   const at = lines.findIndex((line) => line.trim() === '## Status')
-  return at >= 0 && lines[at + 1]?.trim() === 'PASS'
+  return at >= 0 && lines[at + 1] === 'PASS'
 }
 
 // The retry cap of cf.md's Loop Budget; a change there is a change here.

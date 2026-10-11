@@ -157,3 +157,12 @@ test('RetriesLeft T3 no loop budget leaves null', () => {
 test('RetriesLeft T4 no retry used leaves four', () => {
   expect(implementFiguresOf({ shardsJson: null, outcomes: {}, dispatchStateJson: null, loopBudgetJson: '{"retries_used":0}' }).retriesLeft).toBe(4)
 })
+
+test('ImplementFigures T9 a PASS line counts only when it is exactly PASS', () => {
+  const passed = (outcome: string) => implementFiguresOf({ shardsJson: '{"groups":{"A":{}}}', outcomes: { A: outcome }, dispatchStateJson: null, loopBudgetJson: null }).shards!.passed
+  expect(passed('## Status\nPASS\n')).toBe(1)
+  expect(passed('## Status\n PASS\n')).toBe(0)
+  expect(passed('## Status\nPASS \n')).toBe(0)
+  expect(passed('## Status\nPASS\r\n')).toBe(0)
+  expect(passed('  ## Status  \nPASS\n')).toBe(1)
+})
