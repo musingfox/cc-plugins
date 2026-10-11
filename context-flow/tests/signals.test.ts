@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import { BAND, bandLines, nodesOf, stringsIn } from './fixtures/band.ts'
 import { BENEATH, ENV, ENV2, ROOT, ROOT2, SESSION, SETUP_OUT, bareBash, ok, openFlow, world } from './fixtures/world.ts'
-import { isImplementCommand, isSetupCommand, sourcedRootOf } from '../hooks/cf-signals.ts'
+import { isImplementCommand, isSetupCommand, setupRootOf, sourcedRootOf } from '../hooks/cf-signals.ts'
 
 const first = async ($: any) => (await bandLines($))[0]
 const colorOf = (node: any) => node.props?.color ?? node.color
@@ -523,4 +523,12 @@ test('SetupRunOpensFlow R3 a substitution that only names the setup script opens
   const w = await bareBash($, on, ok('/tmp/cf-1008-Rez6\n'))
   await bash($, w, 'B=$(basename "$SCRIPTS/cf-pi-setup.sh")')
   expect(await $.ui.render(BAND)).toEqual(BENEATH)
+})
+
+test('SetupRootOf T1 a root that runs on into more name opens nothing', () => {
+  expect(setupRootOf('/tmp/cf-1008-Rez6x\n')).toBe(null)
+})
+
+test('SetupRootOf T2 the first root that ends its name is the one returned', () => {
+  expect(setupRootOf('/tmp/cf-1008-Rez6\nSESSION=/tmp/cf-1008-Rez6\n')).toBe('/tmp/cf-1008-Rez6')
 })

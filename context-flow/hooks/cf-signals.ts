@@ -1,6 +1,7 @@
 import type { FlowPhase, ImplementFiguresResult } from '../types/index.d.ts'
 
-const ROOT = '/tmp/cf-\\d{4}-[A-Za-z0-9]{4}'
+const ROOT_SUFFIX_CHARS = 'A-Za-z0-9'
+const ROOT = `/tmp/cf-\\d{4}-[${ROOT_SUFFIX_CHARS}]{4}`
 
 // cf-pi-setup.sh prints the session path alone on stdout; cf.md echoes it again as SESSION=<root>.
 export function sessionRootOf(stdout: string): string | null {
@@ -37,7 +38,7 @@ export const isImplementCommand = (command: string): boolean => executedPattern(
 export const isSetupCommand = (command: string): boolean => executedPattern('cf-pi-setup\\.sh', 'optional', true).test(command)
 
 // A setup whose output has no SESSION= line alone still prints the root; the first root not followed by more name wins.
-export const setupRootOf = (output: string): string | null => output.match(new RegExp(`(${ROOT})(?![A-Za-z0-9])`))?.[1] ?? null
+export const setupRootOf = (output: string): string | null => output.match(new RegExp(`(${ROOT})(?![${ROOT_SUFFIX_CHARS}])`))?.[1] ?? null
 
 // 'any' when the command runs whatever env.sh's CLEANUP_SCRIPT names; else the root of a literal <root>/cleanup.sh.
 export function cleanupTargetOf(command: string): 'any' | string | null {
