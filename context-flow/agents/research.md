@@ -2,7 +2,7 @@
 name: research
 description: "Explore codebase and produce capability inventory"
 color: green
-model: opus
+model: sonnet
 effort: high
 tools: Read, Write, Grep, Glob, Bash, WebFetch
 ---

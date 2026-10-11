@@ -2,7 +2,7 @@
 name: plan
 description: "Design implementation plan with behavioral contracts and test cases"
 color: blue
-model: opus
+model: sonnet
 effort: high
 tools: Read, Write, Grep, Glob
 ---

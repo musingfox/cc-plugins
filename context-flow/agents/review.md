@@ -8,9 +8,11 @@ tools: Read, Write, Grep, Glob, Bash
 ---
 
 <!-- model: opus is a capability floor, not a preference: the default builder is
-     cf:implement on sonnet and OMP is the opt-in overflow builder (routed up to the
-     strongest config overlay available), and the dispatch doctrine requires the
-     reviewer seat to sit at or above the builder. -->
+     cf:implement on haiku, research and plan run on sonnet, OMP is the opt-in
+     overflow builder (routed up to the strongest config overlay available), and the
+     dispatch doctrine requires the reviewer seat to sit at or above the builder.
+     This is the one seat that is not downgraded: a reviewer that misses a defect
+     produces a false PASS, which no later gate catches (measured 2026-10-11). -->
 
 One review definition, two briefs. Judge the diff at `## Diff path` on exactly one axis and write one report file.
 

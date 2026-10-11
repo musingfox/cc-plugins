@@ -28,7 +28,7 @@ fi
 rm -f "$report"
 
 fm=$(sed -n '1,/^---$/p;' "$IMPLEMENT" | sed -n '1,9p')
-assert_contains "$fm" "model: sonnet" "T4 model unchanged"
+assert_contains "$fm" "model: haiku" "T4 model is the haiku builder"
 assert_contains "$fm" "effort: medium" "T4b effort unchanged"
 assert_contains "$fm" "tools: Read, Edit, Write, Bash, Glob, Grep, WebFetch" "T4c tools unchanged"
 assert_eq "0" "$(grep -c 'permissionMode' "$IMPLEMENT" || true)" "T4d no permissionMode"

@@ -50,10 +50,11 @@ rank() {
 tier_violation() { [ "$(rank "$1")" -lt "$(rank "$2")" ] && echo violation || echo ok; }
 
 assert_eq "ok" "$(tier_violation "$REVIEW" "$IMPLEMENT")" "T6 real review tier is at or above implement"
-copy="$(mktemp)"
+copy="$(mktemp)"; builder="$(mktemp)"
 sed 's/^model: .*/model: haiku/' "$REVIEW" > "$copy"
-assert_eq "violation" "$(tier_violation "$copy" "$IMPLEMENT")" "T6b a haiku review copy is reported as a violation"
-rm -f "$copy"
+sed 's/^model: .*/model: sonnet/' "$IMPLEMENT" > "$builder"
+assert_eq "violation" "$(tier_violation "$copy" "$builder")" "T6b a haiku review copy over a sonnet builder is reported as a violation"
+rm -f "$copy" "$builder"
 
 # T7
 for t in revert-gate-docs brief-anatomy-doc brief-writable-rule review-two-axis; do

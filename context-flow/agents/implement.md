@@ -2,7 +2,7 @@
 name: implement
 description: "Implement contracts and pass all test cases"
 color: yellow
-model: sonnet
+model: haiku
 effort: medium
 tools: Read, Edit, Write, Bash, Glob, Grep, WebFetch
 ---
