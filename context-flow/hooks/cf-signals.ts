@@ -63,6 +63,11 @@ const parse = (text: string | null): any => {
   }
 }
 
+export function shardIdsOf(shardsJson: string | null): string[] {
+  const groups = parse(shardsJson)?.groups
+  return groups !== null && typeof groups === 'object' ? Object.keys(groups) : []
+}
+
 const isPass = (outcome: string | null): boolean => {
   const lines = (outcome ?? '').split('\n')
   const at = lines.findIndex((line) => line.trim() === '## Status')
@@ -84,7 +89,7 @@ export function implementFiguresOf(input: FiguresInput): ImplementFiguresResult 
   const retries = parse(input.loopBudgetJson)?.retries_used
   const retriesLeft = typeof retries === 'number' ? Math.max(0, RETRY_CAP - retries) : null
   if (!shardsFile) return { shards: null, round: null, retriesLeft }
-  const ids = Object.keys(shardsFile.groups ?? {})
+  const ids = shardIdsOf(input.shardsJson)
   const outcomeOf = (id: string) => Object.hasOwn(input.outcomes, id) ? (input.outcomes[id] ?? null) : null
   const currentRound = parse(input.dispatchStateJson)?.current_round
   const running = ids.some((id) => outcomeOf(id) === null)

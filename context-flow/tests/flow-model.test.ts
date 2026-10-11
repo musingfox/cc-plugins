@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { implementFiguresOf } from '../hooks/cf-signals.ts'
+import { implementFiguresOf, shardIdsOf } from '../hooks/cf-signals.ts'
 import { reduceFlow } from '../hooks/flow-model.ts'
 
 const ROOT = '/tmp/cf-1008-Rez6'
@@ -165,4 +165,16 @@ test('ImplementFigures T9 a PASS line counts only when it is exactly PASS', () =
   expect(passed('## Status\nPASS \n')).toBe(0)
   expect(passed('## Status\nPASS\r\n')).toBe(0)
   expect(passed('  ## Status  \nPASS\n')).toBe(1)
+})
+
+test('ShardIds T1 group ids are the keys of groups', () => {
+  expect(shardIdsOf('{"groups":{"A":{},"B":{}}}')).toEqual(['A', 'B'])
+})
+
+test('ShardIds T2 input without a groups object yields no ids', () => {
+  for (const json of ['nope', null, '[]', '{"groups":null}']) expect(shardIdsOf(json)).toEqual([])
+})
+
+test('ImplementFigures T10 unparsable shards.json leaves shards null', () => {
+  expect(implementFiguresOf({ shardsJson: 'nope', outcomes: {}, dispatchStateJson: null, loopBudgetJson: null }).shards).toBeNull()
 })
