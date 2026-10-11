@@ -1,18 +1,10 @@
 import { expect, test } from 'claude-code/testing'
 import { BAND, bandLines, nodesOf, stringsIn } from './fixtures/band.ts'
 import { BENEATH, ENV, ENV2, ROOT, ROOT2, SESSION, SETUP_OUT, bareBash, ok, openFlow, world } from './fixtures/world.ts'
+import { ASYNC, bash, colorOf, first } from './fixtures/helpers.ts'
 import { isImplementCommand, isSetupCommand, setupRootOf, sourcedRootOf } from '../hooks/cf-signals.ts'
 
-const first = async ($: any) => (await bandLines($))[0]
-const colorOf = (node: any) => node.props?.color ?? node.color
 const ENV_FILES = { [`${ROOT}/env.sh`]: ENV }
-const ASYNC = { result: { status: 'async_launched', agentId: 'a1', description: 'd', prompt: 'p', outputFile: '/o' } }
-
-const bash = async ($: any, w: any, command: string, extra: object = {}) => {
-  const result = await $.tool.call({ tool: 'Bash', command, ...extra })
-  await w.clock.settle()
-  return result
-}
 
 test('FlowStartsOnSetupLine T1 the setup line opens a band', async ($, on) => {
   const w = await bareBash($, on, ok(SETUP_OUT))
@@ -531,4 +523,30 @@ test('SetupRootOf T1 a root that runs on into more name opens nothing', () => {
 
 test('SetupRootOf T2 the first root that ends its name is the one returned', () => {
   expect(setupRootOf('/tmp/cf-1008-Rez6\nSESSION=/tmp/cf-1008-Rez6\n')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SharedHelpers T1 bash forwards extra to the tool call', async ($, on) => {
+  const w = await bareBash($, on, ok(SETUP_OUT))
+  await bash($, w, 'cf setup', { agentId: 'sub-1' })
+  expect(await $.ui.render(BAND)).toEqual(BENEATH)
+  await bash($, w, 'cf setup')
+  expect(await first($)).toBe('● cf mod-band · setup · 0m')
+})
+
+test('SharedHelpers T2 colorOf prefers props.color over a bare color', () => {
+  expect(colorOf({ props: { color: 'warning' }, color: 'x' })).toBe('warning')
+  expect(colorOf({ color: 'suggestion' })).toBe('suggestion')
+})
+
+test('SharedHelpers T3 ASYNC is the Agent result the helper returns unchanged', async ($, on) => {
+  on('tool.call', { tool: 'Agent' }, () => ASYNC)
+  expect(ASYNC.result.status).toBe('async_launched')
+  const result = await $.tool.call({ tool: 'Agent', subagent_type: 'general-purpose', prompt: 'p', description: 'd' })
+  expect(result).toEqual(ASYNC)
+})
+
+test('SharedHelpers T4 first is the top band line, not the whole list', async ($, on) => {
+  await openFlow($, on)
+  expect(await first($)).toBe('● cf mod-band · setup · 0m')
+  expect((await bandLines($))[0]).toBe('● cf mod-band · setup · 0m')
 })

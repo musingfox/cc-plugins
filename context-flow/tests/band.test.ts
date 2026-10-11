@@ -1,9 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import { BAND, bandLines, bandRows, handlerOf, nodesOf, stringsIn } from './fixtures/band.ts'
 import { BENEATH, ENV, NOW, ROOT, ROOT2, SESSION, ok, openFlow, world } from './fixtures/world.ts'
-
-const first = async ($: any) => (await bandLines($))[0]
-const colorOf = (node: any) => node.props?.color ?? node.color
+import { colorOf, first } from './fixtures/helpers.ts'
 
 test('ProgressBand T1 an open flow draws one line above what the others drew', async ($, on) => {
   await openFlow($, on)

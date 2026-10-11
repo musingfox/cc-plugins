@@ -1,18 +1,12 @@
 import { expect, test } from 'claude-code/testing'
-import { BAND, bandLines } from './fixtures/band.ts'
+import { BAND } from './fixtures/band.ts'
 import { cleanupTargetOf } from '../hooks/cf-signals.ts'
 import { BENEATH, ENV, ENV2, NOW, ROOT, ROOT2, SESSION, bareBash, ok, openFlow, world } from './fixtures/world.ts'
+import { ASYNC, bash, first } from './fixtures/helpers.ts'
 
-const first = async ($: any) => (await bandLines($))[0]
 const cleanupAt = (root: string) => `. "${root}/env.sh"\n[ -n "\${CLEANUP_SCRIPT:-}" ] && [ -x "$CLEANUP_SCRIPT" ] && bash "$CLEANUP_SCRIPT"`
 const CLEANUP = cleanupAt(ROOT)
 const ZERO = { setup: 0, research: 0, plan: 0, implement: 0, review: 0, waiting: 0 }
-const ASYNC = { result: { status: 'async_launched', agentId: 'a1', description: 'd', prompt: 'p', outputFile: '/o' } }
-
-const bash = async ($: any, w: any, command: string) => {
-  await $.tool.call({ tool: 'Bash', command })
-  await w.clock.settle()
-}
 
 test('CleanupClosesFlow T1 the cleanup script clears the band and stores the flow', async ($, on) => {
   on('tool.call', { tool: 'Agent' }, () => ASYNC)

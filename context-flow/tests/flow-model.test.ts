@@ -1,9 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import { implementFiguresOf, shardIdsOf } from '../hooks/cf-signals.ts'
 import { reduceFlow } from '../hooks/flow-model.ts'
-
-const ROOT = '/tmp/cf-1008-Rez6'
-const ROOT2 = '/tmp/cf-1008-Ab12'
+import { ROOT, ROOT2 } from './fixtures/world.ts'
 const EMPTY = { flow: null, lastEndedRoot: null }
 
 function run(events: any[], from: any = EMPTY) {
