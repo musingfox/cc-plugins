@@ -1,5 +1,5 @@
 import type { CleanupTarget, FlowPhase, ImplementFiguresResult } from '../types/index.d.ts'
-import { scanCommands, type SimpleCommand, type Word } from './shell-scan.ts'
+import { scanCommands, type ScanOptions, type SimpleCommand, type Word } from './shell-scan.ts'
 
 const ROOT_SUFFIX_CHARS = 'A-Za-z0-9'
 const ROOT = `/tmp/cf-\\d{4}-[${ROOT_SUFFIX_CHARS}]{4}`
@@ -50,12 +50,13 @@ function executedWordOf({ words }: SimpleCommand): Word | null {
   return next && !next.text.startsWith('-') ? next : null
 }
 
-const executesScript = (command: string, script: string): boolean =>
-  scanCommands(command).some((c) => executedWordOf(c)?.text.match(new RegExp(`(^|/)${script}$`)) != null)
+const executesScript = (command: string, script: string, options?: ScanOptions): boolean =>
+  scanCommands(command, options).some((c) => executedWordOf(c)?.text.match(new RegExp(`(^|/)${script}$`)) != null)
 
 export const isImplementCommand = (command: string): boolean => executesScript(command, 'cf-pi-(?:worktree|shard|run)\\.sh')
 
-export const isSetupCommand = (command: string): boolean => executedPattern('cf-pi-setup\\.sh', 'optional', true).test(command)
+// The setup's SESSION=$(...) runs its script, so assignment substitutions are scanned for it.
+export const isSetupCommand = (command: string): boolean => executesScript(command, 'cf-pi-setup\\.sh', { assignmentSubstitutions: 'commands' })
 
 // A setup whose output has no SESSION= line alone still prints the root; the first root not followed by more name wins.
 export const setupRootOf = (output: string): string | null => output.match(new RegExp(`(${ROOT})(?![${ROOT_SUFFIX_CHARS}])`))?.[1] ?? null

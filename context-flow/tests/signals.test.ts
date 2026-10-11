@@ -649,3 +649,27 @@ test('ImplementCommand T7 the existing ImplementOnlyWhenExecuted cases keep thei
   expect(isImplementCommand('X=$(date) cf-pi-run.sh')).toBe(true)
   expect(isImplementCommand('bash -x/cf-pi-run.sh')).toBe(false)
 })
+
+test('SetupCommand T1 a setup name in quotes or after a separator decides whether it runs', () => {
+  expect(isSetupCommand('echo "a; cf-pi-setup.sh"')).toBe(false)
+  expect(isSetupCommand('echo a; "$SCRIPTS/cf-pi-setup.sh" s')).toBe(true)
+})
+
+test('SetupCommand T2 a setup run inside SESSION=$(...) or backticks runs', () => {
+  expect(isSetupCommand('SESSION=$("$SCRIPTS/cf-pi-setup.sh" "mod-band")\necho "$SESSION"')).toBe(true)
+  expect(isSetupCommand('S=`"$SCRIPTS/cf-pi-setup.sh" s`')).toBe(true)
+})
+
+test('SetupCommand T3 a setup run inside SESSION=$(...) with prefixed assignments runs', () => {
+  expect(isSetupCommand("SESSION=$(CF_IMPLEMENTER=omp PI_DISPATCH_CMD='pi --model x' \"$SCRIPTS/cf-pi-setup.sh\" s)")).toBe(true)
+})
+
+test('SetupCommand T4 a setup name only named inside a substitution does not run it', () => {
+  expect(isSetupCommand('B=$(basename "$SCRIPTS/cf-pi-setup.sh")')).toBe(false)
+  expect(isSetupCommand('X=$(echo "a; cf-pi-setup.sh")')).toBe(false)
+})
+
+test('SetupCommand T5 a setup name in a heredoc body does not run it, through bash -c it does', () => {
+  expect(isSetupCommand('cat <<EOF\n"$SCRIPTS/cf-pi-setup.sh" s\nEOF')).toBe(false)
+  expect(isSetupCommand('bash -c \'"$SCRIPTS/cf-pi-setup.sh" s\'')).toBe(true)
+})
