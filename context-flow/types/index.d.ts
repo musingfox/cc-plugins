@@ -16,6 +16,8 @@ export type FlowTracker = { flow: FlowState | null; lastEndedRoot: string | null
 
 export type FlowOutcome = 'cleanup' | 'abandoned' | 'session-end'
 
+export type CleanupTarget = { kind: 'any' } | { kind: 'roots'; roots: string[] }
+
 export type FlowEvent =
   | { kind: 'root'; root: string; at: number }
   | { kind: 'phase'; phase: 'research' | 'plan' | 'implement' | 'review'; at: number }

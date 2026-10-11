@@ -129,7 +129,7 @@ export function register(on: On) {
         const steps: Step[] = []
         if (root) steps.push({ kind: 'root', root, at })
         if (implement) steps.push({ kind: 'phase', phase: 'implement', at })
-        if (target) steps.push((t) => (t.flow && (target === 'any' || target === t.flow.root) ? { kind: 'end', outcome: 'cleanup', at } : null))
+        if (target) steps.push((t) => (t.flow && (target.kind === 'any' || target.roots.includes(t.flow.root)) ? { kind: 'end', outcome: 'cleanup', at } : null))
         settle($, await applyEvents($, steps))
       }
     } catch {

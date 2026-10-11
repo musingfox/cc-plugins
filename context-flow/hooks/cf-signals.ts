@@ -1,4 +1,4 @@
-import type { FlowPhase, ImplementFiguresResult } from '../types/index.d.ts'
+import type { CleanupTarget, FlowPhase, ImplementFiguresResult } from '../types/index.d.ts'
 
 const ROOT_SUFFIX_CHARS = 'A-Za-z0-9'
 const ROOT = `/tmp/cf-\\d{4}-[${ROOT_SUFFIX_CHARS}]{4}`
@@ -40,10 +40,11 @@ export const isSetupCommand = (command: string): boolean => executedPattern('cf-
 // A setup whose output has no SESSION= line alone still prints the root; the first root not followed by more name wins.
 export const setupRootOf = (output: string): string | null => output.match(new RegExp(`(${ROOT})(?![${ROOT_SUFFIX_CHARS}])`))?.[1] ?? null
 
-// 'any' when the command runs whatever env.sh's CLEANUP_SCRIPT names; else the root of a literal <root>/cleanup.sh.
-export function cleanupTargetOf(command: string): 'any' | string | null {
-  if (executedPattern('\\$(?:CLEANUP_SCRIPT|\\{CLEANUP_SCRIPT\\})', 'optional', false).test(command)) return 'any'
-  return executedPattern(`(${ROOT})/cleanup\\.sh`, 'optional', false).exec(command)?.[1] ?? null
+// 'any' when the command runs whatever env.sh's CLEANUP_SCRIPT names; else the roots of every literal <root>/cleanup.sh it runs.
+export function cleanupTargetOf(command: string): CleanupTarget | null {
+  if (executedPattern('\\$(?:CLEANUP_SCRIPT|\\{CLEANUP_SCRIPT\\})', 'optional', false).test(command)) return { kind: 'any' }
+  const roots = [...new Set([...command.matchAll(executedPattern(`(${ROOT})/cleanup\\.sh`, 'optional', false))].map((match) => match[1]))]
+  return roots.length ? { kind: 'roots', roots } : null
 }
 
 // The last CF_SLUG line wins: cf-pi-worktree.sh appends a collision-bumped one.
