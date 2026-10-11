@@ -6,7 +6,11 @@ const MAX_NEST = 32
 const SEPARATOR = /[ \t\n;&|()<>]/
 const KEYWORDS = new Set(['{', 'do', 'then', 'else'])
 
-type Read = { text: string; dynamic: boolean; plain: boolean; eqAt: number; fd: boolean }
+type Read = { text: string; dynamic: boolean; plain: boolean; eqAt: number; fd: boolean; subs: string[] }
+
+export type ScanOptions = { assignmentSubstitutions?: 'data' | 'commands' }
+
+const MAX_DESCENT = 8
 type Piece = { text: string; dynamic: boolean; end: number }
 
 class Lexer {
@@ -14,8 +18,14 @@ class Lexer {
   private cmd: SimpleCommand = { assignments: [], words: [] }
   private readonly out: SimpleCommand[] = []
   private heredocs: { delimiter: string; strip: boolean }[] = []
+  private subs: string[] = []
 
-  constructor(private readonly s: string, private readonly bindings: Map<string, string>) {}
+  constructor(
+    private readonly s: string,
+    private readonly bindings: Map<string, string>,
+    private readonly commands: boolean,
+    private readonly descent: number,
+  ) {}
 
   run(): SimpleCommand[] {
     const s = this.s
@@ -44,8 +54,21 @@ class Lexer {
         else this.bindings.set(name, value.text)
       }
     }
-    if (assignments.length || words.length) this.out.push({ assignments, words })
+    if (assignments.length || words.length) {
+      this.out.push({ assignments, words })
+      const body = words.length ? bodyOf(words) : null
+      if (body !== null && this.descent < MAX_DESCENT) this.emit(this.nested(body))
+    }
     this.cmd = { assignments: [], words: [] }
+  }
+
+  private emit(commands: SimpleCommand[]): void {
+    for (const c of commands) this.out.push(c)
+  }
+
+  // Scans a substitution or a -c/eval body with a copy of the bindings, so its bindings do not leak out.
+  private nested(text: string): SimpleCommand[] {
+    return new Lexer(text, new Map(this.bindings), this.commands, this.descent + 1).run()
   }
 
   private word(): void {
@@ -55,6 +78,7 @@ class Lexer {
     if (r.plain && cmd.words.length === 0 && cmd.assignments.length === 0 && KEYWORDS.has(r.text)) return
     if (r.eqAt >= 0 && cmd.words.length === 0) {
       cmd.assignments.push({ name: r.text.slice(0, r.eqAt), value: { text: r.text.slice(r.eqAt + 1), dynamic: r.dynamic } })
+      if (this.commands && this.descent < MAX_DESCENT) for (const body of r.subs) this.emit(this.nested(body))
       return
     }
     cmd.words.push({ text: r.text, dynamic: r.dynamic })
@@ -97,6 +121,7 @@ class Lexer {
 
   private readWord(): Read {
     const s = this.s
+    this.subs = []
     let text = ''
     let dynamic = false
     let plain = true
@@ -105,7 +130,7 @@ class Lexer {
     while (this.i < s.length) {
       const c = s[this.i]
       if (SEPARATOR.test(c)) {
-        if ((c === '<' || c === '>') && bare && text !== '') return { text, dynamic, plain, eqAt, fd: true }
+        if ((c === '<' || c === '>') && bare && text !== '') return { text, dynamic, plain, eqAt, fd: true, subs: [] }
         break
       }
       if (c === '\\') {
@@ -163,7 +188,7 @@ class Lexer {
       text += c
       this.i++
     }
-    return { text, dynamic, plain, eqAt, fd: false }
+    return { text, dynamic, plain, eqAt, fd: false, subs: this.subs }
   }
 
   private dq(from: number): Piece {
@@ -198,12 +223,14 @@ class Lexer {
     if (s[j] === '`') {
       const k = this.backtickEnd(j + 1)
       const end = Math.min(k + 1, s.length)
+      if (k < s.length) this.subs.push(s.slice(j + 1, k))
       return { text: s.slice(j, end), dynamic: true, end }
     }
     const n = s[j + 1]
     if (n === '(') {
       const k = this.closeParen(j + 2, 0)
       const end = k < 0 ? s.length : k
+      if (k >= 0 && s[j + 2] !== '(') this.subs.push(s.slice(j + 2, k - 1))
       return { text: s.slice(j, end), dynamic: true, end }
     }
     if (n === '{') {
@@ -302,6 +329,19 @@ class Lexer {
   }
 }
 
-export function scanCommands(text: string): SimpleCommand[] {
-  return new Lexer(text, new Map()).run()
+function bodyOf(words: Word[]): string | null {
+  const [head, ...rest] = words
+  if (head.text === 'eval') return rest.length ? rest.map((w) => w.text).join(' ') : null
+  if (head.text !== 'bash' && head.text !== 'sh') return null
+  let k = 0
+  let dashC = false
+  while (k < rest.length && /^-[A-Za-z]+$/.test(rest[k].text)) {
+    if (rest[k].text.includes('c')) dashC = true
+    k++
+  }
+  return dashC && k < rest.length ? rest[k].text : null
+}
+
+export function scanCommands(text: string, options: ScanOptions = {}): SimpleCommand[] {
+  return new Lexer(text, new Map(), options.assignmentSubstitutions === 'commands', 0).run()
 }

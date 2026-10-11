@@ -225,3 +225,75 @@ test('ScanVariableResolution T8 export is a limit: its assignment does not bind'
 test('ScanVariableResolution T9 a default-value expansion is never resolved', () => {
   expect(argv(scanCommands('S=a; echo ${S:-d}'))).toEqual([['echo', '${S:-d}']])
 })
+
+const COMMANDS = { assignmentSubstitutions: 'commands' } as const
+
+test('ScanAssignmentSubstitutions T1 an assignment substitution is data by default', () => {
+  const commands = scanCommands('SESSION=$("$SCRIPTS/cf-pi-setup.sh" s)')
+  expect(commands.length).toBe(1)
+  expect(assigns(commands[0])).toEqual([['SESSION', '$("$SCRIPTS/cf-pi-setup.sh" s)']])
+  expect(commands[0].words).toEqual([])
+})
+
+test('ScanAssignmentSubstitutions T2 in commands mode the substitution command is scanned', () => {
+  expect(argv(scanCommands('SESSION=$("$SCRIPTS/cf-pi-setup.sh" s)', COMMANDS))).toContainEqual(['$SCRIPTS/cf-pi-setup.sh', 's'])
+})
+
+test('ScanAssignmentSubstitutions T3 a backtick substitution is scanned in commands mode', () => {
+  expect(argv(scanCommands('S=`"$X/cf-pi-setup.sh" s`', COMMANDS))).toContainEqual(['$X/cf-pi-setup.sh', 's'])
+})
+
+test('ScanAssignmentSubstitutions T4 a substitution in a word is not an assignment and is not scanned', () => {
+  expect(argv(scanCommands('echo "$(ls)"', COMMANDS))).toEqual([['echo', '$(ls)']])
+})
+
+test('ScanAssignmentSubstitutions T5 bindings made inside a substitution do not leak out', () => {
+  expect(argv(scanCommands('X=$(S=a; true); echo $S', COMMANDS))).toContainEqual(['echo', '$S'])
+})
+
+test('ScanAssignmentSubstitutions T6 the substitution command runs before the carrying command', () => {
+  expect(argv(scanCommands('X=$(date) cf-pi-run.sh', COMMANDS))).toEqual([['date'], ['cf-pi-run.sh']])
+})
+
+test('ScanStringBodyDescent T1 a bash -c body is scanned right after the invoking command', () => {
+  expect(argv(scanCommands("bash -c '. /tmp/cf-1008-Rez6/env.sh'"))).toEqual([['bash', '-c', '. /tmp/cf-1008-Rez6/env.sh'], ['.', '/tmp/cf-1008-Rez6/env.sh']])
+})
+
+test('ScanStringBodyDescent T2 sh -c and a letter cluster with c are scanned', () => {
+  expect(argv(scanCommands('sh -c "echo hi; ls"'))).toContainEqual(['echo', 'hi'])
+  expect(argv(scanCommands("bash -lc 'ls'"))).toContainEqual(['ls'])
+})
+
+test('ScanStringBodyDescent T3 eval joins its arguments and scans them', () => {
+  expect(argv(scanCommands('eval ". /tmp/cf-1008-Rez6/env.sh"'))).toContainEqual(['.', '/tmp/cf-1008-Rez6/env.sh'])
+  expect(argv(scanCommands('eval . /tmp/cf-1008-Rez6/env.sh'))).toContainEqual(['.', '/tmp/cf-1008-Rez6/env.sh'])
+})
+
+test('ScanStringBodyDescent T4 a non-flag word before -c, or -c with no body, adds nothing', () => {
+  expect(argv(scanCommands('bash script.sh -c x'))).toEqual([['bash', 'script.sh', '-c', 'x']])
+  expect(argv(scanCommands('bash -c'))).toEqual([['bash', '-c']])
+})
+
+test('ScanStringBodyDescent T5 a nested bash -c body is scanned', () => {
+  expect(argv(scanCommands("bash -c \"bash -c '. /tmp/cf-1008-Rez6/env.sh'\""))).toContainEqual(['.', '/tmp/cf-1008-Rez6/env.sh'])
+})
+
+test('ScanStringBodyDescent T6 the body commands come before the next command', () => {
+  const text = "bash -c '. /tmp/cf-1008-Ab12/env.sh'; . /tmp/cf-1008-Rez6/env.sh"
+  const list = argv(scanCommands(text))
+  expect(list.findIndex((w) => w[1] === '/tmp/cf-1008-Ab12/env.sh')).toBeLessThan(list.findIndex((w) => w[1] === '/tmp/cf-1008-Rez6/env.sh'))
+})
+
+test('ScanStringBodyDescent T7 an eval body sees the bindings in effect', () => {
+  expect(argv(scanCommands("S=/tmp/cf-1008-Rez6; eval '. $S/env.sh'"))).toContainEqual(['.', '/tmp/cf-1008-Rez6/env.sh'])
+})
+
+test('ScanStringBodyDescent T8 echoing a bash -c string does not descend', () => {
+  expect(argv(scanCommands('echo "bash -c \'ls\'"'))).toEqual([['echo', "bash -c 'ls'"]])
+})
+
+test('ScanStringBodyDescent T9 descent stops at eight levels and returns', () => {
+  let t = 'ls'
+  for (let k = 0; k < 12; k++) t = 'eval ' + JSON.stringify(t)
+  expect(scanCommands(t)[0].words[0].text).toBe('eval')
+})
