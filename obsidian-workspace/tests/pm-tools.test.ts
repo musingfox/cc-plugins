@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { appendNote, cardText, setStatus, tickAc } from '../hooks/pm-tools.ts'
+import { appendNote, cardText, evalArgv, setStatus, tickAc } from '../hooks/pm-tools.ts'
 import { readOutput } from '../hooks/cli-output.ts'
 import { acLabel } from '../hooks/card.ts'
 
@@ -86,4 +86,49 @@ describe('cardText', () => {
     }
   })
   test('refuses an empty frontmatter', () => expect(cardText({ frontmatter: '', body: 'x' })).toHaveProperty('refused'))
+})
+
+const decode = (argv: string[]) => {
+  const payload = /atob\('([^']*)'\)/.exec(argv[3])![1]
+  return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(payload), (c) => c.charCodeAt(0))))
+}
+const SCOPE = { vault: 'obsidian', project: 'cc-plugins' }
+const P = 'pm/cc-plugins/tasks/a.md'
+
+describe('evalArgv', () => {
+  test('builds one eval call carrying the text as base64 and never content=', () => {
+    const built = evalArgv(SCOPE, P, TWO)
+    expect(built).toHaveProperty('argv')
+    const { argv } = built as { argv: string[] }
+    expect(argv).toHaveLength(4)
+    expect(argv.slice(0, 3)).toEqual(['obsidian', 'vault=obsidian', 'eval'])
+    expect(argv[3].startsWith('code=')).toBe(true)
+    expect(argv[3].split("atob('").length - 1).toBe(1)
+    expect(argv[3]).toContain('app.vault.modify')
+    expect(argv[3]).toContain("'OK'")
+    expect(argv.some((element) => element.startsWith('content='))).toBe(false)
+  })
+  test('the base64 decodes to the path and the text, CJK intact', () => {
+    const { argv } = evalArgv(SCOPE, P, TWO) as { argv: string[] }
+    expect(decode(argv)).toEqual({ path: P, text: TWO })
+  })
+  test('keeps code-like and special characters out of the code, and round-trips them', () => {
+    const text = "x'); app.vault.delete(f); //${1}$&`\nline \"q\""
+    const { argv } = evalArgv(SCOPE, P, text) as { argv: string[] }
+    for (const raw of ["x'); app.vault.delete(f); //", '${1}', '$&', '`', '\n', '"']) expect(argv[3]).not.toContain(raw)
+    expect(decode(argv).text).toBe(text)
+  })
+  test('carries 60,000 CJK characters in one code element', () => {
+    const text = '字'.repeat(60000)
+    const { argv } = evalArgv(SCOPE, P, text) as { argv: string[] }
+    expect(argv.filter((element) => element.startsWith('code='))).toHaveLength(1)
+    expect(decode(argv).text).toBe(text)
+  })
+  test('refuses an empty, dot-only, foreign, nested or non-.md path with no argv', () => {
+    for (const path of ['', 'pm/cc-plugins/tasks/.md', 'pm/other/tasks/a.md', 'pm/cc-plugins/tasks/a/b.md', 'pm/cc-plugins/tasks/..md']) {
+      const built = evalArgv(SCOPE, path, TWO)
+      expect(built).toHaveProperty('refused')
+      expect(built).not.toHaveProperty('argv')
+    }
+  })
 })

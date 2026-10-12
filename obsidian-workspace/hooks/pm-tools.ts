@@ -1,4 +1,9 @@
 import { AC_HEADING, CHECKBOX } from './card.ts'
+import { cardPathArgv } from './base-argv.ts'
+import type { Scope } from './base-argv.ts'
+import { isBadCardName, taskFolder } from './argv.ts'
+
+const PATH_REFUSAL = 'The card path is not a card under pm/<project>/tasks/.'
 
 export type Edit = { text: string } | { refused: string }
 
@@ -71,4 +76,18 @@ export function setStatus(text: string, status: string): Edit {
 export function cardText(card: { frontmatter: string; body: string }): { text: string } | { refused: string } {
   if (card.frontmatter === '') return { refused: 'The card has no frontmatter to rebuild exactly.' }
   return { text: `---\n${card.frontmatter}\n---\n${card.body}` }
+}
+
+// The write carries the text as base64 of UTF-8 JSON: no byte of the card is ever part of the JS source.
+export function evalArgv(scope: Scope, path: string, text: string): { argv: string[] } | { refused: string } {
+  const built = cardPathArgv(scope, path)
+  if (!('argv' in built)) return { refused: PATH_REFUSAL }
+  const folder = taskFolder(scope.project)
+  if (!path.startsWith(folder) || isBadCardName(path.slice(folder.length, -'.md'.length))) return { refused: PATH_REFUSAL }
+  const bytes = new TextEncoder().encode(JSON.stringify({ path, text }))
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  const payload = btoa(binary)
+  const code = `(async () => { const p = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('${payload}'), (c) => c.charCodeAt(0)))); const f = app.vault.getAbstractFileByPath(p.path); if (!f) return 'ERR card not found: ' + p.path; await app.vault.modify(f, p.text); return 'OK' })()`
+  return { argv: [built.argv[0], built.argv[1], 'eval', `code=${code}`] }
 }
