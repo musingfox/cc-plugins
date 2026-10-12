@@ -66,3 +66,9 @@ export function setStatus(text: string, status: string): Edit {
   lines[at] = `status: ${status}`
   return { text: lines.join('\n') }
 }
+
+// An empty frontmatter would make the rebuilt card gain a byte, so the rebuild refuses it.
+export function cardText(card: { frontmatter: string; body: string }): { text: string } | { refused: string } {
+  if (card.frontmatter === '') return { refused: 'The card has no frontmatter to rebuild exactly.' }
+  return { text: `---\n${card.frontmatter}\n---\n${card.body}` }
+}

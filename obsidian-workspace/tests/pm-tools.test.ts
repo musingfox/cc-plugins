@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { appendNote, setStatus, tickAc } from '../hooks/pm-tools.ts'
+import { appendNote, cardText, setStatus, tickAc } from '../hooks/pm-tools.ts'
+import { readOutput } from '../hooks/cli-output.ts'
 import { acLabel } from '../hooks/card.ts'
 
+const CARD = '---\ntitle: "Claude Mod：面板顯示 obw 的 task 與 issue"\nstatus: todo\npriority: medium\ndue:\ntags:\n  - claude-mods\ncreated: 2026-09-18\n---\n# mod-obw-issue-pane\n\n## Acceptance Criteria\n- [ ] one\n'
 const TWO = '---\ntitle: t\nstatus: todo\n---\n# t\n\n## Acceptance Criteria\n- [ ] one\n- [ ] 二\n'
 const MIXED = '---\ntitle: m\nstatus: todo\npriority: medium\n- [ ] fm\n---\n# t\n- [ ] not ac\n\n## Acceptance Criteria\n- [ ] one\n- [x] 二\n  - [ ] nested\n### three\n- [ ] three\n\n## Agent\n- [ ] outside\n'
 
@@ -72,4 +74,16 @@ describe('setStatus', () => {
     expect(setStatus('# t\nstatus: todo\n', 'done')).toHaveProperty('refused')
     expect(setStatus('---\nx:\n  status: x\n---\n', 'done')).toHaveProperty('refused')
   })
+})
+
+describe('cardText', () => {
+  test('rebuilds the whole card from its frontmatter and body', () => expect(cardText({ frontmatter: 'a: 1', body: '# x\n' })).toEqual({ text: '---\na: 1\n---\n# x\n' }))
+  test('round-trips a read card byte-exactly', () => {
+    for (const text of [CARD, TWO, MIXED]) {
+      const card = readOutput({ kind: 'exited', exitCode: 0, stdout: text, stderr: '' })
+      expect(card).toMatchObject({ kind: 'card' })
+      expect(cardText(card as { frontmatter: string; body: string })).toEqual({ text })
+    }
+  })
+  test('refuses an empty frontmatter', () => expect(cardText({ frontmatter: '', body: 'x' })).toHaveProperty('refused'))
 })
