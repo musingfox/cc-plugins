@@ -118,3 +118,25 @@ export const PM_TOOLS = [
     isDeferred: false,
   },
 ]
+
+const CARD_REFUSAL = 'The card name must be a file name without /, control characters or dots alone.'
+const ARGUMENT_REFUSAL = 'The arguments do not match the tool: a checkbox index is a whole number, checked is true or false, and status is one of the four values.'
+
+// What a pm tool call changes, checked before any CLI run; `apply` makes the edit once the card has been read.
+export function pmEdit(tool: string, event: Record<string, unknown>): { card: string; apply: (text: string) => Edit } | { refused: string } {
+  const { card } = event
+  if (typeof card !== 'string' || isBadCardName(card)) return { refused: CARD_REFUSAL }
+  if (tool === 'pm_tick') {
+    const { index, checked } = event
+    if (typeof index !== 'number' || !Number.isInteger(index) || typeof checked !== 'boolean') return { refused: ARGUMENT_REFUSAL }
+    return { card, apply: (text) => tickAc(text, index, checked) }
+  }
+  if (tool === 'pm_note') {
+    const { line } = event
+    if (typeof line !== 'string' || lineProblem(line)) return { refused: LINE_REFUSAL }
+    return { card, apply: (text) => appendNote(text, line) }
+  }
+  const { status } = event
+  if (typeof status !== 'string' || !STATUSES.includes(status)) return { refused: ARGUMENT_REFUSAL }
+  return { card, apply: (text) => setStatus(text, status) }
+}

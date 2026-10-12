@@ -61,6 +61,8 @@ export type WorldOptions = {
   beneath?: unknown
   rm?: CliAnswer
   toolRegister?: { deny: string }
+  cards?: Record<string, string>
+  eval?: CliAnswer
 }
 
 export function kindOf(argv: string[]) {
@@ -86,9 +88,10 @@ function readAnswer(reads: Record<string, CliAnswer>, argv: string[]): CliAnswer
 // `rm` runs are answered by `rm` (exit 0 by default) and an exit-0 answer deletes argv[2] from `files`, which is live.
 // `beneath` is what the AbovePrompt hooks below the plugin draw.
 export function world(on: any, options: WorldOptions = {}) {
-  for (const key of Object.keys(options)) if (!['cwd', 'files', 'exists', 'views', 'query', 'read', 'reads', 'register', 'open', 'env', 'write', 'render', 'termaid', 'serve', 'sessionId', 'beneath', 'rm', 'toolRegister'].includes(key)) throw new Error(`stale world option: ${key}`)
+  for (const key of Object.keys(options)) if (!['cwd', 'files', 'exists', 'views', 'query', 'read', 'reads', 'register', 'open', 'env', 'write', 'render', 'termaid', 'serve', 'sessionId', 'beneath', 'rm', 'toolRegister', 'cards', 'eval'].includes(key)) throw new Error(`stale world option: ${key}`)
   const runs: any[] = []
   const tools: any[] = []
+  const cards: Record<string, string> = { ...(options.cards ?? {}) }
   const existsCalls: string[] = []
   const readCalls: string[] = []
   const opened: any[] = []
@@ -105,6 +108,7 @@ export function world(on: any, options: WorldOptions = {}) {
     rm: options.rm ?? '',
     termaid: options.termaid ?? DIAGRAM,
     ...(options.serve === undefined ? {} : { serve: options.serve }),
+    ...(options.eval === undefined ? {} : { eval: options.eval }),
   }
   const defaults: Record<string, string> = { views: VIEWS, 'base:query': LIST, read: CARD, render: RENDERED, termaid: DIAGRAM }
 
@@ -151,7 +155,7 @@ export function world(on: any, options: WorldOptions = {}) {
   on('process.run', async ($: any, e: any) => {
     runs.push(e)
     const verb = kindOf(e.argv)
-    const answer = verb === 'read' && options.reads ? readAnswer(options.reads, e.argv) : answers[verb]
+    const answer = verb === 'read' && (options.reads || options.cards) ? readAnswer({ ...cards, ...(options.reads ?? {}) }, e.argv) : answers[verb]
     if (answer === undefined) return { deny: `no answer for ${verb}` }
     if (answer === 'defer') {
       const stdout = await new Promise<string>((resolve) => deferred.set(runs.length - 1, resolve))
@@ -178,6 +182,7 @@ export function world(on: any, options: WorldOptions = {}) {
     opened,
     registered,
     tools,
+    cards,
     writes,
     files,
     release(run: number, stdout: string) {
