@@ -195,3 +195,63 @@ test('a 60,000-character CJK card is written as the transform gives it', async (
   expect(result.result.ok).toBe(true)
   expect(stored(w)).toBe((tickAc(card, 1, true) as { text: string }).text)
 })
+
+test('a read answering the CLI error text fails with that text, no eval', async ($, on) => {
+  const w = world(on, { cards: {} })
+  await $.session.start(SESSION)
+  const result: any = await $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'a', index: 1, checked: true } as any)
+  expect(result.result.ok).toBe(false)
+  expect(result.result.reason).toContain('not found')
+  expect(verbs(w)).toEqual(['read'])
+})
+
+test('a read that exits 1 fails with its stderr, no eval', async ($, on) => {
+  const w = world(on, { cards: { [P]: TWO }, reads: { [P]: { exitCode: 1, stdout: '', stderr: 'Obsidian is not running' } } })
+  await $.session.start(SESSION)
+  const result: any = await $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'a', index: 1, checked: true } as any)
+  expect(result.result).toEqual({ ok: false, reason: 'Obsidian is not running' })
+  expect(verbs(w)).toEqual(['read'])
+})
+
+test('a denied read says the CLI did not run, no eval', async ($, on) => {
+  const w = world(on, { cards: { [P]: TWO }, reads: { [P]: { deny: 'no' } } })
+  await $.session.start(SESSION)
+  const result: any = await $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'a', index: 1, checked: true } as any)
+  expect(result.result.ok).toBe(false)
+  expect(result.result.reason.startsWith('The obsidian CLI did not run')).toBe(true)
+  expect(verbs(w)).toEqual(['read'])
+})
+
+test('an eval answering an ERR line fails with no read back', async ($, on) => {
+  const w = world(on, { cards: { [P]: TWO }, eval: '=> ERR card not found: x\n' })
+  await $.session.start(SESSION)
+  const result: any = await $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'a', index: 1, checked: true } as any)
+  expect(result.result.ok).toBe(false)
+  expect(verbs(w)).toEqual(['read', 'eval'])
+})
+
+test('an eval that exits 1 fails with its stderr', async ($, on) => {
+  const w = world(on, { cards: { [P]: TWO }, eval: { exitCode: 1, stdout: '=> OK\n', stderr: 'boom' } })
+  await $.session.start(SESSION)
+  const result: any = await $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'a', index: 1, checked: true } as any)
+  expect(result.result).toEqual({ ok: false, reason: 'boom' })
+  expect(verbs(w)).toEqual(['read', 'eval'])
+})
+
+test('an OK eval that stores nothing fails at the read back, with no fourth run', async ($, on) => {
+  const w = world(on, { cards: { [P]: TWO }, eval: '=> OK\n' })
+  await $.session.start(SESSION)
+  const result: any = await $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'a', index: 1, checked: true } as any)
+  expect(result.result.ok).toBe(false)
+  expect(result.result.reason).toMatch(/read back|read-back/)
+  expect(verbs(w)).toEqual(['read', 'eval', 'read'])
+})
+
+test('an OK eval that stores half the text fails at the read back', async ($, on) => {
+  const w = world(on, { cards: { [P]: TWO }, eval: 'store-half' })
+  await $.session.start(SESSION)
+  const result: any = await $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'a', index: 1, checked: true } as any)
+  expect(result.result.ok).toBe(false)
+  expect(result.result.reason).toMatch(/read back|read-back/)
+  expect(verbs(w)).toEqual(['read', 'eval', 'read'])
+})

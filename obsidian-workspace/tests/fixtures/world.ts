@@ -62,7 +62,7 @@ export type WorldOptions = {
   rm?: CliAnswer
   toolRegister?: { deny: string }
   cards?: Record<string, string>
-  eval?: CliAnswer | 'store'
+  eval?: CliAnswer | 'store' | 'store-half'
 }
 
 // The path and text a pm write carries: the base64 argument of the eval code hooks/pm-tools.ts builds.
@@ -162,10 +162,10 @@ export function world(on: any, options: WorldOptions = {}) {
     runs.push(e)
     const verb = kindOf(e.argv)
     const answer = verb === 'read' && (options.reads || options.cards) ? readAnswer({ ...cards, ...(options.reads ?? {}) }, e.argv) : answers[verb]
-    // `eval: 'store'` keeps a write's text in `cards`, as Obsidian would, and answers OK.
-    if (answer === 'store') {
+    // `eval: 'store'` keeps a write's text in `cards`, as Obsidian would, and answers OK; 'store-half' keeps only its first half.
+    if (answer === 'store' || answer === 'store-half') {
       const { path, text } = evalPayload(e.argv)
-      cards[path] = text
+      cards[path] = answer === 'store' ? text : text.slice(0, Math.ceil(text.length / 2))
       return { value: { exitCode: 0, stdout: '=> OK\n', stderr: '' } }
     }
     if (answer === undefined) return { deny: `no answer for ${verb}` }
