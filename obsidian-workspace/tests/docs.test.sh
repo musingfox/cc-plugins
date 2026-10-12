@@ -103,3 +103,7 @@ n="$(awk '/^## Session Writeback/,/^## Prerequisites/' obsidian-workspace/README
 [ "$n" -ge 1 ] || fail "obw README Session Writeback must mention /issue"
 n="$(awk '/^## Session Writeback/,/^## Prerequisites/' obsidian-workspace/README.md | grep -c 'in-progress' || true)"
 [ "$n" -ge 1 ] || fail "obw README Session Writeback must mention in-progress"
+for w in pm_tick pm_note pm_status card index checked line status; do
+  n="$(awk '/^## Pm Tools/,/^## Prerequisites/' obsidian-workspace/README.md | grep -cw -- "$w" || true)"
+  [ "$n" -ge 1 ] || fail "obw README Pm Tools must mention $w"
+done
