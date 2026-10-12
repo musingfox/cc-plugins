@@ -132,3 +132,11 @@ describe('evalArgv', () => {
     }
   })
 })
+
+test('evalArgv refuses a bad vault or project', () => {
+  for (const scope of [{ vault: '', project: 'cc-plugins' }, { vault: 'v', project: '' }]) {
+    const built = evalArgv(scope, P, TWO)
+    expect(built).toHaveProperty('refused')
+    expect(built).not.toHaveProperty('argv')
+  }
+})
