@@ -280,3 +280,20 @@ test('a failing call settles alone and the next queued call still runs', async (
   expect(valid.result.ok).toBe(true)
   expect(verbs(w)).toEqual(['read', 'read', 'eval', 'read'])
 })
+
+test('a read of a card without frontmatter keeps the card text out of the reason', async ($, on) => {
+  const w = world(on, { cards: {}, reads: { [P]: '# t\n\n## Acceptance Criteria\n- [ ] SECRETCARDTEXT\n' } })
+  await $.session.start(SESSION)
+  for (const call of [
+    { tool: 'mcp__obw__pm_tick', card: 'a', index: 1, checked: true },
+    { tool: 'mcp__obw__pm_note', card: 'a', line: 'n' },
+    { tool: 'mcp__obw__pm_status', card: 'a', status: 'done' },
+  ]) {
+    const result: any = await $.tool.call(call as any)
+    expect(result.result.ok).toBe(false)
+    expect(result.isError).toBe(true)
+    expect(result.result.reason).toContain('did not return a card')
+    expect(JSON.stringify(result)).not.toContain('SECRETCARDTEXT')
+  }
+  expect(verbs(w)).toEqual(['read', 'read', 'read'])
+})

@@ -7,6 +7,7 @@ import { baseQueryArgv, cardPathArgv, viewsArgv } from './base-argv.ts'
 import type { Scope } from './base-argv.ts'
 import { baseQueryOutput, viewsOutput, readOutput, evalOutput, OBSIDIAN_TIMEOUT_MS } from './cli-output.ts'
 import type { Run } from './cli-output.ts'
+import type { Run } from './cli-output.ts'
 import { cardName, listRows, resolveArgument, rowNamed, rowSlug, rowsOutside } from './rows.ts'
 import { COUNT_VIEW, missingViewHint, missingViewText } from './counts.ts'
 import { listGroups, listItems } from './list.ts'
@@ -736,6 +737,18 @@ function pmFail(reason: string) {
   return { result: { ok: false, reason }, isError: true }
 }
 
+// A failed read is reported from the CLI's complaint only. A card printed on stdout is never quoted:
+// the one stdout line named is the CLI's own not-found line for this path.
+function readFailure(path: string, run: Run) {
+  if (run.kind === 'exited' && run.exitCode === 0) {
+    const out = run.stdout.trim()
+    return out === `Error: File "${path}" not found.` ? out : `${path} did not return a card.`
+  }
+  const complaint = run.kind === 'exited' ? { ...run, stdout: '' } : run
+  const failed = readOutput(complaint)
+  return failed.kind === 'error' ? failed.message : `${path} did not return a card.`
+}
+
 // A card counts as written only when reading it back gives the text that was written.
 async function pmCall($: any, tool: string, event: Record<string, unknown>) {
   const edit = pmEdit(tool, event)
@@ -746,8 +759,9 @@ async function pmCall($: any, tool: string, event: Record<string, unknown>) {
   const path = `${taskFolder(config.project)}${edit.card}.md`
   const built = cardPathArgv(scope, path)
   if (!('argv' in built)) return pmFail(`${config.path}: the vault or pm.project cannot name a card.`)
-  const first = readOutput(await runProcess($, built.argv))
-  if (first.kind === 'error') return pmFail(first.message)
+  const firstRun = await runProcess($, built.argv)
+  const first = readOutput(firstRun)
+  if (first.kind === 'error') return pmFail(readFailure(path, firstRun))
   const current = cardText(first)
   if ('refused' in current) return pmFail(current.refused)
   const next = edit.apply(current.text)
@@ -756,8 +770,9 @@ async function pmCall($: any, tool: string, event: Record<string, unknown>) {
   if ('refused' in written) return pmFail(written.refused)
   const evaluated = evalOutput(await runProcess($, written.argv, EVAL_TIMEOUT_MS))
   if (evaluated.kind === 'error') return pmFail(evaluated.message)
-  const back = readOutput(await runProcess($, built.argv))
-  if (back.kind === 'error') return pmFail(`${path} was written, but its read back failed: ${back.message}`)
+  const backRun = await runProcess($, built.argv)
+  const back = readOutput(backRun)
+  if (back.kind === 'error') return pmFail(`${path} was written, but its read back failed: ${readFailure(path, backRun)}`)
   const readBack = cardText(back)
   if ('refused' in readBack || readBack.text !== next.text) return pmFail(`${path} was written, but the read back differs from the text written.`)
   return { result: { ok: true, path } }
