@@ -221,7 +221,11 @@ test('closes frontmatter at a final --- with no newline', () => expect(readOutpu
 test('reads an eval run that printed OK as written', () => expect(evalOutput(run('=> OK\n'))).toEqual({ kind: 'written' }))
 test('reads an eval run that printed an error on stdout as an error', () =>
   expect(evalOutput(run('=> ERR card not found: x\n'))).toEqual({ kind: 'error', message: '=> ERR card not found: x' }))
-test('reads a failed eval run as an error from stderr even when stdout said OK', () =>
+test('eval stdout that only contains => OK is an error', () => {
+  expect(evalOutput(run('=> ERR card not found: pm/p/tasks/x => OK.md\n'))).toEqual({ kind: 'error', message: '=> ERR card not found: pm/p/tasks/x => OK.md' })
+  expect(evalOutput(run('=> OKAY\n'))).toEqual({ kind: 'error', message: '=> OKAY' })
+})
+test('reads a failed eval run as an error from stderr even when stdout said OK',() =>
   expect(evalOutput(run('=> OK\n', 1, 'Obsidian is not running'))).toEqual({ kind: 'error', message: 'Obsidian is not running' }))
 test('reports an eval run with no output', () => expect(evalOutput(run(''))).toEqual({ kind: 'error', message: 'obsidian exited 0 with no output.' }))
 test('reports an eval run that did not run', () => expect(evalOutput({ kind: 'rejected' })).toEqual({ kind: 'error', message: NOT_RUN }))
