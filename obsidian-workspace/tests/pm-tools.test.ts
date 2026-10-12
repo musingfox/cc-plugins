@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { appendNote, tickAc } from '../hooks/pm-tools.ts'
+import { appendNote, setStatus, tickAc } from '../hooks/pm-tools.ts'
 import { acLabel } from '../hooks/card.ts'
 
 const TWO = '---\ntitle: t\nstatus: todo\n---\n# t\n\n## Acceptance Criteria\n- [ ] one\n- [ ] 二\n'
@@ -53,5 +53,23 @@ describe('appendNote', () => {
   test('does not treat a ### Notes heading as the section', () => expect(appendNote('### Notes\nx\n', 'n')).toEqual({ text: '### Notes\nx\n\n## Notes\n- n\n' }))
   test('refuses empty, whitespace, newline, CR, tab, NUL and DEL lines', () => {
     for (const line of ['', '   ', 'a\nb', 'a\rb', 'a\tb', 'a\u0000b', 'a\u007fb']) expect(appendNote(TWO, line)).toHaveProperty('refused')
+  })
+})
+
+describe('setStatus', () => {
+  test('replaces only the frontmatter status line', () => expect(setStatus(MIXED, 'done')).toEqual({ text: MIXED.replace('status: todo', 'status: done') }))
+  test('replaces quoted and unspaced status lines', () => {
+    const quoted = '---\nstatus: "todo"\n---\n'
+    const unspaced = '---\nstatus:todo\n---\n'
+    expect(setStatus(quoted, 'in-progress')).toEqual({ text: '---\nstatus: in-progress\n---\n' })
+    expect(setStatus(unspaced, 'in-progress')).toEqual({ text: '---\nstatus: in-progress\n---\n' })
+  })
+  test('refuses a status outside the four values', () => {
+    for (const status of ['finished', '', 'Done', 'done\n', ' done']) expect(setStatus(MIXED, status)).toHaveProperty('refused')
+  })
+  test('ignores a status line in the body', () => expect(setStatus('---\ntitle: x\n---\nstatus: todo\n', 'done')).toHaveProperty('refused'))
+  test('refuses a card with no frontmatter or only a nested status line', () => {
+    expect(setStatus('# t\nstatus: todo\n', 'done')).toHaveProperty('refused')
+    expect(setStatus('---\nx:\n  status: x\n---\n', 'done')).toHaveProperty('refused')
   })
 })

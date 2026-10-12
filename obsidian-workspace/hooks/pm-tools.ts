@@ -51,3 +51,18 @@ export function appendNote(text: string, line: string): Edit {
   lines.splice(last + 1, 0, `- ${line}`)
   return { text: lines.join('\n') }
 }
+
+export const STATUSES = ['todo', 'in-progress', 'blocked', 'done']
+const STATUS_REFUSAL = `status must be one of ${STATUSES.join(', ')}.`
+const NO_STATUS = 'The card has no top-level status: line in its frontmatter.'
+
+export function setStatus(text: string, status: string): Edit {
+  if (!STATUSES.includes(status)) return { refused: STATUS_REFUSAL }
+  const lines = text.split('\n')
+  const close = lines[0] === '---' ? lines.indexOf('---', 1) : -1
+  if (close < 0) return { refused: NO_STATUS }
+  const at = lines.slice(0, close).findIndex((line) => /^status:/.test(line))
+  if (at < 0) return { refused: NO_STATUS }
+  lines[at] = `status: ${status}`
+  return { text: lines.join('\n') }
+}
