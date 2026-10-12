@@ -255,3 +255,28 @@ test('an OK eval that stores half the text fails at the read back', async ($, on
   expect(result.result.reason).toMatch(/read back|read-back/)
   expect(verbs(w)).toEqual(['read', 'eval', 'read'])
 })
+
+test('calls issued together each keep the other edit', async ($, on) => {
+  const w = world(on, { cards: { [P]: TWO }, eval: 'store' })
+  await $.session.start(SESSION)
+  const [first, second]: any[] = await Promise.all([
+    $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'a', index: 1, checked: true } as any),
+    $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'a', index: 2, checked: true } as any),
+  ])
+  expect(first.result.ok).toBe(true)
+  expect(second.result.ok).toBe(true)
+  expect(stored(w)).toBe(TWO.replace('- [ ] one', '- [x] one').replace('- [ ] 二', '- [x] 二'))
+  expect(verbs(w)).toEqual(['read', 'eval', 'read', 'read', 'eval', 'read'])
+})
+
+test('a failing call settles alone and the next queued call still runs', async ($, on) => {
+  const w = world(on, { cards: { [P]: TWO }, eval: 'store' })
+  await $.session.start(SESSION)
+  const [missing, valid]: any[] = await Promise.all([
+    $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'zz', index: 1, checked: true } as any),
+    $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'a', index: 1, checked: true } as any),
+  ])
+  expect(missing.result.ok).toBe(false)
+  expect(valid.result.ok).toBe(true)
+  expect(verbs(w)).toEqual(['read', 'read', 'eval', 'read'])
+})

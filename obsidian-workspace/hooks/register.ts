@@ -763,6 +763,15 @@ async function pmCall($: any, tool: string, event: Record<string, unknown>) {
   return { result: { ok: true, path } }
 }
 
+// Calls that arrive together run one after another, so a call's read never misses an edit another has written.
+let queue: Promise<unknown> = Promise.resolve()
+
+function queued<T>(work: () => Promise<T>): Promise<T> {
+  const next = queue.then(work)
+  queue = next.catch(() => {})
+  return next
+}
+
 async function pmHook($: any, tool: string, event: Record<string, unknown>) {
   try {
     return await pmCall($, tool, event)
@@ -857,9 +866,9 @@ export function register(on: On) {
     return result
   })
 
-  on('tool.call', { tool: 'mcp__obw__pm_tick' }, ($, e) => pmHook($, 'pm_tick', e))
-  on('tool.call', { tool: 'mcp__obw__pm_note' }, ($, e) => pmHook($, 'pm_note', e))
-  on('tool.call', { tool: 'mcp__obw__pm_status' }, ($, e) => pmHook($, 'pm_status', e))
+  on('tool.call', { tool: 'mcp__obw__pm_tick' }, ($, e) => queued(() => pmHook($, 'pm_tick', e)))
+  on('tool.call', { tool: 'mcp__obw__pm_note' }, ($, e) => queued(() => pmHook($, 'pm_note', e)))
+  on('tool.call', { tool: 'mcp__obw__pm_status' }, ($, e) => queued(() => pmHook($, 'pm_status', e)))
 
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
