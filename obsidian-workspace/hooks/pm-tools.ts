@@ -91,3 +91,30 @@ export function evalArgv(scope: Scope, path: string, text: string): { argv: stri
   const code = `(async () => { const p = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('${payload}'), (c) => c.charCodeAt(0)))); const f = app.vault.getAbstractFileByPath(p.path); if (!f) return 'ERR card not found: ' + p.path; await app.vault.modify(f, p.text); return 'OK' })()`
   return { argv: [built.argv[0], built.argv[1], 'eval', `code=${code}`] }
 }
+
+const CARD_FIELD = { type: 'string', description: 'The card file name under pm/<project>/tasks/, without .md.' }
+
+export const PM_TOOLS = [
+  {
+    name: 'pm_tick',
+    description: 'Tick or untick one acceptance-criteria checkbox of a pm task card. index counts the checkboxes under its ## Acceptance Criteria heading from 1.',
+    inputSchema: {
+      type: 'object',
+      properties: { card: CARD_FIELD, index: { type: 'integer', description: 'The 1-based checkbox number under ## Acceptance Criteria.' }, checked: { type: 'boolean' } },
+      required: ['card', 'index', 'checked'],
+    },
+    isDeferred: false,
+  },
+  {
+    name: 'pm_note',
+    description: 'Append one line as a bullet at the end of a pm task card Notes section, creating the section when it is missing.',
+    inputSchema: { type: 'object', properties: { card: CARD_FIELD, line: { type: 'string', description: 'One line of text, without line breaks.' } }, required: ['card', 'line'] },
+    isDeferred: false,
+  },
+  {
+    name: 'pm_status',
+    description: 'Set the status of a pm task card in its frontmatter.',
+    inputSchema: { type: 'object', properties: { card: CARD_FIELD, status: { type: 'string', enum: STATUSES } }, required: ['card', 'status'] },
+    isDeferred: false,
+  },
+]

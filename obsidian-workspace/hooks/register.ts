@@ -23,6 +23,7 @@ import { fitWidth } from './width.ts'
 import type { ObwBound, ObwBrowser, ObwCard, ObwLine, ObwList, ObwPane } from '../types/index.d.ts'
 import { bindingAction, bindingOf, bindingPath, sameBinding, statusChanges } from './bind.ts'
 import type { Binding } from './bind.ts'
+import { PM_TOOLS } from './pm-tools.ts'
 
 // The scan that checks `update` and `read` follows an atom only when it is made in the file that uses it.
 // Bump the shape tag when ObwPane changes meaning: a reload then declines what the old code wrote.
@@ -738,6 +739,13 @@ export function register(on: On) {
       })
     } catch {
       // A refused /issue must not stop the session.
+    }
+    for (const tool of PM_TOOLS) {
+      try {
+        await $.tool.register(tool)
+      } catch {
+        // A refused tool must not stop the others, /issue or the session.
+      }
     }
     void loadBinding($).catch(() => {})
     return next(e)
