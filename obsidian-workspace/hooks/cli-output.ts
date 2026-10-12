@@ -122,3 +122,8 @@ export function readOutput(run: Run): { kind: 'card'; frontmatter: string; body:
   if (!note) return { kind: 'error', message: errorMessage(run) }
   return { kind: 'card', ...note }
 }
+
+export function evalOutput(run: Run): { kind: 'written' } | { kind: 'error'; message: string } {
+  if (run.kind === 'exited' && run.exitCode === 0 && run.stdout.includes('=> OK')) return { kind: 'written' }
+  return { kind: 'error', message: errorMessage(run) }
+}
