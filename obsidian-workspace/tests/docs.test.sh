@@ -107,3 +107,8 @@ for w in pm_tick pm_note pm_status card index checked line status; do
   n="$(awk '/^## Pm Tools/,/^## Prerequisites/' obsidian-workspace/README.md | grep -cw -- "$w" || true)"
   [ "$n" -ge 1 ] || fail "obw README Pm Tools must mention $w"
 done
+s="$(awk '/^## Pm Tools/,/^## Prerequisites/' obsidian-workspace/README.md)"
+if printf '%s\n' "$s" | grep -Eqi 'literal vault path|bare name[^.]*rejected'; then
+  fail "README Pm Tools tells callers to pass the vault path as card; the tools take the file name without .md"
+fi
+printf '%s\n' "$s" | grep -q 'pm/<project>/tasks/' || fail "README Pm Tools must state the card path rule"
