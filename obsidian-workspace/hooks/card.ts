@@ -15,8 +15,8 @@ export function headerOf(frontmatter: string): CardHeader {
   return header
 }
 
-const AC_HEADING = /^## acceptance criteria\s*$/i
-const CHECKBOX = /^\s*[-*+] \[( |x|X)\](\s|$)/
+export const AC_HEADING = /^## acceptance criteria\s*$/i
+export const CHECKBOX =/^\s*[-*+] \[( |x|X)\](\s|$)/
 
 // The section runs to the next `#` or `##` heading; a `###` subheading stays inside it.
 export function acLabel(body: string): string | null {
