@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 import { CONFIG, SESSION, evalPayload, kindOf, world } from './fixtures/world.ts'
+import { tickAc } from '../hooks/pm-tools.ts'
 
 test('session start registers pm_tick, pm_note and pm_status', async ($, on) => {
   const w = world(on)
@@ -138,4 +139,59 @@ test('a config without pm.project refuses with no CLI run', async ($, on) => {
   const result: any = await $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'a', index: 1, checked: true } as any)
   expect(result.result).toEqual({ ok: false, reason: '/work/.obsidian.yaml has no pm.project.' })
   expect(w.runs).toHaveLength(0)
+})
+
+const stored = (w: any) => w.cards[P]
+
+test('a tick reads, writes and reads back the transformed card', async ($, on) => {
+  const w = world(on, { cards: { [P]: TWO }, eval: 'store' })
+  await $.session.start(SESSION)
+  const result: any = await $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'a', index: 2, checked: true } as any)
+  const text = (tickAc(TWO, 2, true) as { text: string }).text
+  expect(result.result).toEqual({ ok: true, path: P })
+  expect(verbs(w)).toEqual(['read', 'eval', 'read'])
+  expect(w.runs[0].argv).toEqual(['obsidian', 'vault=obsidian', 'read', `path=${P}`])
+  expect(evalPayload(w.runs[1].argv)).toEqual({ path: P, text })
+  expect(stored(w)).toBe(text)
+})
+
+test('a note appends its bullet to the stored card', async ($, on) => {
+  const w = world(on, { cards: { [P]: TWO }, eval: 'store' })
+  await $.session.start(SESSION)
+  const result: any = await $.tool.call({ tool: 'mcp__obw__pm_note', card: 'a', line: '完成 API 重構' } as any)
+  expect(result.result.ok).toBe(true)
+  expect(stored(w).endsWith('## Notes\n- 完成 API 重構\n')).toBe(true)
+})
+
+test('a status change replaces only the status line in the stored card', async ($, on) => {
+  const w = world(on, { cards: { [P]: TWO }, eval: 'store' })
+  await $.session.start(SESSION)
+  const result: any = await $.tool.call({ tool: 'mcp__obw__pm_status', card: 'a', status: 'in-progress' } as any)
+  expect(result.result.ok).toBe(true)
+  expect(stored(w)).toBe(TWO.replace('status: todo', 'status: in-progress'))
+})
+
+test('every CLI run is a read or an eval, and none carries content=', async ($, on) => {
+  const w = world(on, { cards: { [P]: TWO }, eval: 'store' })
+  await $.session.start(SESSION)
+  await $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'a', index: 1, checked: true } as any)
+  expect(verbs(w).every((verb: string) => verb === 'read' || verb === 'eval')).toBe(true)
+  expect(w.runs.flatMap((run: any) => run.argv).some((element: string) => element.startsWith('content='))).toBe(false)
+})
+
+test('the result never carries the card text', async ($, on) => {
+  world(on, { cards: { [P]: TWO.replace('# t', '# t\nTOPSECRET-MARK') }, eval: 'store' })
+  await $.session.start(SESSION)
+  const result: any = await $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'a', index: 1, checked: true } as any)
+  expect(result.result.ok).toBe(true)
+  expect(JSON.stringify(result)).not.toContain('TOPSECRET-MARK')
+})
+
+test('a 60,000-character CJK card is written as the transform gives it', async ($, on) => {
+  const card = `---\ntitle: t\nstatus: todo\n---\n# t\n\n${'字'.repeat(60000)}\n\n## Acceptance Criteria\n- [ ] one\n`
+  const w = world(on, { cards: { [P]: card }, eval: 'store' })
+  await $.session.start(SESSION)
+  const result: any = await $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'a', index: 1, checked: true } as any)
+  expect(result.result.ok).toBe(true)
+  expect(stored(w)).toBe((tickAc(card, 1, true) as { text: string }).text)
 })
