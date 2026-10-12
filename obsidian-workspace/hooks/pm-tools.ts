@@ -30,3 +30,24 @@ export function tickAc(text: string, index: number, checked: boolean): Edit {
   }
   return { refused: NO_BOX }
 }
+
+const CONTROL = /[\u0000-\u001f\u007f-\u009f]/
+export const LINE_REFUSAL = 'line must be one line of text.'
+
+export function lineProblem(line: string): string | null {
+  return line.trim() === '' || CONTROL.test(line) ? LINE_REFUSAL : null
+}
+
+// The Notes section runs to the next `#` or `##` heading, as the acceptance-criteria section does.
+export function appendNote(text: string, line: string): Edit {
+  if (lineProblem(line)) return { refused: LINE_REFUSAL }
+  const lines = text.split('\n')
+  const heading = lines.findIndex((value) => /^## Notes\s*$/.test(value))
+  if (heading < 0) return { text: `${text}${text.endsWith('\n') ? '\n' : '\n\n'}## Notes\n- ${line}\n` }
+  let end = heading + 1
+  while (end < lines.length && !lines[end].startsWith('# ') && !lines[end].startsWith('## ')) end++
+  let last = heading
+  for (let at = heading + 1; at < end; at++) if (lines[at].trim() !== '') last = at
+  lines.splice(last + 1, 0, `- ${line}`)
+  return { text: lines.join('\n') }
+}

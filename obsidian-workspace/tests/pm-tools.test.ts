@@ -1,5 +1,5 @@
-import { expect, test } from 'claude-code/testing'
-import { tickAc } from '../hooks/pm-tools.ts'
+import { describe, expect, test } from 'claude-code/testing'
+import { appendNote, tickAc } from '../hooks/pm-tools.ts'
 import { acLabel } from '../hooks/card.ts'
 
 const TWO = '---\ntitle: t\nstatus: todo\n---\n# t\n\n## Acceptance Criteria\n- [ ] one\n- [ ] 二\n'
@@ -36,4 +36,22 @@ test('the acLabel total is the largest index tickAc accepts', () => {
   expect(acLabel(body)).toBe('AC 1/4')
   expect(tickAc(MIXED, 4, true)).toHaveProperty('text')
   expect(tickAc(MIXED, 5, true)).toHaveProperty('refused')
+})
+
+describe('appendNote', () => {
+  test('adds a bullet and a Notes heading to a card without one', () => {
+    expect(appendNote(TWO, '完成 API 重構')).toEqual({ text: `${TWO}\n## Notes\n- 完成 API 重構\n` })
+  })
+  test('adds the bullet after the last note', () => expect(appendNote('## Notes\n- a\n- b\n', 'c')).toEqual({ text: '## Notes\n- a\n- b\n- c\n' }))
+  test('adds the bullet before the next section, keeping the blank line', () =>
+    expect(appendNote('## Notes\n- a\n\n## Other\nx\n', 'b')).toEqual({ text: '## Notes\n- a\n- b\n\n## Other\nx\n' }))
+  test('adds no final newline when the card has none', () => expect(appendNote('## Notes\n- a', 'b')).toEqual({ text: '## Notes\n- a\n- b' }))
+  test('creates the section after a list and after a heading with no final newline', () => {
+    expect(appendNote('# t\n- [ ] one\n', 'n')).toEqual({ text: '# t\n- [ ] one\n\n## Notes\n- n\n' })
+    expect(appendNote('# t', 'n')).toEqual({ text: '# t\n\n## Notes\n- n\n' })
+  })
+  test('does not treat a ### Notes heading as the section', () => expect(appendNote('### Notes\nx\n', 'n')).toEqual({ text: '### Notes\nx\n\n## Notes\n- n\n' }))
+  test('refuses empty, whitespace, newline, CR, tab, NUL and DEL lines', () => {
+    for (const line of ['', '   ', 'a\nb', 'a\rb', 'a\tb', 'a\u0000b', 'a\u007fb']) expect(appendNote(TWO, line)).toHaveProperty('refused')
+  })
 })
