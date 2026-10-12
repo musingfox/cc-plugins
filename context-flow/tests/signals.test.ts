@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import { BAND, bandLines, nodesOf, stringsIn } from './fixtures/band.ts'
 import { BENEATH, ENV, ENV2, ROOT, ROOT2, SESSION, SETUP_OUT, bareBash, ok, openFlow, world } from './fixtures/world.ts'
 import { ASYNC, bash, colorOf, first } from './fixtures/helpers.ts'
-import { isImplementCommand, isSetupCommand, setupRootOf, sourcedRootOf } from '../hooks/cf-signals.ts'
+import { cleanupTargetOf, isImplementCommand, isSetupCommand, setupRootOf, sourcedRootOf } from '../hooks/cf-signals.ts'
 
 const ENV_FILES = { [`${ROOT}/env.sh`]: ENV }
 
@@ -549,4 +549,228 @@ test('SharedHelpers T4 first is the top band line, not the whole list', async ($
   await openFlow($, on)
   expect(await first($)).toBe('● cf mod-band · setup · 0m')
   expect((await bandLines($))[0]).toBe('● cf mod-band · setup · 0m')
+})
+
+test('ScanTotalAndLinear T5 the exports return for empty and lone-delimiter inputs', () => {
+  const inputs = ['', ' ', '"', "'", '`', '$(', '${', '\\', '<<', '<<EOF', 'a=', '=', '(', ')', '$((', ';;', '\u0000']
+  for (const text of inputs) {
+    expect(() => [isImplementCommand(text), isSetupCommand(text), sourcedRootOf(text), cleanupTargetOf(text)]).not.toThrow()
+  }
+})
+
+test('ScanTotalAndLinear T6 the exports return null for deeply nested input', () => {
+  for (const text of ['$('.repeat(100000), '('.repeat(100000), '"$('.repeat(50000), 'bash -c "'.repeat(50000)]) {
+    expect(sourcedRootOf(text)).toBeNull()
+  }
+})
+
+test('ScanTotalAndLinear T4 isImplementCommand returns false for two hundred empty assignments within 50 ms', () => {
+  const t = performance.now()
+  expect(isImplementCommand("A='' ".repeat(200) + 'make')).toBe(false)
+  expect(performance.now() - t).toBeLessThan(50)
+})
+
+test('SourcedRootOf T1 a sourced env.sh resolves a variable, quoted or braced', () => {
+  expect(sourcedRootOf('S=/tmp/cf-1008-Rez6; . $S/env.sh')).toBe('/tmp/cf-1008-Rez6')
+  expect(sourcedRootOf('S="/tmp/cf-1008-Rez6"; . "$S/env.sh"')).toBe('/tmp/cf-1008-Rez6')
+  expect(sourcedRootOf("S='/tmp/cf-1008-Rez6'; source ${S}/env.sh")).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SourcedRootOf T2 a plain assignment beside the source still resolves', () => {
+  expect(sourcedRootOf("A=$'x y'; . /tmp/cf-1008-Rez6/env.sh")).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SourcedRootOf T3 a source inside bash -c, eval or sh -c runs and resolves', () => {
+  expect(sourcedRootOf("bash -c '. /tmp/cf-1008-Rez6/env.sh'")).toBe('/tmp/cf-1008-Rez6')
+  expect(sourcedRootOf('eval ". /tmp/cf-1008-Rez6/env.sh"')).toBe('/tmp/cf-1008-Rez6')
+  expect(sourcedRootOf('sh -c ". /tmp/cf-1008-Rez6/env.sh"')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SourcedRootOf T4 an unresolved variable source yields null and a literal one yields the root', () => {
+  expect(sourcedRootOf('. $S/env.sh')).toBeNull()
+  expect(sourcedRootOf('. "$SESSION/env.sh"')).toBeNull()
+  expect(sourcedRootOf('S=/tmp/cf-1008-Rez6; . $S/env.sh')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SourcedRootOf T5 a source inside quotes yields null and a real one yields the root', () => {
+  expect(sourcedRootOf('echo "x; . /tmp/cf-1008-Rez6/env.sh"')).toBeNull()
+  expect(sourcedRootOf("echo 'x'; . /tmp/cf-1008-Rez6/env.sh")).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SourcedRootOf T6 a source inside a heredoc body yields null and one after it yields the root', () => {
+  expect(sourcedRootOf('cat <<EOF\n. /tmp/cf-1008-Rez6/env.sh\nEOF')).toBeNull()
+  expect(sourcedRootOf('cat <<EOF\nx\nEOF\n. /tmp/cf-1008-Rez6/env.sh')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SourcedRootOf T7 a shard env.sh one level deeper is not a root', () => {
+  expect(sourcedRootOf('S=/tmp/cf-1008-Rez6; . $S/shards/A/env.sh')).toBeNull()
+  expect(sourcedRootOf('. /tmp/cf-1008-Rez6/shards/A/env.sh')).toBeNull()
+})
+
+test('SourcedRootOf T8 the last executed source wins', () => {
+  expect(sourcedRootOf('S=/tmp/cf-1008-Ab12; . $S/env.sh && . /tmp/cf-1008-Rez6/env.sh')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SourcedRootOf T9 a source inside a substitution assignment yields null', () => {
+  expect(sourcedRootOf('X=$(. /tmp/cf-1008-Rez6/env.sh)')).toBeNull()
+})
+
+test('ImplementCommand T1 a shard script with a prefixed PATH assignment runs', () => {
+  expect(isImplementCommand('PATH="$HOME"/bin:$PATH cf-pi-run.sh /tmp/cf-1008-Rez6/shards/A g c t')).toBe(true)
+})
+
+test('ImplementCommand T2 any assignment quoting before the script still runs it', () => {
+  expect(isImplementCommand("A=$'x y' cf-pi-run.sh a")).toBe(true)
+  expect(isImplementCommand("A=$'it\\'s' cf-pi-run.sh")).toBe(true)
+  expect(isImplementCommand('A=`date` cf-pi-shard.sh')).toBe(true)
+  expect(isImplementCommand("FOO='a'\"b\"c cf-pi-worktree.sh")).toBe(true)
+})
+
+test('ImplementCommand T3 a script name in a heredoc body does not run it, one after the body does', () => {
+  expect(isImplementCommand('cat <<EOF\ncf-pi-run.sh /tmp/cf-1008-Rez6/shards/A\nEOF')).toBe(false)
+  expect(isImplementCommand('cat <<EOF\nx\nEOF\ncf-pi-run.sh /tmp/cf-1008-Rez6/shards/A')).toBe(true)
+})
+
+test('ImplementCommand T4 a script name in quotes or a comment does not run it, after a separator it does', () => {
+  expect(isImplementCommand('echo "x; cf-pi-run.sh"')).toBe(false)
+  expect(isImplementCommand('# cf-pi-run.sh')).toBe(false)
+  expect(isImplementCommand('echo x; cf-pi-run.sh')).toBe(true)
+})
+
+test('ImplementCommand T5 a script run through bash -c runs', () => {
+  expect(isImplementCommand('bash -c \'"$SCRIPTS/cf-pi-run.sh" x\'')).toBe(true)
+})
+
+test('ImplementCommand T6 a script inside an assignment substitution is data', () => {
+  expect(isImplementCommand('X=$("$SCRIPTS/cf-pi-run.sh")')).toBe(false)
+})
+
+test('ImplementCommand T7 the existing ImplementOnlyWhenExecuted cases keep their answers', () => {
+  expect(isImplementCommand('X=$(date) cf-pi-run.sh')).toBe(true)
+  expect(isImplementCommand('bash -x/cf-pi-run.sh')).toBe(false)
+})
+
+test('SetupCommand T1 a setup name in quotes or after a separator decides whether it runs', () => {
+  expect(isSetupCommand('echo "a; cf-pi-setup.sh"')).toBe(false)
+  expect(isSetupCommand('echo a; "$SCRIPTS/cf-pi-setup.sh" s')).toBe(true)
+})
+
+test('SetupCommand T2 a setup run inside SESSION=$(...) or backticks runs', () => {
+  expect(isSetupCommand('SESSION=$("$SCRIPTS/cf-pi-setup.sh" "mod-band")\necho "$SESSION"')).toBe(true)
+  expect(isSetupCommand('S=`"$SCRIPTS/cf-pi-setup.sh" s`')).toBe(true)
+})
+
+test('SetupCommand T3 a setup run inside SESSION=$(...) with prefixed assignments runs', () => {
+  expect(isSetupCommand("SESSION=$(CF_IMPLEMENTER=omp PI_DISPATCH_CMD='pi --model x' \"$SCRIPTS/cf-pi-setup.sh\" s)")).toBe(true)
+})
+
+test('SetupCommand T4 a setup name only named inside a substitution does not run it', () => {
+  expect(isSetupCommand('B=$(basename "$SCRIPTS/cf-pi-setup.sh")')).toBe(false)
+  expect(isSetupCommand('X=$(echo "a; cf-pi-setup.sh")')).toBe(false)
+})
+
+test('SetupCommand T5 a setup name in a heredoc body does not run it, through bash -c it does', () => {
+  expect(isSetupCommand('cat <<EOF\n"$SCRIPTS/cf-pi-setup.sh" s\nEOF')).toBe(false)
+  expect(isSetupCommand('bash -c \'"$SCRIPTS/cf-pi-setup.sh" s\'')).toBe(true)
+})
+
+test('ScannerLimits T1 an export does not bind a variable for a source path', () => {
+  expect(sourcedRootOf('export S=/tmp/cf-1008-Rez6; . $S/env.sh')).toBeNull()
+})
+
+test('ScannerLimits T2 a default or a substitution in the path is not resolved', () => {
+  expect(sourcedRootOf('S=/tmp/cf-1008-Rez6; . ${S:-x}/env.sh')).toBeNull()
+  expect(sourcedRootOf('. $(echo /tmp/cf-1008-Rez6)/env.sh')).toBeNull()
+})
+
+test('ScannerLimits T3 a function body is scanned as commands, its calls are not tracked', () => {
+  expect(sourcedRootOf('f() { . /tmp/cf-1008-Rez6/env.sh; }')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('ScannerLimits T4 a bash -c body inherits the bindings in effect', () => {
+  expect(sourcedRootOf("S=/tmp/cf-1008-Rez6; bash -c '. $S/env.sh'")).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('ScannerLimits T5 a heredoc inside a substitution does not derail the scan after it', () => {
+  expect(sourcedRootOf('X=$(cat <<E2\nls\nE2\n)\n. /tmp/cf-1008-Rez6/env.sh')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('ScannerLimits T6 a bound unquoted value is not word-split into a command', () => {
+  expect(sourcedRootOf('CMD=". /tmp/cf-1008-Rez6/env.sh"; $CMD')).toBeNull()
+  expect(sourcedRootOf('. /tmp/cf-1008-Rez6/env.sh')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('ScannerLimits T7 a binding made in an eval body does not reach later commands', () => {
+  expect(sourcedRootOf('eval S=/tmp/cf-1008-Rez6; . $S/env.sh')).toBeNull()
+  expect(sourcedRootOf('S=/tmp/cf-1008-Rez6; . $S/env.sh')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('ScannerLimits T8 a setup run inside a default expansion is not scanned', () => {
+  expect(isSetupCommand('SESSION=${X:-$("$SCRIPTS/cf-pi-setup.sh" s)}')).toBe(false)
+  expect(isSetupCommand('SESSION=$("$SCRIPTS/cf-pi-setup.sh" s)')).toBe(true)
+})
+
+test('ScannerLimits T9 a locale-quoted path keeps its dollar and finds no root', () => {
+  expect(sourcedRootOf('. $"/tmp/cf-1008-Rez6/env.sh"')).toBeNull()
+  expect(sourcedRootOf('. "/tmp/cf-1008-Rez6/env.sh"')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('ScannerLimits T10 the no-parens function form folds its first body command into the header', () => {
+  expect(sourcedRootOf('function f { . /tmp/cf-1008-Rez6/env.sh; }')).toBeNull()
+  expect(sourcedRootOf('function f() { . /tmp/cf-1008-Rez6/env.sh; }')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test("ImplementOnlyWhenExecuted R4 an ANSI-C quote with an escaped quote in a substitution still runs the script", () => {
+  expect(isImplementCommand("X=$(echo $'it\\'s') cf-pi-run.sh")).toBe(true)
+})
+
+test('ImplementCommand R2 a variable in the heredoc delimiter keeps the script name in the body as data', () => {
+  expect(isImplementCommand('S=EOF; cat <<$S\nEOF\ncf-pi-run.sh x\n$S')).toBe(false)
+  expect(isImplementCommand('S=EOF; cat <<$S\nEOF\n$S\ncf-pi-run.sh x')).toBe(true)
+})
+
+test("SetupRunOpensFlow R4 a comment with an apostrophe inside SESSION=$(...) still opens the flow", () => {
+  expect(isSetupCommand('SESSION=$("$SCRIPTS/cf-pi-setup.sh" s # it\'s the setup\n)')).toBe(true)
+})
+
+test('SetupCommand R2 a variable in the heredoc delimiter keeps the setup name in the body as data', () => {
+  expect(isSetupCommand('S=EOF; cat <<$S\nEOF\n"$SCRIPTS/cf-pi-setup.sh" s\n$S')).toBe(false)
+  expect(isSetupCommand('S=EOF; cat <<$S\nEOF\n$S\n"$SCRIPTS/cf-pi-setup.sh" s')).toBe(true)
+})
+
+test("SourcedRootOf R1 an ANSI-C quote with an escaped quote before the source still resolves it", () => {
+  expect(sourcedRootOf("X=$(echo $'it\\'s'); . /tmp/cf-1008-Rez6/env.sh")).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SourcedRootOf R2 a source inside a substitution with a ")" comment is data', () => {
+  expect(sourcedRootOf('X=$(echo hi # a ) b\n. /tmp/cf-1008-Rez6/env.sh\n)')).toBe(null)
+})
+
+test('SourcedRootOf R3 a variable in the heredoc delimiter keeps the source in the body as data', () => {
+  expect(sourcedRootOf('S=EOF; cat <<$S\nEOF\n. /tmp/cf-1008-Rez6/env.sh\n$S')).toBe(null)
+  expect(sourcedRootOf('S=EOF; cat <<$S\nEOF\n$S\n. /tmp/cf-1008-Rez6/env.sh')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SourcedRootOf R4 a hash right after a nested substitution does not hide the source', () => {
+  expect(sourcedRootOf('X=$(echo $(echo a)#c); . /tmp/cf-1008-Rez6/env.sh')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SourcedRootOf R5 a variable in the same command resolves for a later value', () => {
+  expect(sourcedRootOf('S=/tmp/cf-1008-Rez6 E=$S/env.sh; . $E')).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('SourcedRootOf R6 a heredoc with an apostrophe inside a substitution does not hide the source', () => {
+  expect(sourcedRootOf(`echo "$(cat <<'EOF'\nfix: don't x\nEOF\n)"\n. /tmp/cf-1008-Rez6/env.sh`)).toBe('/tmp/cf-1008-Rez6')
+})
+
+test('ImplementCommand R3 a hash right after a nested substitution does not hide the script', () => {
+  expect(isImplementCommand('X=$(echo $(echo a)#c); cf-pi-run.sh x')).toBe(true)
+})
+
+test('ImplementCommand R4 a heredoc with an apostrophe inside a substitution does not hide the script', () => {
+  expect(isImplementCommand(`echo "$(cat <<'EOF'\nfix: don't x\nEOF\n)"; "$SCRIPTS/cf-pi-run.sh" x`)).toBe(true)
+})
+
+test('SetupCommand R3 a hash right after a nested substitution does not hide the setup', () => {
+  expect(isSetupCommand('X=$(echo $(echo a)#c); "$SCRIPTS/cf-pi-setup.sh" s')).toBe(true)
 })

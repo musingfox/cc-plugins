@@ -1,4 +1,5 @@
 import type { CleanupTarget, FlowPhase, ImplementFiguresResult } from '../types/index.d.ts'
+import { scanCommands, type ScanOptions, type SimpleCommand, type Word } from './shell-scan.ts'
 
 const ROOT_SUFFIX_CHARS = 'A-Za-z0-9'
 const ROOT = `/tmp/cf-\\d{4}-[${ROOT_SUFFIX_CHARS}]{4}`
@@ -8,19 +9,16 @@ export function sessionRootOf(stdout: string): string | null {
   return stdout.match(new RegExp(`^SESSION=(${ROOT})$`, 'm'))?.[1] ?? null
 }
 
-// A regex cannot see quoting or heredocs, so a separator inside a quoted string or a heredoc body still counts as a position.
-function executedPattern(name: string, runner: 'optional' | 'source', prefix: boolean): RegExp {
-  const position = '(?:^|(?<=[\\n;&|()])|(?<=\\{)(?=\\s)|(?<!\\w)(?:do|then|else)(?!\\w))'
-  const assignments = `(?:\\w+=(?:'[^']*'|"[^"]*"|(?!['"])[^\\s;&|()]*)[ \\t]+)*`
-  const runnerWord = runner === 'source' ? '(?:\\.|source)[ \\t]+(?!["\']?-)' : '(?:(?:bash|sh|\\.|source)[ \\t]+(?!["\']?-))?'
-  const path = prefix ? '(?:[^\\s"\';&|()]*\\/)?' : ''
-  return new RegExp(`${position}[ \\t]*${assignments}${runnerWord}["']?${path}${name}["']?(?=[\\s;&|)<>]|$)`, 'g')
-}
-
 // Every cf Bash after setup starts with `. "<root>/env.sh"`; a shard's env.sh sits one level deeper and does not match.
 export function sourcedRootOf(command: string): string | null {
-  const found = [...command.matchAll(executedPattern(`(${ROOT})/env\\.sh`, 'source', false))]
-  return found.at(-1)?.[1] ?? null
+  let root: string | null = null
+  for (const { words } of scanCommands(command)) {
+    const [first, next] = words
+    if ((first?.text === '.' || first?.text === 'source') && next && !next.text.startsWith('-')) {
+      root = next.text.match(new RegExp(`^(${ROOT})/env\\.sh$`))?.[1] ?? root
+    }
+  }
+  return root
 }
 
 export function phaseOfAgent(subagentType: unknown): Exclude<FlowPhase, 'setup'> | null {
@@ -33,17 +31,32 @@ export function phaseOfAgent(subagentType: unknown): Exclude<FlowPhase, 'setup'>
   }
 }
 
-export const isImplementCommand = (command: string): boolean => executedPattern('cf-pi-(?:worktree|shard|run)\\.sh', 'optional', true).test(command)
+const RUNNERS = new Set(['bash', 'sh', '.', 'source'])
 
-export const isSetupCommand = (command: string): boolean => executedPattern('cf-pi-setup\\.sh', 'optional', true).test(command)
+// The word a command executes: its first word, or the script after a runner whose next word is not flag-led.
+function executedWordOf({ words }: SimpleCommand): Word | null {
+  const [first, next] = words
+  if (!first) return null
+  if (!RUNNERS.has(first.text)) return first
+  return next && !next.text.startsWith('-') ? next : null
+}
+
+const executesScript = (command: string, script: string, options?: ScanOptions): boolean =>
+  scanCommands(command, options).some((c) => executedWordOf(c)?.text.match(new RegExp(`(^|/)${script}$`)) != null)
+
+export const isImplementCommand = (command: string): boolean => executesScript(command, 'cf-pi-(?:worktree|shard|run)\\.sh')
+
+// The setup's SESSION=$(...) runs its script, so assignment substitutions are scanned for it.
+export const isSetupCommand = (command: string): boolean => executesScript(command, 'cf-pi-setup\\.sh', { assignmentSubstitutions: 'commands' })
 
 // A setup whose output has no SESSION= line alone still prints the root; the first root not followed by more name wins.
 export const setupRootOf = (output: string): string | null => output.match(new RegExp(`(${ROOT})(?![${ROOT_SUFFIX_CHARS}])`))?.[1] ?? null
 
 // 'any' when the command runs whatever env.sh's CLEANUP_SCRIPT names; else the roots of every literal <root>/cleanup.sh it runs.
 export function cleanupTargetOf(command: string): CleanupTarget | null {
-  if (executedPattern('\\$(?:CLEANUP_SCRIPT|\\{CLEANUP_SCRIPT\\})', 'optional', false).test(command)) return { kind: 'any' }
-  const roots = [...new Set([...command.matchAll(executedPattern(`(${ROOT})/cleanup\\.sh`, 'optional', false))].map((match) => match[1]))]
+  const targets = scanCommands(command).map(executedWordOf).filter((word): word is Word => word !== null)
+  if (targets.some((word) => word.dynamic && (word.text === '$CLEANUP_SCRIPT' || word.text === '${CLEANUP_SCRIPT}'))) return { kind: 'any' }
+  const roots = [...new Set(targets.map((word) => word.text.match(new RegExp(`^(${ROOT})/cleanup\\.sh$`))?.[1]).filter((root): root is string => root !== undefined))]
   return roots.length ? { kind: 'roots', roots } : null
 }
 
