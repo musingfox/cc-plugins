@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { SESSION, kindOf, world } from './fixtures/world.ts'
+import { CONFIG, SESSION, evalPayload, kindOf, world } from './fixtures/world.ts'
 
 test('session start registers pm_tick, pm_note and pm_status', async ($, on) => {
   const w = world(on)
@@ -102,4 +102,40 @@ test('a valid call reaches the eval, so the zero-eval refusals above can fail', 
   await $.session.start(SESSION)
   await $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'a', index: 2, checked: true } as any)
   expect(verbs(w)).toContain('eval')
+})
+
+test('a valid call acts on the vault and project the cwd config names', async ($, on) => {
+  const w = world(on, { files: { '/work/.obsidian.yaml': 'vault: Work\npm:\n  project: proj-x\n' }, cards: { 'pm/proj-x/tasks/a.md': TWO }, eval: 'store' })
+  await $.session.start(SESSION)
+  const result: any = await $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'a', index: 2, checked: true } as any)
+  expect(w.runs[0].argv).toEqual(['obsidian', 'vault=Work', 'read', 'path=pm/proj-x/tasks/a.md'])
+  expect(evalPayload(w.runs[1].argv).path).toBe('pm/proj-x/tasks/a.md')
+  expect(result.result).toEqual({ ok: true, path: 'pm/proj-x/tasks/a.md' })
+})
+
+test('a cwd below the config resolves the ancestor values', async ($, on) => {
+  const w = world(on, { cwd: '/work/sub', files: { '/work/.obsidian.yaml': CONFIG }, cards: { 'pm/cc-plugins/tasks/a.md': TWO }, eval: 'store' })
+  await $.session.start(SESSION)
+  const result: any = await $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'a', index: 2, checked: true } as any)
+  expect(w.runs[0].argv).toEqual(['obsidian', 'vault=obsidian', 'read', 'path=pm/cc-plugins/tasks/a.md'])
+  expect(evalPayload(w.runs[1].argv).path).toBe('pm/cc-plugins/tasks/a.md')
+  expect(result.result.path).toBe('pm/cc-plugins/tasks/a.md')
+})
+
+test('no .obsidian.yaml in the cwd or above refuses with no CLI run', async ($, on) => {
+  const w = world(on, { files: {} })
+  await $.session.start(SESSION)
+  const result: any = await $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'a', index: 1, checked: true } as any)
+  expect(result.result.ok).toBe(false)
+  expect(result.result.reason).toContain('No .obsidian.yaml')
+  expect(result.isError).toBe(true)
+  expect(w.runs).toHaveLength(0)
+})
+
+test('a config without pm.project refuses with no CLI run', async ($, on) => {
+  const w = world(on, { files: { '/work/.obsidian.yaml': 'vault: obsidian\n' } })
+  await $.session.start(SESSION)
+  const result: any = await $.tool.call({ tool: 'mcp__obw__pm_tick', card: 'a', index: 1, checked: true } as any)
+  expect(result.result).toEqual({ ok: false, reason: '/work/.obsidian.yaml has no pm.project.' })
+  expect(w.runs).toHaveLength(0)
 })

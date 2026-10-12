@@ -62,7 +62,13 @@ export type WorldOptions = {
   rm?: CliAnswer
   toolRegister?: { deny: string }
   cards?: Record<string, string>
-  eval?: CliAnswer
+  eval?: CliAnswer | 'store'
+}
+
+// The path and text a pm write carries: the base64 argument of the eval code hooks/pm-tools.ts builds.
+export function evalPayload(argv: string[]): { path: string; text: string } {
+  const payload = /atob\('([^']*)'\)/.exec(argv[3])![1]
+  return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(payload), (c) => c.charCodeAt(0))))
 }
 
 export function kindOf(argv: string[]) {
@@ -156,6 +162,12 @@ export function world(on: any, options: WorldOptions = {}) {
     runs.push(e)
     const verb = kindOf(e.argv)
     const answer = verb === 'read' && (options.reads || options.cards) ? readAnswer({ ...cards, ...(options.reads ?? {}) }, e.argv) : answers[verb]
+    // `eval: 'store'` keeps a write's text in `cards`, as Obsidian would, and answers OK.
+    if (answer === 'store') {
+      const { path, text } = evalPayload(e.argv)
+      cards[path] = text
+      return { value: { exitCode: 0, stdout: '=> OK\n', stderr: '' } }
+    }
     if (answer === undefined) return { deny: `no answer for ${verb}` }
     if (answer === 'defer') {
       const stdout = await new Promise<string>((resolve) => deferred.set(runs.length - 1, resolve))
