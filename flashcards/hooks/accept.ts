@@ -7,6 +7,9 @@ export type DropReason = 'unknown-source' | 'kind' | 'fields' | 'quote' | 'dupli
 
 const PER_SOURCE_LIMIT = 3
 
+// Sources hard-wrap mid-sentence and a model may re-flow a quote, so the check compares with runs of whitespace collapsed.
+const squash = (value: string) => value.replace(/\s+/g, ' ').trim()
+
 const text = (value: unknown) => (typeof value === 'string' && value !== '' ? value : null)
 
 // Async because the card id is a SHA-256, which only crypto.subtle computes.
@@ -32,7 +35,7 @@ export async function acceptCards(raw: RawCard[], batch: Source[]): Promise<{ ac
       dropped.push({ reason: 'kind' })
       continue
     }
-    if (!source.text.includes(quote)) {
+    if (!squash(source.text).includes(squash(quote))) {
       dropped.push({ reason: 'quote' })
       continue
     }

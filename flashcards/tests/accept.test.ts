@@ -23,6 +23,13 @@ describe('acceptCards', () => {
     expect(accepted[0]!.id).toMatch(/^[0-9a-f]{16}$/)
   })
 
+  test('a quote the source hard-wraps mid-sentence is accepted; different words are still dropped', async () => {
+    const wrapped: Source = { ...spec, text: 'Rules must hold. Never skip\n  the gate.' }
+    expect((await acceptCards([raw(spec.path)], [wrapped])).accepted).toHaveLength(1)
+    expect((await acceptCards([raw(spec.path, { quote: 'Never skip  the\tgate.' })], [spec])).accepted).toHaveLength(1)
+    expect((await acceptCards([raw(spec.path, { quote: 'Never skip a gate.' })], [wrapped])).dropped.map((d) => d.reason)).toEqual(['quote'])
+  })
+
   test('a quote that is not in the source is dropped; an empty quote is dropped as fields', async () => {
     const result = await acceptCards([raw(spec.path, { quote: 'Never skip the gates.' }), raw(spec.path, { quote: '' })], [spec])
     expect(result.accepted).toEqual([])
