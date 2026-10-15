@@ -25,3 +25,14 @@ assert_contains "$replan" '§3.6' "the partial-replan re-fan-out names §3.6"
 
 # T4
 assert_contains "$any_fail" 'Per-shard, per-round FAIL retry budget = 1' "the FAIL retry budget stays one"
+
+# OmpRelaunchOneTask T1
+assert_contains "$any_fail" 'one background Bash' "Any FAIL re-launches OMP shards on one background Bash"
+assert_contains "$any_fail" '§3.6' "Any FAIL points at the §3.6 single-task form"
+for stale in 'LATER message' 'Re-arm' 'cf-pi-watch' 'progress monitor'; do
+  assert_eq "0" "$(printf '%s\n' "$any_fail" | grep -cF -- "$stale" || true)" "Any FAIL no longer names $stale"
+done
+
+# OmpRelaunchOneTask T3 (3.4 side)
+assert_eq "0" "$(printf '%s\n' "$any_fail" | grep -cE '^ *Bash\(run_in_background' || true)" \
+  "Any FAIL holds no per-shard Bash(run_in_background example"
