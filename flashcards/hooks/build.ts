@@ -61,16 +61,22 @@ async function unclaimedAgent($: EngineInterface): Promise<string | undefined> {
   return agents.find((agent) => agent.spawnedBy === 'flashcards' && !claimed.has(agent.id))?.id
 }
 
-function settle(batch: Batch, outcome: { added: number; dropped: number } | 'failed') {
+// The last batch to settle reports the build: what was added, dropped and failed, and what is still pending.
+async function settle($: EngineInterface, batch: Batch, outcome: { added: number; dropped: number } | 'failed') {
   const { build } = batch
   build.outstanding -= 1
   if (outcome === 'failed') {
     build.failedSources += batch.sources.length
-    return
+  } else {
+    build.added += outcome.added
+    build.dropped += outcome.dropped
+    build.recordedSources += batch.sources.length
   }
-  build.added += outcome.added
-  build.dropped += outcome.dropped
-  build.recordedSources += batch.sources.length
+  if (build.outstanding === 0) {
+    const remaining = build.pendingBefore - build.recordedSources
+    await $.ui.toast(`Flashcards: ${build.added} cards added, ${build.dropped} dropped, ${build.failedSources} sources failed, ${remaining} sources remain.`)
+    await $.ui.invalidate('ui.render')
+  }
 }
 
 async function spawnBatch($: EngineInterface, batch: Batch): Promise<void> {
@@ -78,11 +84,11 @@ async function spawnBatch($: EngineInterface, batch: Batch): Promise<void> {
   try {
     result = await $.agent.spawn({ prompt: batchPrompt(batch.sources), model: 'haiku', description: `Flashcards: ${batch.sources.length} sources` })
   } catch {
-    return settle(batch, 'failed')
+    return settle($, batch, 'failed')
   }
-  if (result.deny) return settle(batch, 'failed')
+  if (result.deny) return settle($, batch, 'failed')
   const agentId = result.agentId ?? (await unclaimedAgent($))
-  if (!agentId) return settle(batch, 'failed')
+  if (!agentId) return settle($, batch, 'failed')
   claimed.add(agentId)
   tracked.set(agentId, batch)
 }
@@ -102,7 +108,7 @@ async function merge($: EngineInterface, batch: Batch, reply: { reason: string; 
   const { root } = batch.build
   const raw = reply.reason === 'answer' ? parseReply(reply.answer) : null
   const deck = raw ? await loadDeck($, root) : null
-  if (!raw || !deck) return settle(batch, 'failed')
+  if (!raw || !deck) return settle($, batch, 'failed')
   const { accepted, dropped } = await acceptCards(raw, batch.sources)
   const paths = new Set(batch.sources.map((source) => source.path))
   const replacedIds = deck.cards.filter((card) => paths.has(card.sourcePath)).map((card) => card.id)
@@ -111,13 +117,13 @@ async function merge($: EngineInterface, batch: Batch, reply: { reason: string; 
     sources: { ...deck.sources, ...Object.fromEntries(batch.sources.map((source) => [source.path, { hash: source.hash, type: source.type }])) },
     cards: [...deck.cards.filter((card) => !paths.has(card.sourcePath)), ...accepted],
   }
-  if (!(await saveDeck($, root, next))) return settle(batch, 'failed')
+  if (!(await saveDeck($, root, next))) return settle($, batch, 'failed')
   if (replacedIds.length) {
     const review = await loadReview($, root)
     for (const id of replacedIds) delete review[id]
     await saveReview($, root, review)
   }
-  settle(batch, { added: accepted.length, dropped: dropped.length })
+  await settle($, batch, { added: accepted.length, dropped: dropped.length })
 }
 
 // Merges run one at a time: each reads the stored deck, so two batches that finish together would lose one write.
