@@ -379,12 +379,16 @@ This is the Claude round, the default builder. With `CF_IMPLEMENTER=omp` recorde
 
    Dispatch at most 20 per message and the rest in the next batch once those return: the 21st concurrent subagent fails with `Concurrent subagent limit reached`.
 
-4. **Gate each return.** When an agent returns, run `--gates-only` for that shard as a background Bash, whatever the reply says — the gates decide. Act on nothing else in the reply, except a Claude usage limit shown there: that goes to §3.6, not to the gates.
+4. **Gate each return.** When an agent returns, run `--gates-only` for that shard in the foreground, whatever the reply says — the gates decide. Act on nothing else in the reply, except a Claude usage limit shown there: that goes to §3.6, not to the gates.
 
    ```
-   Bash(run_in_background: true, timeout: 7200000, command:
+   Bash(timeout: 600000, command:
      ". $SESSION/env.sh && echo \"A returned $(date +%s)\" >> $SESSION/claude-dispatch.log && $SCRIPTS/cf-pi-run.sh --gates-only $SESSION/shards/A '<one-sentence goal>' '<short constraints>' \"$SHARD_TEST_RUNNER\" > $SESSION/shards/A/gates.out 2>&1")
    ```
+
+   The gates exit 1, 2 or 3 for a FAIL, NEEDS_REPLAN or REBRIEF, which the harness shows as a tool error; that is expected. Route in step 5 on `outcome.md` and the last line of `gates.out`, not the exit code. Always run it in the foreground; never start it as a background task.
+
+   If the Bash result says `was moved to the background` (the 10-minute timeout was hit), the gate is still running and keeps running: do not re-run it. End your turn, and on that task's completion notification read the shard's `outcome.md` and the last line of `gates.out` as in step 5. This wait is not counted against the retry budget.
 
 5. **Read each gates return.** A non-empty `$SESSION/shards/<id>/outcome.md` → the shard is done. Otherwise, if the last line of `gates.out` is `REBRIEF <kind> <path>` → dispatch a fresh `cf:implement` with the same prompt plus a `Re-brief: <path>` line, then step 4 again. Neither → treat the shard as `FAIL outcome-missing`.
 
