@@ -28,7 +28,7 @@ assert_eq "0" "$(printf '%s\n' "$pd_lines" | grep -vc 'required' || true)" "T2b 
 # T3
 sec() { awk -v n="$2" '$0 ~ "^## " n "\\." {f=1; print; next} f && /^## /{exit} f' "$1"; }
 assert_contains "$(sec "$DESIGN" 1)" "--gates-only" "T3 design section 1 names --gates-only"
-assert_contains "$(sec "$DESIGN" 8)" "OMP rounds" "T3b design section 8 limits the Monitor to OMP rounds"
+assert_contains "$(sec "$DESIGN" 8)" "Two layers" "T3b design section 8 names two observability layers"
 assert_contains "$(grep '^J\.' "$DESIGN")" "cf:implement" "T3c design decision J names cf:implement"
 
 # T4
@@ -71,3 +71,14 @@ assert_eq "0" "$(printf '%s\n' "$s7" | grep -c 'main never re-launches for a tes
 assert_contains "$s7" "REBRIEF" "T8b design section 7 names the REBRIEF re-launch"
 assert_contains "$s7" "An infrastructure re-launch is self-cleaning" "T8c design section 7 scopes self-cleaning to infrastructure re-launches"
 assert_eq "0" "$(printf '%s\n' "$s7" | grep -c 'A main-issued re-launch is self-cleaning' || true)" "T8d design section 7 does not call a main-issued re-launch self-cleaning"
+
+# T9: design section 8 has two layers, no push Monitor, no cf-pi-watch.
+s8=$(sec "$DESIGN" 8)
+assert_contains "$s8" "Two layers" "T9 design section 8 says Two layers"
+assert_contains "$s8" "cf-pi-status.sh" "T9b design section 8 names the cf-pi-status.sh pull layer"
+assert_eq "0" "$(printf '%s\n' "$s8" | grep -c 'Monitor' || true)" "T9c design section 8 has no Monitor"
+assert_eq "0" "$(printf '%s\n' "$s8" | grep -c 'cf-pi-watch' || true)" "T9d design section 8 has no cf-pi-watch"
+
+# T10: the design doc names run.out and no longer shows one OMP background task launching N workers as a row.
+assert_contains "$(cat "$DESIGN")" "run.out" "T10 design doc names run.out"
+assert_eq "0" "$(grep -c 'N × cf-pi-run.sh (background task' "$DESIGN" || true)" "T10b design doc has no per-shard background task line"
