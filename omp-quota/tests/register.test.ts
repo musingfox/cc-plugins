@@ -8,7 +8,7 @@ function stringsIn(node: any): string[] {
   return [...(node.children ?? []), ...(node.props?.children ?? [])].flatMap(stringsIn)
 }
 
-const BENEATH = { type: 'Text', children: ['beneath'] }
+const BENEATH = { type: 'Text', children: ['beneath'], part: { plugin: 'test' } }
 
 
 // The band's rows that show: the empty Box the engine draws beneath the band takes none.
