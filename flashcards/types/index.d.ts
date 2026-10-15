@@ -17,6 +17,6 @@ export type Review = Record<string, { box: Box; due: number }>
 
 declare module 'claude-code' {
   interface PluginState {
-    flashcards: { queue: string[]; index: number; flipped: boolean; reviewed: number }
+    flashcards: { queue: string[]; index: number; flipped: boolean; reviewed: number; tally: number[] }
   }
 }

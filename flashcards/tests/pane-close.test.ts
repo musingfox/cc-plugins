@@ -51,7 +51,7 @@ describe('q closes the review pane', () => {
     const { ui } = await mountWith(on, $, { [`deck:${key}`]: deckOf(card('c1')) })
     await ui.press({ key: 'flip' })
     await ui.press({ key: 'rate:3' })
-    expect(await ui.find({ text: /Done: 1 cards reviewed/ })).toBeDefined()
+    expect(await ui.find({ text: /這輪複習完 1 張/ })).toBeDefined()
     expect(await ui.find({ key: 'close' })).toBeDefined()
   })
 })

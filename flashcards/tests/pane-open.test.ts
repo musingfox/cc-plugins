@@ -30,7 +30,7 @@ describe('/cards opens the review pane', () => {
     await $.session.start(SESSION)
     await $.command.run(cards())
     const ui = await $.ui.mount({ plugin: 'flashcards', surface: 'terminal', component: 'Pane', requestId: 'cards', props: PANE_PROPS })
-    expect(await ui.find({ text: 'No deck for this repo yet. Run /cards build to make one.' })).toBeDefined()
+    expect(await ui.find({ text: '這個 repo 還沒有牌組。先跑 /cards build。' })).toBeDefined()
   })
 
   test('a deck with nothing due says what it holds, by box', async ($, on) => {
@@ -40,7 +40,7 @@ describe('/cards opens the review pane', () => {
     await $.session.start(SESSION)
     await $.command.run(cards())
     const ui = await $.ui.mount({ plugin: 'flashcards', surface: 'terminal', component: 'Pane', requestId: 'cards', props: PANE_PROPS })
-    expect(await ui.find({ text: 'Nothing due right now. 1 cards: 0 in box 1, 1 in box 2, 0 in box 3.' })).toBeDefined()
+    expect(await ui.find({ text: '共 1 張：第 1 格 0 · 第 2 格 1 · 第 3 格 0' })).toBeDefined()
   })
 
   test('a question with an escape and 20000 characters is drawn cut and clean', async ($, on) => {
@@ -60,7 +60,7 @@ describe('/cards opens the review pane', () => {
     await $.session.start(SESSION)
     await $.command.run(cards())
     const ui = await $.ui.mount({ plugin: 'flashcards', surface: 'terminal', component: 'Pane', requestId: 'cards', props: PANE_PROPS })
-    expect(await ui.find({ text: 'The deck could not be read from the Claude store.' })).toBeDefined()
+    expect(await ui.find({ text: '讀不到這個 repo 的牌組（Claude store 拒絕讀取）。' })).toBeDefined()
   })
 
   test('a card deleted from the deck between open and render is skipped', async ($, on) => {

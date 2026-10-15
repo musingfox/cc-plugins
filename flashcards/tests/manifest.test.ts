@@ -7,6 +7,6 @@ describe('manifest', () => {
     await $.session.start(SESSION)
     await $.command.run(cards())
     const ui = await $.ui.mount({ plugin: 'flashcards', surface: 'terminal', component: 'Pane', requestId: 'cards', props: paneProps('Flashcards') })
-    expect(await ui.find({ text: 'No deck for this repo yet. Run /cards build to make one.' })).toBeDefined()
+    expect(await ui.find({ text: '這個 repo 還沒有牌組。先跑 /cards build。' })).toBeDefined()
   })
 })

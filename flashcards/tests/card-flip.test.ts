@@ -27,7 +27,7 @@ describe('f flips the card', () => {
     await ui.press({ key: 'flip' })
     expect(await ui.find({ key: 'flip' })).toBeUndefined()
     expect((await ui.find({ key: 'answer' }))?.text).toBe('Answer c1.')
-    expect(await ui.find({ text: 'docs/spec/a.md' })).toBeDefined()
+    expect(await ui.find({ text: 'repo · docs/spec/a.md' })).toBeDefined()
     expect((await ui.find({ key: 'rate:1' }))?.props.hotkey).toBe('1')
     expect((await ui.find({ key: 'rate:2' }))?.props.hotkey).toBe('2')
     expect((await ui.find({ key: 'rate:3' }))?.props.hotkey).toBe('3')

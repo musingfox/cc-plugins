@@ -26,7 +26,7 @@ describe('1, 2 and 3 rate the flipped card', () => {
     await ui.press({ key: 'flip' })
     await ui.press({ key: 'rate:3' })
     expect(seen.store[`review:${key}`]).toEqual({ c1: { box: 2, due: 1000 + DAY } })
-    expect(await ui.find({ text: 'Done: 1 cards reviewed.' })).toBeDefined()
+    expect(await ui.find({ text: /這輪複習完 1 張：記得 1、模糊 0、忘了 0。/ })).toBeDefined()
   })
 
   test('rating 1 on a box-3 card drops it to box 1, due now', async ($, on) => {
@@ -53,7 +53,7 @@ describe('1, 2 and 3 rate the flipped card', () => {
     await $.session.start(SESSION)
     await $.command.run(cards())
     const second = await pane($)
-    expect(await second.find({ text: 'Nothing due right now. 1 cards: 0 in box 1, 1 in box 2, 0 in box 3.' })).toBeDefined()
+    expect(await second.find({ text: '共 1 張：第 1 格 0 · 第 2 格 1 · 第 3 格 0' })).toBeDefined()
   })
 
   test('after a rating the next card comes up unflipped', async ($, on) => {
