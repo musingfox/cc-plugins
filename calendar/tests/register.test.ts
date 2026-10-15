@@ -30,7 +30,7 @@ function linesOf(tree: any): string[] {
   return rowsOf(tree).map(lineText)
 }
 
-const BENEATH = { type: 'Text', children: ['beneath'] }
+const BENEATH = { type: 'Text', children: ['beneath'], part: { plugin: 'test' } }
 
 
 describe('/cal', () => {
