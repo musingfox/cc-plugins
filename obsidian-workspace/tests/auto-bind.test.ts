@@ -3,7 +3,7 @@ import { BAND, bandLines, handlerOf } from './fixtures/band.ts'
 import { CARD, SESSION, world } from './fixtures/world.ts'
 
 const BIND = '/Users/u/.claude-mobile/launches/sid-1.json'
-const BENEATH = { type: 'Text', children: ['beneath'] }
+const BENEATH = { type: 'Text', children: ['beneath'], part: { plugin: 'test' } }
 const SET = (value: string) => `Set status: ${value}\n`
 const SET_IN_PROGRESS_VIA_VARS = 'V=obsidian; P="pm/cc-plugins/tasks/mod-obw-bind-and-band.md"\ntimeout 20 obsidian vault=$V property:set name=status value=in-progress path="$P" | cat'
 const setIn = (path: string, value = 'in-progress') => `obsidian vault=obsidian property:set name=status value=${value} path="pm/cc-plugins/tasks/${path}.md" | cat`

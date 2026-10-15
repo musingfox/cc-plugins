@@ -60,7 +60,7 @@ describe('pane', () => {
     world(on)
     on('ui.render', { component: 'Pane' }, () => ({ type: 'Text', children: ['beneath'] }))
     await $.session.start(SESSION)
-    expect(await $.ui.render({ ...PANE, requestId: 'other' })).toEqual({ type: 'Text', children: ['beneath'] })
+    expect(await $.ui.render({ ...PANE, requestId: 'other' })).toEqual({ type: 'Text', children: ['beneath'], part: { plugin: 'test' } })
   })
 })
 

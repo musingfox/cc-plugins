@@ -12,7 +12,7 @@ const boundToA = (extra: any = {}) => ({
   reads: { 'pm/cc-plugins/tasks/a.md': CARD },
   ...extra,
 })
-const BENEATH = { type: 'Text', children: ['beneath'] }
+const BENEATH = { type: 'Text', children: ['beneath'], part: { plugin: 'test' } }
 const A = 'pm/cc-plugins/tasks/a.md'
 const TITLE = 'Claude Mod：面板顯示 obw 的 task 與 issue'
 

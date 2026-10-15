@@ -6,7 +6,7 @@ import { ERROR as RED } from '../hooks/style.ts'
 
 const BIND = '/Users/u/.claude-mobile/launches/sid-1.json'
 const CARD_PATH = 'pm/cc-plugins/tasks/mod-obw-issue-pane.md'
-const BENEATH = { type: 'Text', children: ['beneath'] }
+const BENEATH = { type: 'Text', children: ['beneath'], part: { plugin: 'test' } }
 const rows = (...paths: string[]) => JSON.stringify(paths.map((path) => ({ path, status: 'todo' })))
 const TITLE = 'Claude Mod：面板顯示 obw 的 task 與 issue'
 const record = (extra = '', cardPath = CARD_PATH, vault = 'obsidian') => `{"cardPath":"${cardPath}","vault":"${vault}","project":"cc-plugins",${extra}"createdAt":"2026-10-07T00:00:00.000Z"}`
