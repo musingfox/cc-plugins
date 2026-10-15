@@ -1,0 +1,4 @@
+{
+  "description": "Flashcards: /cards builds a review deck in the background and opens a Leitner review pane",
+  "modules": ["./register.ts"]
+}
