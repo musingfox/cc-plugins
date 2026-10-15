@@ -356,6 +356,14 @@ test('ImplementOnlyWhenExecuted T17 git add does not execute', () => {
   expect(isImplementCommand('git add context-flow/scripts/cf-pi-shard.sh')).toBe(false)
 })
 
+test('LaunchFormScanned T1 the shared OMP launch form is an implement command', () => {
+  expect(isImplementCommand('. $SESSION/env.sh\n$SCRIPTS/cf-pi-run.sh $SESSION/shards/A \'g\' \'c\' "$SHARD_TEST_RUNNER" > $SESSION/shards/A/run.out 2>&1 &\n$SCRIPTS/cf-pi-run.sh $SESSION/shards/B \'g\' \'c\' "$SHARD_TEST_RUNNER" > $SESSION/shards/B/run.out 2>&1 &\nwait\nexit 0')).toBe(true)
+})
+
+test('LaunchFormScanned T2 wait and exit alone are not an implement command', () => {
+  expect(isImplementCommand('wait\nexit 0')).toBe(false)
+})
+
 test('ImplementOnlyWhenExecuted T1 grepping a runner name leaves the phase', async ($, on) => {
   const { w, bash: answer } = await openFlow($, on)
   answer.answer = ok('')
