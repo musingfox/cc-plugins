@@ -114,8 +114,8 @@ export function world(on: any, options: WorldOptions = {}) {
     const n = seen.spawns.length
     return options.spawn?.(n) ?? { model: 'haiku', agentId: `agent-${n}` }
   })
-  on('agent.list', () =>
-    seen.spawns.map((_, i) => ({ id: `agent-${i + 1}`, spawnedBy: 'flashcards', description: '', type: 'general-purpose', status: 'completed' })),
-  )
+  on('agent.list', () => ({
+    value: seen.spawns.map((_, i) => ({ id: `agent-${i + 1}`, spawnedBy: 'flashcards', description: '', type: 'general-purpose', status: 'completed' })),
+  }))
   return seen
 }

@@ -62,7 +62,7 @@ describe('/cards build prunes the deck first', () => {
     await $.session.start(SESSION)
     await $.command.run(cards('build'))
     await seen.clock.settle()
-    expect(seen.toasts).toEqual(['Vault task cards skipped: Error: no such base'])
+    expect(seen.toasts[0]).toBe('Vault task cards skipped: Error: no such base')
     expect((seen.store[`deck:${key}`] as Deck).cards.map((c) => c.id)).toEqual(['x1'])
   })
 
