@@ -34,6 +34,7 @@ export type WorldOptions = {
   query?: string | { deny: string }
   reads?: Record<string, string | { deny: string }>
   spawn?: (n: number) => unknown
+  listDeny?: string
   now?: number
 }
 
@@ -125,7 +126,7 @@ export function world(on: any, options: WorldOptions = {}) {
     const n = seen.spawns.length
     return options.spawn?.(n) ?? { model: 'haiku', agentId: `agent-${n}` }
   })
-  on('agent.list', () => ({
+  on('agent.list', () => options.listDeny ? { deny: options.listDeny } : ({
     value: seen.spawns.map((_, i) => ({ id: `agent-${i + 1}`, spawnedBy: 'flashcards', description: '', type: 'general-purpose', status: 'completed' })),
   }))
   return seen

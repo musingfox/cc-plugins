@@ -45,9 +45,7 @@ export async function startBuild($: EngineInterface) {
   const now = await $.clock.now()
   if (inFlight && now - inFlight.startedAt < GUARD_MS) return $.ui.toast(BUSY)
   inFlight = { startedAt: now }
-  void continueBuild($).catch(() => {
-    inFlight = null
-  })
+  void continueBuild($).catch((error: unknown) => stop($, `Flashcards build stopped: ${error instanceof Error ? error.message : String(error)}`).catch(() => {}))
 }
 
 async function stop($: EngineInterface, text: string) {

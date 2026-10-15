@@ -86,4 +86,15 @@ describe('/cards build starts the background batches', () => {
     await $.turn.complete({ agentId: 'agent-1', reason: 'answer', answer: '[]', durationMs: 1, isAborted: false, turnId: 't1' })
     expect(Object.keys((seen.store[`deck:${key}`] as Deck).sources).sort()).toEqual(['docs/spec/a.md', 'docs/spec/b.md', 'docs/spec/c.md'])
   })
+
+  test('a build that throws after the guard tells the user why it stopped and frees the guard', async ($, on) => {
+    const seen = world(on, { files: ABSOLUTE(SPECS), dirs: { '/work/docs/spec': SPEC_DIR }, spawn: () => ({ model: 'haiku' }), listDeny: 'agent list unavailable' })
+    await $.session.start(SESSION)
+    await $.command.run(cards('build'))
+    await seen.clock.settle()
+    expect(seen.toasts.some((t) => t.startsWith('Flashcards build stopped:'))).toBe(true)
+    await $.command.run(cards('build'))
+    await seen.clock.settle()
+    expect(seen.spawns).toHaveLength(2)
+  })
 })
