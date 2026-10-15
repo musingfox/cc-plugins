@@ -5,7 +5,7 @@ import { configOf } from './config.ts'
 import { isBadCardName, dashboardPath, taskFolder } from './argv.ts'
 import { baseQueryArgv, cardPathArgv, viewsArgv } from './base-argv.ts'
 import type { Scope } from './base-argv.ts'
-import { baseQueryOutput, viewsOutput, readOutput, OBSIDIAN_TIMEOUT_MS } from './cli-output.ts'
+import { baseQueryOutput, viewsOutput, readOutput, evalOutput, OBSIDIAN_TIMEOUT_MS } from './cli-output.ts'
 import type { Run } from './cli-output.ts'
 import { cardName, listRows, resolveArgument, rowNamed, rowSlug, rowsOutside } from './rows.ts'
 import { COUNT_VIEW, missingViewHint, missingViewText } from './counts.ts'
@@ -23,6 +23,7 @@ import { fitWidth } from './width.ts'
 import type { ObwBound, ObwBrowser, ObwCard, ObwLine, ObwList, ObwPane } from '../types/index.d.ts'
 import { bindingAction, bindingOf, bindingPath, sameBinding, statusChanges } from './bind.ts'
 import type { Binding } from './bind.ts'
+import { PM_TOOLS, cardText, evalArgv, pmEdit } from './pm-tools.ts'
 
 // The scan that checks `update` and `read` follows an atom only when it is made in the file that uses it.
 // Bump the shape tag when ObwPane changes meaning: a reload then declines what the old code wrote.
@@ -727,6 +728,73 @@ function cardView($: any, draw: DrawContext, { columns, ruleWidth }: { columns: 
   })
 }
 
+// A write carries the whole card in one eval, so it may take longer than a read.
+const EVAL_TIMEOUT_MS = 30_000
+
+// A tool result is text or content blocks, never a bare object: the body is one JSON line.
+// A refusal or failure names what went wrong; the reason never carries card text.
+function pmFail(reason: string) {
+  return { result: JSON.stringify({ ok: false, reason }), isError: true }
+}
+
+// A failed read is reported from the CLI's complaint only. A card printed on stdout is never quoted:
+// the one stdout line named is the CLI's own not-found line for this path.
+function readFailure(path: string, run: Run) {
+  if (run.kind === 'exited' && run.exitCode === 0) {
+    const out = run.stdout.trim()
+    return out === `Error: File "${path}" not found.` ? out : `${path} did not return a card.`
+  }
+  const complaint = run.kind === 'exited' ? { ...run, stdout: '' } : run
+  const failed = readOutput(complaint)
+  return failed.kind === 'error' ? failed.message : `${path} did not return a card.`
+}
+
+// A card counts as written only when reading it back gives the text that was written.
+async function pmCall($: any, tool: string, event: Record<string, unknown>) {
+  const edit = pmEdit(tool, event)
+  if ('refused' in edit) return pmFail(edit.refused)
+  const config = await resolveConfig($)
+  if ('error' in config) return pmFail(config.error)
+  const scope: Scope = { vault: config.vault, project: config.project }
+  const path = `${taskFolder(config.project)}${edit.card}.md`
+  const built = cardPathArgv(scope, path)
+  if (!('argv' in built)) return pmFail(`${config.path}: the vault or pm.project cannot name a card.`)
+  const firstRun = await runProcess($, built.argv)
+  const first = readOutput(firstRun)
+  if (first.kind === 'error') return pmFail(readFailure(path, firstRun))
+  const current = cardText(first)
+  if ('refused' in current) return pmFail(current.refused)
+  const next = edit.apply(current.text)
+  if ('refused' in next) return pmFail(next.refused)
+  const written = evalArgv(scope, path, next.text)
+  if ('refused' in written) return pmFail(written.refused)
+  const evaluated = evalOutput(await runProcess($, written.argv, EVAL_TIMEOUT_MS))
+  if (evaluated.kind === 'error') return pmFail(evaluated.message)
+  const backRun = await runProcess($, built.argv)
+  const back = readOutput(backRun)
+  if (back.kind === 'error') return pmFail(`${path} was written, but its read back failed: ${readFailure(path, backRun)}`)
+  const readBack = cardText(back)
+  if ('refused' in readBack || readBack.text !== next.text) return pmFail(`${path} was written, but the read back differs from the text written.`)
+  return { result: JSON.stringify({ ok: true, path }) }
+}
+
+// Calls that arrive together run one after another, so a call's read never misses an edit another has written.
+let queue: Promise<unknown> = Promise.resolve()
+
+function queued<T>(work: () => Promise<T>): Promise<T> {
+  const next = queue.then(work)
+  queue = next.catch(() => {})
+  return next
+}
+
+async function pmHook($: any, tool: string, event: Record<string, unknown>) {
+  try {
+    return await pmCall($, tool, event)
+  } catch (error) {
+    return pmFail(`The pm tool could not run: ${reasonOf(error)}`)
+  }
+}
+
 export function register(on: On) {
   on('session.start', async ($, e, next) => {
     try {
@@ -738,6 +806,13 @@ export function register(on: On) {
       })
     } catch {
       // A refused /issue must not stop the session.
+    }
+    for (const tool of PM_TOOLS) {
+      try {
+        await $.tool.register(tool)
+      } catch {
+        // A refused tool must not stop the others, /issue or the session.
+      }
     }
     void loadBinding($).catch(() => {})
     return next(e)
@@ -805,6 +880,10 @@ export function register(on: On) {
     void followStatus($, e.command, outputOf(result)).catch(() => {})
     return result
   })
+
+  on('tool.call', { tool: 'mcp__obw__pm_tick' }, ($, e) => queued(() => pmHook($, 'pm_tick', e)))
+  on('tool.call', { tool: 'mcp__obw__pm_note' }, ($, e) => queued(() => pmHook($, 'pm_note', e)))
+  on('tool.call', { tool: 'mcp__obw__pm_status' }, ($, e) => queued(() => pmHook($, 'pm_status', e)))
 
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)

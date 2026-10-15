@@ -60,6 +60,15 @@ export type WorldOptions = {
   sessionId?: string
   beneath?: unknown
   rm?: CliAnswer
+  toolRegister?: { deny: string }
+  cards?: Record<string, string>
+  eval?: CliAnswer | 'store' | 'store-half'
+}
+
+// The path and text a pm write carries: the base64 argument of the eval code hooks/pm-tools.ts builds.
+export function evalPayload(argv: string[]): { path: string; text: string } {
+  const payload = /atob\('([^']*)'\)/.exec(argv[3])![1]
+  return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(payload), (c) => c.charCodeAt(0))))
 }
 
 export function kindOf(argv: string[]) {
@@ -85,8 +94,10 @@ function readAnswer(reads: Record<string, CliAnswer>, argv: string[]): CliAnswer
 // `rm` runs are answered by `rm` (exit 0 by default) and an exit-0 answer deletes argv[2] from `files`, which is live.
 // `beneath` is what the AbovePrompt hooks below the plugin draw.
 export function world(on: any, options: WorldOptions = {}) {
-  for (const key of Object.keys(options)) if (!['cwd', 'files', 'exists', 'views', 'query', 'read', 'reads', 'register', 'open', 'env', 'write', 'render', 'termaid', 'serve', 'sessionId', 'beneath', 'rm'].includes(key)) throw new Error(`stale world option: ${key}`)
+  for (const key of Object.keys(options)) if (!['cwd', 'files', 'exists', 'views', 'query', 'read', 'reads', 'register', 'open', 'env', 'write', 'render', 'termaid', 'serve', 'sessionId', 'beneath', 'rm', 'toolRegister', 'cards', 'eval'].includes(key)) throw new Error(`stale world option: ${key}`)
   const runs: any[] = []
+  const tools: any[] = []
+  const cards: Record<string, string> = { ...(options.cards ?? {}) }
   const existsCalls: string[] = []
   const readCalls: string[] = []
   const opened: any[] = []
@@ -103,6 +114,7 @@ export function world(on: any, options: WorldOptions = {}) {
     rm: options.rm ?? '',
     termaid: options.termaid ?? DIAGRAM,
     ...(options.serve === undefined ? {} : { serve: options.serve }),
+    ...(options.eval === undefined ? {} : { eval: options.eval }),
   }
   const defaults: Record<string, string> = { views: VIEWS, 'base:query': LIST, read: CARD, render: RENDERED, termaid: DIAGRAM }
 
@@ -134,6 +146,10 @@ export function world(on: any, options: WorldOptions = {}) {
     registered.push(e)
     return options.register ?? { value: { command: e.name } }
   })
+  on('tool.register', ($: any, e: any) => {
+    tools.push(e)
+    return options.toolRegister ?? { value: { tool: `mcp__obw__${e.name}` } }
+  })
   on('ui.open', ($: any, e: any) => {
     opened.push(e)
     return options.open ?? { value: undefined }
@@ -145,7 +161,13 @@ export function world(on: any, options: WorldOptions = {}) {
   on('process.run', async ($: any, e: any) => {
     runs.push(e)
     const verb = kindOf(e.argv)
-    const answer = verb === 'read' && options.reads ? readAnswer(options.reads, e.argv) : answers[verb]
+    const answer = verb === 'read' && (options.reads || options.cards) ? readAnswer({ ...cards, ...(options.reads ?? {}) }, e.argv) : answers[verb]
+    // `eval: 'store'` keeps a write's text in `cards`, as Obsidian would, and answers OK; 'store-half' keeps only its first half.
+    if (answer === 'store' || answer === 'store-half') {
+      const { path, text } = evalPayload(e.argv)
+      cards[path] = answer === 'store' ? text : text.slice(0, Math.ceil(text.length / 2))
+      return { value: { exitCode: 0, stdout: '=> OK\n', stderr: '' } }
+    }
     if (answer === undefined) return { deny: `no answer for ${verb}` }
     if (answer === 'defer') {
       const stdout = await new Promise<string>((resolve) => deferred.set(runs.length - 1, resolve))
@@ -171,6 +193,8 @@ export function world(on: any, options: WorldOptions = {}) {
     readCalls,
     opened,
     registered,
+    tools,
+    cards,
     writes,
     files,
     release(run: number, stdout: string) {

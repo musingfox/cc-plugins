@@ -3,7 +3,7 @@ import * as out from '../hooks/cli-output.ts'
 import { baseQueryArgv } from '../hooks/base-argv.ts'
 import { VIEWS, VIEW_NAMES } from './fixtures/world.ts'
 
-const { baseQueryOutput, readOutput, viewsOutput } = out
+const { baseQueryOutput, evalOutput, readOutput, viewsOutput } = out
 const run = (stdout: string, exitCode = 0, stderr = '') => ({ kind: 'exited' as const, exitCode, stdout, stderr })
 const closed = 'The CLI is unable to find Obsidian. Please make sure Obsidian is running and try again.\n'
 const NOT_RUN = 'The obsidian CLI did not run: it is not on PATH, or it did not answer within 10 s.'
@@ -217,3 +217,15 @@ test('uses stderr and rejection for failed reads', () => { expect(readOutput(run
 test('closes frontmatter only at a line that is exactly ---', () => expect(readOutput(run('---\ntitle: x---\n---\nbody'))).toEqual({ kind: 'card', frontmatter: 'title: x---', body: 'body' }))
 test('does not close frontmatter at a longer dash line', () => expect(readOutput(run('---\na: 1\n----\n---\nbody'))).toEqual({ kind: 'card', frontmatter: 'a: 1\n----', body: 'body' }))
 test('closes frontmatter at a final --- with no newline', () => expect(readOutput(run('---\ntitle: x\n---'))).toEqual({ kind: 'card', frontmatter: 'title: x', body: '' }))
+
+test('reads an eval run that printed OK as written', () => expect(evalOutput(run('=> OK\n'))).toEqual({ kind: 'written' }))
+test('reads an eval run that printed an error on stdout as an error', () =>
+  expect(evalOutput(run('=> ERR card not found: x\n'))).toEqual({ kind: 'error', message: '=> ERR card not found: x' }))
+test('eval stdout that only contains => OK is an error', () => {
+  expect(evalOutput(run('=> ERR card not found: pm/p/tasks/x => OK.md\n'))).toEqual({ kind: 'error', message: '=> ERR card not found: pm/p/tasks/x => OK.md' })
+  expect(evalOutput(run('=> OKAY\n'))).toEqual({ kind: 'error', message: '=> OKAY' })
+})
+test('reads a failed eval run as an error from stderr even when stdout said OK',() =>
+  expect(evalOutput(run('=> OK\n', 1, 'Obsidian is not running'))).toEqual({ kind: 'error', message: 'Obsidian is not running' }))
+test('reports an eval run with no output', () => expect(evalOutput(run(''))).toEqual({ kind: 'error', message: 'obsidian exited 0 with no output.' }))
+test('reports an eval run that did not run', () => expect(evalOutput({ kind: 'rejected' })).toEqual({ kind: 'error', message: NOT_RUN }))

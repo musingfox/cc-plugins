@@ -15,7 +15,8 @@ shapes are a note's text starting with `---\n`, a `base:query … format=json`
 result that parses as a JSON array of row objects each carrying a string
 `path`, where the empty array means a view with no rows, and a `read` of a
 `.base` file whose top-level `views:` list names its views, where a `views:`
-with no item means a dashboard with no views.
+with no item means a dashboard with no views, and an `eval` write run whose
+stdout, trimmed, is `=> OK` on exit 0.
 An empty result is a success shape, an unreadable one is not: collapsing an
 error into the empty case is the same violation as accepting it. A closed
 Obsidian.app is the only case observed to exit 1, with its message on stderr,

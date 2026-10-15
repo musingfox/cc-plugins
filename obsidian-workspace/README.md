@@ -49,6 +49,16 @@ A session is bound to a task card by a file at `~/.claude-mobile/launches/<sessi
 
 Writes go through `obsidian eval` and are read back; a failed write is logged to `~/.claude-mobile/writeback.log` and never blocks the session.
 
+## Pm Tools
+
+The obw Claude Mod registers three tools that Claude can call to change a task card:
+
+- `pm_tick {card, index, checked}` sets one checkbox of the card to `checked`.
+- `pm_note {card, line}` adds `line` to the card.
+- `pm_status {card, status}` sets the card's status. It does not bind or unbind the session.
+
+`card` is the card's file name without `.md`, such as `a` for `pm/<project>/tasks/a.md`; the project comes from `.obsidian.yaml`. An empty name, a name with `/`, or one with a control character is rejected with `isError` set, and nothing is written. Every result is one JSON line in the tool's text: `{"ok":true,"path":"pm/<project>/tasks/a.md"}` on success, `{"ok":false,"reason":"..."}` otherwise; the platform accepts only text or content blocks as a tool result, so the object is never returned bare.
+
 ## Prerequisites
 
 - Official `obsidian` plugin (from the `obsidian-skills` marketplace) — declared as a plugin dependency, so it auto-installs with this plugin as long as that marketplace is added (`claude plugin marketplace add`)
