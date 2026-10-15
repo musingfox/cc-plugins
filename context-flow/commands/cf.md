@@ -392,7 +392,7 @@ This is the Claude round, the default builder. With `CF_IMPLEMENTER=omp` recorde
 
 ### 3.3 Collect
 
-Wait for ALL shards of the current wave before routing (round-collection rule, design §4) so NEEDS_REPLAN coalesces into a single Plan invocation. End your turn after fan-out; the harness re-invokes you on each task completion — check whether every id dispatched this wave now has a non-empty `$SESSION/shards/<id>/outcome.md`, and if not, end the turn again. A Claude round arms no Monitor: each shard's background `--gates-only` Bash re-invokes you when it completes (§3.2 step 4), and the progress Monitor belongs to the OMP round (§3.6).
+Wait for ALL shards of the current wave before routing (round-collection rule, design §4) so NEEDS_REPLAN coalesces into a single Plan invocation. End your turn after fan-out. On a Claude round, each agent return is the collection event: gate that shard in that turn (§3.2 step 4), and continue when every dispatched shard has a non-empty `$SESSION/shards/<id>/outcome.md`. A Claude round arms no Monitor. On an OMP round, the one background completion (§3.6) means every shard of the wave has finished: read the outcomes and continue. A shard with no non-empty `outcome.md` at that point is `FAIL outcome-missing`; do not end the turn again to wait for it.
 
 Once all are done, read each shard's status from its paths-only outcome (never the report/diff/JSONL it points to):
 

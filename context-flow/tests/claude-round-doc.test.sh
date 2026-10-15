@@ -63,3 +63,12 @@ assert_contains "$s32" '§3.3' "§3.2 continues at §3.3"
 
 # T10
 assert_contains "$s32" 'the gates decide' "§3.2 leaves the verdict to the gates"
+
+# CollectOnSingleCompletion T1
+for token in 'no Monitor' 'one background completion' 'do not end the turn again' 'each agent return'; do
+  assert_contains "$s33" "$token" "§3.3 names $token"
+done
+
+# CollectOnSingleCompletion T2
+assert_eq "0" "$(count "$s33" "each shard's background \`--gates-only\`")" "§3.3 no longer ties re-invocation to each shard's background --gates-only"
+assert_eq "0" "$(count "$s33" 'progress Monitor belongs')" "§3.3 no longer places the progress Monitor in the OMP round"
