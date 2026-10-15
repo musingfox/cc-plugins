@@ -76,7 +76,7 @@ describe('/cards build prunes the deck first', () => {
     expect(seen.spawns).toEqual([])
     expect(await $.command.run(cards('build'))).toEqual({})
     await seen.clock.settle()
-    expect(seen.toasts.length).toBe(2)
+    expect(seen.toasts[1]).toBe('Flashcards deck could not be saved; build stopped.')
   })
 
   test('the command resolves to {} before the continuation has finished', async ($, on) => {
