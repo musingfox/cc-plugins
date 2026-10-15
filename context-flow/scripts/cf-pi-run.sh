@@ -93,8 +93,8 @@ START_TS=$(date +%s)
 # -------- 0. clear this round's artifacts -------------------------------
 # A re-launched shard (cf.md §3.5) reuses its session directory, and nothing
 # else truncates these. Left behind, last round's copies are read as this
-# round's: outcome.md makes cf-pi-watch.sh report the shard finished before it
-# started (with the stale status), escalate.md short-circuits step 6 into
+# round's: a stale outcome.md makes main read the shard as finished (with the
+# stale status) before it started, escalate.md short-circuits step 6 into
 # NEEDS_REPLAN, and implement-report.md carries gate 1 on stale contract claims.
 # The worktree/branch is NOT touched -- committed work is the resume base.
 # Must stay out of dispatch_and_poll: the gate-3 and gate-1 re-briefs depend on
@@ -372,8 +372,7 @@ record_quota_wall() {
 }
 
 # Step 0 removed the previous round's outcome, so from here on an abort with no
-# outcome.md leaves cf-pi-watch.sh waiting on a file that will never appear (its
-# all_done tests -s outcome.md) and main with nothing to route. Everything below
+# outcome.md leaves main with nothing to route for that shard. Everything below
 # runs under set -e, and the worktree setup + env re-source can both die without
 # reaching a write_outcome, so guarantee an outcome on every exit path.
 # An intentional no-outcome exit (PREPARED, REBRIEF) sets NO_OUTCOME_EXIT first;

@@ -4,8 +4,8 @@
 # cf.md §3.5 re-runs cf-pi-run.sh on the same session directory after an
 # infrastructure FAIL. Left in place, last round's files are read as this
 # round's:
-#   - outcome.md  : cf-pi-watch.sh declares the shard finished (with the stale
-#                   status) before the retry has started
+#   - outcome.md  : main reads the shard as finished (with the stale status)
+#                   before the retry has started
 #   - escalate.md : the escalation step short-circuits into NEEDS_REPLAN
 #   - report      : gate 1 passes on stale contract claims
 #   - pi-rundir   : a failure BEFORE dispatch reports last round's session JSONL
@@ -91,8 +91,8 @@ EOF
   fi
 
   # The worker records whether the stale outcome.md was still on disk when it
-  # started: the clear must happen BEFORE dispatch, or cf-pi-watch.sh reads the
-  # shard as already finished while the retry is still running. In `silent` mode
+  # started: the clear must happen BEFORE dispatch, or main reads the shard as
+  # already finished while the retry is still running. In `silent` mode
   # it writes nothing at all, so gate 1 has only the stale report to go on.
   cat > "$STUBS/cf-pi-dispatch.sh" <<EOF
 #!/bin/bash
@@ -172,7 +172,7 @@ rm -rf "$FLOW"
 
 # ---- scenario 4: abort before any gate -> an outcome is still written ----
 # Step 0 removed the previous round's outcome, so nothing masks an early abort:
-# without an outcome file cf-pi-watch.sh waits forever on a shard that is gone.
+# without an outcome file main has nothing to read for a shard that is gone.
 
 build_fixture worktree-fails
 PATH="$STUBS:$PATH" bash "$REAL_SCRIPTS/cf-pi-run.sh" "$SHARD" "goal" "none" "true" \

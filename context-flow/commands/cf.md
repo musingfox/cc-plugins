@@ -1,7 +1,7 @@
 ---
 description: "Turn a goal into a contract-driven implementation, with a human deciding at each key gate. Use when the user asks to implement or build a feature whose scope is already settled, or to start work on a goal handed over by spiral."
 argument-hint: "<goal>"
-allowed-tools: [Agent, Read, Write, Bash, Glob, Grep, AskUserQuestion, Monitor]
+allowed-tools: [Agent, Read, Write, Bash, Glob, Grep, AskUserQuestion]
 ---
 
 # Context Flow Orchestrator
@@ -562,22 +562,10 @@ Bash(run_in_background: true, timeout: 7200000, command:
 
 The 4 positionals are `SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER` — pass the resolved `SHARD_TEST_RUNNER` (the full suite belongs to the integration gate). Do NOT pass research output, decision alternatives, plan prose, or rejected approaches; each shard derives everything else from its `SHARD_SESSION/env.sh`. A foreground Bash is capped at 10 minutes, so the background task carries an explicit `timeout: 7200000` (two hours), and that timeout stops every shard of the wave together. A shard that exits 1, 2 or 3 does not fail the task; a shard that dies before writing its outcome gets `FAIL outcome-missing` from its own exit trap, and each shard writes `$SESSION/shards/<id>/outcome.md` on completion.
 
-**Progress visibility** — the human must never sit blind while shards run. Immediately after fan-out (same turn), arm ONE progress monitor:
+**Progress** — the round arms no progress monitor. The human checks on demand with one line, printed right after fan-out:
 
-```
-Monitor(
-  command: ". $SESSION/env.sh && \"$SCRIPTS/cf-pi-watch.sh\" \"$SESSION\" 300",
-  description: "cf shards progress",
-  timeout_ms: 3600000, persistent: false
-)
-```
-
-`cf-pi-watch.sh` emits one line per meaningful change — lifecycle-phase transitions, liveness transitions (ALIVE/STALL/…), and a final per-shard `Status (reason) — cause` summary — then exits when every shard has an outcome. The `300` sets a 5-minute poll interval, so meaningful changes coalesce into at most one notification burst every 5 min instead of spamming. Each line arrives as a chat notification, so progress is visible mid-run with zero polling from you. Round counters and byte sizes are normalized away; it will not spam.
-
-- Also print one line so the human can check on demand: `` Watch progress: bash $SCRIPTS/cf-pi-status.sh $SESSION ``
-- The monitor's `--- all shards done ---` event doubles as the round-collection signal — proceed to reading outcomes.
-- If the monitor times out (flow > 1h) with shards still pending, re-arm it.
-- On a `STALL` event, do not intervene — `cf-pi-run.sh` handles kill/retry itself; the event is for awareness.
+- `` Watch progress: bash $SCRIPTS/cf-pi-status.sh $SESSION ``
+- On a `STALL` line in that status output, do not intervene — `cf-pi-run.sh` handles kill/retry itself; the line is for awareness.
 
 ---
 
