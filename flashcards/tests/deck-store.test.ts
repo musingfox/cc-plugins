@@ -42,6 +42,13 @@ describe('deck storage', () => {
     expect(await loadDeck(fake({ store: { [`deck:${key}`]: { v: 1, sources: {}, cards: [card] } } }).$, '/work/a')).toBeNull()
   })
 
+  test('a deck whose source record is not a { hash, type } record loads as null', async () => {
+    const key = await repoKey('/work/a')
+    expect(await loadDeck(fake({ store: { [`deck:${key}`]: { v: 1, sources: { 'docs/spec/a.md': null }, cards: [] } } }).$, '/work/a')).toBeNull()
+    expect(await loadDeck(fake({ store: { [`deck:${key}`]: { v: 1, sources: { 'docs/spec/a.md': { hash: 'h', type: 'memo' } }, cards: [] } } }).$, '/work/a')).toBeNull()
+    expect(await loadDeck(fake({ store: { [`deck:${key}`]: { v: 1, sources: { 'docs/spec/a.md': { hash: 'h', type: 'spec' } }, cards: [] } } }).$, '/work/a')).not.toBeNull()
+  })
+
   test('a failed store write returns false for the deck and for the review', async () => {
     const { $ } = fake({ refuse: 'set' })
     expect(await saveDeck($, '/work/a', DECK)).toBe(false)

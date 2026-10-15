@@ -1,6 +1,7 @@
 import type { EngineInterface } from 'claude-code'
 import { hashText } from './hash.ts'
-import type { Deck, Review } from '../types'
+import { KINDS } from './prompt.ts'
+import type { Card, Deck, Review } from '../types'
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 
@@ -8,16 +9,19 @@ export async function repoKey(root: string): Promise<string> {
   return (await hashText(root)).slice(0, 16)
 }
 
-const KINDS: readonly string[] = ['rule', 'why', 'what-for']
-const CARD_TEXT_FIELDS = ['id', 'sourcePath', 'sourceHash', 'q', 'a', 'quote'] as const
+const KIND_SET = new Set<string>(Object.values(KINDS).flat())
+const CARD_TEXT_FIELDS = ['id', 'sourcePath', 'sourceHash', 'q', 'a', 'quote'] as const satisfies readonly (keyof Card)[]
 
 // A card the pane can draw and the build can merge: every text field a string, and a known kind.
-const isCard = (value: unknown) => isRecord(value) && CARD_TEXT_FIELDS.every((key) => typeof value[key] === 'string') && KINDS.includes(value.kind as string)
+const isCard = (value: unknown) => isRecord(value) && CARD_TEXT_FIELDS.every((key) => typeof value[key] === 'string') && KIND_SET.has(value.kind as string)
+
+// A source record the build can compare: a string hash and a known source type.
+const isSourceRecord = (value: unknown) => isRecord(value) && typeof value.hash === 'string' && Object.hasOwn(KINDS, value.type as string)
 
 // The store answers nothing for an absent key; a value of another shape or version, or a card with a bad field, is not a deck.
 function deckOf(value: unknown): Deck | null {
   if (value === undefined || value === null) return { v: 1, sources: {}, cards: [] }
-  if (!isRecord(value) || value.v !== 1 || !isRecord(value.sources) || !Array.isArray(value.cards) || !value.cards.every(isCard)) return null
+  if (!isRecord(value) || value.v !== 1 || !isRecord(value.sources) || !Object.values(value.sources).every(isSourceRecord) || !Array.isArray(value.cards) || !value.cards.every(isCard)) return null
   return value as unknown as Deck
 }
 
