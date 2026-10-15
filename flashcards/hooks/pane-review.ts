@@ -11,7 +11,14 @@ const NO_DECK = 'No deck for this repo yet. Run /cards build to make one.'
 
 const queue = atom({ plugin: 'flashcards', key: 'queue' } as const, [] as string[])
 const index = atom({ plugin: 'flashcards', key: 'index' } as const, 0)
+const flipped = atom({ plugin: 'flashcards', key: 'flipped' } as const, false)
 const reviewed = atom({ plugin: 'flashcards', key: 'reviewed' } as const, 0)
+
+const RATINGS = [
+  { rating: 1, label: '1 忘了' },
+  { rating: 2, label: '2 模糊' },
+  { rating: 3, label: '3 記得' },
+] as const
 
 // The repo the open pane reviews, and its review progress, which this session keeps even when the store refuses a write.
 let session: { root: string; review: Review } | null = null
@@ -29,6 +36,16 @@ function boxOf(review: Review, card: Card): number {
   return review[card.id]?.box ?? 1
 }
 
+// Shows the answer of the card on screen; a card that is no longer in the deck is skipped first.
+async function flip($: EngineInterface) {
+  if (!session) return
+  const deck = await loadDeck($, session.root)
+  const at = locate(await read($, queue), await read($, index), deck?.cards ?? [])
+  if (!at) return
+  await update($, index, () => at.at)
+  await update($, flipped, () => true)
+}
+
 export async function openReview($: EngineInterface) {
   const root = await repoRoot($)
   const deck = await loadDeck($, root)
@@ -37,13 +54,14 @@ export async function openReview($: EngineInterface) {
   const now = await $.clock.now()
   await update($, queue, () => (deck ? dueQueue(deck.cards, review, now) : []))
   await update($, index, () => 0)
+  await update($, flipped, () => false)
   await update($, reviewed, () => 0)
   await $.ui.open({ id: PANE, title: 'Flashcards', focus: true })
 }
 
 export function registerReview(on: On) {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
     const deck = session ? await loadDeck($, session.root) : null
     if (!deck) return Text({ color: 'error', children: [CARD_DEAL_ERROR] })
     if (deck.cards.length === 0 && Object.keys(deck.sources).length === 0) return Text({ dimColor: true, children: [NO_DECK] })
@@ -56,11 +74,25 @@ export function registerReview(on: On) {
     }
     const at = locate(queueIds, await read($, index), deck.cards)
     if (!at) return Text({ children: [drawable(`Done: ${await read($, reviewed)} cards reviewed.`)] })
+    const isFlipped = await read($, flipped)
     return Box({
       flexDirection: 'column',
       children: [
         Box({ key: 'progress', children: [Text({ children: [drawable(`${at.at + 1}/${queueIds.length} · box ${boxOf(session!.review, at.card)}`)] })] }),
         Box({ key: 'question', children: [Text({ wrap: 'wrap', children: [drawable(at.card.q)] })] }),
+        ...(isFlipped
+          ? [
+              Box({ key: 'answer', children: [Text({ wrap: 'wrap', children: [drawable(at.card.a)] })] }),
+              Text({ dimColor: true, children: [drawable(at.card.sourcePath)] }),
+            ]
+          : []),
+        Box({
+          flexDirection: 'row',
+          gap: 2,
+          children: isFlipped
+            ? RATINGS.map((item) => Button({ key: `rate:${item.rating}`, label: item.label, hotkey: String(item.rating), plain: true, onPress: () => undefined }))
+            : [Button({ key: 'flip', label: 'flip', hotkey: 'f', plain: true, onPress: () => flip($) })],
+        }),
       ],
     })
   })
