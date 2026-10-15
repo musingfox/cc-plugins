@@ -731,9 +731,10 @@ function cardView($: any, draw: DrawContext, { columns, ruleWidth }: { columns: 
 // A write carries the whole card in one eval, so it may take longer than a read.
 const EVAL_TIMEOUT_MS = 30_000
 
+// A tool result is text or content blocks, never a bare object: the body is one JSON line.
 // A refusal or failure names what went wrong; the reason never carries card text.
 function pmFail(reason: string) {
-  return { result: { ok: false, reason }, isError: true }
+  return { result: JSON.stringify({ ok: false, reason }), isError: true }
 }
 
 // A failed read is reported from the CLI's complaint only. A card printed on stdout is never quoted:
@@ -774,7 +775,7 @@ async function pmCall($: any, tool: string, event: Record<string, unknown>) {
   if (back.kind === 'error') return pmFail(`${path} was written, but its read back failed: ${readFailure(path, backRun)}`)
   const readBack = cardText(back)
   if ('refused' in readBack || readBack.text !== next.text) return pmFail(`${path} was written, but the read back differs from the text written.`)
-  return { result: { ok: true, path } }
+  return { result: JSON.stringify({ ok: true, path }) }
 }
 
 // Calls that arrive together run one after another, so a call's read never misses an edit another has written.
