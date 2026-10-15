@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import { BAND, bandLines, nodesOf, stringsIn } from './fixtures/band.ts'
 import { BENEATH, ENV, ENV2, ROOT, ROOT2, SESSION, SETUP_OUT, bareBash, ok, openFlow, world } from './fixtures/world.ts'
 import { ASYNC, bash, colorOf, first } from './fixtures/helpers.ts'
-import { cleanupTargetOf, isImplementCommand, isSetupCommand, setupRootOf, sourcedRootOf } from '../hooks/cf-signals.ts'
+import { cleanupTargetOf, gateSecondsOf, isImplementCommand, isSetupCommand, setupRootOf, sourcedRootOf } from '../hooks/cf-signals.ts'
 
 const ENV_FILES = { [`${ROOT}/env.sh`]: ENV }
 
@@ -773,4 +773,18 @@ test('ImplementCommand R4 a heredoc with an apostrophe inside a substitution doe
 
 test('SetupCommand R3 a hash right after a nested substitution does not hide the setup', () => {
   expect(isSetupCommand('X=$(echo $(echo a)#c); "$SCRIPTS/cf-pi-setup.sh" s')).toBe(true)
+})
+
+test('GateSeconds T1 sums the seconds of every well-formed line', () => {
+  expect(gateSecondsOf('A 120\nB 30\n')).toBe(150)
+})
+
+test('GateSeconds T2 no file or no well-formed line is null', () => {
+  expect(gateSecondsOf(null)).toBe(null)
+  expect(gateSecondsOf('')).toBe(null)
+  expect(gateSecondsOf('A x\nB -3\n')).toBe(null)
+})
+
+test('GateSeconds T3 a malformed line is skipped, not summed', () => {
+  expect(gateSecondsOf('A 10\ngarbage\nB 5 extra\nC 7')).toBe(17)
 })

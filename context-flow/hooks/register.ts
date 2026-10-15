@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { On } from 'claude-code'
 import type { EndedFlow, FlowDetail, FlowEvent, FlowRecord, FlowTracker } from '../types/index.d.ts'
-import { cleanupTargetOf, implementFiguresOf, isImplementCommand, isSetupCommand, phaseOfAgent, sessionRootOf, setupRootOf, shardIdsOf, slugOf, sourcedRootOf } from './cf-signals.ts'
+import { cleanupTargetOf, gateSecondsOf, implementFiguresOf, isImplementCommand, isSetupCommand, phaseOfAgent, sessionRootOf, setupRootOf, shardIdsOf, slugOf, sourcedRootOf } from './cf-signals.ts'
 import { appendFlowRecord, bandLineOf, reduceFlow } from './flow-model.ts'
 
 const POLL_MS = 10_000
@@ -47,7 +47,7 @@ async function applyEvents($: any, steps: Step[]): Promise<{ ended: EndedFlow[];
 
 async function recordFlow($: any, ended: EndedFlow) {
   try {
-    const record: FlowRecord = { v: 1, root: ended.root, slug: slugOf(await readText($, `${ended.root}/env.sh`)), startedAt: ended.startedAt, endedAt: ended.endedAt, outcome: ended.outcome, phases: ended.phases }
+    const record: FlowRecord = { v: 1, root: ended.root, slug: slugOf(await readText($, `${ended.root}/env.sh`)), startedAt: ended.startedAt, endedAt: ended.endedAt, outcome: ended.outcome, phases: ended.phases, gateSeconds: gateSecondsOf(await readText($, `${ended.root}/gate-seconds`)) }
     await $.store.set('flows', appendFlowRecord(await $.store.get('flows'), record, MAX_RECORDS))
   } catch {
     // A refused store loses the record, never the band.

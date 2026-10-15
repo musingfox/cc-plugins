@@ -382,8 +382,12 @@ record_quota_wall() {
 # keying on the exit code instead would let a failing command that happens to
 # exit 3 pass for a re-brief.
 NO_OUTCOME_EXIT=0
+# Set when the gates start; the band adds the flow's gate-seconds to its record,
+# so gate time can be told apart from building in the implement phase.
+GATES_TS=""
 on_exit() {
   local rc=$?
+  [ -z "$GATES_TS" ] || printf '%s %s\n' "$SHARD_ID" "$(( $(date +%s) - GATES_TS ))" >>"$FLOW_SESSION/gate-seconds" 2>/dev/null || true
   [ "$NO_OUTCOME_EXIT" -eq 1 ] || [ -s "$OUTCOME_FILE" ] || \
     write_outcome FAIL outcome-missing "" "(all): cf-pi-run aborted before any gate (rc=$rc)" "-" "-" 2>/dev/null || true
   exit "$rc"
@@ -686,6 +690,7 @@ else
 fi
 
 # -------- 7. gate 1: report file ---------------------------------------
+GATES_TS=$(date +%s)
 
 # Self-contained on purpose: when the prior session cannot be resumed, this
 # file IS the whole prompt a cold worker receives, so it must name the brief

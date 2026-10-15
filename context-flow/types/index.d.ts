@@ -34,7 +34,8 @@ export type EndedFlow = {
   phases: Record<FlowBucket, number>
 }
 
-export type FlowRecord = EndedFlow & { v: 1; slug: string | null }
+// gateSeconds: the time cf-pi-run.sh spent in its gates, summed over shards and rounds.
+export type FlowRecord = EndedFlow & { v: 1; slug: string | null; gateSeconds: number | null }
 
 export type ImplementFiguresResult = {
   shards: { passed: number; total: number } | null

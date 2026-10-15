@@ -67,6 +67,15 @@ export function slugOf(envSh: string | null): string | null {
   return value ? value : null
 }
 
+// cf-pi-run.sh appends `<shard> <seconds>` per gates pass; a line of any other shape is skipped.
+export function gateSecondsOf(text: string | null): number | null {
+  const seconds = (text ?? '').split('\n').flatMap((line) => {
+    const match = /^\S+ (\d+)$/.exec(line)
+    return match ? [Number(match[1])] : []
+  })
+  return seconds.length ? seconds.reduce((a, b) => a + b, 0) : null
+}
+
 const parse = (text: string | null): any => {
   if (text === null) return null
   try {

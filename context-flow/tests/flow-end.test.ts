@@ -17,7 +17,7 @@ test('CleanupClosesFlow T1 the cleanup script clears the band and stores the flo
   answer.answer = ok('')
   await bash($, w, CLEANUP)
   expect(await $.ui.render(BAND)).toEqual(BENEATH)
-  expect(w.flows()).toEqual([{ v: 1, root: ROOT, slug: 'mod-band', startedAt: NOW, endedAt: NOW + 180000, outcome: 'cleanup', phases: { setup: 60000, research: 120000, plan: 0, implement: 0, review: 0, waiting: 0 } }])
+  expect(w.flows()).toEqual([{ v: 1, root: ROOT, slug: 'mod-band', startedAt: NOW, endedAt: NOW + 180000, outcome: 'cleanup', phases: { setup: 60000, research: 120000, plan: 0, implement: 0, review: 0, waiting: 0 }, gateSeconds: null }])
 })
 
 test('CleanupClosesFlow T2 sourcing the closed root again does not reopen a band', async ($, on) => {
@@ -52,7 +52,14 @@ test('CleanupClosesFlow T5 the record holds nothing from env.sh but the slug', a
   const text = JSON.stringify(w.flows())
   expect(text).not.toContain('sk-live-SECRET')
   expect(text).not.toContain('CLEANUP_SCRIPT')
-  expect(Object.keys(w.flows()[0])).toEqual(['v', 'root', 'slug', 'startedAt', 'endedAt', 'outcome', 'phases'])
+  expect(Object.keys(w.flows()[0])).toEqual(['v', 'root', 'slug', 'startedAt', 'endedAt', 'outcome', 'phases', 'gateSeconds'])
+})
+
+test('CleanupClosesFlow T8 the record sums the gate seconds every shard wrote', async ($, on) => {
+  const { w, bash: answer } = await openFlow($, on, { files: { [`${ROOT}/env.sh`]: ENV, [`${ROOT}/gate-seconds`]: 'A 120\nB 30\nA 45\n' } })
+  answer.answer = ok('')
+  await bash($, w, CLEANUP)
+  expect(w.flows()[0].gateSeconds).toBe(195)
 })
 
 test('NewRootAbandonsFlow T1 a new SESSION line closes the open flow as abandoned', async ($, on) => {
@@ -60,7 +67,7 @@ test('NewRootAbandonsFlow T1 a new SESSION line closes the open flow as abandone
   await w.clock.advance(90_000)
   answer.answer = ok(`SESSION=${ROOT2}\n`)
   await bash($, w, 'cf setup again')
-  expect(w.flows()).toEqual([{ v: 1, root: ROOT, slug: 'mod-band', startedAt: NOW, endedAt: NOW + 90000, outcome: 'abandoned', phases: { ...ZERO, setup: 90000 } }])
+  expect(w.flows()).toEqual([{ v: 1, root: ROOT, slug: 'mod-band', startedAt: NOW, endedAt: NOW + 90000, outcome: 'abandoned', phases: { ...ZERO, setup: 90000 }, gateSeconds: null }])
   expect(await first($)).toBe('● cf other-flow · setup · 0m')
 })
 
@@ -82,7 +89,7 @@ test('SessionEndClosesFlow T1 ending the session stores the open flow', async ($
   const { w } = await openFlow($, on)
   await w.clock.advance(300_000)
   await $.session.end({ reason: 'clear', sessionId: 's1', resume: false })
-  expect(w.flows()).toEqual([{ v: 1, root: ROOT, slug: 'mod-band', startedAt: NOW, endedAt: NOW + 300000, outcome: 'session-end', phases: { ...ZERO, setup: 300000 } }])
+  expect(w.flows()).toEqual([{ v: 1, root: ROOT, slug: 'mod-band', startedAt: NOW, endedAt: NOW + 300000, outcome: 'session-end', phases: { ...ZERO, setup: 300000 }, gateSeconds: null }])
   expect(await $.ui.render(BAND)).toEqual(BENEATH)
 })
 
@@ -215,7 +222,7 @@ test('OpenAndCloseInOneCommandStoresNothing T4 an open flow abandoned by the bat
   answer.answer = ok('')
   await w.clock.advance(90_000)
   await bash($, w, cleanupAt(ROOT2))
-  expect(w.flows()).toEqual([{ v: 1, root: ROOT, slug: 'mod-band', startedAt: NOW, endedAt: NOW + 90000, outcome: 'abandoned', phases: { ...ZERO, setup: 90000 } }])
+  expect(w.flows()).toEqual([{ v: 1, root: ROOT, slug: 'mod-band', startedAt: NOW, endedAt: NOW + 90000, outcome: 'abandoned', phases: { ...ZERO, setup: 90000 }, gateSeconds: null }])
   expect(await $.ui.render(BAND)).toEqual(BENEATH)
 })
 

@@ -43,6 +43,20 @@ assert_eq "CLEAN 1" "$(head -1 "$SHARD/revert-gate.out")" "T3 revert gate verdic
 assert_eq "$BASE_SHA" "$(git -C "$REPO" rev-parse HEAD)" "T3 host repo HEAD unchanged"
 wired_clean
 
+# T5: each gates pass appends its shard id and seconds to the flow's gate-seconds
+fx_build
+fx_report valid
+fx_run --gates-only "$SHARD" goal none "$RUNNER"
+fx_run --gates-only "$SHARD" goal none "$RUNNER"
+assert_eq "2" "$(grep -cE '^A [0-9]+$' "$FLOW/gate-seconds" 2>/dev/null)" "T5 two gate-seconds lines"
+fx_clean
+
+# T6: an exit before the gates start records nothing
+fx_build
+fx_run --prepare-only "$SHARD" goal none "$RUNNER"
+assert_eq absent "$(fx_exists "$FLOW/gate-seconds")" "T6 prepare-only records no gate time"
+fx_clean
+
 # T4: unknown leading flag
 fx_build
 fx_run --bogus "$SHARD" goal none true
