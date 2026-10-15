@@ -2,11 +2,9 @@
 # Phase-3 lifecycle for ONE shard, end-to-end, in pure shell. Two builders share it:
 # the plain form dispatches OMP; --prepare-only / --gates-only bracket a Claude
 # builder (cf:implement) that main dispatches between the two calls.
-# Main launches this as a background task (run_in_background) and only reads the
-# resulting OUTCOME_FILE -- it never sees brief/report/JSONL/test logs directly
-# (the background task's stdout is captured to its own output file, not main's
-# context). Runs to completion synchronously here, so it is exempt from the
-# foreground Bash ceiling.
+# On OMP, main launches one background Bash per wave that starts this script once
+# per shard, with stdout and stderr in the shard's run.out (cf.md §3.6), and reads
+# only OUTCOME_FILE -- it never sees brief/report/JSONL/test logs directly.
 #
 # Usage:   cf-pi-run.sh [--prepare-only|--gates-only] SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER
 #   Every mode first refuses a blank TEST_RUNNER (lifecycle step 0b).

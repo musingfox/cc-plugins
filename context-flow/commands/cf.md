@@ -282,9 +282,9 @@ carries that approval from the upstream handoff).
 
 State to the human upfront: `Phase 3: parallel-sharded fan-out on <N> contract(s), built by <cf:implement | OMP ($PI_DESC)> per CF_IMPLEMENTER. Parent branch cf/$CF_SLUG; per-shard branches cf/$CF_SLUG-shard-<id>.`
 
-Phase 3 splits the contract set by file-touch graph and builds one shard per connected component. On the default builder each shard is a background `cf:implement` agent bracketed by `cf-pi-run.sh --prepare-only` and `--gates-only` (§3.2); on OMP it is one background `cf-pi-run.sh` (§3.6). The gates live inside that script; you only fan out, collect, and route. "Design §N" below means section N of `${CLAUDE_PLUGIN_ROOT}/docs/parallel-sharded-design.md`.
+Phase 3 splits the contract set by file-touch graph and builds one shard per connected component. On the default builder each shard is a background `cf:implement` agent bracketed by `cf-pi-run.sh --prepare-only` and `--gates-only` (§3.2); on OMP it is one background Bash that runs `cf-pi-run.sh` for every shard (§3.6). The gates live inside that script; you only fan out, collect, and route. "Design §N" below means section N of `${CLAUDE_PLUGIN_ROOT}/docs/parallel-sharded-design.md`.
 
-**Token discipline (design §7), non-negotiable**: read ONLY each shard's paths-only `outcome.md` plus bounded peeks (`Read(file, limit=…)`, `jq '.field'`, `head`/`tail -N`, `sed -n` section slices). NEVER read `report.md`, `contracts.json`, `escalate.md`, briefs, postmortems, JSONL, or test logs — background-task stdout stays in the task's own output file (of `gates.out`, only its last line).
+**Token discipline (design §7), non-negotiable**: read ONLY each shard's paths-only `outcome.md` plus bounded peeks (`Read(file, limit=…)`, `jq '.field'`, `head`/`tail -N`, `sed -n` section slices). NEVER read `report.md`, `contracts.json`, `escalate.md`, briefs, postmortems, JSONL, or test logs — background-task stdout stays in the task's own output file (`run.out` on OMP; of `gates.out`, only its last line).
 
 ### 3.0 Parent worktree setup (idempotent)
 
@@ -535,7 +535,7 @@ If either fires, escalate to the user via `AskUserQuestion`:
 
 Replan budget = 2 attempts per contract (third NEEDS_REPLAN escalates). Rollback budget = 2 cycles per flow (third escalates). FAIL retry budget = 1 per shard per round (handled in §3.4 Any FAIL).
 
-### 3.6 OMP overflow (`CF_IMPLEMENTER=omp`): one background `cf-pi-run.sh` per shard, `QUOTA` outcomes
+### 3.6 OMP overflow (`CF_IMPLEMENTER=omp`): one background Bash per wave, `QUOTA` outcomes
 
 OMP builds a round only when `CF_IMPLEMENTER=omp` is recorded in `$SESSION/env.sh` and `PI_AVAILABLE=1`. The full per-shard lifecycle (worktree → brief → probe → dispatch → poll → gates → outcome) lives inside `cf-pi-run.sh`; you only fan out, collect, and route.
 
@@ -553,17 +553,19 @@ OMP builds with the model in `$PI_DISPATCH_CMD`. Keep the reviewer at or above t
 
 **No pre-dispatch quota gate.** There is none, deliberately: there is no provider-side headroom signal to read (`pi auth check` reports readiness, not remaining balance, and is blind to package-provided providers). Exhaustion is caught reactively — `cf-pi-run.sh`'s poll classifies it as `QUOTA` (balance or plan, which only paying resets) or `QUOTA-WINDOW` (a rolling window that clears on its own in hours), and one worker hitting the wall aborts its whole batch rather than letting every sibling pay for the same wall: the shard that hits it records the wall for the flow, and every sibling `cf-pi-run.sh` stops its own worker from that record with the same tag. On that outcome (§3.4 Any FAIL), route those shards back to the Claude builder (§3.2) or re-run later as a new flow with a different `$PI_DISPATCH_CMD`.
 
-Launch the READY shards in PARALLEL — one `cf-pi-run.sh` per shard as a **background task** (`Bash` with `run_in_background: true` and `timeout: 7200000`), all in a **single message**:
+Launch the READY shards in PARALLEL as ONE background task: a single `Bash` with `run_in_background: true` and `timeout: 7200000`, in a **single message**. It starts one `cf-pi-run.sh` per READY shard, waits for all of them, and exits 0; each shard writes its own output to `run.out`:
 
 ```
 Bash(run_in_background: true, timeout: 7200000, command:
-  ". $SESSION/env.sh && $SCRIPTS/cf-pi-run.sh $SESSION/shards/A '<one-sentence goal>' '<short constraints>' \"$SHARD_TEST_RUNNER\"")
-Bash(run_in_background: true, timeout: 7200000, command:
-  ". $SESSION/env.sh && $SCRIPTS/cf-pi-run.sh $SESSION/shards/B '<one-sentence goal>' '<short constraints>' \"$SHARD_TEST_RUNNER\"")
-... (one background Bash per READY id)
+  ". $SESSION/env.sh || exit 1
+   $SCRIPTS/cf-pi-run.sh $SESSION/shards/A '<one-sentence goal>' '<short constraints>' \"$SHARD_TEST_RUNNER\" > $SESSION/shards/A/run.out 2>&1 &
+   $SCRIPTS/cf-pi-run.sh $SESSION/shards/B '<one-sentence goal>' '<short constraints>' \"$SHARD_TEST_RUNNER\" > $SESSION/shards/B/run.out 2>&1 &
+   ... (one line per READY id)
+   wait
+   exit 0")
 ```
 
-The 4 positionals are `SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER` — pass the resolved `SHARD_TEST_RUNNER` (the full suite belongs to the integration gate). Do NOT pass research output, decision alternatives, plan prose, or rejected approaches; each shard derives everything else from its `SHARD_SESSION/env.sh`. A foreground Bash is capped at 10 minutes, so a background task carries an explicit `timeout: 7200000` (two hours) and is stopped there; each writes `$SESSION/shards/<id>/outcome.md` on completion.
+The 4 positionals are `SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER` — pass the resolved `SHARD_TEST_RUNNER` (the full suite belongs to the integration gate). Do NOT pass research output, decision alternatives, plan prose, or rejected approaches; each shard derives everything else from its `SHARD_SESSION/env.sh`. A foreground Bash is capped at 10 minutes, so the background task carries an explicit `timeout: 7200000` (two hours), and that timeout stops every shard of the wave together. A shard that exits 1, 2 or 3 does not fail the task; a shard that dies before writing its outcome gets `FAIL outcome-missing` from its own exit trap, and each shard writes `$SESSION/shards/<id>/outcome.md` on completion.
 
 **Progress visibility** — the human must never sit blind while shards run. Immediately after fan-out (same turn), arm ONE progress monitor:
 
