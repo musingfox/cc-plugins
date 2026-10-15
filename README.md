@@ -162,6 +162,7 @@ Personal Obsidian vault productivity — capture, notes, and project management 
 - **Jot** (`/obw:jot`): Quick capture (timestamped journal bullet) or long-form note — triages by input shape; filename strategies (title / slug / timestamp-title), `--folder` overrides per-call
 - **Project Management** (`/obw:pm`): Task/doc lifecycle, Bases dashboards, wikilink cross-references; split a spec into blocking tickets
 - **Interactive Init** (`/obw:init`): Guided setup of `.obsidian.yaml` — vault binding, note/pm sections
+- **Pm Tools** (`mcp__obw__pm_tick`, `pm_note`, `pm_status`): Claude ticks an acceptance criterion, appends a Notes line or sets a card's status in one tool call; each writes through one `obsidian eval` and reads the card back
 - **Prerequisites**: Obsidian app + CLI enabled, `.obsidian.yaml` config in project root; the Issue Pane also needs Claude Code 2.1.287 or later, with uv and viz optional
 
 **Installation:**
