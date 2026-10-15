@@ -1,3 +1,4 @@
+// Copied from obsidian-workspace/hooks/config.ts; keep the two in step.
 // A quoted value keeps any `#` inside its quotes and drops a comment after them.
 const QUOTED = /^(["'])(.*)\1\s*(#.*)?$/
 

@@ -1,3 +1,4 @@
+// Adapted from obsidian-workspace/hooks/base-argv.ts and cli-output.ts; keep the two in step.
 // The obsidian CLI runs only on literal, scoped arguments: nothing here is shell-parsed, and anything
 // that could widen the path or the project is refused before a run.
 export type Run = { kind: 'exited'; exitCode: number; stdout: string; stderr: string } | { kind: 'rejected' }
@@ -15,7 +16,7 @@ const BAD_PROJECT = /[/\s[\]"']/
 const NOT_RUN = `The obsidian CLI did not run: it is not on PATH, or it did not answer within ${VAULT_TIMEOUT_MS / 1000} s.`
 
 function scopeRefusal(scope: Scope): { refused: 'vault' | 'project' } | null {
-  // Copied from obsidian-workspace/hooks/base-argv.ts isBadVault: a vault name with a control character is refused.
+  // Stricter than obsidian-workspace/hooks/base-argv.ts isBadVault: tab and newline are refused too, and there is no length bound.
   if (!scope.vault || CONTROLS.test(scope.vault)) return { refused: 'vault' }
   if (!scope.project || BAD_PROJECT.test(scope.project) || CONTROLS.test(scope.project)) return { refused: 'project' }
   return null
