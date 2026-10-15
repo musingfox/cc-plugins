@@ -6,6 +6,15 @@ Obsidian project configured in `.obsidian.yaml`, to a background Haiku in batche
 `/cards` opens a review pane that deals the due cards with a Leitner schedule; it runs
 without model tokens.
 
+## Install
+
+Add the marketplace once, then install the plugin:
+
+```bash
+/plugin marketplace add musingfox/cc-plugins
+/plugin install flashcards
+```
+
 | Command | What it does |
 |---|---|
 | `/cards build` | Build or refresh the deck from up to 20 changed sources |

@@ -265,6 +265,17 @@ Mini games to play in a pane while Claude works, as a Claude Mod (tested on Clau
 /plugin install games
 ```
 
+### flashcards
+
+Review cards generated from your repo's specs, ADRs and vault task cards, as a Claude Mod (see [flashcards/README.md](flashcards/README.md)):
+- **`/cards build`**: sends up to 20 changed sources to a background Haiku in batches of 10; the deck is kept outside the repo
+- **`/cards`**: opens a review pane that deals the due cards with a Leitner schedule, without model tokens; `f` flips, `1` `2` `3` rate, `q` closes
+
+**Installation:**
+```bash
+/plugin install flashcards
+```
+
 ### mermaid-inline
 
 Every ```` ```mermaid ```` block Claude writes drawn as plain box art in place in the transcript, as a Claude Mod (needs Claude Code 2.1.287 or later); a fork of [claude-mermaid](https://github.com/galElmalah/claude-mermaid) (MIT):
@@ -320,6 +331,7 @@ cc-plugins/
 ├── diagnose/           skills: diagnose, diagnose-now · docs, scripts, tests
 ├── fizzy/              skills: fizzy
 ├── games/             hooks: register (Claude Mod) · relay (Cloudflare Worker) · tests
+├── flashcards/        hooks: register (Claude Mod) · tests
 ├── hook-guard/         skills: hook-guard
 ├── mermaid-inline/     hooks: register (Claude Mod) · tests
 ├── obsidian-workspace/ skills: init, jot, pm · templates, tests · hooks: register (Claude Mod)

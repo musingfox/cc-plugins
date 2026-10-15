@@ -102,6 +102,11 @@
       "name": "audit",
       "source": "./audit",
       "description": "[Experimental] Repository audits that put each piece of knowledge where it cannot drift — the repo's docs, from README to CLAUDE.md, sorted into what is a cache of the code, a rule or a decision, and its standing milestones' commitments traced to the tests that guard them"
+    },
+    {
+      "name": "flashcards",
+      "source": "./flashcards",
+      "description": "[Experimental] Flashcards from your repo's specs, ADRs and vault task cards — /cards build generates a review deck with a background Haiku, /cards opens a token-free Leitner review pane"
     }
   ]
 }
