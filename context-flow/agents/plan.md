@@ -409,6 +409,8 @@ Run this self-check before producing your final output. If any item fails, fix t
 - [ ] Every High decision has Trade-off, Alternatives, and Rationale (not merged). Medium decisions have at least a Rationale line. Low decisions need only the Choice line.
 - [ ] No decision classified High unless it meets the Strategic-direction or Irreversible-technical criteria. (Over-escalating wastes the CEO's attention; under-escalating ships unauthorized commitments.)
 - [ ] Every behavioral contract has Effect, purpose, input, output, errors, depends, and ≥1 concrete test case.
+- [ ] Each contract's tests can pass with only its own `touches_files` and those of the contracts in its `depends` in place. A test that needs a file another contract creates (a module a loader requires, a shared fixture) names that contract in `depends`, or the file moves into this contract.
+- [ ] Every test case that leans on existing code's behavior (what a model keeps, what a loader requires, what a route returns) is backed by a file:line you read this session, or is listed in Assumptions.
 - [ ] Every **user-facing** contract has a States block covering Loading / Empty / Error / Success (Partial/Stale where applicable), with at least one test case per non-trivial state.
 - [ ] **Atomicity**: every contract describes ONE observable behavior — no ` and ` / `;` / multi-verb Effect lines; no mixed input→output mappings under one contract; no compound error classes. Split when in doubt.
 - [ ] Every research constraint is either covered by a test case or listed in Unresolved with justification.
