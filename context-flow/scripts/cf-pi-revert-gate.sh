@@ -10,6 +10,12 @@
 # contracts.json, or without the field, its touched paths that look like tests.
 # A run that exits non-zero, or is killed at the deadline, went red.
 #
+# A red run is reused instead of rerun when the tracked tree it judged and the
+# command are unchanged since an earlier gate on this shard: the verdict is a
+# function of that tree, so a fix round that edits only implementation files
+# costs the control run alone. Untracked files and the machine are not in the
+# key; a flaky suite keeps the red it once gave. Green runs always rerun.
+#
 # Usage:   cf-pi-revert-gate.sh SHARD_SESSION TEST_CMD [ARGS...]
 # Stdout:  exactly one verdict line
 #            CLEAN <n>                 exit 0  all n contracts went red
@@ -74,6 +80,18 @@ put_back() {
   rm -f "$idx"
 }
 
+# Key of the tree a run judges: the tracked files as they stand now, plus the command.
+# A scratch index, so the real index keeps step 11's intent-to-add entries.
+run_key() {
+  local idx="$SHARD_SESSION/revert-gate.index" tree
+  rm -f "$idx"
+  GIT_INDEX_FILE="$idx" git -C "$WORK" read-tree HEAD \
+    && GIT_INDEX_FILE="$idx" git -C "$WORK" add -u \
+    && tree=$(GIT_INDEX_FILE="$idx" git -C "$WORK" write-tree) || { rm -f "$idx"; return 1; }
+  rm -f "$idx"
+  { printf '%s\0' "$tree"; printf '%s\0' "${CMD[@]}"; } | git hash-object --stdin
+}
+
 restore() { [ ${#own[@]} -eq 0 ] || put_back HEAD "${own[@]}"; }
 
 on_signal() {
@@ -97,6 +115,7 @@ shift
 CMD=("$@")
 LOG="$SHARD_SESSION/revert-gate.log"
 STALL_MARK="$SHARD_SESSION/revert-gate-stalled.mark"
+RED_KEYS="$SHARD_SESSION/revert-gate.red"
 DEADLINE="${CF_TEST_DEADLINE_S:-1800}"
 
 load_cf_pi_env "$SHARD_SESSION" 2>/dev/null || verdict "ERROR session env.sh" 1
@@ -160,7 +179,14 @@ for name in ${contracts[@]+"${contracts[@]}"}; do
     revert+=("$p")
   done
   [ ${#revert[@]} -eq 0 ] || put_back "$BASE_HEAD" "${revert[@]}"
-  run_suite "$name"
+  key=$(run_key 2>/dev/null) || key=""
+  if [ -n "$key" ] && grep -Fxq -- "$key" "$RED_KEYS" 2>/dev/null; then
+    printf '### %s\nreused red run %s\n' "$name" "$key" >>"$LOG"
+    rc=1
+  else
+    run_suite "$name"
+    if [ "$rc" -ne 0 ] && [ -n "$key" ]; then printf '%s\n' "$key" >>"$RED_KEYS"; fi
+  fi
   restore || true
   [ "$rc" -ne 0 ] || green="${green:+$green,}$name"
 done

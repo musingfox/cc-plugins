@@ -926,7 +926,7 @@ fi
 # completeness. Runs after step 11, so the diff is the unreverted tree.
 
 declared_count=$(printf '%s\n' "$declared_names" | grep -c . || true)
-say "revert gate: $declared_count contract(s), $((declared_count + 1)) suite runs"
+say "revert gate: $declared_count contract(s), at most $((declared_count + 1)) suite runs"
 GATE_RC=0
 "$SCRIPT_DIR/cf-pi-revert-gate.sh" "$SHARD_SESSION" bash -c "$TEST_RUNNER" \
   > "$SHARD_SESSION/revert-gate.out" || GATE_RC=$?  # not $SCRIPTS: this gate is never stubbable

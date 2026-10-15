@@ -240,6 +240,83 @@ assert_eq "CLEAN 2" "$GATE_OUT" "T11 two effective contracts: stdout"
 assert_eq "3" "$(wc -l <"$FLOW/counter" 2>/dev/null | tr -d ' ')" "T11 runs: 1 control + 2 contracts"
 rm -rf "$FLOW"
 
+# ==== a red run is reused while its reverted tree and command are unchanged ====
+
+# reuse_fixture: C1 and C5 effective, every suite run counted in $FLOW/counter
+reuse_fixture() {
+  new_flow; write_runner; base_commit; add_effective
+  printf '%s\n' 'echo $(($1 - $2))' >"$WORK/src/sub.sh"
+  printf '%s\n' '[ "$(bash src/sub.sh 5 3)" = 2 ]' >"$WORK/tests/sub.test.sh"
+  commit_all c5
+  set_docs '[{"name":"C1","touches_files":["src/add.sh","tests/add.test.sh"]},{"name":"C5","touches_files":["src/sub.sh","tests/sub.test.sh"]}]' '["C1","C5"]'
+  env_sh
+  printf '%s\n' "printf 'x\\n' >>'$FLOW/counter'" 'bash run-tests.sh' >"$FLOW/count.sh"
+}
+runs() { wc -l <"$FLOW/counter" 2>/dev/null | tr -d ' '; }
+
+# U1: a second gate on the same tree runs only the control
+reuse_fixture
+run_gate "$GATE" bash "$FLOW/count.sh"
+: >"$FLOW/counter"
+run_gate "$GATE" bash "$FLOW/count.sh"
+assert_eq "CLEAN 2" "$GATE_OUT" "U1 unchanged tree: stdout"
+assert_eq "1" "$(runs)" "U1 unchanged tree: control only"
+assert_contains "$(cat "$SHARD/revert-gate.log")" "### C1" "U1 log still names C1"
+rm -rf "$FLOW"
+
+# U2: a fix to an implementation file reverts to the same tree, so nothing reruns
+reuse_fixture
+run_gate "$GATE" bash "$FLOW/count.sh"
+printf '%s\n' 'echo $((  $1 + $2 ))' >"$WORK/src/add.sh"
+commit_all fix
+: >"$FLOW/counter"
+run_gate "$GATE" bash "$FLOW/count.sh"
+assert_eq "CLEAN 2" "$GATE_OUT" "U2 implementation fix: stdout"
+assert_eq "1" "$(runs)" "U2 implementation fix: control only"
+rm -rf "$FLOW"
+
+# U3: a changed test file reruns its contract and only that one
+reuse_fixture
+run_gate "$GATE" bash "$FLOW/count.sh"
+printf '%s\n' '[ "$(bash src/add.sh 2 2)" = 4 ]' >>"$WORK/tests/add.test.sh"
+commit_all test-fix
+: >"$FLOW/counter"
+run_gate "$GATE" bash "$FLOW/count.sh"
+assert_eq "CLEAN 2" "$GATE_OUT" "U3 test change: stdout"
+assert_eq "2" "$(runs)" "U3 test change: control + C1"
+rm -rf "$FLOW"
+
+# U4: a green run is never reused
+new_flow; write_runner; base_commit; add_vacuous
+set_docs "$C2" '["C2"]'; env_sh
+printf '%s\n' "printf 'x\\n' >>'$FLOW/counter'" 'bash run-tests.sh' >"$FLOW/count.sh"
+run_gate "$GATE" bash "$FLOW/count.sh"
+: >"$FLOW/counter"
+run_gate "$GATE" bash "$FLOW/count.sh"
+assert_eq "STAYS_GREEN C2" "$GATE_OUT" "U4 green rerun: stdout"
+assert_eq "2" "$(runs)" "U4 green rerun: control + C2"
+rm -rf "$FLOW"
+
+# U5: another command does not reuse the first command's red runs
+reuse_fixture
+run_gate "$GATE" bash "$FLOW/count.sh"
+: >"$FLOW/counter"
+run_gate "$GATE" bash "$FLOW/count.sh" extra-arg
+assert_eq "CLEAN 2" "$GATE_OUT" "U5 other command: stdout"
+assert_eq "3" "$(runs)" "U5 other command: every run"
+rm -rf "$FLOW"
+
+# U6: the reuse check leaves the real index as it found it
+reuse_fixture
+printf 'n\n' >"$WORK/notes.txt"
+git -C "$WORK" add -N notes.txt
+before=$(git -C "$WORK" diff --cached --name-status; git -C "$WORK" ls-files -s)
+run_gate "$GATE" bash "$FLOW/count.sh"
+run_gate "$GATE" bash "$FLOW/count.sh"
+after=$(git -C "$WORK" diff --cached --name-status; git -C "$WORK" ls-files -s)
+assert_eq "$before" "$after" "U6 real index untouched"
+rm -rf "$FLOW"
+
 # T12: no own paths, an intent-to-add file present: skip the dirty check, still judge
 empty_fixture() {
   new_flow; write_runner; base_commit
