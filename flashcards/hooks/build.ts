@@ -79,7 +79,7 @@ async function unclaimedAgent($: EngineInterface): Promise<string | undefined> {
 }
 
 // The last batch to settle reports the build: what was added, dropped and failed, and what is still pending.
-async function settle($: EngineInterface, batch: Batch, outcome: { added: number; dropped: number } | 'failed') {
+async function settle($: EngineInterface, batch: Batch, outcome: { added: number; dropped: number; recorded: number } | 'failed') {
   const { build } = batch
   build.outstanding -= 1
   if (outcome === 'failed') {
@@ -87,12 +87,16 @@ async function settle($: EngineInterface, batch: Batch, outcome: { added: number
   } else {
     build.added += outcome.added
     build.dropped += outcome.dropped
-    build.recordedSources += batch.sources.length
+    build.recordedSources += outcome.recorded
   }
   if (build.outstanding === 0) {
     inFlight = null
     const remaining = build.pendingBefore - build.recordedSources
-    await $.ui.toast(`Flashcards: ${build.added} cards added, ${build.dropped} dropped, ${build.failedSources} sources failed, ${remaining} sources remain.`)
+    const parts = [`${build.added} cards added`]
+    if (build.dropped) parts.push(`${build.dropped} rejected by the checks`)
+    if (build.failedSources) parts.push(`${build.failedSources} sources failed and wait for the next build`)
+    parts.push(`${remaining} sources remain`)
+    await $.ui.toast(`Flashcards: ${parts.join(', ')}.`)
     await $.ui.invalidate('ui.render')
   }
 }
@@ -128,11 +132,14 @@ async function merge($: EngineInterface, batch: Batch, reply: { reason: string; 
   const deck = raw ? await loadDeck($, root) : null
   if (!raw || !deck) return settle($, batch, 'failed')
   const { accepted, dropped } = await acceptCards(raw, batch.sources)
-  const paths = new Set(batch.sources.map((source) => source.path))
+  // A source the model gave cards for, all of them rejected, stays pending: only a source with an accepted card,
+  // or one the model judged had nothing worth a card, is recorded at its hash.
+  const recorded = batch.sources.filter((source) => accepted.some((card) => card.sourcePath === source.path) || !raw.some((card) => card.source === source.path))
+  const paths = new Set(recorded.map((source) => source.path))
   const replacedIds = deck.cards.filter((card) => paths.has(card.sourcePath)).map((card) => card.id)
   const next: Deck = {
     ...deck,
-    sources: { ...deck.sources, ...Object.fromEntries(batch.sources.map((source) => [source.path, { hash: source.hash, type: source.type }])) },
+    sources: { ...deck.sources, ...Object.fromEntries(recorded.map((source) => [source.path, { hash: source.hash, type: source.type }])) },
     cards: [...deck.cards.filter((card) => !paths.has(card.sourcePath)), ...accepted],
   }
   if (!(await saveDeck($, root, next))) return settle($, batch, 'failed')
@@ -141,7 +148,7 @@ async function merge($: EngineInterface, batch: Batch, reply: { reason: string; 
     for (const id of replacedIds) delete review[id]
     await saveReview($, root, review)
   }
-  await settle($, batch, { added: accepted.length, dropped: dropped.length })
+  await settle($, batch, { added: accepted.length, dropped: dropped.length, recorded: recorded.length })
 }
 
 // Merges run one at a time: each reads the stored deck, so two batches that finish together would lose one write.

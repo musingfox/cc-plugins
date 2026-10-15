@@ -31,7 +31,7 @@ describe('the build report', () => {
     await $.turn.complete(reply('agent-1', answerFor(paths.slice(15, 25))))
     expect(seen.toasts.filter((t) => t.startsWith('Flashcards:'))).toEqual([])
     await $.turn.complete(reply('agent-2', answerFor(paths.slice(5, 15))))
-    expect(seen.toasts.filter((t) => t.startsWith('Flashcards:'))).toEqual(['Flashcards: 20 cards added, 0 dropped, 0 sources failed, 5 sources remain.'])
+    expect(seen.toasts.filter((t) => t.startsWith('Flashcards:'))).toEqual(['Flashcards: 20 cards added, 5 sources remain.'])
     expect(seen.invalidates).toBeGreaterThan(0)
   })
 
@@ -43,7 +43,7 @@ describe('the build report', () => {
     await seen.clock.settle()
     await $.turn.complete(reply('agent-1', '', 'error'))
     await $.turn.complete(reply('agent-2', answerFor(paths.slice(5, 15))))
-    expect(seen.toasts.filter((t) => t.startsWith('Flashcards:'))).toEqual(['Flashcards: 10 cards added, 0 dropped, 10 sources failed, 15 sources remain.'])
+    expect(seen.toasts.filter((t) => t.startsWith('Flashcards:'))).toEqual(['Flashcards: 10 cards added, 10 sources failed and wait for the next build, 15 sources remain.'])
   })
 
   test('a card whose quote is not in its source counts as dropped', async ($, on) => {
@@ -53,7 +53,7 @@ describe('the build report', () => {
     await seen.clock.settle()
     const answer = '[{"source":"docs/spec/a.md","kind":"rule","q":"Q1 is?","a":"A.","quote":"One."},{"source":"docs/spec/a.md","kind":"rule","q":"Q2 is?","a":"A.","quote":"Missing."},{"source":"docs/spec/a.md","kind":"rule","q":"Q3 is?","a":"A.","quote":"Two."},{"source":"docs/spec/a.md","kind":"rule","q":"Q4 is?","a":"A.","quote":"Gone."}]'
     await $.turn.complete(reply('agent-1', answer))
-    expect(seen.toasts.filter((t) => t.startsWith('Flashcards:'))).toEqual(['Flashcards: 2 cards added, 2 dropped, 0 sources failed, 0 sources remain.'])
+    expect(seen.toasts.filter((t) => t.startsWith('Flashcards:'))).toEqual(['Flashcards: 2 cards added, 2 rejected by the checks, 0 sources remain.'])
   })
 
   test('every batch denied at spawn reports zero added and the next build is not stopped', async ($, on) => {
@@ -62,7 +62,7 @@ describe('the build report', () => {
     await $.session.start(SESSION)
     await $.command.run(cards('build'))
     await seen.clock.settle()
-    expect(seen.toasts.filter((t) => t.startsWith('Flashcards:'))).toEqual(['Flashcards: 0 cards added, 0 dropped, 20 sources failed, 25 sources remain.'])
+    expect(seen.toasts.filter((t) => t.startsWith('Flashcards:'))).toEqual(['Flashcards: 0 cards added, 20 sources failed and wait for the next build, 25 sources remain.'])
     await $.command.run(cards('build'))
     await seen.clock.settle()
     expect(seen.spawns.length).toBe(4)

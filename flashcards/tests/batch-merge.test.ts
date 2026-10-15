@@ -44,6 +44,19 @@ describe('batch merge', () => {
     expect(deckOf(seen, await repoKey('/work')).cards.map((c: Card) => c.q)).toEqual(['Which step must never be skipped?'])
   })
 
+  test('a source whose every card is rejected stays pending, so the next build retries it', async ($, on) => {
+    const seen = await oneSpecBuild($, on)
+    const bad = '{"source":"docs/spec/rules.md","kind":"rule","q":"Which gate is open?","a":"Any.","quote":"Gates are open."}'
+    await $.turn.complete(reply(`[${bad}]`))
+    expect(deckOf(seen, await repoKey('/work')).sources).toEqual({})
+  })
+
+  test('a source the model gives no card is recorded, so it is not sent again', async ($, on) => {
+    const seen = await oneSpecBuild($, on)
+    await $.turn.complete(reply('[]'))
+    expect(Object.keys(deckOf(seen, await repoKey('/work')).sources)).toEqual(['docs/spec/rules.md'])
+  })
+
   test('an error reply leaves the deck and the source pending', async ($, on) => {
     const seen = await oneSpecBuild($, on)
     await $.turn.complete(reply(VALID, 'error'))
