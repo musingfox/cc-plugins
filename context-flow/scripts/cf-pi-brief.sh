@@ -184,7 +184,7 @@ shard_group="$SHARD_ID"
   echo "- **BASE_HEAD**: \`${BASE_HEAD:-(unset)}\`     (compute diffs against this commit)"
   echo "- **REPORT_FILE**: \`$REPORT_FILE\`     (write your structured report here)"
   echo "- **ESCALATE_FILE**: \`$ESCALATE_FILE\`     (write here ONLY when stuck per Escalation Contract below)"
-  echo "- **TEST_RUNNER**: \`$test_runner\`     (run it yourself after each contract per Methodology; the orchestrator re-runs it independently as a gate — green here does not skip the gate)"
+  echo "- **TEST_RUNNER**: \`$test_runner\`     (run it yourself once before your report, per Methodology; the orchestrator re-runs it independently as a gate — green here does not skip the gate)"
   echo "- **SHARD_GROUP**: \`$shard_group\`"
   # Prerequisite interfaces merged into this branch by cf-pi-run.sh (1b).
   # Without this line the worker rediscovers them file-by-file or escalates.

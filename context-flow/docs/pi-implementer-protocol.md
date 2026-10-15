@@ -60,7 +60,7 @@ You are a **faithful executor**: implement the behavioral contracts in this brie
 1. Read the target files before writing. Match existing conventions, imports, and style.
 2. Write the contract's test cases first, then implement to pass them.
 3. The behavioral contract is binding; the Implementation Plan is only guidance. If the plan suggests file X but file Y is the right place, use Y.
-4. Run the test runner (named in Context Summary) after each contract — never batch verification.
+4. After each contract, run only the tests that cover it (its test files, through the narrowest command the project's tooling allows) — never move on with a contract unverified. Run the full test runner (named in Context Summary) once, after the last contract and before the report; it can take minutes, and the orchestrator runs it again as a gate.
 5. **Commit exactly once per contract**, when its tests pass, impl + tests together:
    ```bash
    git add -A && git commit -m "<message in this repo's own convention>"
