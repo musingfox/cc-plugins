@@ -47,6 +47,8 @@ export function world(on: any, options: WorldOptions = {}) {
     closed: [] as any[],
     toasts: [] as string[],
     spawns: [] as any[],
+    models: [] as any[],
+    tools: [] as any[],
     runs: [] as any[],
     invalidates: 0,
     store: data,
@@ -109,6 +111,14 @@ export function world(on: any, options: WorldOptions = {}) {
     const path = argv[3].slice('path='.length)
     const read = options.reads?.[path] ?? `Error: File "${path}" not found.\n`
     return typeof read === 'string' ? { value: { exitCode: 0, stdout: read, stderr: '' } } : read
+  })
+  on('model.complete', ($: any, e: any) => {
+    seen.models.push(e)
+    return { deny: 'recorded by the test world' }
+  })
+  on('tool.call', ($: any, e: any) => {
+    seen.tools.push(e)
+    return { deny: 'recorded by the test world' }
   })
   on('agent.spawn', ($: any, e: any) => {
     seen.spawns.push(e)
