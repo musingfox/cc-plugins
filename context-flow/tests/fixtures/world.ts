@@ -6,7 +6,7 @@ export const ROOT = '/tmp/cf-1008-Rez6'
 export const ROOT2 = '/tmp/cf-1008-Ab12'
 export const ENV = `SESSION="${ROOT}"\nSESSION_BASENAME="cf-1008-Rez6"\nCF_SLUG="mod-band"\nCLEANUP_SCRIPT="${ROOT}/cleanup.sh"\nPI_DISPATCH_CMD=pi\\ --api-key\\ sk-live-SECRET\n`
 export const ENV2 = ENV.replaceAll(ROOT, ROOT2).replace('mod-band', 'other-flow').replace('cf-1008-Rez6', 'cf-1008-Ab12')
-export const BENEATH = { type: 'Text', children: ['beneath'] }
+export const BENEATH = { type: 'Text', children: ['beneath'], part: { plugin: 'test' } }
 export const SETUP_OUT = `${ROOT}\nSESSION=${ROOT}\n`
 export const ok = (stdout: string) => ({ result: { stdout, stderr: '', interrupted: false }, text: stdout })
 
