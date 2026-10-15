@@ -1,6 +1,7 @@
 import type { EngineInterface, On } from 'claude-code'
 import { atom, read, update } from 'claude-code'
-import { loadDeck, loadReview, repoRoot } from './deck-store.ts'
+import { loadDeck, loadReview, repoRoot, saveReview } from './deck-store.ts'
+import { rate } from './leitner.ts'
 import { dueQueue } from './queue.ts'
 import { drawable } from './text.ts'
 import type { Card, Review } from '../types'
@@ -46,6 +47,22 @@ async function flip($: EngineInterface) {
   await update($, flipped, () => true)
 }
 
+// Files the flipped card in its new box, saves the review, and deals the next card unflipped.
+// A store that refuses the write keeps the progress for this session only.
+async function rateCard($: EngineInterface, rating: 1 | 2 | 3) {
+  if (!session || !(await read($, flipped))) return
+  const deck = await loadDeck($, session.root)
+  const at = locate(await read($, queue), await read($, index), deck?.cards ?? [])
+  if (!at) return
+  const now = await $.clock.now()
+  session.review = { ...session.review, [at.card.id]: rate(session.review[at.card.id], rating, now) }
+  await saveReview($, session.root, session.review)
+  await update($, index, () => at.at + 1)
+  await update($, flipped, () => false)
+  await update($, reviewed, (count) => count + 1)
+  await $.ui.invalidate('ui.render')
+}
+
 export async function openReview($: EngineInterface) {
   const root = await repoRoot($)
   const deck = await loadDeck($, root)
@@ -73,7 +90,7 @@ export function registerReview(on: On) {
       })
     }
     const at = locate(queueIds, await read($, index), deck.cards)
-    if (!at) return Text({ children: [drawable(`Done: ${await read($, reviewed)} cards reviewed.`)] })
+    if (!at) return Text({ children: [drawable(`Done: ${await read($, reviewed)} cards reviewed. Run /cards again when more are due.`)] })
     const isFlipped = await read($, flipped)
     return Box({
       flexDirection: 'column',
@@ -90,7 +107,7 @@ export function registerReview(on: On) {
           flexDirection: 'row',
           gap: 2,
           children: isFlipped
-            ? RATINGS.map((item) => Button({ key: `rate:${item.rating}`, label: item.label, hotkey: String(item.rating), plain: true, onPress: () => undefined }))
+            ? RATINGS.map((item) => Button({ key: `rate:${item.rating}`, label: item.label, hotkey: String(item.rating), plain: true, onPress: () => rateCard($, item.rating) }))
             : [Button({ key: 'flip', label: 'flip', hotkey: 'f', plain: true, onPress: () => flip($) })],
         }),
       ],
