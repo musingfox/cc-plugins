@@ -41,6 +41,7 @@ export type WorldOptions = {
 export function world(on: any, options: WorldOptions = {}) {
   const data: Record<string, unknown> = { ...(options.store ?? {}) }
   const seen = {
+    refuse: options.refuse as 'get' | 'set' | undefined,
     commands: [] as any[],
     opened: [] as any[],
     closed: [] as any[],
@@ -58,11 +59,11 @@ export function world(on: any, options: WorldOptions = {}) {
   on('session.root', () => ({ value: SESSION.cwd }))
   on('turn.complete', () => ({ text: '' }))
   on('store.get', ($: any, e: any) => {
-    if (options.refuse === 'get') return { deny: 'store unavailable' }
+    if (seen.refuse === 'get') return { deny: 'store unavailable' }
     return { value: data[e.key] }
   })
   on('store.set', ($: any, e: any) => {
-    if (options.refuse === 'set') return { deny: 'store unavailable' }
+    if (seen.refuse === 'set') return { deny: 'store unavailable' }
     data[e.key] = e.value
     return { value: undefined }
   })

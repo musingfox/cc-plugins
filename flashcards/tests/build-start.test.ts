@@ -77,4 +77,13 @@ describe('/cards build starts the background batches', () => {
     await seen.clock.settle()
     expect(seen.spawns).toHaveLength(2)
   })
+  test('a spawn that answers no id is tracked under the id the agent list gives it', async ($, on) => {
+    const key = await repoKey('/work')
+    const seen = world(on, { files: ABSOLUTE(SPECS), dirs: { '/work/docs/spec': SPEC_DIR }, spawn: () => ({ model: 'haiku' }) })
+    await $.session.start(SESSION)
+    await $.command.run(cards('build'))
+    await seen.clock.settle()
+    await $.turn.complete({ agentId: 'agent-1', reason: 'answer', answer: '[]', durationMs: 1, isAborted: false, turnId: 't1' })
+    expect(Object.keys((seen.store[`deck:${key}`] as Deck).sources).sort()).toEqual(['docs/spec/a.md', 'docs/spec/b.md', 'docs/spec/c.md'])
+  })
 })
