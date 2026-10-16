@@ -98,5 +98,22 @@ do
   note check_reject "$HOOK" "$SUBJ"
 done
 
+# The same helpers must go red when the hook cannot fail or cannot pass.
+printf 'exit 0\n' > "$TMP/stub-accept"
+printf 'exit 1\n' > "$TMP/stub-reject"
+if check_reject "$TMP/stub-accept" "spiral: x"; then
+  bad "guard cannot fail"
+else
+  ok "guard expect-reject fails on accept-all stub"
+fi
+if check_accept "$TMP/stub-reject" "feat: x"; then
+  bad "guard cannot fail"
+else
+  ok "guard expect-accept fails on reject-all stub"
+fi
+
+ran=$((PASS + FAIL))
+if [ "$ran" -gt 0 ]; then ok "checks ran"; else bad "no checks ran"; fi
+
 echo "--- commit-msg: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && [ "$PASS" -gt 0 ]
