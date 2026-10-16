@@ -138,6 +138,26 @@ bump_por="$(git -C "$FIX_WORK" status --porcelain)"
 [ -z "$bump_por" ] || die "work tree dirty after bump: $bump_por"
 ok
 
+# A version the author already changed is left alone.
+new_fixture "$HOOKSDIR"
+printf 'b\n' >> "$FIX_WORK/p/a.txt"
+cat > "$FIX_WORK/p/.claude-plugin/plugin.json" <<'EOF'
+{
+  "name": "p",
+  "version": "1.1.0",
+  "description": "d"
+}
+EOF
+git -C "$FIX_WORK" add -A
+manual_out="$(git -C "$FIX_WORK" commit -m "feat(p): x" 2>&1)" || die "manual bump commit failed: $manual_out"
+manual_json="$(git -C "$FIX_WORK" show HEAD:p/.claude-plugin/plugin.json)"
+printf '%s\n' "$manual_json" | grep -q '"version": "1.1.0"' || die "manual version was not kept"
+ok
+if printf '%s\n' "$manual_out" | grep -q 'Auto-bumped'; then
+  die "manual version commit printed Auto-bumped"
+fi
+ok
+
 end_head="$(git -C "$ROOT" rev-parse HEAD)"
 end_refs="$(git -C "$ROOT" for-each-ref)"
 [ "$end_head" = "$REAL_HEAD" ] || die "real repo HEAD changed"
