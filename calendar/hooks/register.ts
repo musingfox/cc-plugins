@@ -3,6 +3,7 @@ import { CALENDAR_BUTTON, calModelOf, URL_BUTTON } from './cal-model.ts'
 import type { CalView } from './cal-model.ts'
 import { calendarsOf, eventsOf, payloadOf, wantedOf } from './events.ts'
 import type { CalEvent } from './events.ts'
+import { drawable } from './text.ts'
 
 const SERVER = 'claude.ai Google Calendar'
 const DEFAULT_DAYS = 7
@@ -13,6 +14,7 @@ const RETRY_MS = 30_000
 const MAX_RETRIES = 10
 const BAND_KEY = 'band'
 const DAYS_KEY = 'days'
+const REASON_MAX = 9900
 
 type Reading = { ok: true; events: CalEvent[] } | { ok: false; reason: string }
 
@@ -45,7 +47,8 @@ async function fetchEvents($: any, days: number): Promise<Reading> {
     ),
   )
   const failed = wanted.filter((_, i) => lists[i] === null).map((c) => c.name)
-  if (failed.length) return { ok: false, reason: `could not read ${failed.join(', ')}` }
+  // The notice adds its own prefix and a duration, so the reason stays under the 10000 draw bound with room to spare.
+  if (failed.length) return { ok: false, reason: drawable(`could not read ${failed.join(', ')}`, REASON_MAX) }
   return { ok: true, events: lists.flatMap((l) => l ?? []) }
 }
 

@@ -1,3 +1,5 @@
+import { oneLine } from './text.ts'
+
 export type CalTime = { kind: 'date'; date: string } | { kind: 'time'; ms: number }
 
 export type CalEvent = { id: string; title: string; location: string; link: string; url: string; start: CalTime; end: CalTime | null }
@@ -38,10 +40,9 @@ function timeOf(raw: unknown): CalTime | null {
 }
 
 // A meeting's join link, or a location that is itself a link.
-function urlOf(raw: unknown): string {
+function urlOf(raw: unknown, location: string): string {
   const entryPoints = field(field(raw, 'conferenceData'), 'entryPoints')
   const video = Array.isArray(entryPoints) ? entryPoints.find((p) => field(p, 'entryPointType') === 'video') : undefined
-  const location = stringOf(field(raw, 'location'))
   return stringOf(field(raw, 'hangoutLink')) || stringOf(field(video, 'uri')) || (/^https:\/\//.test(location) ? location : '')
 }
 
@@ -50,7 +51,7 @@ export function calendarsOf(payload: unknown): Calendar[] | null {
   if (!Array.isArray(list)) return null
   return list.flatMap((c) => {
     const id = stringOf(field(c, 'id'))
-    return id ? [{ id, name: stringOf(field(c, 'summary')) || id }] : []
+    return id ? [{ id, name: oneLine(stringOf(field(c, 'summary'))) || oneLine(id) }] : []
   })
 }
 
@@ -62,13 +63,14 @@ export function eventsOf(payload: unknown): CalEvent[] | null {
   return list.flatMap((raw) => {
     const start = timeOf(field(raw, 'start'))
     if (!start || field(raw, 'status') === 'cancelled') return []
+    const location = oneLine(stringOf(field(raw, 'location')))
     return [
       {
         id: stringOf(field(raw, 'id')),
-        title: stringOf(field(raw, 'summary')) || '(no title)',
-        location: stringOf(field(raw, 'location')),
+        title: oneLine(stringOf(field(raw, 'summary'))) || '(no title)',
+        location,
         link: stringOf(field(raw, 'htmlLink')),
-        url: urlOf(raw),
+        url: urlOf(raw, location),
         start,
         end: timeOf(field(raw, 'end')),
       },

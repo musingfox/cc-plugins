@@ -3,6 +3,8 @@ id: mod-ui-text-within-element-bounds
 status: accepted
 scope:
   - "obsidian-workspace/hooks/**"
+  - "calendar/hooks/**"
+  - "omp-quota/hooks/**"
 verify: null
 related: [obsidian-cli-output-classified-positively]
 source: obw-issue-pane
@@ -29,6 +31,4 @@ Born prose: the bound is on run-time data. Bind it to a `claude plugin test`
 case per module that feeds an 11000-character and a `\r`-bearing string
 through the render path and asserts on the drawn strings. The test kit draws a
 `\r` rather than falling back to the engine's drawing, so a test that waits for
-the fallback passes with no check in the module. `omp-quota/hooks/**` is the next scope to add: it draws
-provider names from `omp usage --json` into `Text` unchecked
-(`omp-quota/hooks/register.ts:106`), so it joins once that path is audited.
+the fallback passes with no check in the module.

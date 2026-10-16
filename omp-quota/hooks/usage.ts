@@ -1,3 +1,5 @@
+import { oneLine } from './text.ts'
+
 export type QuotaStatus = 'ok' | 'warning' | 'exhausted'
 
 export type LimitQuota = {
@@ -44,7 +46,7 @@ function statusOf(value: unknown): QuotaStatus | null {
 }
 
 function stringOf(value: unknown): string {
-  return typeof value === 'string' ? value : ''
+  return typeof value === 'string' ? oneLine(value) : ''
 }
 
 function limitOf(raw: unknown): LimitQuota | null {
