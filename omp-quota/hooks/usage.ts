@@ -1,3 +1,5 @@
+import { oneLine } from './text.ts'
+
 export type QuotaStatus = 'ok' | 'warning' | 'exhausted'
 
 export type LimitQuota = {
@@ -47,6 +49,10 @@ function stringOf(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
+function textOf(value: unknown): string {
+  return typeof value === 'string' ? oneLine(value) : ''
+}
+
 function limitOf(raw: unknown): LimitQuota | null {
   const id = field(raw, 'id')
   if (typeof id !== 'string') return null
@@ -54,8 +60,8 @@ function limitOf(raw: unknown): LimitQuota | null {
   const resetsAt = field(window, 'resetsAt')
   return {
     id,
-    label: stringOf(field(raw, 'label')),
-    windowLabel: stringOf(field(window, 'label')),
+    label: textOf(field(raw, 'label')),
+    windowLabel: textOf(field(window, 'label')),
     resetsAt: isFiniteNumber(resetsAt) ? resetsAt : null,
     share: remainingShareOf(field(raw, 'amount')),
     status: statusOf(field(raw, 'status')),
