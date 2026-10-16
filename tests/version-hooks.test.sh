@@ -158,6 +158,48 @@ if printf '%s\n' "$manual_out" | grep -q 'Auto-bumped'; then
 fi
 ok
 
+# A brand-new plugin (no remote) and a manifest-only edit keep 1.0.0.
+fx=$((fx + 1))
+fresh="$TMP/f${fx}"
+git init -b main "$fresh" >/dev/null
+git -C "$fresh" config user.email "dev@example.com"
+git -C "$fresh" config user.name "Dev"
+git -C "$fresh" config core.hooksPath "$HOOKSDIR"
+mkdir -p "$fresh/p/.claude-plugin"
+cat > "$fresh/p/.claude-plugin/plugin.json" <<'EOF'
+{
+  "name": "p",
+  "version": "1.0.0",
+  "description": "d"
+}
+EOF
+printf 'a\n' > "$fresh/p/a.txt"
+git -C "$fresh" add -A
+fresh_out="$(git -C "$fresh" commit -m "feat(p): init" 2>&1)" || die "first plugin commit failed: $fresh_out"
+fresh_json="$(git -C "$fresh" show HEAD:p/.claude-plugin/plugin.json)"
+printf '%s\n' "$fresh_json" | grep -q '"version": "1.0.0"' || die "new plugin version changed"
+if printf '%s\n' "$fresh_out" | grep -q 'Auto-bumped'; then
+  die "new plugin commit printed Auto-bumped"
+fi
+ok
+
+new_fixture "$HOOKSDIR"
+cat > "$FIX_WORK/p/.claude-plugin/plugin.json" <<'EOF'
+{
+  "name": "p",
+  "version": "1.0.0",
+  "description": "e"
+}
+EOF
+git -C "$FIX_WORK" add -A
+desc_out="$(git -C "$FIX_WORK" commit -m "docs(p): describe" 2>&1)" || die "description commit failed: $desc_out"
+desc_json="$(git -C "$FIX_WORK" show HEAD:p/.claude-plugin/plugin.json)"
+printf '%s\n' "$desc_json" | grep -q '"version": "1.0.0"' || die "description-only edit changed the version"
+if printf '%s\n' "$desc_out" | grep -q 'Auto-bumped'; then
+  die "description-only commit printed Auto-bumped"
+fi
+ok
+
 end_head="$(git -C "$ROOT" rev-parse HEAD)"
 end_refs="$(git -C "$ROOT" for-each-ref)"
 [ "$end_head" = "$REAL_HEAD" ] || die "real repo HEAD changed"
