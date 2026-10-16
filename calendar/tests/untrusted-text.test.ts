@@ -90,3 +90,28 @@ describe('CalendarEventLocationClean', () => {
     for (const s of drawn) expect(s.length).toBeLessThanOrEqual(10000)
   })
 })
+
+describe('CalendarLocationUrlAgreement', () => {
+  const eventWith = (fields: object) => ({ events: [{ id: 'x', summary: 'A', start: START, ...fields }] })
+
+  test('a location that is a link with a trailing line break is the event url', () => {
+    const [event] = eventsOf(eventWith({ location: 'https://zoom.example.test/j/9\n' }))!
+    expect(event!.url).toBe('https://zoom.example.test/j/9')
+    expect(event!.location).toBe(event!.url)
+  })
+
+  test('a location that is a link after a leading line break is the event url', () => {
+    expect(eventsOf(eventWith({ location: '\nhttps://x.example.test' }))![0]!.url).toBe('https://x.example.test')
+  })
+
+  test('a hangout link stays the url, and the location is still cleaned', () => {
+    const [event] = eventsOf(eventWith({ location: 'Home\n2F', hangoutLink: 'https://meet.google.com/abc-defg-hij' }))!
+    expect([event!.url, event!.location]).toEqual(['https://meet.google.com/abc-defg-hij', 'Home 2F'])
+  })
+
+  test('a link location draws the link button and no @ segment', async ($, on) => {
+    const drawn = await drawnFor($, on, [{ id: 'e1', summary: 'A', location: 'https://zoom.example.test/j/9\n', start: START }])
+    expect(drawn).toContain('[ 連結 ]')
+    expect(drawn.some((s) => s.trimStart().startsWith('@'))).toBe(false)
+  })
+})

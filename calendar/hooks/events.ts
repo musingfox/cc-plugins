@@ -40,10 +40,9 @@ function timeOf(raw: unknown): CalTime | null {
 }
 
 // A meeting's join link, or a location that is itself a link.
-function urlOf(raw: unknown): string {
+function urlOf(raw: unknown, location: string): string {
   const entryPoints = field(field(raw, 'conferenceData'), 'entryPoints')
   const video = Array.isArray(entryPoints) ? entryPoints.find((p) => field(p, 'entryPointType') === 'video') : undefined
-  const location = stringOf(field(raw, 'location'))
   return stringOf(field(raw, 'hangoutLink')) || stringOf(field(video, 'uri')) || (/^https:\/\//.test(location) ? location : '')
 }
 
@@ -64,13 +63,14 @@ export function eventsOf(payload: unknown): CalEvent[] | null {
   return list.flatMap((raw) => {
     const start = timeOf(field(raw, 'start'))
     if (!start || field(raw, 'status') === 'cancelled') return []
+    const location = oneLine(stringOf(field(raw, 'location')))
     return [
       {
         id: stringOf(field(raw, 'id')),
         title: oneLine(stringOf(field(raw, 'summary'))) || '(no title)',
-        location: oneLine(stringOf(field(raw, 'location'))),
+        location,
         link: stringOf(field(raw, 'htmlLink')),
-        url: urlOf(raw),
+        url: urlOf(raw, location),
         start,
         end: timeOf(field(raw, 'end')),
       },
