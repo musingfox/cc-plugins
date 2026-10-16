@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Pins cf.md's one-line cf-pi-run.sh dispatch templates: each hands the recorded
-# SHARD_TEST_RUNNER to cf-pi-run.sh byte for byte. A template that wraps the
-# runner in single quotes cannot carry a runner that holds one, such as
-# `bash -c '...'`. Each template is run as written against a stub cf-pi-run.sh.
+# Pins the one one-line cf-pi-run.sh dispatch template that remains in cf.md: the
+# foreground --gates-only form, which hands the recorded SHARD_TEST_RUNNER to
+# cf-pi-run.sh byte for byte. A template that wraps the runner in single quotes
+# cannot carry a runner that holds one, such as `bash -c '...'`. The template is
+# run as written against a stub cf-pi-run.sh.
+# The multi-line OMP launch is covered by omp-launch-form.test.sh.
 # NO set -e
 
 : "${CF_TESTS_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
@@ -12,7 +14,8 @@ CF_MD="$CF_TESTS_DIR/../commands/cf.md"
 RUNNER="bash -c 'echo \"it'\\''s green\"'"
 
 templates="$(grep -E '^[[:space:]]*".*cf-pi-run\.sh.*"\)$' "$CF_MD")"
-assert_eq "5" "$(printf '%s\n' "$templates" | grep -c .)" "cf.md has the five one-line cf-pi-run.sh templates"
+n=$(printf '%s\n' "$templates" | grep -c .)
+assert_eq "1" "$n" "cf.md has exactly one one-line cf-pi-run.sh template"
 
 while IFS= read -r line; do
   [ -n "$line" ] || continue

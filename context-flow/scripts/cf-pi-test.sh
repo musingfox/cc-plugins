@@ -17,8 +17,8 @@
 # The command gets /dev/null on stdin and a deadline. A suite that stops to read
 # stdin, or one that spins, used to hang this script forever: nothing downstream
 # bounds it (pi-poll's liveness guards watch the worker, not the gate), so the
-# only backstop was the orchestrator's one-hour Monitor, and a shard sat there
-# looking like progress the whole time.
+# only backstop was the orchestrator's outcome read, which comes only once the
+# shard has finished, and a shard sat there looking like progress the whole time.
 #
 # Env: CF_TEST_DEADLINE_S  seconds before the runner is group-killed (default 1800)
 

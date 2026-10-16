@@ -9,7 +9,7 @@ Operational detail lives in `commands/cf.md` (orchestration) and `docs/pi-implem
 
 ```
 goal → Plan (contracts.json) → cf-pi-shard.sh (file-touch graph → shards)
-     → N × cf-pi-run.sh (background task: worktree → brief → dispatch → poll → gates → outcome.md)   [OMP, opt-in]
+     → one background task launches N × cf-pi-run.sh (worktree → brief → dispatch → poll → gates → outcome.md)   [OMP, opt-in]
      → N × (cf-pi-run.sh --prepare-only → cf:implement agent → cf-pi-run.sh --gates-only → outcome.md)   [default]
      → main collects paths-only outcomes → route:
          all PASS        → integration gate (merge + full suite) → review
@@ -21,11 +21,11 @@ goal → Plan (contracts.json) → cf-pi-shard.sh (file-touch graph → shards)
 | Layer | Owns | Claude-token cost |
 |---|---|---|
 | Main orchestrator | fan-out decisions, reading paths-only `outcome.md`, routing, integration, user-facing summary | bounded reads only |
-| `cf-pi-run.sh` (per shard, background task) | OMP: full worker lifecycle in pure shell; `--prepare-only` / `--gates-only` bracket a `cf:implement` agent; heavy stdout goes to the task's own output file | zero |
+| `cf-pi-run.sh` (per shard) | OMP: full worker lifecycle in pure shell; `--prepare-only` / `--gates-only` bracket a `cf:implement` agent; each shard's stdout goes to its own `run.out` | zero |
 | `cf:implement` agent (default) | implement contracts, per-contract commit, write report/escalate file | the agent's own session; only its bounded reply enters main |
 | OMP worker (opt-in) | same work as `cf:implement` | zero (separate billing) |
 
-For OMP no sub-agent sits between main and a shard: the background-task output split IS the token firewall (its stdout never enters main's context).
+For OMP no sub-agent sits between main and a shard: each shard's stdout goes to its own `run.out`, so it never enters main's context. That output split IS the token firewall.
 
 ## 2. Sharding Model
 
@@ -81,7 +81,7 @@ Never silently waste validated work. Partial-replan is the default; Plan owns th
 
 ## 7. Token Discipline (non-negotiable)
 
-Main must never hold flow artifacts in context. Structural guarantee: each shard is a background task, so its stdout can't leak into main; convention covers the rest.
+Main must never hold flow artifacts in context. Structural guarantee: each shard's stdout goes to its own `run.out`, so it can't leak into main; convention covers the rest.
 
 Never enters main: `contracts.json` bodies, worker reports, JSONL event streams, test logs, briefs, escalate bodies, revision JSON, diffs. All live on disk; main passes **paths**. The one exception is a `cf:implement` agent's reply, which enters main bounded by implement.md's Return Format (`Report written: <path>` plus at most five bullets).
 
@@ -91,9 +91,8 @@ Anti-growth: `dispatch-state.json` holds only the latest round (~1KB); history i
 
 ## 8. Observability
 
-Three layers, all fed by `cf-pi-run.sh` mirroring its latest progress line to `$SHARD_SESSION/progress`:
+Two layers, both fed by `cf-pi-run.sh` mirroring its latest progress line to `$SHARD_SESSION/progress`:
 
-- **Push (primary, OMP rounds only)**: after an OMP fan-out the orchestrator arms one `Monitor` on `cf-pi-watch.sh`, which emits one chat notification per meaningful change (phase transitions, liveness transitions, per-shard final `Status (reason) — cause`) and exits when all outcomes exist — that exit doubles as the round-collection signal. Volatile counters are normalized away so it never spams.
 - **Pull (on demand)**: `cf-pi-status.sh $SESSION` — one line per shard, liveness + current phase; read-only, safe any time.
 - **Post-hoc**: `## Cause` in each outcome (reason-matched, bounded) plus the durable non-PASS bundle under `$PI_RUNS_DIR`. Reporting non-PASS causes to the human is mandatory — never a bare FAIL.
 

@@ -61,9 +61,18 @@ presenting=$(awk '/^### Presenting Results/ {p=1} p {print} /^### Handling the V
 assert_contains "$presenting" 'builder:' "Presenting names each shard's builder from outcome.md"
 assert_eq "0" "$(printf '%s\n' "$presenting" | grep -cF 'Fallback: Claude implement agent' || true)" "Presenting no longer says Fallback: Claude implement agent"
 
-# T-timeout: every background cf-pi-run.sh launch in the handling carries the two-hour timeout.
-launches=$(printf '%s\n' "$handling" | grep -F -B1 'cf-pi-run.sh $SESSION/shards/<id>' | grep -F 'run_in_background' || true)
-assert_contains "$launches" 'timeout: 7200000' "Phase 4 OMP re-run launch carries timeout: 7200000"
+# OmpRelaunchOneTask T2
+handling_step4=$(printf '%s\n' "$handling" | awk '/^  4\. / {p=1} /^  5\. / {exit} p')
+assert_contains "$handling_step4" 'one background Bash' "Phase 4 step 4 re-launches on one background Bash"
+assert_contains "$handling_step4" '§3.6' "Phase 4 step 4 points at the §3.6 single-task form"
+assert_contains "$handling_step4" 'run_in_background: true' "Phase 4 step 4 names run_in_background: true"
+assert_contains "$handling_step4" 'timeout: 7200000' "Phase 4 step 4 names timeout: 7200000"
+assert_eq "0" "$(printf '%s\n' "$handling_step4" | grep -cF 'one background `cf-pi-run.sh` per shard' || true)" \
+  "Phase 4 step 4 no longer names one background cf-pi-run.sh per shard"
+
+# OmpRelaunchOneTask T3 (Phase 4 side)
+assert_eq "0" "$(printf '%s\n' "$handling" | grep -cE '^ *Bash\(run_in_background' || true)" \
+  "Phase 4 handling holds no per-shard Bash(run_in_background example"
 
 # T-status-routing: Phase 4 routes by §3.4's statuses, not by retired Failure Classes.
 phase4_text=$(awk '/^## Phase 4: Review/ {p=1} p {print} /^## Context Compression/ && p {exit}' "$CFMD")

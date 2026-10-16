@@ -2,11 +2,9 @@
 # Phase-3 lifecycle for ONE shard, end-to-end, in pure shell. Two builders share it:
 # the plain form dispatches OMP; --prepare-only / --gates-only bracket a Claude
 # builder (cf:implement) that main dispatches between the two calls.
-# Main launches this as a background task (run_in_background) and only reads the
-# resulting OUTCOME_FILE -- it never sees brief/report/JSONL/test logs directly
-# (the background task's stdout is captured to its own output file, not main's
-# context). Runs to completion synchronously here, so it is exempt from the
-# foreground Bash ceiling.
+# On OMP, main launches one background Bash per wave that starts this script once
+# per shard, with stdout and stderr in the shard's run.out (cf.md §3.6), and reads
+# only OUTCOME_FILE -- it never sees brief/report/JSONL/test logs directly.
 #
 # Usage:   cf-pi-run.sh [--prepare-only|--gates-only] SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER
 #   Every mode first refuses a blank TEST_RUNNER (lifecycle step 0b).
@@ -95,8 +93,8 @@ START_TS=$(date +%s)
 # -------- 0. clear this round's artifacts -------------------------------
 # A re-launched shard (cf.md §3.5) reuses its session directory, and nothing
 # else truncates these. Left behind, last round's copies are read as this
-# round's: outcome.md makes cf-pi-watch.sh report the shard finished before it
-# started (with the stale status), escalate.md short-circuits step 6 into
+# round's: a stale outcome.md makes main read the shard as finished (with the
+# stale status) before it started, escalate.md short-circuits step 6 into
 # NEEDS_REPLAN, and implement-report.md carries gate 1 on stale contract claims.
 # The worktree/branch is NOT touched -- committed work is the resume base.
 # Must stay out of dispatch_and_poll: the gate-3 and gate-1 re-briefs depend on
@@ -374,8 +372,7 @@ record_quota_wall() {
 }
 
 # Step 0 removed the previous round's outcome, so from here on an abort with no
-# outcome.md leaves cf-pi-watch.sh waiting on a file that will never appear (its
-# all_done tests -s outcome.md) and main with nothing to route. Everything below
+# outcome.md leaves main with nothing to route for that shard. Everything below
 # runs under set -e, and the worktree setup + env re-source can both die without
 # reaching a write_outcome, so guarantee an outcome on every exit path.
 # An intentional no-outcome exit (PREPARED, REBRIEF) sets NO_OUTCOME_EXIT first;

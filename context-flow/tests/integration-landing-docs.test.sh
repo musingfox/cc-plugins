@@ -71,14 +71,15 @@ assert_ge1 "$(grep -cF 'integration_test_stalled' \
     "$(cd "$CF_TESTS_DIR/.." && pwd)/scripts/cf-pi-integrate.sh" || true)" \
   "cf-pi-integrate.sh emits reason integration_test_stalled"
 
-# T7 — do not call the suite runner from this file; Phase 4 stays byte-identical
+# T7 — do not call the suite runner from this file. The Phase 4 pin tracks the Phase 4 text
+# OmpRelaunchOneTask left; re-pin it on any later Phase 4 edit.
 if bash "$CF_TESTS_DIR/review-two-axis.test.sh"; then
   assert_eq "ok" "ok" "review-two-axis.test.sh still ok"
 else
   assert_eq "ok" "fail" "review-two-axis.test.sh still ok"
 fi
 got=$(phase4 | shasum -a 256 | awk '{print $1}')
-assert_eq "71eb58f020ded09d90c1b2d2e78c4307abc17f7cd6fd4ab73b6237a75b0f462a" "$got" \
+assert_eq "69e92850eb72e138c8b31f0378f7a5581c8a69b2e3903c413d1e34cc3ee71ef7" "$got" \
   "Phase 4 section is byte-identical"
 assert_eq "0" "$(phase4 | grep -cF 're-verifies on the NOOP path' || true)" \
   "Phase 4 TESTFAIL row does not claim a NOOP re-verification"

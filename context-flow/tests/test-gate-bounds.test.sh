@@ -2,7 +2,8 @@
 # The gate-3 test runner is bounded: stdin is /dev/null and the command has a
 # deadline. Without both, a suite that reads stdin or spins hangs cf-pi-run.sh
 # forever — nothing downstream bounds it, so the only backstop was the
-# orchestrator's one-hour Monitor while the shard looked like it was working.
+# orchestrator's outcome read, which comes only once the shard has finished,
+# while the shard looked like it was working.
 #
 #   - a command that reads stdin gets EOF instead of blocking
 #   - a command that outruns CF_TEST_DEADLINE_S is killed, reported as
