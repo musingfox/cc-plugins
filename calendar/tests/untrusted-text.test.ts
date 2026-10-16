@@ -57,3 +57,36 @@ describe('CalendarEventTitleClean', () => {
     for (const s of drawn) expect(s.length).toBeLessThanOrEqual(10000)
   })
 })
+
+describe('CalendarEventLocationClean', () => {
+  const eventWith = (fields: object) => ({ events: [{ id: 'x', summary: 'A', start: START, ...fields }] })
+
+  test('a location with a line break reads as one line', () => {
+    expect(eventsOf(eventWith({ location: 'Room 1\n2F' }))![0]!.location).toBe('Room 1 2F')
+  })
+
+  test('a location with nothing drawable, or no string location, reads as empty', () => {
+    expect(eventsOf(eventWith({ location: '\u0007' }))![0]!.location).toBe('')
+    expect(eventsOf(eventWith({ location: 42 }))![0]!.location).toBe('')
+    expect(eventsOf(eventWith({}))![0]!.location).toBe('')
+  })
+
+  test('a location with a line break draws as one @ segment', async ($, on) => {
+    const drawn = await drawnFor($, on, [{ id: 'e1', summary: 'A', location: 'Room 1\n2F', start: START }])
+    expect(drawn).toContain('  @Room 1 2F')
+    for (const s of drawn) expect(s).not.toContain('\n')
+  })
+
+  test('a location with nothing drawable draws no @ segment', async ($, on) => {
+    const drawn = await drawnFor($, on, [{ id: 'e1', summary: 'A', location: '\u0007', start: START }])
+    expect(drawn).toContain('A')
+    expect(drawn.some((s) => s.trimStart().startsWith('@'))).toBe(false)
+  })
+
+  test('a long location is cut to a 1000-character @ segment', async ($, on) => {
+    const drawn = await drawnFor($, on, [{ id: 'e1', summary: 'A', location: 'L'.repeat(11000) + '\r', start: START }])
+    const segment = drawn.map((s) => s.trimStart()).find((s) => s.startsWith('@'))
+    expect(segment).toHaveLength(1001)
+    for (const s of drawn) expect(s.length).toBeLessThanOrEqual(10000)
+  })
+})

@@ -68,7 +68,7 @@ export function eventsOf(payload: unknown): CalEvent[] | null {
       {
         id: stringOf(field(raw, 'id')),
         title: oneLine(stringOf(field(raw, 'summary'))) || '(no title)',
-        location: stringOf(field(raw, 'location')),
+        location: oneLine(stringOf(field(raw, 'location'))),
         link: stringOf(field(raw, 'htmlLink')),
         url: urlOf(raw),
         start,
