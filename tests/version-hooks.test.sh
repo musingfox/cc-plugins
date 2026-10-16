@@ -94,6 +94,34 @@ global="$(git config --global --list 2>/dev/null || true)"
 [ -z "$global" ] || die "git config --global --list was not empty"
 ok
 
+# A second content commit before any push must not bump again, and amending the
+# bump commit with more staged content must keep 1.0.1.
+new_fixture "$HOOKSDIR"
+printf 'b\n' >> "$FIX_WORK/p/a.txt"
+git -C "$FIX_WORK" add -A
+git -C "$FIX_WORK" commit -m "feat(p): x" >/dev/null || die "first content commit failed"
+printf 'c\n' >> "$FIX_WORK/p/a.txt"
+git -C "$FIX_WORK" add -A
+second_out="$(git -C "$FIX_WORK" commit -m "feat(p): y" 2>&1)" || die "second content commit failed: $second_out"
+if printf '%s\n' "$second_out" | grep -q 'Auto-bumped'; then
+  die "second unpushed content commit printed Auto-bumped"
+fi
+ok
+second_json="$(git -C "$FIX_WORK" show HEAD:p/.claude-plugin/plugin.json)"
+printf '%s\n' "$second_json" | grep -q '"version": "1.0.1"' || die "second commit version is not 1.0.1"
+ok
+
+new_fixture "$HOOKSDIR"
+printf 'b\n' >> "$FIX_WORK/p/a.txt"
+git -C "$FIX_WORK" add -A
+git -C "$FIX_WORK" commit -m "feat(p): x" >/dev/null || die "bump commit failed"
+printf 'c\n' >> "$FIX_WORK/p/a.txt"
+git -C "$FIX_WORK" add -A
+git -C "$FIX_WORK" commit --amend --no-edit >/dev/null || die "amend failed"
+amend_json="$(git -C "$FIX_WORK" show HEAD:p/.claude-plugin/plugin.json)"
+printf '%s\n' "$amend_json" | grep -q '"version": "1.0.1"' || die "amended bump commit version is not 1.0.1"
+ok
+
 end_head="$(git -C "$ROOT" rev-parse HEAD)"
 end_refs="$(git -C "$ROOT" for-each-ref)"
 [ "$end_head" = "$REAL_HEAD" ] || die "real repo HEAD changed"
