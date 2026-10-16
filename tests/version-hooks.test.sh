@@ -122,6 +122,22 @@ amend_json="$(git -C "$FIX_WORK" show HEAD:p/.claude-plugin/plugin.json)"
 printf '%s\n' "$amend_json" | grep -q '"version": "1.0.1"' || die "amended bump commit version is not 1.0.1"
 ok
 
+# A content commit on a pushed plugin bumps the patch version inside that commit.
+new_fixture "$HOOKSDIR"
+printf 'b\n' >> "$FIX_WORK/p/a.txt"
+git -C "$FIX_WORK" add -A
+bump_out="$(git -C "$FIX_WORK" commit -m "feat(p): x" 2>&1)" || die "content commit failed: $bump_out"
+printf '%s\n' "$bump_out" | grep -q 'Auto-bumped p version: 1.0.0 -> 1.0.1' || die "missing auto-bump line"
+ok
+bump_json="$(git -C "$FIX_WORK" show HEAD:p/.claude-plugin/plugin.json)"
+printf '%s\n' "$bump_json" | grep -q '"version": "1.0.1"' || die "HEAD version is not 1.0.1"
+wt_json="$(cat "$FIX_WORK/p/.claude-plugin/plugin.json")"
+printf '%s\n' "$wt_json" | grep -q '"version": "1.0.1"' || die "work tree version is not 1.0.1"
+ok
+bump_por="$(git -C "$FIX_WORK" status --porcelain)"
+[ -z "$bump_por" ] || die "work tree dirty after bump: $bump_por"
+ok
+
 end_head="$(git -C "$ROOT" rev-parse HEAD)"
 end_refs="$(git -C "$ROOT" for-each-ref)"
 [ "$end_head" = "$REAL_HEAD" ] || die "real repo HEAD changed"
