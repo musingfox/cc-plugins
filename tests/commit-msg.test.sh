@@ -85,5 +85,18 @@ for SUBJ in "fixup!x" "Merge" "merge x"; do
   note check_lines 1 "$SUBJ"
 done
 
+# Malformed subjects: exit 1 and the hook names what it saw.
+for SUBJ in \
+  "spiral: x" \
+  "feat: " \
+  "feat:x" \
+  "Feat: x" \
+  "wip: x" \
+  "feat(Spiral): x" \
+  "feat(): x"
+do
+  note check_reject "$HOOK" "$SUBJ"
+done
+
 echo "--- commit-msg: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && [ "$PASS" -gt 0 ]
