@@ -217,6 +217,23 @@ ok
 [ "$(git -C "$FIX_BARE" rev-parse main)" = "$(git -C "$FIX_WORK" rev-parse HEAD)" ] || die "bare main does not match work HEAD after push"
 ok
 
+# A push of plugin content without a version change is refused and the remote stays put.
+new_fixture "$HOOKSDIR"
+refuse_before="$(git -C "$FIX_BARE" rev-parse main)"
+printf 'b\n' >> "$FIX_WORK/p/a.txt"
+git -C "$FIX_WORK" add -A
+git -C "$FIX_WORK" commit --no-verify -m "feat(p): x" >/dev/null || die "no-verify content commit failed"
+refuse_err="$TMP/push-refuse.err"
+git -C "$FIX_WORK" push origin main >"$TMP/push-refuse.out" 2>"$refuse_err"
+refuse_ec=$?
+[ "$refuse_ec" -ne 0 ] || die "unbumped push exited 0"
+ok
+refuse_line='pre-push: p changed in refs/heads/main but p/.claude-plugin/plugin.json version is still 1.0.0'
+grep -F -q "$refuse_line" "$refuse_err" || die "refused push stderr missing hook line"
+ok
+[ "$(git -C "$FIX_BARE" rev-parse main)" = "$refuse_before" ] || die "bare main moved after a refused push"
+ok
+
 end_head="$(git -C "$ROOT" rev-parse HEAD)"
 end_refs="$(git -C "$ROOT" for-each-ref)"
 [ "$end_head" = "$REAL_HEAD" ] || die "real repo HEAD changed"
