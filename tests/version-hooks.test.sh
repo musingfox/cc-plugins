@@ -200,6 +200,23 @@ if printf '%s\n' "$desc_out" | grep -q 'Auto-bumped'; then
 fi
 ok
 
+# A push whose content change also carries a version change is accepted.
+new_fixture "$HOOKSDIR"
+printf 'b\n' >> "$FIX_WORK/p/a.txt"
+git -C "$FIX_WORK" add -A
+git -C "$FIX_WORK" commit -m "feat(p): x" >/dev/null 2>&1 || die "bump commit before push failed"
+allow_err="$TMP/push-allow.err"
+git -C "$FIX_WORK" push origin main >"$TMP/push-allow.out" 2>"$allow_err"
+allow_ec=$?
+[ "$allow_ec" -eq 0 ] || die "bumped push exited $allow_ec"
+ok
+if grep -q '^pre-push:' "$allow_err"; then
+  die "bumped push stderr contains a pre-push: line"
+fi
+ok
+[ "$(git -C "$FIX_BARE" rev-parse main)" = "$(git -C "$FIX_WORK" rev-parse HEAD)" ] || die "bare main does not match work HEAD after push"
+ok
+
 end_head="$(git -C "$ROOT" rev-parse HEAD)"
 end_refs="$(git -C "$ROOT" for-each-ref)"
 [ "$end_head" = "$REAL_HEAD" ] || die "real repo HEAD changed"
