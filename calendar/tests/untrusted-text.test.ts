@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { eventsOf } from '../hooks/events.ts'
+import { calendarsOf, eventsOf, wantedOf } from '../hooks/events.ts'
 import { answer, BAND, SESSION, world } from './fixtures/world.ts'
 
 const START = { dateTime: '2026-09-25T14:00:00+08:00' }
@@ -113,5 +113,70 @@ describe('CalendarLocationUrlAgreement', () => {
     const drawn = await drawnFor($, on, [{ id: 'e1', summary: 'A', location: 'https://zoom.example.test/j/9\n', start: START }])
     expect(drawn).toContain('[ 連結 ]')
     expect(drawn.some((s) => s.trimStart().startsWith('@'))).toBe(false)
+  })
+})
+
+describe('CalendarNameClean', () => {
+  test('a calendar name with a line break reads as one line', () => {
+    expect(calendarsOf({ calendars: [{ id: 'w@x.test', summary: 'Work\nCal' }] })).toEqual([{ id: 'w@x.test', name: 'Work Cal' }])
+  })
+
+  test('a calendar name with nothing drawable falls back to the calendar id', () => {
+    expect(calendarsOf({ calendars: [{ id: 'w@x.test', summary: '\u0007\n' }] })).toEqual([{ id: 'w@x.test', name: 'w@x.test' }])
+  })
+
+  test('an excluded calendar is still left out by id after its name was cleaned', () => {
+    const calendars = calendarsOf({ calendars: [{ id: 'w@x.test', summary: 'Work\nCal' }] })!
+    expect(wantedOf(calendars, ['w@x.test'])).toEqual([])
+  })
+
+  test('the notice names a calendar with a line break as one line', async ($, on) => {
+    const w = world(on, {
+      store: { band: true },
+      mcp: ($: any, e: any) =>
+        e.tool === 'list_calendars'
+          ? { value: answer({ calendars: [{ id: 'w@x.test', summary: 'Work\nCal' }] }) }
+          : { value: { content: [{ type: 'text', text: 'boom' }], isError: true } },
+    })
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    const drawn = stringsIn(await $.ui.render(BAND))
+    expect(drawn).toContain('Unavailable: could not read Work Cal')
+    for (const s of drawn) expect(s).not.toContain('\n')
+  })
+
+  test('a calendar with nothing drawable in its name draws a clean id in the notice', async ($, on) => {
+    const w = world(on, {
+      store: { band: true },
+      mcp: ($: any, e: any) =>
+        e.tool === 'list_calendars'
+          ? { value: answer({ calendars: [{ id: 'cal\nid\r', summary: '\u0007\n' }] }) }
+          : { value: { content: [{ type: 'text', text: 'boom' }], isError: true } },
+    })
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    const drawn = stringsIn(await $.ui.render(BAND))
+    expect(drawn).toContain('Unavailable: could not read cal id')
+    for (const s of drawn) {
+      expect(s).not.toMatch(/[\n\r]/)
+      expect(s).not.toMatch(CONTROL_CHARS)
+    }
+  })
+
+  test('the notice stays within 10000 characters when eleven long calendar names fail', async ($, on) => {
+    const calendars = Array.from({ length: 11 }, (_, i) => ({ id: `c${i}@x.test`, summary: 'N'.repeat(1000) }))
+    const w = world(on, {
+      store: { band: true },
+      mcp: ($: any, e: any) =>
+        e.tool === 'list_calendars'
+          ? { value: answer({ calendars }) }
+          : { value: { content: [{ type: 'text', text: 'boom' }], isError: true } },
+    })
+    await $.session.start(SESSION)
+    await w.clock.settle()
+    const drawn = stringsIn(await $.ui.render(BAND))
+    const notice = drawn.find((s) => s.startsWith('Unavailable: could not read'))
+    expect(notice).toBeDefined()
+    expect(notice!.length).toBeLessThanOrEqual(10000)
   })
 })

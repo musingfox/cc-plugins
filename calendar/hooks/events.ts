@@ -51,7 +51,7 @@ export function calendarsOf(payload: unknown): Calendar[] | null {
   if (!Array.isArray(list)) return null
   return list.flatMap((c) => {
     const id = stringOf(field(c, 'id'))
-    return id ? [{ id, name: stringOf(field(c, 'summary')) || id }] : []
+    return id ? [{ id, name: oneLine(stringOf(field(c, 'summary'))) || oneLine(id) }] : []
   })
 }
 
