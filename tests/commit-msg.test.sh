@@ -4,6 +4,9 @@
 
 set -uo pipefail
 
+# A caller's GIT_* must not steer this test or rewrite that repo's config.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR
+
 PASS=0; FAIL=0
 ok()  { PASS=$((PASS+1)); echo "ok   - $1"; }
 bad() { FAIL=$((FAIL+1)); echo "FAIL - $1"; }
@@ -13,19 +16,6 @@ HOOK="$REPO/.githooks/commit-msg"
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-# PATH may lead with a git shim that refuses to run unless PI_REAL_GIT is set.
-# The runner scrubs that variable, so use the first real git on PATH.
-GIT=""
-IFS=: read -r -a _git_dirs <<<"$PATH"
-for _d in "${_git_dirs[@]}"; do
-  [ -x "$_d/git" ] || continue
-  grep -q PI_REAL_GIT "$_d/git" 2>/dev/null && continue
-  GIT="$_d/git"
-  break
-done
-[ -n "$GIT" ] || { echo "FAIL - git not found"; exit 1; }
-"$GIT" -C "$TMP" init -q
-"$GIT" -C "$TMP" config core.hooksPath "$REPO/.githooks"
 
 RC=0
 run_hook() {
@@ -66,6 +56,18 @@ done
 SUBJ="feat(spiral): add x"; note check_accept "$HOOK" "$SUBJ"
 SUBJ="fix!: x"; note check_accept "$HOOK" "$SUBJ"
 SUBJ="feat(a/b.c_d-1)!: x"; note check_accept "$HOOK" "$SUBJ"
+
+# Line 1 decides; the body cannot save or sink the subject.
+check_lines() {
+  local expect=$1
+  shift
+  run_hook "$HOOK" "$@"
+  [ "$RC" -eq "$expect" ]
+}
+SUBJ="feat: x then wip: body"
+note check_lines 0 "feat: x" "wip: body"
+SUBJ="wip: x then feat: body"
+note check_lines 1 "wip: x" "feat: body"
 
 echo "--- commit-msg: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && [ "$PASS" -gt 0 ]
