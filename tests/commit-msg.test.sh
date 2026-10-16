@@ -69,5 +69,21 @@ note check_lines 0 "feat: x" "wip: body"
 SUBJ="wip: x then feat: body"
 note check_lines 1 "wip: x" "feat: body"
 
+# Subjects git and the fixup workflow write themselves, exact prefix only.
+for SUBJ in \
+  "fixup! feat: x" \
+  "squash! x" \
+  "Merge branch 'x'" \
+  "Revert \"feat: x\"" \
+  "# comment-only"
+do
+  note check_accept "$HOOK" "$SUBJ"
+done
+SUBJ="empty message"
+note check_lines 0
+for SUBJ in "fixup!x" "Merge" "merge x"; do
+  note check_lines 1 "$SUBJ"
+done
+
 echo "--- commit-msg: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && [ "$PASS" -gt 0 ]
