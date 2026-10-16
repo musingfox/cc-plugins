@@ -2,6 +2,10 @@
 # Self-checks for .githooks/pre-commit and pre-push. The hooks themselves are not modified.
 set -uo pipefail
 
+# A caller inside a git hook exports these; they must not steer the fixture repos.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
+  GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR
+
 export GIT_CONFIG_GLOBAL=/dev/null
 export GIT_CONFIG_NOSYSTEM=1
 
@@ -28,13 +32,23 @@ hash -r 2>/dev/null || true
 REAL_HEAD="$(git -C "$ROOT" rev-parse HEAD)"
 REAL_REFS="$(git -C "$ROOT" for-each-ref)"
 
-checks=0
+PASS=0
+FAIL=0
 TMP="$(mktemp -d)"
-fx=0
 
 die() {
   printf 'FAIL: %s\n' "$*" >&2
   exit 1
+}
+
+ok() {
+  PASS=$((PASS + 1))
+  printf 'ok   - %s\n' "$1"
+}
+
+bad() {
+  FAIL=$((FAIL + 1))
+  printf 'FAIL - %s\n' "$1"
 }
 
 on_exit() {
@@ -46,22 +60,23 @@ on_exit() {
     printf 'FAIL: real repo HEAD or for-each-ref changed\n' >&2
     rc=1
   fi
+  if [ $((PASS + FAIL)) -eq 0 ]; then
+    printf 'FAIL: no checks ran\n' >&2
+    rc=1
+  fi
   rm -rf "$TMP"
   exit "$rc"
 }
 trap on_exit EXIT
 
-ok() {
-  checks=$((checks + 1))
-}
-
 # new_fixture <hooks-dir>
 # Sets FIX_WORK and FIX_BARE: bare origin plus a main work tree with plugin p at 1.0.0, pushed.
 new_fixture() {
   local hooks="$1"
-  fx=$((fx + 1))
-  FIX_BARE="$TMP/f${fx}.git"
-  FIX_WORK="$TMP/f${fx}"
+  local slot
+  slot="$(mktemp -d "$TMP/fix.XXXXXX")"
+  FIX_BARE="$slot/bare.git"
+  FIX_WORK="$slot/work"
   git init --bare -b main "$FIX_BARE" >/dev/null
   git init -b main "$FIX_WORK" >/dev/null
   git -C "$FIX_WORK" config user.email "dev@example.com"
@@ -82,61 +97,128 @@ EOF
   git -C "$FIX_WORK" push -u origin main >/dev/null 2>&1 || die "fixture initial push failed"
 }
 
+# scenario_bump <hooks-dir>
+# One content commit on a pushed 1.0.0 plugin. Echoes single-line observations.
+scenario_bump() {
+  local hooks="$1"
+  local out json ver wt bumped por
+  new_fixture "$hooks"
+  printf 'b\n' >> "$FIX_WORK/p/a.txt"
+  git -C "$FIX_WORK" add -A
+  out="$(git -C "$FIX_WORK" commit -m "feat(p): x" 2>&1)" || die "content commit failed: $out"
+  json="$(git -C "$FIX_WORK" show HEAD:p/.claude-plugin/plugin.json)"
+  ver="$(printf '%s\n' "$json" | sed -n 's/.*"version": *"\([^"]*\)".*/\1/p')"
+  wt="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$FIX_WORK/p/.claude-plugin/plugin.json")"
+  bumped=0
+  printf '%s\n' "$out" | grep -q 'Auto-bumped p version: 1.0.0 -> 1.0.1' && bumped=1
+  por="$(git -C "$FIX_WORK" status --porcelain)"
+  printf 'version=%s\n' "$ver"
+  printf 'wt_version=%s\n' "$wt"
+  printf 'bump_line=%s\n' "$bumped"
+  if [ -z "$por" ]; then
+    printf 'porcelain_empty=1\n'
+  else
+    printf 'porcelain_empty=0\n'
+  fi
+}
+
+# scenario_refuse <hooks-dir>
+# Content commit with --no-verify, then push. Echoes the push exit code.
+scenario_refuse() {
+  local hooks="$1"
+  local before err ec same
+  new_fixture "$hooks"
+  before="$(git -C "$FIX_BARE" rev-parse main)"
+  printf 'b\n' >> "$FIX_WORK/p/a.txt"
+  git -C "$FIX_WORK" add -A
+  git -C "$FIX_WORK" commit --no-verify -m "feat(p): x" >/dev/null || die "no-verify content commit failed"
+  err="$(mktemp "$TMP/push-refuse.XXXXXX")"
+  git -C "$FIX_WORK" push origin main >"$TMP/push-refuse.out" 2>"$err"
+  ec=$?
+  same=0
+  [ "$(git -C "$FIX_BARE" rev-parse main)" = "$before" ] && same=1
+  printf 'exit=%s\n' "$ec"
+  printf 'remote_same=%s\n' "$same"
+  if grep -F -q 'pre-push: p changed in refs/heads/main but p/.claude-plugin/plugin.json version is still 1.0.0' "$err"; then
+    printf 'hook_line=1\n'
+  else
+    printf 'hook_line=0\n'
+  fi
+}
+
 new_fixture "$HOOKSDIR"
 got="$(git -C "$FIX_WORK" config --get core.hooksPath)"
-[ "$got" = "$HOOKSDIR" ] || die "core.hooksPath is '$got', want '$HOOKSDIR'"
-ok
+if [ "$got" = "$HOOKSDIR" ]; then
+  ok "fixture core.hooksPath is the repo .githooks"
+else
+  bad "fixture core.hooksPath is the repo .githooks"
+fi
 
-[ -f "$HOOKSDIR/pre-commit" ] && [ -f "$HOOKSDIR/pre-push" ] || die "repo .githooks is missing pre-commit or pre-push"
-ok
+if [ -f "$HOOKSDIR/pre-commit" ] && [ -f "$HOOKSDIR/pre-push" ]; then
+  ok "repo .githooks has pre-commit and pre-push"
+else
+  bad "repo .githooks has pre-commit and pre-push"
+fi
 
 global="$(git config --global --list 2>/dev/null || true)"
-[ -z "$global" ] || die "git config --global --list was not empty"
-ok
+if [ -z "$global" ]; then
+  ok "git config --global --list is empty"
+else
+  bad "git config --global --list is empty"
+fi
 
 # A second content commit before any push must not bump again, and amending the
 # bump commit with more staged content must keep 1.0.1.
 new_fixture "$HOOKSDIR"
 printf 'b\n' >> "$FIX_WORK/p/a.txt"
 git -C "$FIX_WORK" add -A
-git -C "$FIX_WORK" commit -m "feat(p): x" >/dev/null || die "first content commit failed"
+git -C "$FIX_WORK" commit -m "feat(p): x" >/dev/null 2>&1 || die "first content commit failed"
 printf 'c\n' >> "$FIX_WORK/p/a.txt"
 git -C "$FIX_WORK" add -A
 second_out="$(git -C "$FIX_WORK" commit -m "feat(p): y" 2>&1)" || die "second content commit failed: $second_out"
 if printf '%s\n' "$second_out" | grep -q 'Auto-bumped'; then
-  die "second unpushed content commit printed Auto-bumped"
+  bad "second unpushed content commit has no Auto-bumped line"
+else
+  ok "second unpushed content commit has no Auto-bumped line"
 fi
-ok
 second_json="$(git -C "$FIX_WORK" show HEAD:p/.claude-plugin/plugin.json)"
-printf '%s\n' "$second_json" | grep -q '"version": "1.0.1"' || die "second commit version is not 1.0.1"
-ok
+if printf '%s\n' "$second_json" | grep -q '"version": "1.0.1"'; then
+  ok "second unpushed commit keeps version 1.0.1"
+else
+  bad "second unpushed commit keeps version 1.0.1"
+fi
 
 new_fixture "$HOOKSDIR"
 printf 'b\n' >> "$FIX_WORK/p/a.txt"
 git -C "$FIX_WORK" add -A
-git -C "$FIX_WORK" commit -m "feat(p): x" >/dev/null || die "bump commit failed"
+git -C "$FIX_WORK" commit -m "feat(p): x" >/dev/null 2>&1 || die "bump commit failed"
 printf 'c\n' >> "$FIX_WORK/p/a.txt"
 git -C "$FIX_WORK" add -A
 git -C "$FIX_WORK" commit --amend --no-edit >/dev/null || die "amend failed"
 amend_json="$(git -C "$FIX_WORK" show HEAD:p/.claude-plugin/plugin.json)"
-printf '%s\n' "$amend_json" | grep -q '"version": "1.0.1"' || die "amended bump commit version is not 1.0.1"
-ok
+if printf '%s\n' "$amend_json" | grep -q '"version": "1.0.1"'; then
+  ok "amended bump commit keeps version 1.0.1"
+else
+  bad "amended bump commit keeps version 1.0.1"
+fi
 
 # A content commit on a pushed plugin bumps the patch version inside that commit.
-new_fixture "$HOOKSDIR"
-printf 'b\n' >> "$FIX_WORK/p/a.txt"
-git -C "$FIX_WORK" add -A
-bump_out="$(git -C "$FIX_WORK" commit -m "feat(p): x" 2>&1)" || die "content commit failed: $bump_out"
-printf '%s\n' "$bump_out" | grep -q 'Auto-bumped p version: 1.0.0 -> 1.0.1' || die "missing auto-bump line"
-ok
-bump_json="$(git -C "$FIX_WORK" show HEAD:p/.claude-plugin/plugin.json)"
-printf '%s\n' "$bump_json" | grep -q '"version": "1.0.1"' || die "HEAD version is not 1.0.1"
-wt_json="$(cat "$FIX_WORK/p/.claude-plugin/plugin.json")"
-printf '%s\n' "$wt_json" | grep -q '"version": "1.0.1"' || die "work tree version is not 1.0.1"
-ok
-bump_por="$(git -C "$FIX_WORK" status --porcelain)"
-[ -z "$bump_por" ] || die "work tree dirty after bump: $bump_por"
-ok
+bump_obs="$(scenario_bump "$HOOKSDIR")" || die "bump scenario failed"
+if printf '%s\n' "$bump_obs" | grep -q '^bump_line=1$'; then
+  ok "content commit prints Auto-bumped p version: 1.0.0 -> 1.0.1"
+else
+  bad "content commit prints Auto-bumped p version: 1.0.0 -> 1.0.1"
+fi
+if printf '%s\n' "$bump_obs" | grep -q '^version=1.0.1$' && printf '%s\n' "$bump_obs" | grep -q '^wt_version=1.0.1$'; then
+  ok "content commit stores version 1.0.1 in HEAD and the work tree"
+else
+  bad "content commit stores version 1.0.1 in HEAD and the work tree"
+fi
+if printf '%s\n' "$bump_obs" | grep -q '^porcelain_empty=1$'; then
+  ok "content commit leaves a clean work tree"
+else
+  bad "content commit leaves a clean work tree"
+fi
 
 # A version the author already changed is left alone.
 new_fixture "$HOOKSDIR"
@@ -151,16 +233,19 @@ EOF
 git -C "$FIX_WORK" add -A
 manual_out="$(git -C "$FIX_WORK" commit -m "feat(p): x" 2>&1)" || die "manual bump commit failed: $manual_out"
 manual_json="$(git -C "$FIX_WORK" show HEAD:p/.claude-plugin/plugin.json)"
-printf '%s\n' "$manual_json" | grep -q '"version": "1.1.0"' || die "manual version was not kept"
-ok
-if printf '%s\n' "$manual_out" | grep -q 'Auto-bumped'; then
-  die "manual version commit printed Auto-bumped"
+if printf '%s\n' "$manual_json" | grep -q '"version": "1.1.0"'; then
+  ok "hand-edited version 1.1.0 is what HEAD stores"
+else
+  bad "hand-edited version 1.1.0 is what HEAD stores"
 fi
-ok
+if printf '%s\n' "$manual_out" | grep -q 'Auto-bumped'; then
+  bad "hand-edited version commit has no Auto-bumped line"
+else
+  ok "hand-edited version commit has no Auto-bumped line"
+fi
 
 # A brand-new plugin (no remote) and a manifest-only edit keep 1.0.0.
-fx=$((fx + 1))
-fresh="$TMP/f${fx}"
+fresh="$(mktemp -d "$TMP/fresh.XXXXXX")"
 git init -b main "$fresh" >/dev/null
 git -C "$fresh" config user.email "dev@example.com"
 git -C "$fresh" config user.name "Dev"
@@ -177,11 +262,11 @@ printf 'a\n' > "$fresh/p/a.txt"
 git -C "$fresh" add -A
 fresh_out="$(git -C "$fresh" commit -m "feat(p): init" 2>&1)" || die "first plugin commit failed: $fresh_out"
 fresh_json="$(git -C "$fresh" show HEAD:p/.claude-plugin/plugin.json)"
-printf '%s\n' "$fresh_json" | grep -q '"version": "1.0.0"' || die "new plugin version changed"
-if printf '%s\n' "$fresh_out" | grep -q 'Auto-bumped'; then
-  die "new plugin commit printed Auto-bumped"
+if printf '%s\n' "$fresh_json" | grep -q '"version": "1.0.0"' && ! printf '%s\n' "$fresh_out" | grep -q 'Auto-bumped'; then
+  ok "first commit of a new plugin keeps 1.0.0 without Auto-bumped"
+else
+  bad "first commit of a new plugin keeps 1.0.0 without Auto-bumped"
 fi
-ok
 
 new_fixture "$HOOKSDIR"
 cat > "$FIX_WORK/p/.claude-plugin/plugin.json" <<'EOF'
@@ -194,11 +279,11 @@ EOF
 git -C "$FIX_WORK" add -A
 desc_out="$(git -C "$FIX_WORK" commit -m "docs(p): describe" 2>&1)" || die "description commit failed: $desc_out"
 desc_json="$(git -C "$FIX_WORK" show HEAD:p/.claude-plugin/plugin.json)"
-printf '%s\n' "$desc_json" | grep -q '"version": "1.0.0"' || die "description-only edit changed the version"
-if printf '%s\n' "$desc_out" | grep -q 'Auto-bumped'; then
-  die "description-only commit printed Auto-bumped"
+if printf '%s\n' "$desc_json" | grep -q '"version": "1.0.0"' && ! printf '%s\n' "$desc_out" | grep -q 'Auto-bumped'; then
+  ok "description-only edit keeps 1.0.0 without Auto-bumped"
+else
+  bad "description-only edit keeps 1.0.0 without Auto-bumped"
 fi
-ok
 
 # A push whose content change also carries a version change is accepted.
 new_fixture "$HOOKSDIR"
@@ -208,34 +293,75 @@ git -C "$FIX_WORK" commit -m "feat(p): x" >/dev/null 2>&1 || die "bump commit be
 allow_err="$TMP/push-allow.err"
 git -C "$FIX_WORK" push origin main >"$TMP/push-allow.out" 2>"$allow_err"
 allow_ec=$?
-[ "$allow_ec" -eq 0 ] || die "bumped push exited $allow_ec"
-ok
-if grep -q '^pre-push:' "$allow_err"; then
-  die "bumped push stderr contains a pre-push: line"
+if [ "$allow_ec" -eq 0 ]; then
+  ok "push after the auto-bump exits 0"
+else
+  bad "push after the auto-bump exits 0"
 fi
-ok
-[ "$(git -C "$FIX_BARE" rev-parse main)" = "$(git -C "$FIX_WORK" rev-parse HEAD)" ] || die "bare main does not match work HEAD after push"
-ok
+if grep -q '^pre-push:' "$allow_err"; then
+  bad "push after the auto-bump has no pre-push: line"
+else
+  ok "push after the auto-bump has no pre-push: line"
+fi
+if [ "$(git -C "$FIX_BARE" rev-parse main)" = "$(git -C "$FIX_WORK" rev-parse HEAD)" ]; then
+  ok "bare main matches work HEAD after the bumped push"
+else
+  bad "bare main matches work HEAD after the bumped push"
+fi
 
 # A push of plugin content without a version change is refused and the remote stays put.
-new_fixture "$HOOKSDIR"
-refuse_before="$(git -C "$FIX_BARE" rev-parse main)"
-printf 'b\n' >> "$FIX_WORK/p/a.txt"
-git -C "$FIX_WORK" add -A
-git -C "$FIX_WORK" commit --no-verify -m "feat(p): x" >/dev/null || die "no-verify content commit failed"
-refuse_err="$TMP/push-refuse.err"
-git -C "$FIX_WORK" push origin main >"$TMP/push-refuse.out" 2>"$refuse_err"
-refuse_ec=$?
-[ "$refuse_ec" -ne 0 ] || die "unbumped push exited 0"
-ok
-refuse_line='pre-push: p changed in refs/heads/main but p/.claude-plugin/plugin.json version is still 1.0.0'
-grep -F -q "$refuse_line" "$refuse_err" || die "refused push stderr missing hook line"
-ok
-[ "$(git -C "$FIX_BARE" rev-parse main)" = "$refuse_before" ] || die "bare main moved after a refused push"
-ok
+refuse_obs="$(scenario_refuse "$HOOKSDIR")" || die "refuse scenario failed"
+refuse_ec="$(printf '%s\n' "$refuse_obs" | sed -n 's/^exit=//p')"
+if [ "$refuse_ec" -ne 0 ]; then
+  ok "unbumped content push exits non-zero"
+else
+  bad "unbumped content push exits non-zero"
+fi
+if printf '%s\n' "$refuse_obs" | grep -q '^hook_line=1$'; then
+  ok "unbumped content push stderr has the pre-push version line"
+else
+  bad "unbumped content push stderr has the pre-push version line"
+fi
+if printf '%s\n' "$refuse_obs" | grep -q '^remote_same=1$'; then
+  ok "refused push leaves bare main on the pre-push SHA"
+else
+  bad "refused push leaves bare main on the pre-push SHA"
+fi
+
+# The same scenarios go red when the hooks do nothing.
+noop="$TMP/noop-hooks"
+mkdir -p "$noop"
+printf '#!/bin/sh\nexit 0\n' > "$noop/pre-commit"
+printf '#!/bin/sh\nexit 0\n' > "$noop/pre-push"
+chmod +x "$noop/pre-commit" "$noop/pre-push"
+mut_bump="$(scenario_bump "$noop")" || die "noop bump scenario failed"
+mut_ver="$(printf '%s\n' "$mut_bump" | sed -n 's/^version=//p')"
+if [ "$mut_ver" = "1.0.1" ]; then
+  bad "guard cannot fail"
+elif [ "$mut_ver" = "1.0.0" ]; then
+  ok "no-op pre-commit leaves version 1.0.0"
+else
+  bad "no-op pre-commit leaves version 1.0.0"
+fi
+mut_refuse="$(scenario_refuse "$noop")" || die "noop refuse scenario failed"
+mut_ec="$(printf '%s\n' "$mut_refuse" | sed -n 's/^exit=//p')"
+if [ "$mut_ec" -ne 0 ]; then
+  bad "guard cannot fail"
+elif [ "$mut_ec" -eq 0 ]; then
+  ok "no-op pre-push lets the unbumped push exit 0"
+else
+  bad "no-op pre-push lets the unbumped push exit 0"
+fi
 
 end_head="$(git -C "$ROOT" rev-parse HEAD)"
 end_refs="$(git -C "$ROOT" for-each-ref)"
-[ "$end_head" = "$REAL_HEAD" ] || die "real repo HEAD changed"
-[ "$end_refs" = "$REAL_REFS" ] || die "real repo for-each-ref changed"
-ok
+if [ "$end_head" = "$REAL_HEAD" ] && [ "$end_refs" = "$REAL_REFS" ]; then
+  ok "real repo HEAD and for-each-ref are unchanged"
+else
+  bad "real repo HEAD and for-each-ref are unchanged"
+fi
+
+printf '%s\n' "--- version-hooks: $PASS passed, $FAIL failed"
+if [ "$FAIL" -ne 0 ] || [ "$PASS" -eq 0 ]; then
+  exit 1
+fi
