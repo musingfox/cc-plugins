@@ -1,3 +1,5 @@
+import { oneLine } from './text.ts'
+
 export type CalTime = { kind: 'date'; date: string } | { kind: 'time'; ms: number }
 
 export type CalEvent = { id: string; title: string; location: string; link: string; url: string; start: CalTime; end: CalTime | null }
@@ -65,7 +67,7 @@ export function eventsOf(payload: unknown): CalEvent[] | null {
     return [
       {
         id: stringOf(field(raw, 'id')),
-        title: stringOf(field(raw, 'summary')) || '(no title)',
+        title: oneLine(stringOf(field(raw, 'summary'))) || '(no title)',
         location: stringOf(field(raw, 'location')),
         link: stringOf(field(raw, 'htmlLink')),
         url: urlOf(raw),
