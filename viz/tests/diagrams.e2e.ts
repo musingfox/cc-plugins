@@ -363,6 +363,64 @@ try {
     await waitFor(ALL_DRAWN);
     expectEq("DiagramPalette T6", "--pele-font", await js(`getComputedStyle(document.querySelector('.mermaid')).getPropertyValue('--pele-font').trim().replace(/["']/g, '').startsWith('Fira Code')`), true);
   });
+  // PrintPalette: printing swaps colors by CSS alone; no diagram is re-rendered.
+  const media = (m: string) => cdp("Emulation.setEmulatedMedia", { media: m });
+  await scenario("PrintPalette T1", async () => {
+    await open(edgeUrl);
+    await waitFor(ALL_DRAWN);
+    await js(`document.querySelector('.mermaid svg').setAttribute('data-mark', '1'); window.__renders = 0;
+      const p = window.pele; const render = p.render.bind(p); p.render = (...a) => { window.__renders++; return render(...a); };`);
+    await media("print");
+    await sleep(300);
+    expectEq("PrintPalette T1", "marked svg kept", await js(`!!document.querySelector('svg[data-mark="1"]')`), true);
+    expectEq("PrintPalette T1", "pele.render calls", await js(`window.__renders`), 0);
+    expectEq("PrintPalette T1", "shell background", await js(`getComputedStyle(document.querySelector('.mermaid-shell')).backgroundColor`), "rgb(255, 255, 255)");
+    await media("");
+  });
+  await scenario("PrintPalette T2", async () => {
+    await open(edgeUrl);
+    await waitFor(ALL_DRAWN);
+    await media("print");
+    await sleep(300);
+    const r = await js(`(() => {
+      const lum = ${LUM};
+      const fill = ${RGB("getComputedStyle(document.querySelector('.pele-node rect')).fill")}.slice(0, 3);
+      const label = ${RGB("getComputedStyle(document.querySelector('.pele-label')).fill")}.slice(0, 3);
+      const contrast = (${CONTRAST})(fill, label);
+      return { lum: lum(fill), contrast };
+    })()`);
+    expectEq("PrintPalette T2", "node fill luminance >= 0.85", r.lum >= 0.85, true);
+    expectEq("PrintPalette T2", "label contrast >= 4.5", r.contrast >= 4.5, true);
+    await media("");
+  });
+  await scenario("PrintPalette T3", async () => {
+    await open(edgeUrl);
+    await waitFor(ALL_DRAWN);
+    await media("print");
+    await sleep(300);
+    const r = await js(`(() => {
+      const white = [255, 255, 255, 255];
+      const slices = [...document.querySelectorAll('.pele-slice')].map((el) => ${RGB("getComputedStyle(el).fill")}.slice(0, 3));
+      const pct = [...document.querySelectorAll('.mermaid svg text')].filter((t) => t.textContent.includes('%'));
+      return { count: slices.length, low: slices.filter((f) => (${CONTRAST})(f, white.slice(0, 3)) < 3).length,
+        pct: pct.length ? ${RGB("getComputedStyle(pct[0]).fill")} : null };
+    })()`);
+    expectEq("PrintPalette T3", "slice count", r.count, 8);
+    expectEq("PrintPalette T3", "slices below 3:1 against white", r.low, 0);
+    expectEq("PrintPalette T3", "percentage label fill", r.pct, [255, 255, 255, 255]);
+    await media("");
+  });
+  await scenario("PrintPalette T4", async () => {
+    await open(edgeUrl);
+    await waitFor(ALL_DRAWN);
+    await js(`document.querySelector('.mermaid svg').setAttribute('data-mark', '1')`);
+    await media("print");
+    await sleep(200);
+    await media("");
+    await sleep(200);
+    expectEq("PrintPalette T4", "node stroke on screen", await js(`getComputedStyle(document.querySelector('.pele-node rect')).stroke`), "rgb(253, 151, 31)");
+    expectEq("PrintPalette T4", "marked svg kept", await js(`!!document.querySelector('svg[data-mark="1"]')`), true);
+  });
 } finally {
   ws.close();
   browser.kill();
