@@ -23,4 +23,18 @@ Text that is not a diagram:
 hello world
 ```
 
+A hostile label is drawn as text:
+
+```mermaid
+graph TD
+    A[<img src=x onerror="window.__pwned=1">] --> B[ok]
+```
+
+A broken diagram with a hostile token:
+
+```mermaid
+graph TD
+    A --> <img src=x onerror="window.__pwned=2">
+```
+
 The page keeps going after the broken fences.

@@ -204,7 +204,7 @@ try {
     await open(edgeUrl);
     await waitFor(ALL_DRAWN);
     const truncated = `document.querySelectorAll('.mermaid.pele-error')[0]`;
-    expectEq("PageDiagramErrorsInline T1", "pele-error count", await js(`document.querySelectorAll('.mermaid.pele-error').length`), 2);
+    expectEq("PageDiagramErrorsInline T1", "pele-error count", await js(`document.querySelectorAll('.mermaid.pele-error').length`), 3);
     expectEq("PageDiagramErrorsInline T1", "truncated text", await js(`${truncated}.textContent.includes('Parse error')`), true);
     expectEq("PageDiagramErrorsInline T1", "truncated children", await js(`${truncated}.children.length`), 0);
   });
@@ -225,13 +225,29 @@ try {
     await open(url);
     await waitFor(ALL_DRAWN);
     expectEq("PageDiagramErrorsInline T4", "oversize pele-error text non-empty",
-      await js(`(document.querySelectorAll('.mermaid.pele-error')[2] || {textContent: ''}).textContent.length > 0`), true);
+      await js(`document.querySelectorAll('.mermaid.pele-error')[document.querySelectorAll('.mermaid.pele-error').length - 1].textContent.length > 0`), true);
     expectEq("PageDiagramErrorsInline T4", "valid svg.pele", await js(`document.querySelector('.mermaid svg.pele') !== null`), true);
   });
   await scenario("PageDiagramErrorsInline T5", async () => {
     await open(edgeUrl);
     await waitFor(ALL_DRAWN);
     expectEq("PageDiagramErrorsInline T5", "content starts with Error:", await js(`document.getElementById('content').textContent.trimStart().startsWith('Error:')`), false);
+  });
+  // DiagramTextStaysInert
+  await scenario("DiagramTextStaysInert T1", async () => {
+    await open(edgeUrl);
+    await waitFor(ALL_DRAWN);
+    expectEq("DiagramTextStaysInert T1", "live img, script or on* attributes",
+      await js(`document.querySelectorAll('.mermaid img, .mermaid script, .mermaid [onerror]').length`), 0);
+    expectEq("DiagramTextStaysInert T1", "window.__pwned", await js(`window.__pwned === undefined`), true);
+  });
+  await scenario("DiagramTextStaysInert T2", async () => {
+    await open(edgeUrl);
+    await waitFor(ALL_DRAWN);
+    const hostile = `[...document.querySelectorAll('.mermaid.pele-error')].find((n) => n.textContent.includes('<img'))`;
+    expectEq("DiagramTextStaysInert T2", "hostile error node exists", await js(`!!${hostile}`), true);
+    expectEq("DiagramTextStaysInert T2", "child elements", await js(`${hostile}.children.length`), 0);
+    expectEq("DiagramTextStaysInert T2", "window.__pwned", await js(`window.__pwned === undefined`), true);
   });
 } finally {
   ws.close();
