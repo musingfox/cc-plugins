@@ -51,7 +51,12 @@ function drawNode(node, src, deps, icons) {
     const opts = { icons, idPrefix: `pele${++idCounter}-` };
     const font = fontFor(node, deps.fontFamily);
     if (font) opts.fontFamily = font;
-    node.innerHTML = deps.pele.render(src, opts).svg;
+    try {
+        node.innerHTML = deps.pele.render(src, opts).svg;
+    } catch (err) {
+        node.textContent = err && err.message ? err.message : String(err);
+        node.classList.add('pele-error');
+    }
 }
 
 async function renderDiagrams(nodes, deps = {}) {
