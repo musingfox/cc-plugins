@@ -37,4 +37,18 @@ graph TD
     A --> <img src=x onerror="window.__pwned=2">
 ```
 
+An eight-slice pie:
+
+```mermaid
+pie title Eight slices
+    "One" : 10
+    "Two" : 10
+    "Three" : 10
+    "Four" : 10
+    "Five" : 10
+    "Six" : 10
+    "Seven" : 10
+    "Eight" : 10
+```
+
 The page keeps going after the broken fences.

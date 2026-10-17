@@ -38,7 +38,7 @@ function render(src: string, extra = ""): string {
 }
 const countFences = (path: string) => (readFileSync(path, "utf8").match(/^```mermaid\s*$/gm) ?? []).length;
 
-const browser = Bun.spawn([BROWSER, "--headless=new", "--disable-gpu", `--remote-debugging-port=${CDP_PORT}`,
+const browser = Bun.spawn([BROWSER, "--headless=new", "--disable-gpu", "--force-color-profile=srgb", `--remote-debugging-port=${CDP_PORT}`,
   "--window-size=1100,900", `--user-data-dir=${join(work, "profile")}`, "about:blank"], { stdout: "ignore", stderr: "ignore" });
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -278,6 +278,90 @@ try {
     expectEq("LogosIconsVisible T4", "architecture still svg.pele", await js(`!!document.querySelector('.mermaid svg.pele')`), true);
     expectEq("LogosIconsVisible T4", "pele-error count", await js(`document.querySelectorAll('.pele-error').length`), 0);
     await cdp("Fetch.disable");
+  });
+  // DiagramPalette
+  // Resolves any CSS color (var(), color-mix()) to [r, g, b, a] by a computed-style round trip. A canvas
+  // readback is not used: Brave perturbs canvas pixels by one step, so it cannot prove an exact value.
+  const RGB = (expr: string) => `((e) => { const p = document.createElement('span'); p.style.color = e;
+    document.body.appendChild(p); const v = getComputedStyle(p).color; p.remove();
+    const n = v.match(/[\\d.]+/g).map(Number), k = v.startsWith('color(') ? 255 : 1;
+    return [0, 1, 2].map((i) => Math.round(n[i] * k)).concat([n.length > 3 ? Math.round(n[3] * 255) : 255]); })(${expr})`;
+  const LUM = `(c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); }`;
+  const CONTRAST = `(a, b) => { const x = (${LUM})(a), y = (${LUM})(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }`;
+  const PELE_DEFAULTS = ["#4c78a8", "#f58518", "#54a24b", "#e45756", "#72b7b2", "#eeca3b", "#b279a2", "#9d755d"];
+  const LIGHT_DEFAULTS = ["rgb(138, 138, 138)", "rgb(91, 123, 213)", "rgb(243, 243, 243)", "rgb(230, 230, 230)", "rgb(31, 31, 31)", "rgb(110, 110, 110)", "rgb(255, 255, 255)"];
+  const diagramBg = (el: string) => RGB(`getComputedStyle(${el}).getPropertyValue('--pele-bg')`);
+
+  await scenario("DiagramPalette T1", async () => {
+    await open(edgeUrl);
+    await waitFor(ALL_DRAWN);
+    const [node, cluster] = await js(`[getComputedStyle(document.querySelector('.pele-node rect')).stroke, getComputedStyle(document.querySelector('.pele-cluster > rect')).stroke]`);
+    expectEq("DiagramPalette T1", "node and cluster strokes", [node, cluster], ["rgb(253, 151, 31)", "rgb(46, 46, 46)"]);
+  });
+  await scenario("DiagramPalette T2", async () => {
+    await open(edgeUrl);
+    await waitFor(ALL_DRAWN);
+    expectEq("DiagramPalette T2", "generic --pele-bg pixel", await js(`${diagramBg("document.querySelector('.mermaid')")}`), [24, 24, 24, 255]);
+    await open(feedbackUrl);
+    await js(PLAIN);
+    await waitFor(BRIEF_DRAWN);
+    expectEq("DiagramPalette T2", "feedback --pele-bg pixel", await js(`${diagramBg("document.querySelector('#brief .mermaid')")}`), [34, 34, 34, 255]);
+  });
+  await scenario("DiagramPalette T3", async () => {
+    await open(edgeUrl);
+    await waitFor(ALL_DRAWN);
+    const r = await js(`(() => {
+      const canvas = ${RGB("'#000'")};
+      const slices = [...document.querySelectorAll('.pele-slice')];
+      const rgb = (el) => ${RGB("getComputedStyle(el).fill")}.slice(0, 3);
+      const bg = ${RGB("getComputedStyle(document.querySelector('.mermaid')).getPropertyValue('--pele-bg')")}.slice(0, 3);
+      const fills = slices.map(rgb);
+      const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+      const defaults = ${JSON.stringify(PELE_DEFAULTS)}.map((h) => ${RGB("h")}.slice(0, 3));
+      let minDist = Infinity;
+      fills.forEach((a, i) => fills.forEach((b, j) => { if (j > i) minDist = Math.min(minDist, dist(a, b)); }));
+      const pct = [...document.querySelectorAll('.mermaid svg text')].filter((t) => t.textContent.includes('%'));
+      return {
+        count: slices.length,
+        minDist,
+        defaultHits: fills.filter((f) => defaults.some((d) => dist(f, d) === 0)).length,
+        lowContrast: fills.filter((f) => (${CONTRAST})(f, bg) < 3).length,
+        pctFill: pct.length ? ${RGB("getComputedStyle(pct[0]).fill")}.slice(0, 3) : null,
+        bg,
+      };
+    })()`);
+    expectEq("DiagramPalette T3", "slice count", r.count, 8);
+    expectEq("DiagramPalette T3", "pairwise RGB distance >= 40", r.minDist >= 40, true);
+    expectEq("DiagramPalette T3", "slices equal to a Pele default", r.defaultHits, 0);
+    expectEq("DiagramPalette T3", "slices below 3:1 against bg", r.lowContrast, 0);
+    expectEq("DiagramPalette T3", "percentage label fill", r.pctFill, r.bg);
+  });
+  await scenario("DiagramPalette T4", async () => {
+    await open(typesUrl);
+    await waitFor(ALL_DRAWN);
+    const hits = await js(`(() => {
+      const forbidden = ${JSON.stringify(LIGHT_DEFAULTS)};
+      return [...document.querySelectorAll('.mermaid')]
+        .filter((m) => !/^\\s*(style|classDef)\\b/m.test(m.dataset.src))
+        .flatMap((m) => [...m.querySelectorAll('svg *')].filter((e) => !e.closest('.pele-icon')).flatMap((e) => {
+          const cs = getComputedStyle(e);
+          return [cs.fill, cs.stroke].filter((v) => forbidden.includes(v));
+        })).length;
+    })()`);
+    expectEq("DiagramPalette T4", "light-default fills or strokes", hits, 0);
+  });
+  await scenario("DiagramPalette T5", async () => {
+    await open(edgeUrl);
+    await waitFor(ALL_DRAWN);
+    const err = await js(`(() => { const n = document.querySelector('.mermaid.pele-error'); const cs = getComputedStyle(n);
+      return [cs.color, cs.whiteSpace]; })()`);
+    expectEq("DiagramPalette T5", "error color and whitespace", err, ["rgb(244, 0, 95)", "pre-wrap"]);
+  });
+  await scenario("DiagramPalette T6", async () => {
+    await open(edgeUrl);
+    await waitFor(ALL_DRAWN);
+    expectEq("DiagramPalette T6", "--pele-font", await js(`getComputedStyle(document.querySelector('.mermaid')).getPropertyValue('--pele-font').trim().replace(/["']/g, '').startsWith('Fira Code')`), true);
   });
 } finally {
   ws.close();

@@ -163,6 +163,7 @@ main { max-width: 880px; margin: var(--space-6) auto var(--space-12); padding: 0
 .brief tr:last-child td { border-bottom: none; }
 .brief hr { border: none; border-top: 1px solid var(--border); margin: var(--space-8) 0; }
 .mermaid-shell {
+    --viz-diagram-bg: #222222;
     border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-4);
     background: var(--surface-warm); margin: var(--space-5) 0; text-align: center; overflow-x: auto;
     transition: border-color var(--motion-fast) var(--ease-standard);
@@ -409,6 +410,9 @@ body:has(.reload-banner:not(.hidden)) .toast { bottom: calc(var(--space-6) + 56p
         animation-duration: .01ms !important;
     }
 }
+</style>
+<style id="viz-pele-theme">
+// @inline ../pele-theme.css
 </style>
 </head>
 <body>
