@@ -421,6 +421,47 @@ try {
     expectEq("PrintPalette T4", "node stroke on screen", await js(`getComputedStyle(document.querySelector('.pele-node rect')).stroke`), "rgb(253, 151, 31)");
     expectEq("PrintPalette T4", "marked svg kept", await js(`!!document.querySelector('svg[data-mark="1"]')`), true);
   });
+  // StandaloneDiagramTab: the expanded diagram keeps the page's palette in its own tab.
+  const EXPAND = `window.__opened = []; window.open = (u) => { window.__opened.push(u); return null; };`;
+  const openTab = async () => {
+    await js(EXPAND);
+    await js(`document.querySelector('.mermaid-shell [data-action="expand"]').click()`);
+    return js(`window.__opened.length ? window.__opened[0] : null`);
+  };
+  const tabFrame = async (url: string) => js(`(async () => {
+    const f = document.createElement('iframe'); f.style.width = '1100px'; f.style.height = '900px';
+    f.src = ${JSON.stringify(url)}; document.body.appendChild(f);
+    await new Promise((r) => (f.onload = r));
+    window.__frame = f; return true; })()`);
+  await scenario("StandaloneDiagramTab T1", async () => {
+    await open(edgeUrl);
+    await waitFor(ALL_DRAWN);
+    const url = await openTab();
+    expectEq("StandaloneDiagramTab T1", "captured blob URL", String(url).startsWith("blob:"), true);
+    await tabFrame(url);
+    expectEq("StandaloneDiagramTab T1", "node stroke", await js(`getComputedStyle(window.__frame.contentDocument.querySelector('.pele-node rect')).stroke`), "rgb(253, 151, 31)");
+    expectEq("StandaloneDiagramTab T1", "cluster stroke", await js(`getComputedStyle(window.__frame.contentDocument.querySelector('.pele-cluster > rect')).stroke`), "rgb(46, 46, 46)");
+    expectEq("StandaloneDiagramTab T1", "body background", await js(`getComputedStyle(window.__frame.contentDocument.body).backgroundColor`), "rgb(7, 8, 10)");
+  });
+  await scenario("StandaloneDiagramTab T2", async () => {
+    await open(edgeUrl);
+    await waitFor(ALL_DRAWN);
+    await tabFrame(await openTab());
+    expectEq("StandaloneDiagramTab T2", "script elements in tab", await js(`window.__frame.contentDocument.querySelectorAll('script').length`), 0);
+  });
+  await scenario("StandaloneDiagramTab T3", async () => {
+    await open(edgeUrl);
+    await waitFor(ALL_DRAWN);
+    await js(EXPAND);
+    await js(`[...document.querySelectorAll('.mermaid-shell')].find((sh) => sh.querySelector('.pele-error')).querySelector('[data-action="expand"]').click()`);
+    expectEq("StandaloneDiagramTab T3", "window.open calls on error node", await js(`window.__opened.length`), 0);
+  });
+  await scenario("StandaloneDiagramTab T4", async () => {
+    await open(edgeUrl);
+    await waitFor(ALL_DRAWN);
+    await tabFrame(await openTab());
+    expectEq("StandaloneDiagramTab T4", "svg within 95vw", await js(`window.__frame.contentDocument.querySelector('svg').getBoundingClientRect().width <= 0.95 * window.__frame.contentWindow.innerWidth + 1`), true);
+  });
 } finally {
   ws.close();
   browser.kill();

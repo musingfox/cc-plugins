@@ -718,13 +718,16 @@
                 // 12. Mermaid zoom/pan controls
                 function openDiagramTab(svgEl) {
                     var page = document.implementation.createHTMLDocument('Diagram');
-                    // The SVG carries this page's mermaid palette, so the standalone
-                    // tab has to sit on the same binding canvas to stay readable.
+                    // Diagram colors live in the theme's --pele-* rules, so the tab
+                    // carries a copy of that style block.
                     var bg = '#07080a';
                     page.body.setAttribute('style', 'margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:' + bg);
                     var style = page.createElement('style');
-                    style.textContent = 'svg{max-width:95vw;max-height:95vh}';
+                    style.textContent = 'svg{max-width:95vw !important;max-height:95vh !important}';
                     page.head.appendChild(style);
+                    var theme = page.createElement('style');
+                    theme.textContent = document.getElementById('viz-pele-theme').textContent;
+                    page.head.appendChild(theme);
                     page.body.appendChild(page.importNode(svgEl, true));
                     var blob = new Blob([page.documentElement.outerHTML], { type: 'text/html' });
                     window.open(URL.createObjectURL(blob), '_blank');
