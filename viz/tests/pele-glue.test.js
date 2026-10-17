@@ -100,6 +100,22 @@ describe('DiagramRender', () => {
         expect(pele.calls.length).toBe(1);
         expect('fontFamily' in pele.calls[0][1]).toBe(false);
     });
+
+    test('R1: a plain non-iterable ArrayLike of nodes renders and never rejects', async () => {
+        const node = fakeNode('graph TD\nA-->B');
+        const pele = fakePele();
+        await renderDiagrams({ length: 1, 0: node }, { pele, fontFamily: 'f' });
+        expect(node.innerHTML).toBe(SVG);
+    });
+
+    test('R2: an empty-string source reaches pele and its error is shown', async () => {
+        const node = fakeNode('');
+        const pele = fakePele(() => { throw new Error('No diagram type detected for the given text.'); });
+        await renderDiagrams([node], { pele, fontFamily: 'f' });
+        expect(pele.calls.length).toBe(1);
+        expect(node.classList.contains('pele-error')).toBe(true);
+        expect(node.textContent).toBe('No diagram type detected for the given text.');
+    });
 });
 
 describe('DiagramErrorIsolation', () => {
@@ -181,6 +197,20 @@ describe('LogosIconResolver', () => {
     test('T6: an alias cycle gives null without hanging', () => {
         const resolve = makeLogosResolver({ icons: {}, aliases: { a: { parent: 'b' }, b: { parent: 'a' } } });
         expect(resolve('logos:a')).toBeNull();
+    });
+
+    test('R1: two resolutions of an icon with an element id give different ids, and every reference follows its id', () => {
+        const body = '<linearGradient id="SVGeyciVcvH"/><path fill="url(#SVGeyciVcvH)" d="M0"/><use href="#SVGeyciVcvH"/>';
+        const resolve = makeLogosResolver({ icons: { lambda: { body } } });
+        const first = resolve('logos:lambda');
+        const second = resolve('logos:lambda');
+        const ids = s => [...s.matchAll(/\sid="([^"]+)"/g)].map(m => m[1]);
+        expect(ids(first).length).toBe(1);
+        expect(ids(first)[0]).not.toBe(ids(second)[0]);
+        expect(first).toContain(`url(#${ids(first)[0]})`);
+        expect(first).toContain(`href="#${ids(first)[0]}"`);
+        expect(second).toContain(`url(#${ids(second)[0]})`);
+        expect(second).not.toContain('SVGeyciVcvH');
     });
 
     test('T7: a missing name or an alias with a missing parent gives null', () => {

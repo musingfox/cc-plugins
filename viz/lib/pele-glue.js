@@ -69,9 +69,9 @@ async function renderDiagrams(nodes, deps = {}) {
         return;
     }
     const sources = [];
-    for (const node of nodes) {
+    for (const node of Array.from(nodes)) {
         const src = node.dataset && node.dataset.src;
-        if (src) sources.push([node, src]);
+        if (src != null) sources.push([node, src]);
     }
     const logos = sources.filter(([, src]) => src.includes('logos:'));
     for (const [node, src] of sources) {
