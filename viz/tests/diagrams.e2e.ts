@@ -249,6 +249,36 @@ try {
     expectEq("DiagramTextStaysInert T2", "child elements", await js(`${hostile}.children.length`), 0);
     expectEq("DiagramTextStaysInert T2", "window.__pwned", await js(`window.__pwned === undefined`), true);
   });
+  // LogosIconsVisible. edge-cases.md stays logos-free, so the unknown-icon case is appended at run time.
+  const ICONS = `performance.getEntriesByType('resource').filter((e) => e.name.includes('icons.json')).length`;
+  const UNKNOWN = "\n```mermaid\narchitecture-beta\n    group edge[Edge]\n    service x(logos:does-not-exist)[Missing] in edge\n```\n";
+  await scenario("LogosIconsVisible T1", async () => {
+    await open(typesUrl);
+    await waitFor(ALL_DRAWN);
+    expectEq("LogosIconsVisible T1", ".pele-icon count", await js(`document.querySelectorAll('.pele-icon').length`), 3);
+    expectEq("LogosIconsVisible T1", "icons with a drawn shape", await js(`[...document.querySelectorAll('.pele-icon')].filter((i) => [...i.querySelectorAll('path, g')].some((e) => e.getBoundingClientRect().width > 0)).length`), 3);
+  });
+  await scenario("LogosIconsVisible T2", async () => {
+    await open(typesUrl);
+    await waitFor(ALL_DRAWN);
+    expectEq("LogosIconsVisible T2", "icons.json requests on diagram-types", await js(ICONS), 1);
+    await open(edgeUrl);
+    await waitFor(ALL_DRAWN);
+    expectEq("LogosIconsVisible T2", "icons.json requests on edge-cases", await js(ICONS), 0);
+  });
+  await scenario("LogosIconsVisible T3", async () => {
+    await open(render(EDGE_CASES, UNKNOWN));
+    await waitFor(ALL_DRAWN);
+    expectEq("LogosIconsVisible T3", "unknown icon: pele-error count", await js(`document.querySelectorAll('.pele-error').length`), 3);
+    expectEq("LogosIconsVisible T3", "unknown icon: svg.pele exists", await js(`document.querySelectorAll('.mermaid svg.pele').length >= 2`), true);
+  });
+  await scenario("LogosIconsVisible T4", async () => {
+    await open(typesUrl, /icons\.json/);
+    await waitFor(ALL_DRAWN);
+    expectEq("LogosIconsVisible T4", "architecture still svg.pele", await js(`!!document.querySelector('.mermaid svg.pele')`), true);
+    expectEq("LogosIconsVisible T4", "pele-error count", await js(`document.querySelectorAll('.pele-error').length`), 0);
+    await cdp("Fetch.disable");
+  });
 } finally {
   ws.close();
   browser.kill();
