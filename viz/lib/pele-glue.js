@@ -79,7 +79,13 @@ async function renderDiagrams(nodes, deps = {}) {
     }
     if (logos.length === 0) return;
     const fetchJson = deps.fetchJson || defaultFetchJson;
-    const pack = await fetchJson(LOGOS_ICONS_URL);
+    let pack = null;
+    try {
+        pack = await fetchJson(LOGOS_ICONS_URL);
+    } catch (err) {
+        pack = null;
+    }
+    if (!hasIcons(pack)) console.warn('pele-glue: logos icon pack unavailable; logos icons are drawn empty');
     const icons = makeLogosResolver(pack);
     for (const [node, src] of logos) drawNode(node, src, deps, icons);
 }
