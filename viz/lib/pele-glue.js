@@ -39,6 +39,36 @@ function makeLogosResolver(pack) {
     };
 }
 
+let idCounter = 0;
+
+function fontFor(node, explicit) {
+    if (explicit) return explicit;
+    if (typeof getComputedStyle !== 'function') return undefined;
+    return getComputedStyle(node).getPropertyValue('--pele-font').trim() || undefined;
+}
+
+function drawNode(node, src, deps, icons) {
+    const opts = { icons, idPrefix: `pele${++idCounter}-` };
+    const font = fontFor(node, deps.fontFamily);
+    if (font) opts.fontFamily = font;
+    node.innerHTML = deps.pele.render(src, opts).svg;
+}
+
+async function renderDiagrams(nodes, deps = {}) {
+    if (!deps.pele) {
+        console.error('pele-glue: pele is not loaded; diagrams are left as source');
+        return;
+    }
+    const sources = [];
+    for (const node of nodes) {
+        const src = node.dataset && node.dataset.src;
+        if (src) sources.push([node, src]);
+    }
+    for (const [node, src] of sources) {
+        if (!src.includes('logos:')) drawNode(node, src, deps, () => null);
+    }
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { makeLogosResolver };
+    module.exports = { renderDiagrams, makeLogosResolver };
 }
