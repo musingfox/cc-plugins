@@ -1,8 +1,10 @@
 # Mermaid Diagram Types Reference
 
+Viz draws every `mermaid` fence with Pele, which reads Mermaid syntax.
+
 ## Contents
 
-1. Flowchart / Graph (ELK layout) · 2. Architecture · 3. Sequence · 4. Class · 5. State · 6. ER · 7. Gantt · 8. Pie · Best Practices · Styling · Subgraphs
+1. Flowchart / Graph · 2. Architecture · 3. Sequence · 4. Class · 5. State · 6. ER · 7. Gantt · 8. Pie · Best Practices · Styling · Subgraphs
 
 ## 1. Flowchart / Graph
 
@@ -27,24 +29,18 @@ graph TD
 - `[[Subroutine]]` — predefined process
 - `[(Database)]` — data storage
 
-### ELK layout — for tangled graphs
+### Tangled graphs
 
-Dagre (the default) produces heavy edge crossings past ~12 nodes. Opt into the
-ELK layered engine per diagram with a directive on the first line:
+Pele lays out flowcharts without a layout directive. Past roughly 20 nodes,
+split the diagram, or group related nodes with `subgraph`:
 
 ```mermaid
-%%{init: {"layout": "elk"}}%%
-flowchart LR
-    ...
+graph LR
+    subgraph Backend
+        API --> DB[(Store)]
+    end
+    Web --> API
 ```
-
-Use it whenever the graph has more than ~12 nodes or several converging edges
-(an event bus, a shared database). Leave it off for small graphs — dagre is
-more compact there. Other ELK algorithms: `elk.stress`, `elk.force`,
-`elk.mrtree`.
-
-**ELK flowchart + `subgraph` is the workhorse for complex architecture** —
-prefer it over `architecture-beta` (below) whenever edge routing matters.
 
 ## 2. Architecture (`architecture-beta`)
 
@@ -66,11 +62,11 @@ architecture-beta
 
 - Ports are explicit: `a:R -- L:b` leaves `a`'s right side, enters `b`'s left.
   Arrowheads use `-->` instead of `--`.
-- `service id(icon)[Label] in group` — the icon is optional. The `logos:` pack
-  ([icon list](https://icon-sets.iconify.design/logos/)) is registered in the
-  viewer; without an icon a service renders as a plain empty box.
+- `service id(icon)[Label] in group` — the icon is optional. The viewer loads
+  the `logos:` pack ([icon list](https://icon-sets.iconify.design/logos/)) only
+  when a diagram uses it; without an icon a service renders as a plain empty box.
 - **Known weakness**: its layout engine routes edges diagonally across groups
-  and lets labels collide with edges. Keep the edge count low, or use an ELK
+  and lets labels collide with edges. Keep the edge count low, or draw a
   flowchart with `subgraph` instead.
 
 ## 3. Sequence Diagram
@@ -166,7 +162,7 @@ pie title Distribution
 - Include meaningful arrow labels for decision branches
 
 **DON'T**:
-- Create overly complex diagrams (>20 nodes) — split into multiple, or switch to ELK layout
+- Create overly complex diagrams (>20 nodes) — split into multiple, or group with subgraphs
 - Use very long text in labels (>30 chars) — breaks layout
 - Use spaces in node IDs (use camelCase or underscores)
 - Mix diagram types in a single chart

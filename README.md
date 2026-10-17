@@ -20,7 +20,7 @@ Visual output across the whole spectrum — inline chat shapes for short explana
 - **Full Markdown**: syntax highlighting, KaTeX math, Mermaid, scroll animations, dark mode, TOC
 - **Plans Resolution**: bare name → looks up `~/.claude/plans/*.md`; no argument → lists available plans
 - **Proactive Triggers**: auto-renders when terminal would show a 4+ row / 3+ column table, a comparison, audit, feature matrix, or 50+ lines of structured content
-- **Zero Runtime Deps**: CDN libraries (marked.js, DOMPurify, Mermaid.js, Highlight.js, KaTeX, AOS)
+- **Zero Runtime Deps**: CDN libraries (marked.js, DOMPurify, Pele (Mermaid syntax), Highlight.js, KaTeX, AOS)
 
 **Installation:**
 ```bash

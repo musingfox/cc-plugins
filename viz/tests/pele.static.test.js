@@ -150,3 +150,35 @@ describe('DiagramPalette', () => {
         }
     });
 });
+
+describe('DiagramTypesGuidance', () => {
+    const TYPES = readFileSync(join(import.meta.dir, '../skills/viz-render/references/diagram-types.md'), 'utf8');
+    const SKILL = readFileSync(join(import.meta.dir, '../skills/viz-render/SKILL.md'), 'utf8');
+    const README = readFileSync(join(import.meta.dir, '../../README.md'), 'utf8');
+
+    test('T1: the diagram reference has no ELK mention and no init directive', () => {
+        expect(TYPES).not.toMatch(/elk/i);
+        expect(TYPES).not.toContain('%%{init');
+    });
+
+    test('T2: the Contents line names the flowchart without ELK', () => {
+        const contents = TYPES.split('\n').find(line => line.startsWith('1. Flowchart'));
+        expect(contents).toContain('Flowchart / Graph');
+        expect(contents).not.toContain('ELK');
+    });
+
+    test('T3: the diagram reference still documents Pele and keeps at least 10 mermaid fences', () => {
+        expect(TYPES).toContain('Pele');
+        expect((TYPES.match(/^```mermaid/gm) || []).length).toBeGreaterThanOrEqual(10);
+    });
+
+    test('T4: the skill names Pele and has no ELK mention', () => {
+        expect(SKILL).toContain('Pele');
+        expect(SKILL).not.toMatch(/elk/i);
+    });
+
+    test('T5: the README lists Pele instead of Mermaid.js', () => {
+        expect(README).not.toContain('Mermaid.js');
+        expect(README).toContain('Pele');
+    });
+});

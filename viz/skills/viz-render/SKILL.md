@@ -13,11 +13,11 @@ description: >-
 # Viz Render Skill
 
 Render markdown documents, Mermaid diagrams, or plan files as formatted HTML
-with syntax highlighting, math formulas, and Mermaid, in the dark-only
+with syntax highlighting, math formulas, and Pele diagrams (Mermaid syntax), in the dark-only
 Musingfox design system. One skill, one script, three input shapes.
 
 Requires macOS (`open`, `stat -f`), `python3`, `curl`, `lsof`, and network
-access for the CDN that loads Mermaid, KaTeX, and highlighting.
+access for the CDN that loads Pele, KaTeX, and highlighting.
 
 ## When NOT to Use
 
@@ -87,8 +87,9 @@ When the user requests a diagram without providing the code:
 1. Pick a diagram type (see `references/diagram-types.md` for syntax)
 2. Keep it focused: 5–15 nodes, descriptive labels <30 chars, no-space IDs
 3. If requirements are too broad, suggest splitting into multiple diagrams
-4. After rendering, ask the user to confirm the diagram drew: Mermaid runs in
-   the browser, so a syntax error is visible only to them
+4. After rendering, ask the user to confirm the diagram drew: Pele runs in
+   the browser, and a syntax error shows as red text in place of the diagram,
+   visible only to them
 
 ## Output
 
