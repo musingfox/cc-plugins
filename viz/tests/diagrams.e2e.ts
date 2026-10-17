@@ -198,6 +198,41 @@ try {
     expectEq("FeedbackRendersDiagrams T3", "option cards present", await js(`document.querySelectorAll('.cv-card').length > 0`), true);
     await cdp("Fetch.disable");
   });
+  // PageDiagramErrorsInline
+  const edgeUrl = render(EDGE_CASES);
+  await scenario("PageDiagramErrorsInline T1", async () => {
+    await open(edgeUrl);
+    await waitFor(ALL_DRAWN);
+    const truncated = `document.querySelectorAll('.mermaid.pele-error')[0]`;
+    expectEq("PageDiagramErrorsInline T1", "pele-error count", await js(`document.querySelectorAll('.mermaid.pele-error').length`), 2);
+    expectEq("PageDiagramErrorsInline T1", "truncated text", await js(`${truncated}.textContent.includes('Parse error')`), true);
+    expectEq("PageDiagramErrorsInline T1", "truncated children", await js(`${truncated}.children.length`), 0);
+  });
+  await scenario("PageDiagramErrorsInline T2", async () => {
+    await open(edgeUrl);
+    await waitFor(ALL_DRAWN);
+    expectEq("PageDiagramErrorsInline T2", "unknown text", await js(`document.querySelectorAll('.mermaid.pele-error')[1].textContent`), "No diagram type detected for the given text.");
+  });
+  await scenario("PageDiagramErrorsInline T3", async () => {
+    await open(edgeUrl);
+    await waitFor(ALL_DRAWN);
+    expectEq("PageDiagramErrorsInline T3", "valid svg.pele", await js(`document.querySelector('.mermaid svg.pele') !== null`), true);
+    expectEq("PageDiagramErrorsInline T3", "h1 present", await js(`!!document.querySelector('#content h1')`), true);
+  });
+  await scenario("PageDiagramErrorsInline T4", async () => {
+    const big = ("graph TD\n" + "A-->B\n".repeat(10000)).slice(0, 60000);
+    const url = render(EDGE_CASES, "\n```mermaid\n" + big + "\n```\n");
+    await open(url);
+    await waitFor(ALL_DRAWN);
+    expectEq("PageDiagramErrorsInline T4", "oversize pele-error text non-empty",
+      await js(`(document.querySelectorAll('.mermaid.pele-error')[2] || {textContent: ''}).textContent.length > 0`), true);
+    expectEq("PageDiagramErrorsInline T4", "valid svg.pele", await js(`document.querySelector('.mermaid svg.pele') !== null`), true);
+  });
+  await scenario("PageDiagramErrorsInline T5", async () => {
+    await open(edgeUrl);
+    await waitFor(ALL_DRAWN);
+    expectEq("PageDiagramErrorsInline T5", "content starts with Error:", await js(`document.getElementById('content').textContent.trimStart().startsWith('Error:')`), false);
+  });
 } finally {
   ws.close();
   browser.kill();
