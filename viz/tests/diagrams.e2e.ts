@@ -15,6 +15,7 @@ const CDP_PORT = 9334;
 const FIXTURES = join(VIZ, "tests/fixtures/diagrams");
 const DIAGRAM_TYPES = join(VIZ, "skills/viz-render/references/diagram-types.md");
 const EDGE_CASES = join(FIXTURES, "edge-cases.md");
+const FEEDBACK = join(FIXTURES, "feedback.md");
 
 const work = mkdtempSync(join(tmpdir(), "viz-diagrams-e2e-"));
 mkdirSync(join(work, "bin"));
@@ -80,6 +81,8 @@ const ALL_DRAWN = `[...document.querySelectorAll('.mermaid')].every((n) => n.que
 
 async function open(url: string, blockPattern: RegExp | null = null) {
   blockedUrl = blockPattern;
+  // The feedback page remembers the last view; every scenario starts from its default.
+  await js(`localStorage.clear()`).catch(() => {});
   // A cached script would skip the paused request, so a blocked load must hit the network.
   await cdp("Network.setCacheDisabled", { cacheDisabled: true });
   await cdp("Fetch.disable");
@@ -161,6 +164,39 @@ try {
       return s.getBoundingClientRect().width > content + 1;
     }).length`);
     expectEq("TemplateRendersDiagramsOnLoad T6", "svg wider than viewport content", over, 0);
+  });
+  // FeedbackRendersDiagrams
+  const feedbackUrl = render(FEEDBACK);
+  const BRIEF_DRAWN = `[...document.querySelectorAll('#brief .mermaid')].length === 2 && ${ALL_DRAWN.replace("document.querySelectorAll('.mermaid')", "document.querySelectorAll('#brief .mermaid')")}`;
+  // The fixture's table opens in the card view; #brief holds the diagrams only in the plain (原文) view.
+  const PLAIN = `document.querySelector('#view-toggle button[data-view="plain"]').click()`;
+  await scenario("FeedbackRendersDiagrams T1", async () => {
+    await open(feedbackUrl);
+    await js(PLAIN);
+    await waitFor(BRIEF_DRAWN);
+    expectEq("FeedbackRendersDiagrams T1", "#brief .mermaid count", await js(`document.querySelectorAll('#brief .mermaid').length`), 2);
+    expectEq("FeedbackRendersDiagrams T1", "first canvas svg.pele", await js(`!!document.querySelector('#brief .mermaid svg.pele')`), true);
+    expectEq("FeedbackRendersDiagrams T1", "second canvas error text", await js(`document.querySelectorAll('#brief .mermaid')[1].textContent.includes('Parse error') && document.querySelectorAll('#brief .mermaid')[1].classList.contains('pele-error')`), true);
+    expectEq("FeedbackRendersDiagrams T1", "typeof window.mermaid", await js(`typeof window.mermaid`), "undefined");
+  });
+  await scenario("FeedbackRendersDiagrams T2", async () => {
+    await open(feedbackUrl);
+    await waitFor(BRIEF_DRAWN);
+    expectEq("FeedbackRendersDiagrams T2", "option cards present", await js(`document.querySelectorAll('.cv-card').length > 0`), true);
+  });
+  await scenario("FeedbackRendersDiagrams T3", async () => {
+    await open(feedbackUrl, /pele\.global\.js/);
+    await js(PLAIN);
+    await sleep(1500);
+    expectEq("FeedbackRendersDiagrams T3", "plain view source text",
+      await js(`[...document.querySelectorAll('#brief .mermaid')].filter((n) => n.textContent.trim().length > 0).length`), 2);
+    await js(`document.querySelector('#view-toggle button[data-view="cards"]').click()`);
+    await sleep(300);
+    expectEq("FeedbackRendersDiagrams T3", "svg count", await js(`document.querySelectorAll('#brief .mermaid svg').length`), 0);
+    expectEq("FeedbackRendersDiagrams T3", "canvases with source text",
+      await js(`[...document.querySelectorAll('#brief .mermaid')].filter((n) => n.textContent.trim().length > 0).length`), 2);
+    expectEq("FeedbackRendersDiagrams T3", "option cards present", await js(`document.querySelectorAll('.cv-card').length > 0`), true);
+    await cdp("Fetch.disable");
   });
 } finally {
   ws.close();

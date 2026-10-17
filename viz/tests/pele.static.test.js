@@ -55,3 +55,23 @@ describe('TemplateRendersDiagramsOnLoad', () => {
         for (const target of targets) expect(existsSync(target)).toBe(true);
     });
 });
+
+describe('FeedbackRendersDiagrams', () => {
+    const RECIPES = join(LIB, 'recipes');
+
+    test('T4: the feedback page has no legacy token and pins the same Pele tag as the viewer', () => {
+        const feedback = read('recipes/feedback.html');
+        expect(legacyHits(feedback)).toEqual([]);
+        expect(pinViolations(feedback)).toEqual([]);
+        expect(feedback.split(PELE_TAG).length - 1).toBe(1);
+        expect(feedback.indexOf(PELE_TAG)).toBeLessThan(feedback.indexOf('// @inline ../pele-glue.js'));
+    });
+
+    test('T5: the feedback page keeps the mermaid fence hook and every @inline target exists', () => {
+        const feedback = read('recipes/feedback.html');
+        expect(feedback).toContain('code.language-mermaid');
+        const targets = inlineTargets(feedback, RECIPES);
+        expect(targets.length).toBeGreaterThan(0);
+        for (const target of targets) expect(existsSync(target)).toBe(true);
+    });
+});

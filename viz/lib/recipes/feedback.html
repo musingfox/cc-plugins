@@ -446,7 +446,10 @@ window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
 </script>
 <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pele@1.6.0/dist/pele.global.js"></script>
+<script>
+// @inline ../pele-glue.js
+</script>
 <script>
 // @inline feedback.model.js
 </script>
@@ -529,30 +532,12 @@ window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
             var shell = document.createElement('div'); shell.className = 'mermaid-shell';
             var div = document.createElement('div'); div.className = 'mermaid';
             div.textContent = code.textContent;
+            div.dataset.src = code.textContent;
             shell.appendChild(div);
             pre.replaceWith(shell);
             mermaidNodes.push(div);
         });
-        if (mermaidNodes.length && window.mermaid) {
-            try {
-                window.mermaid.initialize({
-                    startOnLoad: false,
-                    theme: 'base',
-                    securityLevel: 'strict',
-                    themeVariables: {
-                        darkMode: true, background: 'transparent',
-                        fontFamily: 'Fira Code, jf Open Huninn, PingFang TC, ui-monospace, monospace',
-                        primaryColor: '#222222', primaryBorderColor: '#fd971f', primaryTextColor: '#e8e8e5',
-                        secondaryColor: '#181818', secondaryBorderColor: '#75715e',
-                        tertiaryColor: '#181818', tertiaryBorderColor: '#2e2e2e',
-                        lineColor: '#75715e', nodeBorder: '#fd971f',
-                        clusterBkg: '#181818', clusterBorder: '#2e2e2e',
-                        edgeLabelBackground: '#222222', titleColor: '#fd971f'
-                    }
-                });
-                window.mermaid.run({ nodes: mermaidNodes });
-            } catch (e) { /* leave source visible on failure */ }
-        }
+        if (mermaidNodes.length) renderDiagrams(mermaidNodes, { pele: window.pele });
     }
 
     // Option cards for one question. Selection state lives in the caller
