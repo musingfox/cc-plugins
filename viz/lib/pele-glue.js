@@ -10,6 +10,16 @@ function hasIcons(pack) {
     return !!pack && typeof pack === 'object' && !!pack.icons && typeof pack.icons === 'object';
 }
 
+let logosIdCounter = 0;
+
+function scopeIds(body) {
+    const ids = new Set([...body.matchAll(/\sid="([^"]+)"/g)].map(m => m[1]));
+    if (ids.size === 0) return body;
+    const prefix = `logos${++logosIdCounter}-`;
+    return body.replace(/(\sid="|url\(#|url\('#|url\("#|href="#)([^"')\s]+)/g,
+        (match, lead, id) => (ids.has(id) ? lead + prefix + id : match));
+}
+
 function makeLogosResolver(pack) {
     if (!hasIcons(pack)) return () => null;
     const { icons, aliases } = pack;
@@ -35,7 +45,7 @@ function makeLogosResolver(pack) {
         if (!icon || typeof icon !== 'object' || typeof icon.body !== 'string') return null;
         const width = icon.width ?? pack.width ?? 256;
         const height = icon.height ?? pack.height ?? 256;
-        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">${icon.body}</svg>`;
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">${scopeIds(icon.body)}</svg>`;
     };
 }
 

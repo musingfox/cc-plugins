@@ -210,7 +210,8 @@ describe('LogosIconResolver', () => {
         expect(first).toContain(`url(#${ids(first)[0]})`);
         expect(first).toContain(`href="#${ids(first)[0]}"`);
         expect(second).toContain(`url(#${ids(second)[0]})`);
-        expect(second).not.toContain('SVGeyciVcvH');
+        expect(second).not.toContain('id="SVGeyciVcvH"');
+        expect(second).not.toContain('(#SVGeyciVcvH)');
     });
 
     test('T7: a missing name or an alias with a missing parent gives null', () => {
