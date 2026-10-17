@@ -59,6 +59,10 @@ function drawNode(node, src, deps, icons) {
     }
 }
 
+const LOGOS_ICONS_URL = 'https://cdn.jsdelivr.net/npm/@iconify-json/logos@1.2.16/icons.json';
+
+const defaultFetchJson = url => fetch(url).then(r => r.json());
+
 async function renderDiagrams(nodes, deps = {}) {
     if (!deps.pele) {
         console.error('pele-glue: pele is not loaded; diagrams are left as source');
@@ -69,11 +73,17 @@ async function renderDiagrams(nodes, deps = {}) {
         const src = node.dataset && node.dataset.src;
         if (src) sources.push([node, src]);
     }
+    const logos = sources.filter(([, src]) => src.includes('logos:'));
     for (const [node, src] of sources) {
         if (!src.includes('logos:')) drawNode(node, src, deps, () => null);
     }
+    if (logos.length === 0) return;
+    const fetchJson = deps.fetchJson || defaultFetchJson;
+    const pack = await fetchJson(LOGOS_ICONS_URL);
+    const icons = makeLogosResolver(pack);
+    for (const [node, src] of logos) drawNode(node, src, deps, icons);
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { renderDiagrams, makeLogosResolver };
+    module.exports = { renderDiagrams, makeLogosResolver, LOGOS_ICONS_URL };
 }
