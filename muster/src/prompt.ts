@@ -32,7 +32,8 @@ export function buildPrompt(input: { worktree: string; reportPath: string; ticke
     input.ticket,
     "",
     reportBlock(input.reportPath),
-    "If a network host, web fetch, or web search is refused, do not work around it with another tool, mirror, or host. If you cannot proceed, write a BLOCKED report naming the host.",
+    "If a tool is reported as deferred or not loaded, load it with ToolSearch first, then call it with all its required parameters. A schema or input-validation error is not a refusal: fix the input and retry it once.",
+    "If a network host, web fetch, or web search is refused (a permission denial, not a validation error), do not work around it with another tool, mirror, or host. If you cannot proceed, write a BLOCKED report naming the host.",
   ].join("\n");
 }
 

@@ -39,6 +39,15 @@ describe("WorkerPrompt", () => {
     expect(lines[example + 1]).toBe("DONE");
   });
 
+  test("R2: prompt says to load deferred tools with ToolSearch and retry a validation error once", () => {
+    const prompt = buildPrompt({ worktree, reportPath, ticket });
+    expect(prompt).toMatch(/ToolSearch/);
+    expect(prompt).toMatch(/required parameter/i);
+    expect(prompt).toMatch(/deferred|not loaded/i);
+    expect(prompt).toMatch(/retry it once/i);
+    expect(prompt).toMatch(/not a refusal/i);
+  });
+
   test("T4: follow-up carries the text verbatim and the same report line", () => {
     const followup = buildFollowup({ text: "do X", reportPath });
     expect(followup).toContain("do X");
