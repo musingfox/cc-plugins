@@ -8,8 +8,8 @@ export function stopVerb(name: string, env: Env): VerbResult {
   if (!existsSync(p.meta)) {
     return { exitCode: 1, stdout: "", stderr: `no such run: ${name}\n` };
   }
-  if (readPhase(p)?.phase === "exited") {
-    const { state } = readStatus(p.runDir);
+  const { state } = readStatus(p.runDir);
+  if (readPhase(p)?.phase === "exited" || state === "dead") {
     return { exitCode: 0, stdout: `already exited ${name} state=${state}\n`, stderr: "" };
   }
   writeAtomic(p.stop, "");

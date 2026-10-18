@@ -45,6 +45,17 @@ describe("StopCommand", () => {
     expect(existsSync(p.stop)).toBe(false);
   });
 
+  test("R1: a run whose phase is running but whose client pid is dead prints 'already exited' and creates no STOP", () => {
+    const p = runPaths("d1", env);
+    createRunDir(p);
+    writeAtomic(p.meta, "{}");
+    writePhase(p, { phase: "running", pid: 999999 });
+    const r = stopVerb("d1", env);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toBe("already exited d1 state=dead\n");
+    expect(existsSync(p.stop)).toBe(false);
+  });
+
   test("T3: stopping a missing run exits 1", () => {
     const r = stopVerb("nope", env);
     expect(r.exitCode).toBe(1);
