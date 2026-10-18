@@ -15,12 +15,13 @@ export type OpenOptions = {
   stderrPath: string;
 };
 
-type Handler = (params: unknown) => unknown | Promise<unknown>;
+type Handler = (params: unknown, id: string | number) => unknown | Promise<unknown>;
 
 export type Channel = {
   request(method: string, params?: unknown): Promise<unknown>;
   notify(method: string, params?: unknown): Promise<void>;
   onRequest(method: string, handler: Handler): void;
+  logDecision(msg: object): Promise<void>;
   close(): Promise<void>;
   pid: number;
   exited: Promise<number>;
@@ -80,7 +81,7 @@ export async function openChannel(opts: OpenOptions): Promise<Channel> {
       body = { jsonrpc: "2.0", id: req.id, error: { code: -32601, message: `method not supported: ${req.method}` } };
     } else {
       try {
-        body = { jsonrpc: "2.0", id: req.id, result: await handler(req.params) };
+        body = { jsonrpc: "2.0", id: req.id, result: await handler(req.params, req.id) };
       } catch (e) {
         body = { jsonrpc: "2.0", id: req.id, error: { code: -32603, message: (e as Error).message } };
       }
@@ -98,7 +99,7 @@ export async function openChannel(opts: OpenOptions): Promise<Channel> {
     }
     await record("in", msg).catch(() => {});
     if (msg.method !== undefined && msg.id !== undefined) {
-      await answer(msg as { id: string | number; method: string; params?: unknown });
+      void answer(msg as { id: string | number; method: string; params?: unknown });
     } else if (msg.method === undefined && msg.id !== undefined) {
       const p = pending.get(msg.id as string | number);
       if (!p) return;
@@ -140,6 +141,9 @@ export async function openChannel(opts: OpenOptions): Promise<Channel> {
     },
     onRequest(method, handler) {
       handlers.set(method, handler);
+    },
+    logDecision(msg) {
+      return record("client-decision", msg).catch(() => {});
     },
     async notify(method, params) {
       await write("out", { jsonrpc: "2.0", method, params });
