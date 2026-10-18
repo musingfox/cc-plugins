@@ -198,7 +198,6 @@ describe("NetworkPolicy", () => {
       { kind: "other", rawInput: { host: "" } },
       { kind: "other", rawInput: { host: 42 } },
       { kind: "other" },
-      { kind: "execute", rawInput: { command: "git status" } },
       { kind: "think" },
       { kind: "switch_mode" },
     ];
@@ -211,6 +210,14 @@ describe("NetworkPolicy", () => {
       writeFileSync(layout.answer(1), JSON.stringify({ decision: "deny" }));
       await turn;
     }
+  });
+
+  test("R1: an execute request is not a network request and BashPolicy allows it once with no QUESTION file", async () => {
+    const call = { kind: "execute", toolCallId: "e", title: "Bash", rawInput: { command: "git status" } };
+    expect(decideNetwork(call, DEFAULT_HOSTS)).toBeUndefined();
+    const r = await viaHandler(call, {}, "run-r1");
+    expect(r.questionExists).toBe(false);
+    expect(r.reply).toEqual({ outcome: "selected", optionId: "allow-once" });
   });
 
   test("T9: a denial with only an allow option, or an allow with only a reject option, replies cancelled", async () => {
