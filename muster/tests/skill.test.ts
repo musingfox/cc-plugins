@@ -1,11 +1,26 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { DEFAULT_ALLOWED_HOSTS } from "../src/sandbox.ts";
 
 const MUSTER_ROOT = join(import.meta.dir, "..");
 const SKILL = readFileSync(join(MUSTER_ROOT, "skills", "muster", "SKILL.md"), "utf8");
 const PLACEHOLDER = "${CLAUDE_PLUGIN_ROOT}";
 const LITERAL_CMD = "${CLAUDE_PLUGIN_ROOT}/src/muster.ts";
+const OLD_FENCE_FIXTURE = `## Fence limits
+
+A worker does not get the main session's permissions.
+
+- Worker Bash runs only read-only commands (ls, cat, grep, git status, git log, and similar), \`bun test\`, and \`git add\` or \`git commit\`.
+- \`bun test\` and git commit hooks are not fenced; whatever they run is outside the fence.
+`;
+
+function bashFenceClaims(text: string): string[] {
+  const claims: string[] = [];
+  if (text.includes("read-only commands")) claims.push("read-only commands");
+  if (/not fenced/i.test(text)) claims.push("not fenced");
+  return claims;
+}
 
 function frontmatter(text: string): Record<string, string> {
   const m = /^---\n([\s\S]*?)\n---\n/.exec(text);
@@ -58,15 +73,36 @@ describe("CoordinatorSkill", () => {
     for (const line of cmds) expect(line).toContain(LITERAL_CMD);
   });
 
-  test("T4: body names run_in_background, --model, read-only commands, and the unfenced bun test and git commit hooks", () => {
+  test("T4: body names run_in_background, --model, the sandbox confinement, the allowlist variable, BLOCKED, and unconfined reads; claims nothing about temp directories", () => {
     const text = body(SKILL);
     expect(text).toContain("run_in_background");
     expect(text).toContain("--model");
-    expect(text).toContain("read-only commands");
-    expect(text).toContain("bun test");
-    expect(text).toContain("git commit");
-    expect(text).toContain("hook");
-    expect(text).toContain("not fenced");
+    expect(text).toContain("sandbox");
+    expect(text).toContain("MUSTER_ALLOW_HOSTS");
+    expect(text).toContain("BLOCKED");
+    expect(text).toMatch(/reads? (are )?not confined/i);
+    expect(text).not.toMatch(/temp director(y|ies)[^.\n]*denied/i);
+    expect(text).not.toMatch(/MUSTER_HOME[^.\n]*temp/i);
+  });
+
+  test("R1: the confinement section says the system temp directories stay writable and never asks to keep MUSTER_HOME out of temp", () => {
+    const text = body(SKILL);
+    expect(text).toMatch(/temp[^\n]{0,80}writable|writable[^\n]{0,80}temp/i);
+    expect(text).toMatch(/worktree and the system temp directories/i);
+    expect(text).not.toMatch(/MUSTER_HOME[^.\n]*temp/i);
+  });
+
+  test("T6: body carries no old Bash text-fence claims, and the previous fence text fails the same checks", () => {
+    expect(bashFenceClaims(body(SKILL))).toEqual([]);
+    expect(bashFenceClaims(OLD_FENCE_FIXTURE).length).toBe(2);
+  });
+
+  test("T7: the default-hosts paragraph lists exactly DEFAULT_ALLOWED_HOSTS", () => {
+    const text = body(SKILL);
+    for (const host of DEFAULT_ALLOWED_HOSTS) expect(text).toContain(host);
+    const paragraph = text.split(/\n\s*\n/).find((p) => /default hosts/i.test(p)) ?? "";
+    const named = [...paragraph.matchAll(/`([a-z0-9-]+(?:\.[a-z0-9-]+)+)`/g)].map((m) => m[1]);
+    expect([...named].sort()).toEqual([...DEFAULT_ALLOWED_HOSTS].sort());
   });
 
   test("T5: the plugin-root placeholder appears only inside non-heredoc code fences", () => {

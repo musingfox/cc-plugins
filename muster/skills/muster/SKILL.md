@@ -82,12 +82,17 @@ cd /abs/path/to/repo && git worktree remove "<worktree path from meta.json>"
 
 If remove refuses, the worktree holds uncommitted changes. Read them before deciding; do not force.
 
-## Fence limits
+## Confinement
 
 A worker does not get the main session's permissions.
 
-- Worker Bash runs only read-only commands (ls, cat, grep, git status, git log, and similar), `bun test`, and `git add` or `git commit`.
-- `bun test` and git commit hooks are not fenced; whatever they run is outside the fence.
-- Worker writes are limited to its own worktree and its report file.
-- The worker's permission requests reach you as `question` states. You answer `allow` or `deny` only; there is no session-wide grant.
+- Bash runs inside Claude Code's OS sandbox. Writes are confined to the worker's worktree and the system temp directories, which stay writable. Reads are not confined.
+- File tools are fenced by path. A file request outside the worktree becomes a `question` for you.
+- Network is limited to the default hosts: `registry.npmjs.org`, `github.com`, `codeload.github.com`. Hosts listed in `MUSTER_ALLOW_HOSTS` are added to them, set in the environment of `muster run`:
+
+```
+MUSTER_ALLOW_HOSTS=pypi.org,files.pythonhosted.org bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts run --name NAME --model MODEL --repo /abs/path/to/repo --ticket "TICKET TEXT"
+```
+
+- A request for any other host, a web fetch outside the list, and every web search is refused without a `question`. A worker that cannot proceed ends the run `BLOCKED`, and its report names the host.
 - The worker runs the model you named, in default permission mode, and loads no user or project settings.
