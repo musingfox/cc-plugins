@@ -1,12 +1,17 @@
 // Scenario-driven stand-in for an ACP agent. Reads newline-delimited JSON-RPC on stdin.
-// FAKE_AGENT_SCENARIO (JSON): { stderr?: string, startup?: (string | object)[] }
+// FAKE_AGENT_SCENARIO (JSON): { stderr?: string, startup?: (string | object)[],
+//   results?: {method: result}, errors?: {method: message}, silent?: string[] }
 //   startup items are written to stdout before any request is read; strings go out raw.
+//   results/errors override the reply per method; silent methods are never answered.
 // Requests: "fake/emit" writes params.messages to stdout, then replies {};
 //           any other request is answered with {echo: params} after params.delayMs.
 
 const scenario = JSON.parse(process.env.FAKE_AGENT_SCENARIO ?? "{}") as {
   stderr?: string;
   startup?: (string | object)[];
+  results?: Record<string, unknown>;
+  errors?: Record<string, string>;
+  silent?: string[];
 };
 
 const out = (msg: string | object) =>
@@ -24,8 +29,15 @@ function handle(msg: Msg) {
     out({ jsonrpc: "2.0", id: msg.id, result: {} });
     return;
   }
+  if (scenario.silent?.includes(msg.method)) return;
+  const error = scenario.errors?.[msg.method];
+  if (error !== undefined) {
+    out({ jsonrpc: "2.0", id: msg.id, error: { code: -32000, message: error } });
+    return;
+  }
+  const result = scenario.results?.[msg.method] ?? { echo: msg.params ?? null };
   setTimeout(
-    () => out({ jsonrpc: "2.0", id: msg.id, result: { echo: msg.params ?? null } }),
+    () => out({ jsonrpc: "2.0", id: msg.id, result }),
     msg.params?.delayMs ?? 0,
   );
 }
