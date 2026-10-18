@@ -186,6 +186,21 @@ Offload heavy work to [pi](https://github.com/earendil-works/pi) cheap/fast mode
 /plugin install pi-dispatch
 ```
 
+### muster (Experimental)
+
+Unattended Claude workers over [ACP](https://agentclientprotocol.com) (claude-agent-acp, pinned by version): a coordinator dispatches headless workers, each under a permission fence, and collects their result from a report file:
+- **Permission fence**: workers run in default mode with no setting sources; only one-time allow and reject decisions are answered
+- **Event log**: every worker run records its events for replay after the fact
+- **File-based escalation**: when a worker needs a human, the client writes `QUESTION-<n>.json` and the request blocks until `ANSWER-<n>.json` exists
+- **Report-file completion**: a run is done when the worker writes its report file
+
+Bash runs inside Claude Code's OS sandbox, confined to the worktree. Network for Bash and web fetch alike is limited to a built-in allowlist (registry.npmjs.org, github.com, codeload.github.com), extendable per dispatch through `MUSTER_ALLOW_HOSTS`; a host off the list, and any web search, is refused without a question.
+
+**Installation:**
+```bash
+/plugin install muster
+```
+
 ### Wizard
 
 Generate an interactive bash wizard that walks a human through steps only they can perform — ported from [mattpocock/skills](https://github.com/mattpocock/skills) (`wizard`), MIT, Copyright (c) 2026 Matt Pocock:
@@ -334,6 +349,7 @@ cc-plugins/
 ├── flashcards/        hooks: register (Claude Mod) · tests
 ├── hook-guard/         skills: hook-guard
 ├── mermaid-inline/     hooks: register (Claude Mod) · tests
+├── muster/             tests
 ├── obsidian-workspace/ skills: init, jot, pm · templates, tests · hooks: register (Claude Mod)
 ├── omp-quota/          hooks: register (Claude Mod) · tests
 ├── pi-dispatch/        skills: pi-dispatch · agents: builder, reviewer · scripts, shims, extensions, tests

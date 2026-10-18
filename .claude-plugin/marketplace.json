@@ -107,6 +107,11 @@
       "name": "flashcards",
       "source": "./flashcards",
       "description": "[Experimental] Flashcards from your repo's specs, ADRs and vault task cards — /cards build generates a review deck with a background Haiku, /cards opens a token-free Leitner review pane"
+    },
+    {
+      "name": "muster",
+      "source": "./muster",
+      "description": "[Experimental] Unattended Claude workers over ACP — a coordinator dispatches headless workers with a permission fence, an event log, file-based escalation and report-file completion"
     }
   ]
 }
