@@ -77,3 +77,12 @@ test('T6: muster README section states the QUESTION/ANSWER block, the sandbox an
   expect(section).toContain('sandbox')
   expect(section).toContain('MUSTER_ALLOW_HOSTS')
 })
+
+test('R1: muster README states the Bash write scope and unconfined reads, and the tree line names its skill first', () => {
+  const readme = readFileSync(join(ROOT, 'README.md'), 'utf8')
+  const section = musterSection(readme)
+  expect(section).toContain('Bash writes are confined to the worktree and the system temp directories')
+  expect(section).toContain('reads are not confined')
+  const line = structureBlock(readme).split('\n').find((l) => l.startsWith('├── muster/'))
+  expect(line).toMatch(/^├── muster\/\s+skills: muster · /)
+})

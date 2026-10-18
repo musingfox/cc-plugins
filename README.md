@@ -194,7 +194,7 @@ Unattended Claude workers over [ACP](https://agentclientprotocol.com) (claude-ag
 - **File-based escalation**: when a worker needs a human, the client writes `QUESTION-<n>.json` and the request blocks until `ANSWER-<n>.json` exists
 - **Report-file completion**: a run is done when the worker writes its report file
 
-Bash runs inside Claude Code's OS sandbox, confined to the worktree. Network for Bash and web fetch alike is limited to a built-in allowlist (registry.npmjs.org, github.com, codeload.github.com), extendable per dispatch through `MUSTER_ALLOW_HOSTS`; a host off the list, and any web search, is refused without a question.
+Bash runs inside Claude Code's OS sandbox: Bash writes are confined to the worktree and the system temp directories, and reads are not confined. Network for Bash and web fetch alike is limited to a built-in allowlist (registry.npmjs.org, github.com, codeload.github.com), extendable per dispatch through `MUSTER_ALLOW_HOSTS`; a host off the list, and any web search, is refused without a question.
 
 **Installation:**
 ```bash
@@ -349,7 +349,7 @@ cc-plugins/
 ├── flashcards/        hooks: register (Claude Mod) · tests
 ├── hook-guard/         skills: hook-guard
 ├── mermaid-inline/     hooks: register (Claude Mod) · tests
-├── muster/             tests
+├── muster/             skills: muster · src, e2e, tests
 ├── obsidian-workspace/ skills: init, jot, pm · templates, tests · hooks: register (Claude Mod)
 ├── omp-quota/          hooks: register (Claude Mod) · tests
 ├── pi-dispatch/        skills: pi-dispatch · agents: builder, reviewer · scripts, shims, extensions, tests
