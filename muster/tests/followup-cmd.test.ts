@@ -65,6 +65,15 @@ describe("FollowUpCommand", () => {
     expect(existsSync(join(p.runDir, "FOLLOWUP-1.md"))).toBe(false);
   });
 
+  test("R1: empty --file content exits 2 and writes no file", () => {
+    const p = makeRun();
+    const src = join(scratch, "empty.md");
+    writeFileSync(src, "");
+    const r = followupVerb("a1", { file: src }, env());
+    expect(r.exitCode).toBe(2);
+    expect(existsSync(join(p.runDir, "FOLLOWUP-1.md"))).toBe(false);
+  });
+
   test("T5: exited phase exits 1 with 'client exited' and writes no file", () => {
     const p = makeRun({ phase: "exited", pid: 999999 });
     const r = followupVerb("a1", "do X", env());

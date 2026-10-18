@@ -20,7 +20,7 @@ export function followupVerb(name: string, body: string | { file: string }, env:
   }
 
   const text = typeof body === "string" ? body : readFileSync(body.file, "utf8");
-  if (typeof body === "string" && text.trim() === "") {
+  if (text.trim() === "") {
     return { exitCode: 2, stdout: "", stderr: "follow-up text is empty\n" };
   }
 
