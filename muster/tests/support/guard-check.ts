@@ -89,5 +89,16 @@ export function decisionTable(env: Env): Case[] {
       kind: "edit",
       locations: [{ path: join(wt, "a.ts") }, { path: env.outsideFile }],
     }),
+    // R1
+    allow("R1 report path named twice (locations and rawInput)", {
+      kind: "edit",
+      locations: [{ path: env.reportPath }],
+      rawInput: { file_path: env.reportPath },
+    }),
+    deny("R1 report path plus an outside path", {
+      kind: "edit",
+      locations: [{ path: env.reportPath }],
+      rawInput: { file_path: env.outsideFile },
+    }),
   ];
 }

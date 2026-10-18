@@ -58,7 +58,7 @@ export function decidePath(toolCall: ToolCall, ctx: PathContext): Decision {
     const reportIsSymlink = isSymlink(ctx.reportPath);
     const reportReal = reportIsSymlink ? undefined : realpathDeepest(resolve(worktreeReal, ctx.reportPath));
 
-    const resolved = candidates.map((c) => realpathDeepest(resolve(worktreeReal, c)));
+    const resolved = [...new Set(candidates.map((c) => realpathDeepest(resolve(worktreeReal, c))))];
 
     for (const real of resolved) {
       if (real === gitDir || real.startsWith(gitDir + sep)) {
@@ -68,7 +68,7 @@ export function decidePath(toolCall: ToolCall, ctx: PathContext): Decision {
 
     if (
       toolCall.kind === "edit" &&
-      candidates.length === 1 &&
+      resolved.length === 1 &&
       reportReal !== undefined &&
       resolved[0] === reportReal
     ) {
