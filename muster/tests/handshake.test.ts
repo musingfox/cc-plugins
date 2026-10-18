@@ -1,14 +1,34 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, mkdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { openChannel, type Channel } from "../src/channel";
 import { HandshakeError, handshake, handshakeTimeoutMs } from "../src/handshake";
+import { resolveAllowedHosts } from "../src/sandbox";
 
 const FAKE = join(import.meta.dir, "support", "fake-agent.ts");
 const RUNS = join(import.meta.dir, "..", ".test-runs");
 const WORKTREE = "/tmp/worktree-under-test";
 const ADAPTER_RESULTS = {
   initialize: { agentInfo: { name: "claude-agent-acp", version: "0.93.0" } },
+};
+const DEFAULT_HOSTS = ["registry.npmjs.org", "github.com", "codeload.github.com"];
+const T1_PARAMS = {
+  cwd: "/w/x",
+  mcpServers: [],
+  _meta: {
+    claudeCode: {
+      options: {
+        settingSources: [],
+        sandbox: {
+          enabled: true,
+          failIfUnavailable: true,
+          autoAllowBashIfSandboxed: true,
+          allowUnsandboxedCommands: false,
+          network: { allowedDomains: DEFAULT_HOSTS, strictAllowlist: true },
+        },
+      },
+    },
+  },
 };
 
 let dir: string;
@@ -51,16 +71,19 @@ function outMessages(path: string) {
     .map((e) => e.msg);
 }
 
+function sentMethods(path: string): string[] {
+  return existsSync(path) ? outMessages(path).map((m) => m.method) : [];
+}
+
+function sessionNew(path: string) {
+  return outMessages(path).find((m) => m.method === "session/new")?.params;
+}
+
 describe("SessionHandshake", () => {
-  test("T1: session/new is sent with cwd, empty mcpServers and settingSources []", async () => {
+  test("T1: session/new is sent with cwd, empty mcpServers, settingSources [] and the sandbox option", async () => {
     const { ch, eventsPath } = await open();
-    await handshake(ch, { worktree: WORKTREE });
-    const sessionNew = outMessages(eventsPath).find((m) => m.method === "session/new");
-    expect(sessionNew.params).toStrictEqual({
-      cwd: WORKTREE,
-      mcpServers: [],
-      _meta: { claudeCode: { options: { settingSources: [] } } },
-    });
+    await handshake(ch, { worktree: "/w/x", env: {} });
+    expect(sessionNew(eventsPath)).toStrictEqual(T1_PARAMS);
   });
 
   test("T2: initialize is sent with protocolVersion 1 and fs/terminal capabilities off", async () => {
@@ -96,5 +119,58 @@ describe("SessionHandshake", () => {
 
   test("T5: with MUSTER_HANDSHAKE_TIMEOUT_MS unset the timeout is 60000 ms", () => {
     expect(handshakeTimeoutMs()).toBe(60000);
+  });
+
+  test("T6: MUSTER_ALLOW_HOSTS is trimmed, lower-cased, deduplicated and appended after the defaults", async () => {
+    const { ch, eventsPath } = await open();
+    await handshake(ch, {
+      worktree: "/w/x",
+      env: { MUSTER_ALLOW_HOSTS: " Example.org, *.corp.example ,github.com," },
+    });
+    expect(sessionNew(eventsPath)._meta.claudeCode.options.sandbox.network.allowedDomains).toStrictEqual([
+      ...DEFAULT_HOSTS,
+      "example.org",
+      "*.corp.example",
+    ]);
+  });
+
+  test("T7: an invalid MUSTER_ALLOW_HOSTS entry rejects with invalid-allow-host before any request is sent", async () => {
+    for (const entry of ["https://x.org", "a.com/path", "a.com:443", "*", "localhost", "a b"]) {
+      const { ch, eventsPath } = await open();
+      const err = await handshake(ch, { worktree: "/w/x", env: { MUSTER_ALLOW_HOSTS: entry } }).catch((e) => e);
+      expect(err).toBeInstanceOf(HandshakeError);
+      expect(err.message).toContain("invalid-allow-host");
+      expect(err.message).toContain(entry);
+      expect(sentMethods(eventsPath)).not.toContain("initialize");
+      expect(sentMethods(eventsPath)).not.toContain("session/new");
+    }
+  });
+
+  test("R2: session/new sandbox has no filesystem key and no denyWrite or allowWrite, for any worktree", async () => {
+    const { ch, eventsPath } = await open();
+    await handshake(ch, { worktree: "/t/a/runs/w", env: {} });
+    const sandbox = sessionNew(eventsPath)._meta.claudeCode.options.sandbox;
+    expect(sandbox).not.toHaveProperty("filesystem");
+    expect(JSON.stringify(sandbox)).not.toMatch(/denyWrite|allowWrite/);
+  });
+
+  test("T10: no environment variable switches the sandbox off or allows unsandboxed commands", async () => {
+    const { ch, eventsPath } = await open();
+    await handshake(ch, {
+      worktree: "/w/x",
+      env: { MUSTER_SANDBOX: "off", MUSTER_ALLOW_UNSANDBOXED: "1", MUSTER_ALLOW_HOSTS: "" },
+    });
+    expect(sessionNew(eventsPath)).toStrictEqual(T1_PARAMS);
+  });
+
+  test("T11: the sandbox allowedDomains equal resolveAllowedHosts for the same env", async () => {
+    const env = { MUSTER_ALLOW_HOSTS: "a.org" };
+    const { ch, eventsPath } = await open();
+    await handshake(ch, { worktree: "/w/x", env });
+    expect(sessionNew(eventsPath)._meta.claudeCode.options.sandbox.network.allowedDomains).toStrictEqual([
+      ...DEFAULT_HOSTS,
+      "a.org",
+    ]);
+    expect(resolveAllowedHosts(env)).toStrictEqual([...DEFAULT_HOSTS, "a.org"]);
   });
 });

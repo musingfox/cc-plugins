@@ -1,4 +1,5 @@
 import type { Channel } from "./channel";
+import { InvalidAllowHost, resolveAllowedHosts, sandboxOption } from "./sandbox";
 
 export class HandshakeError extends Error {
   override name = "HandshakeError";
@@ -46,7 +47,18 @@ async function call(channel: Channel, method: string, params: unknown, ms: numbe
   }
 }
 
-export async function handshake(channel: Channel, opts: { worktree: string }): Promise<Handshake> {
+export async function handshake(
+  channel: Channel,
+  opts: { worktree: string; env?: Record<string, string | undefined> },
+): Promise<Handshake> {
+  const env = opts.env ?? process.env;
+  try {
+    resolveAllowedHosts(env);
+  } catch (e) {
+    if (e instanceof InvalidAllowHost) throw new HandshakeError(e.message);
+    throw e;
+  }
+  const sandbox = sandboxOption({ env });
   const ms = handshakeTimeoutMs();
   const init = (await call(
     channel,
@@ -64,7 +76,7 @@ export async function handshake(channel: Channel, opts: { worktree: string }): P
     {
       cwd: opts.worktree,
       mcpServers: [],
-      _meta: { claudeCode: { options: { settingSources: [] } } },
+      _meta: { claudeCode: { options: { settingSources: [], sandbox } } },
     },
     ms,
   )) as { sessionId: string; configOptions: unknown };
