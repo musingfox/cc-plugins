@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, readdirSync, rmSync, statSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { followupVerb } from "../src/verbs/followup";
 import {
   UsageError,
   createRunDir,
@@ -78,5 +79,16 @@ describe("RunLayout", () => {
     expect(readPhase(p)).toEqual({ phase: "running", stopReason: "end_turn" });
     writeFileSync(p.phase, "{not json");
     expect(readPhase(p)).toBeUndefined();
+  });
+
+  test("R4: followup(n) names the FOLLOWUP-<n>.md file the follow-up verb writes", () => {
+    const env = { MUSTER_HOME: home, HOME: home };
+    const p = runPaths("a1", env);
+    createRunDir(p);
+    writeFileSync(p.meta, JSON.stringify({ name: "a1" }));
+    writePhase(p, { phase: "running", pid: process.pid });
+    expect(followupVerb("a1", "do X", env).exitCode).toBe(0);
+    expect(p.followup(1)).toBe(join(p.runDir, "FOLLOWUP-1.md"));
+    expect(readFileSync(p.followup(1), "utf8")).toBe("do X");
   });
 });

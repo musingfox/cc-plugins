@@ -63,13 +63,18 @@ function pendingQuestion(runDir: string): { n: number; paths: string[] } | undef
 }
 
 function classify(runDir: string, name: string): StatusLine {
-  const question = pendingQuestion(runDir);
-  if (question) {
-    return { name, state: "question", question: question.n, paths: question.paths };
-  }
-
   const reportPath = resolve(runDir, "REPORT.md");
   const report = readReport(reportPath);
+  const phase = readObject(join(runDir, "phase.json"));
+
+  // A stopped or blocked run no longer waits on its question, so the question must not mask the stop.
+  if (report.kind !== "blocked" && phase?.phase !== "exited") {
+    const question = pendingQuestion(runDir);
+    if (question) {
+      return { name, state: "question", question: question.n, paths: question.paths };
+    }
+  }
+
   if (report.kind === "done") return { name, state: "done", report: reportPath };
   if (report.kind === "blocked") {
     const reason = report.body.trim().replace(/\s*\n\s*/g, " ");
@@ -77,13 +82,14 @@ function classify(runDir: string, name: string): StatusLine {
   }
   if (report.kind === "malformed") return { name, state: "malformed" };
 
-  const phase = readObject(join(runDir, "phase.json"));
   if (!phase) return { name, state: "dead", reason: "phase-unreadable" };
 
   const phaseName = phase.phase;
   if (phaseName !== "exited" && typeof phase.pid === "number" && !pidAlive(phase.pid)) {
     return { name, state: "dead" };
   }
+  // "question" is the window between a worker asking and resuming after ANSWER-n.json.
+  if (phaseName === "question") return { name, state: "running" };
   if (phaseName === "starting" || phaseName === "running") return { name, state: phaseName };
   if (phaseName === "idle" || phaseName === "exited") {
     const stop = typeof phase.stopReason === "string" ? phase.stopReason : undefined;

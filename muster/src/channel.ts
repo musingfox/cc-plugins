@@ -38,7 +38,7 @@ export async function openChannel(opts: OpenOptions): Promise<Channel> {
       stdout: "pipe",
       stderr: stderrFd,
       cwd: opts.cwd,
-      env: { ...process.env, ...opts.env },
+      env: opts.env,
     });
   } catch (e) {
     closeSync(stderrFd);

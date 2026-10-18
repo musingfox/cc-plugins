@@ -46,7 +46,7 @@ export function runPaths(name: string, env: Env): RunPaths {
     stop: join(runDir, "STOP"),
     question: (n) => join(runDir, `QUESTION-${n}.json`),
     answer: (n) => join(runDir, `ANSWER-${n}.json`),
-    followup: (n) => join(runDir, `FOLLOWUP-${n}.json`),
+    followup: (n) => join(runDir, `FOLLOWUP-${n}.md`),
   };
 }
 

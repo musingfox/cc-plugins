@@ -79,6 +79,22 @@ describe("StatusReader", () => {
     expect(readStatus(p.runDir).state).toBe("question");
   });
 
+  test("R1: a stopped run shows blocked reason=stopped even while an unanswered question file remains", () => {
+    const p = makeRun();
+    writePhase(p, { phase: "exited", pid: 999999, stopReason: "stopped" });
+    writeFileSync(p.question(1), JSON.stringify({ paths: ["/x"] }));
+    writeFileSync(p.report, "BLOCKED\nstopped");
+    expect(line(p)).toBe(`a1 state=blocked report=${p.report} reason=stopped`);
+  });
+
+  test("R2: phase question with every question answered renders state=running, not dead", () => {
+    const p = makeRun();
+    writePhase(p, { phase: "question", pid: process.pid });
+    writeFileSync(p.question(1), JSON.stringify({ paths: [] }));
+    writeFileSync(p.answer(1), JSON.stringify({ decision: "allow" }));
+    expect(line(p)).toBe("a1 state=running");
+  });
+
   test("T7: running phase whose pid has exited renders state=dead", async () => {
     const p = makeRun();
     const child = Bun.spawn(["true"]);
