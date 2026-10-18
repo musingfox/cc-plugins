@@ -4,7 +4,10 @@ import { UsageError } from "./layout";
 function reportBlock(reportPath: string): string {
   return [
     `Report file: ${reportPath}`,
-    "Write your report to that file. Its first line must be exactly DONE or BLOCKED, followed by a summary.",
+    "Write your report to that file. Its first line is the single word DONE or BLOCKED, with nothing else on that line. Put the summary on the lines after it.",
+    "Example report:",
+    "DONE",
+    "Created hello.txt with the requested greeting.",
     "Requests outside the worktree may be denied. If a request is refused, do not work around the refusal; record BLOCKED in the report instead.",
   ].join("\n");
 }

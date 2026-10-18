@@ -28,6 +28,17 @@ describe("WorkerPrompt", () => {
     expect(prompt).toContain("CLAUDE.md");
   });
 
+  test("R1: report instruction pins a bare DONE/BLOCKED first line with a literal example", () => {
+    const prompt = buildPrompt({ worktree, reportPath, ticket });
+    const lines = prompt.split("\n");
+    expect(prompt).toContain("nothing else on that line");
+    expect(prompt).toContain("lines after it");
+    expect(prompt).not.toContain("followed by a summary");
+    const example = lines.indexOf("Example report:");
+    expect(example).toBeGreaterThan(-1);
+    expect(lines[example + 1]).toBe("DONE");
+  });
+
   test("T4: follow-up carries the text verbatim and the same report line", () => {
     const followup = buildFollowup({ text: "do X", reportPath });
     expect(followup).toContain("do X");
