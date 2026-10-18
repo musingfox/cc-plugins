@@ -22,6 +22,8 @@ export type Channel = {
   notify(method: string, params?: unknown): Promise<void>;
   onRequest(method: string, handler: Handler): void;
   close(): Promise<void>;
+  pid: number;
+  exited: Promise<number>;
 };
 
 type Pending = { resolve: (value: unknown) => void; reject: (err: Error) => void };
@@ -146,5 +148,7 @@ export async function openChannel(opts: OpenOptions): Promise<Channel> {
       proc.kill();
       await proc.exited;
     },
+    pid: proc.pid,
+    exited: proc.exited,
   };
 }
