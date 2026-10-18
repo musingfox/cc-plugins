@@ -15,9 +15,12 @@ export type OpenOptions = {
   stderrPath: string;
 };
 
+type Handler = (params: unknown) => unknown | Promise<unknown>;
+
 export type Channel = {
   request(method: string, params?: unknown): Promise<unknown>;
   notify(method: string, params?: unknown): Promise<void>;
+  onRequest(method: string, handler: Handler): void;
   close(): Promise<void>;
 };
 
@@ -44,6 +47,7 @@ export async function openChannel(opts: OpenOptions): Promise<Channel> {
   let nextId = 1;
   let closed = false;
   let chain: Promise<void> = Promise.resolve();
+  const handlers = new Map<string, Handler>();
 
   const rejectAll = (err: Error) => {
     for (const p of pending.values()) p.reject(err);
@@ -67,6 +71,21 @@ export async function openChannel(opts: OpenOptions): Promise<Channel> {
     proc.stdin.flush();
   };
 
+  const answer = async (req: { id: string | number; method: string; params?: unknown }) => {
+    const handler = handlers.get(req.method);
+    let body: object;
+    if (!handler) {
+      body = { jsonrpc: "2.0", id: req.id, error: { code: -32601, message: `method not supported: ${req.method}` } };
+    } else {
+      try {
+        body = { jsonrpc: "2.0", id: req.id, result: await handler(req.params) };
+      } catch (e) {
+        body = { jsonrpc: "2.0", id: req.id, error: { code: -32603, message: (e as Error).message } };
+      }
+    }
+    await write("out", body).catch(() => {});
+  };
+
   const handleLine = async (raw: string) => {
     let msg: Record<string, unknown>;
     try {
@@ -76,7 +95,9 @@ export async function openChannel(opts: OpenOptions): Promise<Channel> {
       return;
     }
     await record("in", msg).catch(() => {});
-    if (msg.method === undefined && msg.id !== undefined) {
+    if (msg.method !== undefined && msg.id !== undefined) {
+      await answer(msg as { id: string | number; method: string; params?: unknown });
+    } else if (msg.method === undefined && msg.id !== undefined) {
       const p = pending.get(msg.id as string | number);
       if (!p) return;
       pending.delete(msg.id as string | number);
@@ -114,6 +135,9 @@ export async function openChannel(opts: OpenOptions): Promise<Channel> {
         pending.set(id, { resolve, reject });
         write("out", { jsonrpc: "2.0", id, method, params }).catch(() => {});
       });
+    },
+    onRequest(method, handler) {
+      handlers.set(method, handler);
     },
     async notify(method, params) {
       await write("out", { jsonrpc: "2.0", method, params });
