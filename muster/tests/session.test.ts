@@ -248,4 +248,23 @@ describe("WorkerSessionLoop", () => {
     const everything = [JSON.stringify(readPhase(layout)), readFileSync(layout.events, "utf8"), readFileSync(layout.stderrLog, "utf8")];
     for (const text of everything) expect(text).not.toContain("agent-exited");
   });
+
+  test("R1: the agent exiting during a follow-up turn blocks the run with agent-exited", async () => {
+    const script = join(home, "second-prompt-exits.ts");
+    writeFileSync(
+      script,
+      `import * as base from ${JSON.stringify(SCRIPT)};\nlet n = 0;\nexport const setup = base.setup;\nexport function handle(msg: any, io: any) {\n  if (msg.method === "session/prompt" && ++n === 2) process.exit(3);\n  return base.handle(msg, io);\n}\n`,
+    );
+    const layout = layoutFor();
+    const exits: number[] = [];
+    const sc = scenario({ writeReport: "DONE\nfirst" });
+    const run = runWorker(request(), layout, { env: envFor(sc, { FAKE_AGENT_SCRIPT: script }), exit: (c) => exits.push(c) });
+    expect(await waitFor(() => readPhase(layout)?.phase === "idle")).toBe(true);
+    writeFileSync(join(layout.runDir, "FOLLOWUP-1.md"), "second");
+    await run;
+    expect(exits).toEqual([1]);
+    const lines = readReportFile(layout)?.split("\n") ?? [];
+    expect(lines[0]).toBe("BLOCKED");
+    expect(lines[1]).toContain("agent-exited");
+  });
 });

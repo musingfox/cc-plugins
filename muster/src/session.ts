@@ -112,6 +112,19 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
     }),
   );
 
+  const failTurn = async (e: unknown) => {
+    const grace = new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), killGraceMs(env)));
+    const exitCode = await Promise.race([channel.exited, grace]);
+    if (exitCode !== undefined) await term.terminate("agent-exited", `exit code ${exitCode}`);
+    else await term.terminate("prompt-error", (e as Error).message);
+  };
+  const recordTurn = (result: TurnResult | null) => {
+    setPhase(layout, "idle", {
+      stopReason: result?.stopReason,
+      models: (result?._meta?.quota?.model_usage ?? []).map((u) => u.model),
+    });
+  };
+
   setPhase(layout, "running");
   const turn = channel.request("session/prompt", { sessionId, prompt: [{ type: "text", text: prompt }] });
   state.turn = turn;
@@ -119,18 +132,25 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
   try {
     result = (await turn) as TurnResult | null;
   } catch (e) {
-    const grace = new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), killGraceMs(env)));
-    const exitCode = await Promise.race([channel.exited, grace]);
-    if (exitCode !== undefined) await term.terminate("agent-exited", `exit code ${exitCode}`);
-    else await term.terminate("prompt-error", (e as Error).message);
+    await failTurn(e);
     return;
   }
-  setPhase(layout, "idle", {
-    stopReason: result?.stopReason,
-    models: (result?._meta?.quota?.model_usage ?? []).map((u) => u.model),
-  });
+  recordTurn(result);
 
-  await runFollowupInbox({ paths: layout, channel, sessionId });
+  try {
+    await runFollowupInbox({
+      paths: layout,
+      channel,
+      sessionId,
+      onTurn: (followup) => {
+        state.turn = followup;
+        followup.then((r) => recordTurn(r as TurnResult | null), () => {});
+      },
+    });
+  } catch (e) {
+    await failTurn(e);
+    return;
+  }
   term.dispose();
   await channel.close();
   exit(0);

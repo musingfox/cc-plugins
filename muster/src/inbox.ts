@@ -43,8 +43,9 @@ export async function runFollowupInbox(opts: {
   paths: RunPaths;
   channel: Channel;
   sessionId: string;
+  onTurn?: (turn: Promise<unknown>) => void;
 }): Promise<void> {
-  const { paths: p, channel, sessionId } = opts;
+  const { paths: p, channel, sessionId, onTurn } = opts;
   writePhase(p, { phase: "idle" });
   let idleSince = Date.now();
   for (;;) {
@@ -72,10 +73,12 @@ export async function runFollowupInbox(opts: {
     }
     archiveReport(p);
     writePhase(p, { phase: "running" });
-    await channel.request("session/prompt", {
+    const turn = channel.request("session/prompt", {
       sessionId,
       prompt: [{ type: "text", text: buildFollowup({ text, reportPath: p.report }) }],
     });
+    onTurn?.(turn);
+    await turn;
     writePhase(p, { phase: "idle" });
     idleSince = Date.now();
   }
