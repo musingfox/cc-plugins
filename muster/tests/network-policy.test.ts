@@ -238,6 +238,12 @@ describe("NetworkPolicy", () => {
     expect(lines).not.toContain("/path");
   });
 
+  test("R2: a fetch whose rawInput is a primitive is denied without throwing", () => {
+    for (const raw of ["https://example.com/", 42, true]) {
+      expect(decideNetwork({ kind: "fetch", rawInput: raw }, DEFAULT_HOSTS)?.decision).toBe("deny");
+    }
+  });
+
   test("T11: the table catches a guard that always returns undefined and one that always allows", () => {
     const table: Array<[object, string | undefined]> = [
       [hostCall("evil.example"), "deny"],

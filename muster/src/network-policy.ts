@@ -24,7 +24,7 @@ function allowedBy(host: string, allowedHosts: string[]): boolean {
 }
 
 function decideFetch(rawInput: unknown, allowedHosts: string[]): NetworkDecision {
-  const input = (rawInput ?? {}) as Record<string, unknown>;
+  const input = (typeof rawInput === "object" && rawInput !== null ? rawInput : {}) as Record<string, unknown>;
   if ("query" in input) return { decision: "deny", reason: "web search is not allowed" };
   const host = hostOf(input.url);
   if (host === undefined) return { decision: "deny", reason: "fetch url is missing or not an http(s) url" };
