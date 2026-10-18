@@ -159,12 +159,11 @@ describe("EscalationRoundTrip", () => {
     expect(decisions(other.layout.events)).toEqual([{ decision: "deny", by: "answer-invalid" }]);
   });
 
-  test("T5: Bash without a command, Write with no path, and think/fetch/switch_mode all escalate", async () => {
+  test("T5: Bash without a command, Write with no path, and think/switch_mode all escalate", async () => {
     const cases = [
       { kind: "execute", toolCallId: "c1", title: "Bash", rawInput: {} },
       { kind: "edit", toolCallId: "c2", title: "Write", rawInput: {} },
       { kind: "think", toolCallId: "c3", title: "Think" },
-      { kind: "fetch", toolCallId: "c4", title: "Fetch" },
       { kind: "switch_mode", toolCallId: "c5", title: "Mode" },
     ];
     for (const [i, toolCall] of cases.entries()) {
@@ -200,7 +199,7 @@ describe("EscalationRoundTrip", () => {
 
   test("T7: a 10000-char rawInput string is truncated with a marker and the QUESTION file stays under 20 kB", async () => {
     const big = "a".repeat(10000);
-    const toolCall = { kind: "fetch", toolCallId: "big", title: "Fetch", rawInput: { content: big } };
+    const toolCall = { kind: "edit", toolCallId: "big", title: "Write", locations: [{ path: OUTSIDE }], rawInput: { file_path: OUTSIDE, content: big } };
     const { ch, layout } = await setup({ permission: { toolCall } });
     const turn = ch.request("session/prompt", { sessionId: "sess-1" });
     expect(await waitFor(() => existsSync(layout.question(1)))).toBe(true);

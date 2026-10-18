@@ -2,8 +2,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { decideBash } from "./bash-policy";
 import { writeAtomic, writePhase, type RunPaths } from "./layout";
 import { chooseOutcome, type PermissionOption, type PermissionOutcome } from "./outcome";
+import { decideNetwork } from "./network-policy";
 import { decidePath, type Decision, type ToolCall } from "./path-policy";
 import { awaitAnswerWithin, questionTimeoutMs } from "./question-timeout";
+import { resolveAllowedHosts } from "./sandbox";
 import { pollMs, type Reason } from "./termination";
 
 const PATH_KINDS = new Set(["edit", "delete", "move", "read", "search"]);
@@ -22,6 +24,7 @@ export type PermissionHandlerOptions = {
   terminate: (reason: Reason, detail?: string) => Promise<number>;
   logDecision: (msg: object) => Promise<void>;
   env?: { MUSTER_POLL_MS?: string; MUSTER_QUESTION_TIMEOUT_MS?: string };
+  allowedHosts?: string[];
 };
 
 function policyDecision(toolCall: ToolCallRequest, layout: RunPaths, worktreeReal: string): Decision {
@@ -70,6 +73,17 @@ export function createPermissionHandler(opts: PermissionHandlerOptions) {
   const env = opts.env ?? process.env;
   const poll = pollMs(env);
   let questions = 0;
+  let hosts = opts.allowedHosts;
+  const allowedHosts = (): string[] => {
+    if (hosts === undefined) {
+      try {
+        hosts = resolveAllowedHosts(process.env);
+      } catch {
+        hosts = [];
+      }
+    }
+    return hosts;
+  };
 
   const waitForAnswer = (n: number): Promise<Settled> =>
     new Promise((resolve) => {
@@ -93,6 +107,12 @@ export function createPermissionHandler(opts: PermissionHandlerOptions) {
     const toolCall: ToolCallRequest = req.toolCall ?? { kind: "other" };
     const options = Array.isArray(req.options) ? req.options : [];
     if (options.length === 0) return { outcome: { outcome: "cancelled" } };
+
+    const network = decideNetwork(toolCall, toolCall.kind === "fetch" ? allowedHosts() : []);
+    if (network) {
+      await logDecision({ decision: network.decision, by: "policy", ...(network.host ? { host: network.host } : {}) });
+      return { outcome: chooseOutcome(options, network.decision) };
+    }
 
     const policy = policyDecision(toolCall, layout, worktreeReal);
     if (policy.allow) {
