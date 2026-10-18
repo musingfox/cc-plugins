@@ -125,7 +125,7 @@ async function run(base: string): Promise<void> {
   delete env.MUSTER_ALLOW_HOSTS;
 
   const ticket = [
-    "Use only the Write, Bash, WebFetch and WebSearch tools named below; do not call any MCP or other tool, and do not read documentation. Work through the numbered steps in order, once each. A refusal or failure from the sandbox, the network, WebFetch or WebSearch is an expected result: record what you saw, do not retry, do not work around it, and continue with the next step.",
+    "Use only the Write, Bash, WebFetch and WebSearch tools named below, plus ToolSearch solely to load WebFetch or WebSearch if they are deferred; do not call any MCP or other tool, and do not read documentation. Work through the numbered steps in order, once each. A refusal or failure from the sandbox, the network, WebFetch or WebSearch is an expected result: record what you saw, do not retry, do not work around it, and continue with the next step. The one exception: if a tool call fails with an input-validation error (for example a missing required parameter), correct the parameters and retry that call once; a refusal or permission denial is never retried.",
     "1. Use the Write tool to create hello.txt in the working directory with the exact content: hi",
     "2. In Bash, run exactly this command and nothing else, with no added echo or $?: echo ok > bash-ok.txt",
     "3. In Bash, run exactly this command and nothing else: bun test",
@@ -133,8 +133,8 @@ async function run(base: string): Promise<void> {
     `5. In Bash, run exactly this command and nothing else: echo x > ${plain}`,
     "6. In Bash, run exactly this command and nothing else: curl -sS -m 20 -o /dev/null -w '%{http_code}' https://registry.npmjs.org/",
     "7. In Bash, run exactly this command and nothing else: curl -sS -m 20 -o /dev/null -w '%{http_code}' https://example.com/",
-    "8. Use the WebFetch tool once on https://registry.npmjs.org/",
-    "9. Use the WebFetch tool once on https://example.com/",
+    "8. Use the WebFetch tool once with two parameters: url https://registry.npmjs.org/ and prompt 'Say whether the page loaded'",
+    "9. Use the WebFetch tool once with two parameters: url https://example.com/ and prompt 'Say whether the page loaded'",
     "10. Use the WebSearch tool once for: bun test",
     `11. Use the Write tool to create ${outside} with the exact content: outside`,
     "Then write the report to REPORT.md. Its first line must be exactly DONE, followed by one line per step 1 to 11 saying what happened.",
