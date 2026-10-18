@@ -249,6 +249,19 @@ describe("WorkerSessionLoop", () => {
     for (const text of everything) expect(text).not.toContain("agent-exited");
   });
 
+  test("R3: the session creates no per-run temp dir and hands the agent no temp env or sandbox root", async () => {
+    const layout = layoutFor("r1");
+    const exits: number[] = [];
+    await runWorker(request(), layout, { env: envFor(scenario({ echoEnv: true })), exit: (c) => exits.push(c) });
+    const tmp = join(layout.runDir, "tmp");
+    expect(existsSync(tmp)).toBe(false);
+    const echoed = JSON.parse(readFileSync(layout.stderrLog, "utf8")) as Record<string, string>;
+    expect(JSON.stringify(echoed)).not.toContain(tmp);
+    const sessionNew = events(layout.events).find((e) => e.dir === "out" && e.msg.method === "session/new");
+    expect(JSON.stringify(sessionNew?.msg.params)).not.toContain(tmp);
+    expect(exits).toEqual([0]);
+  });
+
   test("R1: the agent exiting during a follow-up turn blocks the run with agent-exited", async () => {
     const script = join(home, "second-prompt-exits.ts");
     writeFileSync(
