@@ -1,0 +1,137 @@
+import { LaunchError, openChannel, type Channel } from "./channel";
+import { createPermissionHandler } from "./escalation";
+import { handshake } from "./handshake";
+import { runFollowupInbox } from "./inbox";
+import { buildAgentLaunch } from "./launch";
+import { gateModel } from "./model-gate";
+import { enforceDefaultMode } from "./mode-gate";
+import { buildPrompt } from "./prompt";
+import { createRunDir, readPhase, writeAtomic, writePhase, type Phase, type RunPaths } from "./layout";
+import { createTerminator, killGraceMs, type TerminatorState } from "./termination";
+import { createWorkerWorktree } from "./worktree";
+
+export type DispatchRequest = {
+  ticket: string;
+  model: string;
+  repoRoot: string;
+  baseRef: string;
+};
+
+export type WorkerOptions = {
+  env?: Record<string, string | undefined>;
+  exit?: (code: number) => void;
+};
+
+type TurnResult = {
+  stopReason?: string;
+  _meta?: { quota?: { model_usage?: { model: string }[] } };
+};
+
+function setPhase(layout: RunPaths, phase: string, extra: Phase = {}): void {
+  if (readPhase(layout)?.phase === "exited") return;
+  writePhase(layout, { phase, pid: process.pid, updated: new Date().toISOString(), ...extra });
+}
+
+export async function runWorker(request: DispatchRequest, layout: RunPaths, opts: WorkerOptions = {}): Promise<void> {
+  const env = opts.env ?? process.env;
+  const exit = opts.exit ?? ((code: number) => process.exit(code));
+  createRunDir(layout);
+  const wt = createWorkerWorktree({
+    repoRoot: request.repoRoot,
+    baseRef: request.baseRef,
+    name: layout.name,
+    worktreePath: layout.worktree,
+  });
+  writeAtomic(
+    layout.meta,
+    JSON.stringify(
+      {
+        name: layout.name,
+        model: request.model,
+        repoRoot: request.repoRoot,
+        worktree: wt.worktree,
+        branch: wt.branch,
+        baseSha: wt.baseSha,
+        started: new Date().toISOString(),
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+  const prompt = buildPrompt({ worktree: wt.worktree, reportPath: layout.report, ticket: request.ticket });
+  setPhase(layout, "starting");
+
+  const state: TerminatorState = {};
+  const term = createTerminator({ layout, state, env, exit });
+
+  let channel: Channel;
+  try {
+    const launch = buildAgentLaunch(env);
+    channel = await openChannel({
+      argv: launch.argv,
+      env: launch.env,
+      cwd: wt.worktree,
+      eventsPath: layout.events,
+      stderrPath: layout.stderrLog,
+    });
+  } catch (e) {
+    if (e instanceof LaunchError) {
+      await term.terminate("agent-launch-failed", e.message);
+      return;
+    }
+    throw e;
+  }
+  state.channel = channel;
+  term.watch();
+
+  let sessionId: string;
+  try {
+    const hs = await handshake(channel, { worktree: wt.worktree });
+    sessionId = hs.sessionId;
+    state.sessionId = sessionId;
+    await gateModel(channel, { sessionId, configOptions: hs.configOptions, requestedModel: request.model });
+    await enforceDefaultMode(channel, { configOptions: hs.configOptions, sessionId });
+  } catch (e) {
+    await term.terminate("handshake-failed", (e as Error).message);
+    return;
+  }
+
+  const logDecision = async (msg: object) => {
+    await channel.logDecision(msg);
+    if (readPhase(layout)?.phase === "question") setPhase(layout, "running");
+  };
+  channel.onRequest(
+    "session/request_permission",
+    createPermissionHandler({
+      layout,
+      worktreeReal: wt.worktree,
+      trackPending: term.trackPending,
+      terminate: term.terminate,
+      logDecision,
+      env,
+    }),
+  );
+
+  setPhase(layout, "running");
+  const turn = channel.request("session/prompt", { sessionId, prompt: [{ type: "text", text: prompt }] });
+  state.turn = turn;
+  let result: TurnResult | null;
+  try {
+    result = (await turn) as TurnResult | null;
+  } catch (e) {
+    const grace = new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), killGraceMs(env)));
+    const exitCode = await Promise.race([channel.exited, grace]);
+    if (exitCode !== undefined) await term.terminate("agent-exited", `exit code ${exitCode}`);
+    else await term.terminate("prompt-error", (e as Error).message);
+    return;
+  }
+  setPhase(layout, "idle", {
+    stopReason: result?.stopReason,
+    models: (result?._meta?.quota?.model_usage ?? []).map((u) => u.model),
+  });
+
+  await runFollowupInbox({ paths: layout, channel, sessionId });
+  term.dispose();
+  await channel.close();
+  exit(0);
+}
