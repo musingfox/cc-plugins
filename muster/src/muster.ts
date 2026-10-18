@@ -5,7 +5,7 @@ import { followupVerb } from "./verbs/followup";
 import { runVerb } from "./verbs/run";
 import { statusVerb, type VerbResult } from "./verbs/status";
 import { stopVerb } from "./verbs/stop";
-import { watchVerb } from "./verbs/watch";
+import { watchMain } from "./verbs/watch";
 
 const VERBS = ["run", "status", "watch", "answer", "followup", "stop"];
 const USAGE = `usage: muster <${VERBS.join("|")}> [args]`;
@@ -39,13 +39,12 @@ async function main(argv: string[]): Promise<number> {
     case "status":
       return emit(statusVerb(name, env));
     case "watch":
-      return emit(
-        await watchVerb(name, env, { write: (line) => process.stdout.write(`${line}\n`) }),
-      );
+      return emit(await watchMain(args, env, (line) => process.stdout.write(`${line}\n`)));
     case "answer":
       return emit(answerVerb(args, env));
     case "followup": {
-      if (args[1] === "--file" && args[2] !== undefined) {
+      if (args[1] === "--file") {
+        if (args[2] === undefined) return usage();
         return emit(followupVerb(name, { file: args[2] }, env));
       }
       if (args[1] === undefined) return usage();

@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:tes
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createRunDir, runPaths, writeAtomic, writePhase } from "../src/layout";
 import { makeRepo } from "./support/repo";
 
 const CLI = join(import.meta.dir, "..", "src", "muster.ts");
@@ -223,6 +224,38 @@ describe("VerbDispatch", () => {
       expect(text).not.toContain("sk-test");
       expect(text).not.toContain("tok-test");
     }
+  });
+
+  test("R5: watch, followup and stop reach their verbs with the flags they were given", async () => {
+    const p = runPaths("w1", { MUSTER_HOME: env.MUSTER_HOME, HOME: home });
+    createRunDir(p);
+    writeAtomic(p.meta, "{}");
+    writePhase(p, { phase: "running", pid: process.pid });
+
+    const watchProc = Bun.spawn(["bun", CLI, "watch", "w1", "--interval-ms", "50"], {
+      env,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    live.push(watchProc);
+    await new Promise((r) => setTimeout(r, 300));
+    writeAtomic(p.question(1), JSON.stringify({ paths: ["src/a.ts"] }));
+    const questionWrittenAt = Date.now();
+    expect(await watchProc.exited).toBe(0);
+    expect(Date.now() - questionWrittenAt).toBeLessThan(1000);
+    expect(await new Response(watchProc.stdout).text()).toContain("w1 state=question question=1");
+
+    const emptyFile = join(home, "empty.md");
+    writeFileSync(emptyFile, "  \n");
+    expect(muster(["followup", "w1", "--file", emptyFile]).code).toBe(2);
+
+    const dead = runPaths("w2", { MUSTER_HOME: env.MUSTER_HOME, HOME: home });
+    createRunDir(dead);
+    writeAtomic(dead.meta, "{}");
+    writePhase(dead, { phase: "running", pid: Bun.spawnSync(["true"]).pid });
+    const stopped = muster(["stop", "w2"]);
+    expect(stopped.code).toBe(0);
+    expect(stopped.out).toBe("already exited w2 state=dead\n");
   });
 
   test("T6: run with a model the adapter does not offer exits 1, status is blocked, and no prompt was sent", async () => {
