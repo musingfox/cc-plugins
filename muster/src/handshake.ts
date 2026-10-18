@@ -12,7 +12,16 @@ export type Handshake = {
   agentInfo?: AgentInfo;
 };
 
+export const ADAPTER_VERSION = "0.93.0";
+
 const DEFAULT_HANDSHAKE_TIMEOUT_MS = 60000;
+
+export function assertAdapterVersion(agentInfo: AgentInfo | undefined): void {
+  const got = agentInfo?.version;
+  if (got !== ADAPTER_VERSION) {
+    throw new HandshakeError(`adapter-version-mismatch: expected ${ADAPTER_VERSION} got ${got ?? "none"}`);
+  }
+}
 
 export function handshakeTimeoutMs(): number {
   const raw = process.env.MUSTER_HANDSHAKE_TIMEOUT_MS;
@@ -48,6 +57,7 @@ export async function handshake(channel: Channel, opts: { worktree: string }): P
     },
     ms,
   )) as { agentInfo?: AgentInfo } | null;
+  assertAdapterVersion(init?.agentInfo);
   const session = (await call(
     channel,
     "session/new",
