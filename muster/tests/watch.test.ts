@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRunDir, runPaths, writePhase, type RunPaths } from "../src/layout";
 import { readStatus, renderStatus } from "../src/status";
-import { watchVerb } from "../src/verbs/watch";
+import { watchMain, watchVerb } from "../src/verbs/watch";
 
 let home: string;
 const env = () => ({ MUSTER_HOME: home, HOME: home });
@@ -99,5 +99,21 @@ describe("WatchCommand", () => {
     const result = await watchVerb("nope", env(), { intervalMs: 50, write: () => {} });
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toBe("no such run: nope\n");
+  });
+});
+
+describe("WatchCommand argv", () => {
+  test("R1: watchMain honours --interval-ms so a question written at 300 ms exits within 1 s", async () => {
+    const p = makeRun();
+    writePhase(p, { phase: "running", pid: process.pid });
+    const lines: string[] = [];
+    const started = Date.now();
+    const done = watchMain(["w1", "--interval-ms", "50"], env(), (l) => lines.push(l));
+    await sleep(300);
+    writeFileSync(p.question(1), JSON.stringify({ n: 1, paths: [] }));
+    const result = await done;
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(result.exitCode).toBe(0);
+    expect(lines.at(-1)).toBe("w1 state=question question=1");
   });
 });

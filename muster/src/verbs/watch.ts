@@ -35,3 +35,10 @@ export async function watchVerb(name: string, env: Env, opts: WatchOptions): Pro
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
 }
+
+export function watchMain(argv: string[], env: Env, write: (line: string) => void): Promise<VerbResult> {
+  const [name = "", ...rest] = argv;
+  const flag = rest.indexOf("--interval-ms");
+  const intervalMs = flag === -1 ? undefined : Number(rest[flag + 1]);
+  return watchVerb(name, env, { intervalMs, write });
+}
