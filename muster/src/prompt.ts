@@ -32,6 +32,7 @@ export function buildPrompt(input: { worktree: string; reportPath: string; ticke
     input.ticket,
     "",
     reportBlock(input.reportPath),
+    "If a network host, web fetch, or web search is refused, do not work around it with another tool, mirror, or host. If you cannot proceed, write a BLOCKED report naming the host.",
   ].join("\n");
 }
 

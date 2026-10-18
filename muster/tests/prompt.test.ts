@@ -49,4 +49,32 @@ describe("WorkerPrompt", () => {
     expect(() => buildPrompt({ worktree, reportPath, ticket: "" })).toThrow(UsageError);
     expect(() => buildPrompt({ worktree: "relative/wt", reportPath, ticket })).toThrow(UsageError);
   });
+
+  const networkRules = [/network host/i, /web fetch/i, /web search/i, /work(ed)? around/i, /names? the host|naming the host/i];
+
+  test("T6: prompt carries the network-refusal rule and the BLOCKED path", () => {
+    const prompt = buildPrompt({ worktree, reportPath, ticket });
+    for (const rule of networkRules) {
+      expect(prompt).toMatch(rule);
+    }
+    expect(prompt).toContain("BLOCKED");
+  });
+
+  test("T7: the T6 regexes fail against the previous revision's prompt", () => {
+    const previous = [
+      `You are an unattended worker. Work only inside this worktree: ${worktree}`,
+      "If CLAUDE.md exists in the worktree, read it first and follow it.",
+      "",
+      "Ticket:",
+      ticket,
+      "",
+      `Report file: ${reportPath}`,
+      "Write your report to that file. Its first line is the single word DONE or BLOCKED, with nothing else on that line. Put the summary on the lines after it.",
+      "Example report:",
+      "DONE",
+      "Created hello.txt with the requested greeting.",
+      "Requests outside the worktree may be denied. If a request is refused, do not work around the refusal; record BLOCKED in the report instead.",
+    ].join("\n");
+    expect(networkRules.some((rule) => !rule.test(previous))).toBe(true);
+  });
 });
