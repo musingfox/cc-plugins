@@ -21,6 +21,12 @@ const CREDENTIAL_STORES = [
   ".aws",
   ".docker/config.json",
   "Library/Keychains",
+  ".ssh",
+  ".pi",
+  ".config/gcloud",
+  ".kube",
+  ".cargo/credentials.toml",
+  ".pypirc",
 ].map((p) => `/home/u/${p}`);
 const T1_PARAMS = {
   cwd: "/w/x",

@@ -32,6 +32,12 @@ describe("sandbox option filesystem rules", () => {
         "/home/u/.aws",
         "/home/u/.docker/config.json",
         "/home/u/Library/Keychains",
+        "/home/u/.ssh",
+        "/home/u/.pi",
+        "/home/u/.config/gcloud",
+        "/home/u/.kube",
+        "/home/u/.cargo/credentials.toml",
+        "/home/u/.pypirc",
       ],
       allowWrite: ["/r/cache"],
     });

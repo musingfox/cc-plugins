@@ -36,6 +36,12 @@ const CREDENTIAL_STORES = [
   ".aws",
   ".docker/config.json",
   "Library/Keychains",
+  ".ssh",
+  ".pi",
+  ".config/gcloud",
+  ".kube",
+  ".cargo/credentials.toml",
+  ".pypirc",
 ];
 
 export function sandboxOption(opts: { env: Env; cache: string }) {
