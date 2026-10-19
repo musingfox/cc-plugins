@@ -20,6 +20,7 @@ export type TerminatorOptions = {
   state: TerminatorState;
   env?: Env;
   exit?: (code: number) => void;
+  fetchBack?: () => void;
 };
 
 function positiveMs(name: string, raw: string | undefined, fallback: number): number {
@@ -108,6 +109,11 @@ export function createTerminator(opts: TerminatorOptions) {
       }
     } catch (e) {
       log(`report write failed: ${(e as Error).message}`);
+    }
+    try {
+      opts.fetchBack?.();
+    } catch (e) {
+      log(`fetch-back failed: ${(e as Error).message}`);
     }
     try {
       writePhase(layout, { phase: "exited", reason });

@@ -8,7 +8,7 @@ import { enforceDefaultMode } from "./mode-gate";
 import { buildPrompt } from "./prompt";
 import { createRunDir, readPhase, writeAtomic, writePhase, type Phase, type RunPaths } from "./layout";
 import { createTerminator, killGraceMs, type TerminatorState } from "./termination";
-import { createWorkerWorktree } from "./worktree";
+import { createWorkerWorktree, fetchBranchBack } from "./worktree";
 
 export type DispatchRequest = {
   ticket: string;
@@ -61,8 +61,13 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
   const prompt = buildPrompt({ worktree: wt.worktree, reportPath: layout.report, ticket: request.ticket });
   setPhase(layout, "starting");
 
+  const fetchBack = () => {
+    const result = fetchBranchBack({ repoRoot: request.repoRoot, clone: wt.worktree, branch: wt.branch });
+    writePhase(layout, { fetchError: result.ok ? undefined : result.error });
+  };
+
   const state: TerminatorState = {};
-  const term = createTerminator({ layout, state, env, exit });
+  const term = createTerminator({ layout, state, env, exit, fetchBack });
 
   let channel: Channel;
   try {
@@ -119,6 +124,7 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
     else await term.terminate("prompt-error", (e as Error).message);
   };
   const recordTurn = (result: TurnResult | null) => {
+    fetchBack();
     setPhase(layout, "idle", {
       stopReason: result?.stopReason,
       models: (result?._meta?.quota?.model_usage ?? []).map((u) => u.model),
@@ -151,6 +157,7 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
     await failTurn(e);
     return;
   }
+  fetchBack();
   term.dispose();
   await channel.close();
   exit(0);

@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, w
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRunDir, runPaths, writeAtomic, writePhase } from "../src/layout";
-import { makeRepo } from "./support/repo";
+import { git, makeRepo } from "./support/repo";
 
 const CLI = join(import.meta.dir, "..", "src", "muster.ts");
 const FAKE_AGENT = join(import.meta.dir, "support", "fake-agent.ts");
@@ -258,6 +258,15 @@ describe("VerbDispatch", () => {
     const stopped = muster(["stop", "w2"]);
     expect(stopped.code).toBe(0);
     expect(stopped.out).toBe("already exited w2 state=dead\n");
+  });
+
+  test("R6: run with a name whose muster/<name> branch exists exits 2 with a message and no stack trace", () => {
+    git(repo, ["branch", "muster/d8"]);
+    const r = muster(["run", "--name", "d8", "--model", "haiku", "--repo", repo, "--ticket", "write the file"]);
+    expect(r.code).toBe(2);
+    expect(r.err).toContain("muster/d8");
+    expect(r.err).not.toContain("    at ");
+    expect(r.out).toBe("");
   });
 
   test("T6: run with a model the adapter does not offer exits 1, status is blocked, and no prompt was sent", async () => {

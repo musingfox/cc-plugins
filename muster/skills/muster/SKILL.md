@@ -7,7 +7,7 @@ description: Dispatch unattended Claude worker sessions over ACP from the main s
 
 Run these commands from the main session only. Background completions wake the main session, not a subagent, so the wait loop belongs there.
 
-Each worker is a Claude session in its own git worktree on branch `muster/NAME`. NAME is the run name you choose; it must match `^[a-z0-9][a-z0-9-]{0,39}$`.
+Each worker is a Claude session in its own clone of the repository (called the worktree below, under the run directory), on branch `muster/NAME`. Muster fetches that branch back into the repository each time the worker goes idle and when the run ends, so `git log muster/NAME` works from the repository. NAME must not already be a branch in the repository; a taken name is refused. NAME is the run name you choose; it must match `^[a-z0-9][a-z0-9-]{0,39}$`.
 
 ## Dispatch
 
@@ -74,13 +74,11 @@ bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts stop NAME
 
 ## Cleanup
 
-After the run has exited, remove its worktree with a plain `git worktree remove`; never add `--force`. The path is the `worktree` field in `<RUNDIR>/meta.json`. The branch `muster/NAME` stays, so `git log muster/NAME` still works.
+After the run has exited, remove its run directory; this deletes the clone, the event log and the report. Branch `muster/NAME` stays in the repository, so `git log muster/NAME` still works. Read the report first. If `phase.json` in the run directory has a `fetchError`, the branch could not be fetched back and the commits exist only in the clone at `<RUNDIR>/worktree`; fetch them by hand before removing it.
 
 ```
-cd /abs/path/to/repo && git worktree remove "<worktree path from meta.json>"
+rm -rf "<RUNDIR>"
 ```
-
-If remove refuses, the worktree holds uncommitted changes. Read them before deciding; do not force.
 
 ## Confinement
 

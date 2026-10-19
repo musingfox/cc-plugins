@@ -105,4 +105,12 @@ describe("RunRefusal", () => {
     });
     expect(existsSync(runPaths("a1", env).runDir)).toBe(false);
   });
+
+  test("R1: a name whose muster/<name> branch exists in the repo is refused and no run dir is created", () => {
+    execFileSync("git", ["-C", repo, "branch", "muster/a1"]);
+    const err = refusal(valid());
+    expect(err.message).toContain("muster/a1");
+    expect(err.message).toContain("already exists");
+    expect(existsSync(runPaths("a1", env).runDir)).toBe(false);
+  });
 });

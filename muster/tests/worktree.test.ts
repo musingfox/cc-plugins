@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createWorkerWorktree, WorktreeError } from "../src/worktree";
+import { createWorkerWorktree, fetchBranchBack, WorktreeError } from "../src/worktree";
 import { commitFile, git, makeRepo } from "./support/repo";
 
 function freshPath(): string {
@@ -18,7 +18,10 @@ describe("WorkerWorktree", () => {
     expect(git(result.worktree, ["rev-parse", "--abbrev-ref", "HEAD"])).toBe("muster/a1");
     expect(result.branch).toBe("muster/a1");
     expect(git(result.worktree, ["rev-parse", "HEAD"])).toBe(result.baseSha);
-    expect(git(repo, ["worktree", "list", "--porcelain"])).toContain(result.worktree);
+    expect(statSync(join(result.worktree, ".git")).isDirectory()).toBe(true);
+    expect(git(repo, ["worktree", "list", "--porcelain"])).not.toContain(result.worktree);
+    expect(git(result.worktree, ["status", "--porcelain"])).toBe("");
+    expect(existsSync(join(result.worktree, "README.md"))).toBe(true);
   });
 
   test("T2: returns the realpath of the worktree path", () => {
@@ -37,28 +40,28 @@ describe("WorkerWorktree", () => {
     expect(existsSync(join(result.worktree, "dirty.txt"))).toBe(false);
   });
 
-  test("T4: a pre-existing muster/<name> branch raises WorktreeError and leaves no directory", () => {
+  test("T4: the clone shares no object file with the source", () => {
     const repo = makeRepo();
-    git(repo, ["branch", "muster/a1"]);
-    const worktreePath = freshPath();
+    git(repo, ["gc", "-q"]);
+    const result = createWorkerWorktree({ repoRoot: repo, baseRef: "HEAD", name: "a4", worktreePath: freshPath() });
+    const packDir = join(result.worktree, ".git", "objects", "pack");
+    const packs = readdirSync(packDir).filter((f) => f.endsWith(".pack"));
 
-    expect(() =>
-      createWorkerWorktree({ repoRoot: repo, baseRef: "HEAD", name: "a1", worktreePath }),
-    ).toThrow(WorktreeError);
-    expect(existsSync(worktreePath)).toBe(false);
+    expect(packs.length).toBeGreaterThan(0);
+    for (const pack of packs) expect(statSync(join(packDir, pack)).nlink).toBe(1);
   });
 
-  test("T4b: the WorktreeError carries git's stderr", () => {
-    const repo = makeRepo();
-    git(repo, ["branch", "muster/a1"]);
+  test("T4b: a failed clone raises WorktreeError carrying git's stderr and leaves no directory", () => {
+    const notARepo = mkdtempSync(join(tmpdir(), "muster-notrepo-"));
+    const worktreePath = freshPath();
 
     try {
-      createWorkerWorktree({ repoRoot: repo, baseRef: "HEAD", name: "a1", worktreePath: freshPath() });
+      createWorkerWorktree({ repoRoot: notARepo, baseRef: "HEAD", name: "a4", worktreePath });
       throw new Error("expected WorktreeError");
     } catch (err) {
       expect(err).toBeInstanceOf(WorktreeError);
-      expect((err as WorktreeError).stderr).toContain("already exists");
     }
+    expect(existsSync(worktreePath)).toBe(false);
   });
 
   test("T5: a non-HEAD baseRef checks out that commit", () => {
@@ -70,5 +73,43 @@ describe("WorkerWorktree", () => {
     expect(result.baseSha).toBe(first);
     expect(git(result.worktree, ["rev-parse", "HEAD"])).toBe(first);
     expect(result.baseSha).not.toBe(second);
+  });
+});
+
+describe("fetchBranchBack", () => {
+  function runClone(name: string) {
+    const repo = makeRepo();
+    const result = createWorkerWorktree({ repoRoot: repo, baseRef: "HEAD", name, worktreePath: freshPath() });
+    return { repo, clone: result.worktree, branch: result.branch };
+  }
+
+  test("F1: a commit made in the clone shows in git log muster/<name> of the source", () => {
+    const { repo, clone, branch } = runClone("f1");
+    const sha = commitFile(clone, "work.txt", "done\n", "feat: work");
+
+    expect(fetchBranchBack({ repoRoot: repo, clone, branch })).toEqual({ ok: true });
+    expect(git(repo, ["rev-parse", branch])).toBe(sha);
+  });
+
+  test("F2: a branch the worker rewrote still comes back", () => {
+    const { repo, clone, branch } = runClone("f2");
+    commitFile(clone, "work.txt", "one\n", "feat: work");
+    expect(fetchBranchBack({ repoRoot: repo, clone, branch })).toEqual({ ok: true });
+    git(clone, ["commit", "-q", "--amend", "-m", "feat: work amended"]);
+    const amended = git(clone, ["rev-parse", "HEAD"]);
+
+    expect(fetchBranchBack({ repoRoot: repo, clone, branch })).toEqual({ ok: true });
+    expect(git(repo, ["rev-parse", branch])).toBe(amended);
+  });
+
+  test("F3: a refused fetch is returned with git's stderr instead of thrown", () => {
+    const { repo, clone, branch } = runClone("f3");
+    expect(fetchBranchBack({ repoRoot: repo, clone, branch })).toEqual({ ok: true });
+    git(repo, ["switch", "-q", branch]);
+    commitFile(clone, "work.txt", "two\n", "feat: more");
+
+    const result = fetchBranchBack({ repoRoot: repo, clone, branch });
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.error).toContain("checked out");
   });
 });

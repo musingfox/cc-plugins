@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpath
 import { join } from "node:path";
 import { runWorker, type DispatchRequest } from "../src/session";
 import { readPhase, runPaths, type RunPaths } from "../src/layout";
-import { makeRepo } from "./support/repo";
+import { commitFile, git, makeRepo } from "./support/repo";
 
 const FAKE = join(import.meta.dir, "support", "fake-agent.ts");
 const SCRIPT = join(import.meta.dir, "support", "scenarios", "permission-turn.ts");
@@ -287,5 +287,51 @@ describe("WorkerSessionLoop", () => {
     const lines = readReportFile(layout)?.split("\n") ?? [];
     expect(lines[0]).toBe("BLOCKED");
     expect(lines[1]).toContain("agent-exited");
+  });
+
+  test("F1: a commit made in the clone is fetched back into the user's repo when the idle timeout ends the run", async () => {
+    const layout = layoutFor();
+    const exits: number[] = [];
+    const run = runWorker(request(), layout, { env: envFor(scenario()), exit: (c) => exits.push(c) });
+    expect(await waitFor(() => readPhase(layout)?.phase === "idle")).toBe(true);
+    const sha = commitFile(layout.worktree, "late.txt", "x\n", "feat: late");
+    await run;
+    expect(readPhase(layout)?.reason).toBe("idle-timeout");
+    expect(git(repo, ["rev-parse", "muster/run-1"])).toBe(sha);
+  });
+
+  test("F2: a stopped run's branch is fetched back and the clone is not a worktree of the user's repo", async () => {
+    const layout = layoutFor();
+    const exits: number[] = [];
+    void runWorker(request(), layout, { env: envFor(scenario()), exit: (c) => exits.push(c) });
+    expect(await waitFor(() => readPhase(layout)?.phase === "idle")).toBe(true);
+    const sha = commitFile(layout.worktree, "stop.txt", "x\n", "feat: stop");
+    writeFileSync(layout.stop, "");
+    expect(await waitFor(() => exits.length > 0)).toBe(true);
+    expect(readPhase(layout)?.reason).toBe("stopped");
+    expect(git(repo, ["rev-parse", "muster/run-1"])).toBe(sha);
+    expect(git(repo, ["worktree", "list", "--porcelain"])).not.toContain(layout.worktree);
+  });
+
+  test("F3: a crashed run's branch is fetched back too", async () => {
+    const layout = layoutFor();
+    const sc = scenario({ termination: { exitOnMethod: { "session/prompt": 3 } } });
+    await runWorker(request(), layout, { env: envFor(sc), exit: () => {} });
+    expect(readPhase(layout)?.reason).toBe("agent-exited");
+    expect(git(repo, ["rev-parse", "muster/run-1"])).toBe(git(layout.worktree, ["rev-parse", "HEAD"]));
+  });
+
+  test("F4: a failed fetch-back is recorded in phase.json and does not stop the run from ending", async () => {
+    const layout = layoutFor();
+    const exits: number[] = [];
+    void runWorker(request(), layout, { env: envFor(scenario()), exit: (c) => exits.push(c) });
+    expect(await waitFor(() => readPhase(layout)?.phase === "idle")).toBe(true);
+    git(repo, ["switch", "-q", "muster/run-1"]);
+    commitFile(layout.worktree, "refused.txt", "x\n", "feat: refused");
+    writeFileSync(layout.stop, "");
+    expect(await waitFor(() => exits.length > 0)).toBe(true);
+    expect(exits).toEqual([0]);
+    expect(readPhase(layout)?.phase).toBe("exited");
+    expect(String(readPhase(layout)?.fetchError)).toContain("checked out");
   });
 });

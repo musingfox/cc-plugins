@@ -97,6 +97,15 @@ describe("CoordinatorSkill", () => {
     expect(bashFenceClaims(OLD_FENCE_FIXTURE).length).toBe(2);
   });
 
+  test("K1: the skill describes a per-run clone and cleanup by removing the run directory, with no git worktree commands", () => {
+    const text = body(SKILL);
+    expect(text).not.toMatch(/git worktree/i);
+    expect(text).toMatch(/\bclone\b/i);
+    const cleanup = /## Cleanup\n([\s\S]*?)(?=\n## |$)/.exec(text)?.[1] ?? "";
+    expect(cleanup).toMatch(/rm -r/);
+    expect(cleanup).toContain("RUNDIR");
+  });
+
   test("T7: the default-hosts paragraph lists exactly DEFAULT_ALLOWED_HOSTS", () => {
     const text = body(SKILL);
     for (const host of DEFAULT_ALLOWED_HOSTS) expect(text).toContain(host);

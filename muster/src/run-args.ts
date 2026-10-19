@@ -43,6 +43,13 @@ function resolvesToCommit(repoRoot: string, ref: string): boolean {
   return r.status === 0;
 }
 
+function branchExists(repoRoot: string, branch: string): boolean {
+  const r = spawnSync("git", ["-C", repoRoot, "show-ref", "--verify", "--quiet", `refs/heads/${branch}`], {
+    stdio: "ignore",
+  });
+  return r.status === 0;
+}
+
 function ticketText(flags: Map<string, string>): string {
   const ticket = flags.get("--ticket");
   const file = flags.get("--ticket-file");
@@ -83,6 +90,10 @@ export function parseRunArgs(argv: string[], env: Env = { MUSTER_HOME: process.e
 
   const baseRef = flags.get("--base") ?? "HEAD";
   if (!resolvesToCommit(repoRoot, baseRef)) throw new UsageError(`unknown base ref "${baseRef}"`);
+
+  if (branchExists(repoRoot, `muster/${name}`)) {
+    throw new UsageError(`branch muster/${name} already exists in ${repoRoot}; pick another name`);
+  }
 
   return { name, model, repoRoot, baseRef, ticket: ticketText(flags) };
 }
