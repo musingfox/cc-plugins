@@ -80,4 +80,31 @@ describe("cloneDirectory", () => {
 
     expect(clone("/a", "/b")).toEqual({ ok: false, detail: "errno=18" });
   });
+
+  test("T7: a failed clone removes the partial destination it created", () => {
+    const root = mkdirOutsideTemp("muster-clone-");
+    const dst = join(root, "dst");
+    const clone = makeCloneDirectory(() => ({
+      clonefile: (_src, to) => {
+        mkdirSync(to);
+        writeFileSync(join(to, "half.txt"), "half\n");
+        return -1;
+      },
+      errno: () => 28,
+    }));
+
+    expect(clone("/a", dst)).toEqual({ ok: false, detail: "errno=28" });
+    expect(existsSync(dst)).toBe(false);
+  });
+
+  test("T8: a failed clone leaves a destination that existed before the call untouched", () => {
+    const root = mkdirOutsideTemp("muster-clone-");
+    const dst = join(root, "dst");
+    mkdirSync(dst);
+    writeFileSync(join(dst, "keep.txt"), "keep\n");
+    const clone = makeCloneDirectory(() => ({ clonefile: () => -1, errno: () => 17 }));
+
+    expect(clone("/a", dst)).toEqual({ ok: false, detail: "errno=17" });
+    expect(readFileSync(join(dst, "keep.txt"), "utf8")).toBe("keep\n");
+  });
 });

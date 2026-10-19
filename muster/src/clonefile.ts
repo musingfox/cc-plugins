@@ -1,3 +1,4 @@
+import { existsSync, rmSync } from "node:fs";
 import { dlopen, FFIType, read } from "bun:ffi";
 
 export type CloneResult = { ok: true } | { ok: false; detail: string };
@@ -24,8 +25,11 @@ export function makeCloneDirectory(open: () => CloneLibrary): (src: string, dst:
   return (src, dst) => {
     try {
       const lib = open();
+      const existed = existsSync(dst);
       if (lib.clonefile(src, dst, 0) === 0) return { ok: true };
-      return { ok: false, detail: `errno=${lib.errno()}` };
+      const detail = `errno=${lib.errno()}`;
+      if (!existed) rmSync(dst, { recursive: true, force: true });
+      return { ok: false, detail };
     } catch (error) {
       return { ok: false, detail: error instanceof Error ? error.message : String(error) };
     }
