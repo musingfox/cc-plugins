@@ -33,6 +33,8 @@ It exits on `question`, `idle`, `done`, `blocked`, `malformed`, or `dead`. To re
 bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts status NAME
 ```
 
+The status line carries `deps=<copied>/<total>` when the run records its dependency directories: how many of the directories holding a lockfile were copied into the worker's clone, out of how many hold one. `deps=0/0` means none holds a lockfile.
+
 ## Answer
 
 When the state is `question`, decide and answer it. The only decisions are `allow` and `deny`; a decision covers that one request.
@@ -62,7 +64,7 @@ cat "<RUNDIR>/REPORT.md"
 git log <baseSha>..<head sha>
 ```
 
-The status line of a `done` run carries `head=<sha>`, the commit the branch pointed at when the run became done. Review and merge that sha, not the branch name: a command the worker left running can still rewrite `muster/NAME` afterwards. `<baseSha>` is `baseSha` in `<RUNDIR>/meta.json`, so the commits you review are the ones you merge.
+The status line of a `done` run carries `head=<sha>`, the commit the branch pointed at when the run became done. Review and merge that sha, not the branch name: a command the worker left running can still rewrite `muster/NAME` afterwards. `<baseSha>` is `baseSha` in `<RUNDIR>/meta.json`, so the commits you review are the ones you merge. The status line of a `done` run also carries `deps=` as described under Wait.
 
 If the state is `blocked` or `malformed`, read `REPORT.md` the same way before deciding what to do.
 

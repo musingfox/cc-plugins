@@ -22,6 +22,7 @@ export interface StatusLine {
   fetchError?: string;
   head?: string;
   models?: string[];
+  deps?: { copied: number; total: number };
   reason?: string;
 }
 
@@ -40,6 +41,14 @@ function readObject(file: string): Json | undefined {
 
 function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+}
+
+function depCounts(value: unknown): { copied: number; total: number } | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const entries = value.filter(
+    (v): v is Json => typeof v === "object" && v !== null && !Array.isArray(v),
+  );
+  return { copied: entries.filter((e) => e.outcome === "copied").length, total: entries.length };
 }
 
 function pidAlive(pid: number): boolean {
@@ -107,9 +116,12 @@ function classify(runDir: string, name: string): StatusLine {
 
 export function readStatus(runDir: string): StatusLine {
   const name = basename(runDir);
-  const models = strings(readObject(join(runDir, "phase.json"))?.models);
+  const phase = readObject(join(runDir, "phase.json"));
+  const models = strings(phase?.models);
+  const deps = depCounts(phase?.deps);
   const line = classify(runDir, name);
-  return models.length > 0 ? { ...line, models } : line;
+  const withModels = models.length > 0 ? { ...line, models } : line;
+  return deps ? { ...withModels, deps } : withModels;
 }
 
 export function renderStatus(s: StatusLine): string {
@@ -120,6 +132,7 @@ export function renderStatus(s: StatusLine): string {
   if (s.head) parts.push(`head=${s.head}`);
   if (s.stop) parts.push(`stop=${s.stop}`);
   if (s.models?.length) parts.push(`models=${s.models.join(",")}`);
+  if (s.deps) parts.push(`deps=${s.deps.copied}/${s.deps.total}`);
   if (s.reason) parts.push(`reason=${s.reason}`);
   if (s.fetchError) parts.push(`fetch-error=${s.fetchError.replace(/\s*\n\s*/g, " ")}`);
   return parts.join(" ");

@@ -128,6 +128,12 @@ describe("CoordinatorSkill", () => {
     expect([...named].sort()).toEqual([...DEFAULT_ALLOWED_HOSTS].sort());
   });
 
+  test("D1: the status section and the root README muster section document deps=", () => {
+    const readme = readFileSync(join(MUSTER_ROOT, "..", "README.md"), "utf8");
+    expect(body(SKILL)).toContain("deps=");
+    expect(readme).toContain("deps=");
+  });
+
   test("T5: the plugin-root placeholder appears only inside non-heredoc code fences", () => {
     const text = body(SKILL);
     const outside = text.replace(/```[^\n]*\n[\s\S]*?```/g, "");

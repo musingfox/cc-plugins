@@ -134,6 +134,33 @@ describe("StatusReader", () => {
     expect(line(p)).toContain("models=claude-haiku-5-5");
   });
 
+  test("D1: deps renders copied/total from phase.json; a phase without deps omits the field", () => {
+    const p = makeRun();
+    writePhase(p, { phase: "running", pid: process.pid, deps: [{ dir: ".", outcome: "copied" }, { dir: "a", outcome: "lockfile-differs" }] });
+    expect(line(p)).toBe("a1 state=running deps=1/2");
+
+    writePhase(p, { deps: [] });
+    expect(line(p)).toBe("a1 state=running deps=0/0");
+
+    writePhase(p, { deps: undefined });
+    expect(line(p)).toBe("a1 state=running");
+  });
+
+  test("D2: deps follows models= and precedes reason=; a non-array deps value is ignored; non-object entries are not counted", () => {
+    const p = makeRun();
+    writePhase(p, { phase: "idle", pid: process.pid, stopReason: "end_turn", models: ["haiku"], deps: [{ dir: ".", outcome: "copied" }] });
+    writeFileSync(p.report, "BLOCKED\nneed key");
+    writePhase(p, { fetched: true });
+    expect(line(p)).toBe("a1 state=blocked report=" + p.report + " models=haiku deps=1/1 reason=need key");
+
+    writePhase(p, { deps: "x" });
+    expect(() => readStatus(p.runDir)).not.toThrow();
+    expect(readStatus(p.runDir).deps).toBeUndefined();
+
+    writePhase(p, { deps: [1, null, { outcome: "copied" }] });
+    expect(readStatus(p.runDir).deps).toEqual({ copied: 1, total: 1 });
+  });
+
   test("T8b: an unreadable phase.json renders state=dead reason=phase-unreadable", () => {
     const p = makeRun();
     writeFileSync(p.phase, "{not json");
