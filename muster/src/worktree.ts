@@ -58,12 +58,22 @@ export function createWorkerWorktree(input: WorkerWorktreeInput): WorkerWorktree
 }
 
 // The leading + is needed because the worker may rewrite its branch (amend, rebase).
+// Fully qualified source and --no-tags: a tag the worker makes in the clone must neither be imported nor outrank the branch.
 export function fetchBranchBack(input: {
   repoRoot: string;
   clone: string;
   branch: string;
 }): { ok: true } | { ok: false; error: string } {
   const { repoRoot, clone, branch } = input;
-  const fetched = git(repoRoot, ["fetch", "-q", clone, `+${branch}:refs/heads/${branch}`]);
+  const fetched = git(repoRoot, [
+    "-c",
+    "fetch.fsckObjects=true",
+    "fetch",
+    "-q",
+    "--no-tags",
+    "--no-recurse-submodules",
+    clone,
+    `+refs/heads/${branch}:refs/heads/${branch}`,
+  ]);
   return fetched.ok ? { ok: true } : { ok: false, error: fetched.stderr };
 }

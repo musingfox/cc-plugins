@@ -6,6 +6,7 @@ import {
   checkCompleted,
   checkExecuteAllowedOnce,
   checkFetch,
+  checkOnlyBranchRefChanged,
   checkRefProtected,
   checkSessionSandbox,
   checkWorkerTools,
@@ -346,5 +347,28 @@ describe("session/new receipt", () => {
   test("connectors left on fail as settings-option-mismatch", () => {
     const r = checkSessionSandbox([sessionNew({ ...good, settings: { permissions: { ask: ["WebFetch"] } } })]);
     expect(r).toMatchObject({ ok: false, failure: "settings-option-mismatch" });
+  });
+});
+
+describe("source repo refs receipt", () => {
+  const main = "aaa commit\trefs/heads/main";
+  const own = (sha: string) => `${sha} commit\trefs/heads/muster/x`;
+
+  test("only the fetched branch appearing passes", () => {
+    expect(checkOnlyBranchRefChanged({ before: main, after: `${main}\n${own("bbb")}`, branch: "muster/x" }).ok).toBe(true);
+  });
+
+  test("a leaked tag fails as ref-leaked", () => {
+    const after = `${main}\n${own("bbb")}\nccc commit\trefs/tags/release`;
+    expect(checkOnlyBranchRefChanged({ before: main, after, branch: "muster/x" })).toMatchObject({ ok: false, failure: "ref-leaked" });
+  });
+
+  test("a moved main fails as ref-leaked", () => {
+    const after = `ddd commit\trefs/heads/main\n${own("bbb")}`;
+    expect(checkOnlyBranchRefChanged({ before: main, after, branch: "muster/x" })).toMatchObject({ ok: false, failure: "ref-leaked" });
+  });
+
+  test("no fetched branch fails as branch-not-fetched", () => {
+    expect(checkOnlyBranchRefChanged({ before: main, after: main, branch: "muster/x" })).toMatchObject({ ok: false, failure: "branch-not-fetched" });
   });
 });

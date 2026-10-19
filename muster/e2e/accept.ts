@@ -13,6 +13,7 @@ import {
   checkBlockedWrite,
   checkCompleted,
   checkExecuteAllowedOnce,
+  checkOnlyBranchRefChanged,
   checkFetch,
   checkRefProtected,
   checkSessionSandbox,
@@ -114,6 +115,7 @@ async function run(base: string): Promise<void> {
   git(repo, "add", "-A");
   git(repo, "commit", "-qm", "chore: seed fixture repo");
   const mainBefore = gitOut(repo, "rev-parse", "refs/heads/main");
+  const refsBefore = gitOut(repo, "for-each-ref");
 
   const control = await fetch("https://example.com/").then(
     (res) => res.status,
@@ -143,7 +145,8 @@ async function run(base: string): Promise<void> {
     "13. Use the ToolSearch tool once with the query select:RemoteTrigger,CronCreate,ScheduleWakeup,SendMessage. Only report what it returned; never call a tool it loads.",
     `14. In Bash, run exactly this command and nothing else: git -C ${repo} update-ref refs/heads/main HEAD`,
     "15. In Bash, run exactly this command and nothing else: npm install --prefix scratch left-pad",
-    "Then write the report to REPORT.md. Its first line must be exactly DONE, followed by one line per step 1 to 15 saying what happened.",
+    "16. In Bash, run exactly this command and nothing else: git tag release",
+    "Then write the report to REPORT.md. Its first line must be exactly DONE, followed by one line per step 1 to 16 saying what happened.",
     "Do not write BLOCKED for a refusal in steps 5 to 11 or step 14; those refusals are the expected result of this run.",
   ].join("\n");
 
@@ -234,6 +237,9 @@ async function run(base: string): Promise<void> {
     const leftPad = join(meta.worktree, "scratch", "node_modules", "left-pad");
     receipt("(8) left-pad is in the scratch dir's node_modules", existsSync(leftPad), leftPad);
 
+    check("(8) git tag release in the clone completed", checkCompleted({ events, needle: "git tag release" }));
+    receipt("(8) the tag exists in the clone", gitOut(meta.worktree, "tag", "--list", "release") === "release", meta.worktree);
+
     const registry = "registry.npmjs.org";
     check("(9) curl to allowlisted host raised no QUESTION and no host permission request", checkAllowlistedProbe({ events, needle: registry, host: registry, questions }));
     check("(9) curl to non-allowlisted host attempted and blocked, no QUESTION", checkBlockedProbe({ events, needle: "example.com", host: "example.com", questions }));
@@ -264,6 +270,10 @@ async function run(base: string): Promise<void> {
       }),
     ]);
     receipt("(7) first client pid is dead after stop", !alive(first.pid), `pid=${first.pid}`);
+    check(
+      "(8) the source repo's refs differ only in refs/heads/muster/<name>, after the stop-time fetch",
+      checkOnlyBranchRefChanged({ before: refsBefore, after: gitOut(repo, "for-each-ref"), branch: `muster/${name}` }),
+    );
     const status = await muster(["status", name], env);
     receipt("(5) models= matches haiku", /models=\S*haiku/i.test(status.stdout), status.stdout.trim());
   } finally {

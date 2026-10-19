@@ -112,4 +112,22 @@ describe("fetchBranchBack", () => {
     expect(result.ok).toBe(false);
     expect(result.ok === false && result.error).toContain("checked out");
   });
+
+  test("F4: tags made in the clone, including one named muster/<name>, never reach the source", () => {
+    const { repo, clone, branch } = runClone("f4");
+    const sha = commitFile(clone, "work.txt", "done\n", "feat: work");
+    const evil = commitFile(clone, "evil.txt", "evil\n", "feat: evil");
+    git(clone, ["tag", "release", sha]);
+    git(clone, ["tag", "-a", "-m", "x", "annotated", sha]);
+    git(clone, ["tag", branch, sha]);
+    git(clone, ["reset", "-q", "--hard", evil]);
+    const before = git(repo, ["for-each-ref", "--format=%(refname)"]);
+
+    expect(fetchBranchBack({ repoRoot: repo, clone, branch })).toEqual({ ok: true });
+    expect(git(repo, ["tag", "--list"])).toBe("");
+    expect(git(repo, ["rev-parse", `refs/heads/${branch}`])).toBe(evil);
+    expect(git(repo, ["for-each-ref", "--format=%(refname)"]).split("\n").filter((r) => !before.includes(r))).toEqual([
+      `refs/heads/${branch}`,
+    ]);
+  });
 });

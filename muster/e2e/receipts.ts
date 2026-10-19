@@ -245,3 +245,15 @@ export function checkExecuteAllowedOnce(o: { events: Event[]; questions: Questio
   }
   return pass(`${reqs.length} execute request(s), all allowed once by policy`);
 }
+
+// before/after are `git for-each-ref` output of the user's repo. Only the fetched-back branch may differ.
+export function checkOnlyBranchRefChanged(o: { before: string; after: string; branch: string }): Result {
+  const lines = (text: string) => text.split("\n").filter((l) => l.trim() !== "");
+  const own = (l: string) => l.endsWith(` refs/heads/${o.branch}`) || l.endsWith(`\trefs/heads/${o.branch}`);
+  const before = new Set(lines(o.before).filter((l) => !own(l)));
+  const after = new Set(lines(o.after).filter((l) => !own(l)));
+  const changed = [...before, ...after].filter((l) => !(before.has(l) && after.has(l)));
+  if (changed.length > 0) return fail("ref-leaked", changed.join("; "));
+  if (!lines(o.after).some(own)) return fail("branch-not-fetched", `no refs/heads/${o.branch} after the run`);
+  return pass(`only refs/heads/${o.branch} differs`);
+}
