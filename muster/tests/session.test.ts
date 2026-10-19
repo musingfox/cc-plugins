@@ -349,6 +349,55 @@ describe("WorkerSessionLoop", () => {
   });
 });
 
+describe("RecordDepsOutcome", () => {
+  function depsRepo(): string {
+    writeFileSync(join(repo, "bun.lock"), "lock\n");
+    git(repo, ["add", "bun.lock"]);
+    git(repo, ["commit", "-q", "-m", "add lock"]);
+    mkdirSync(join(repo, "node_modules/x"), { recursive: true });
+    writeFileSync(join(repo, "node_modules/x/index.js"), "x\n");
+    return repo;
+  }
+
+  test("T1: a committed lockfile copies node_modules and phase.json records the copy after the run ends", async () => {
+    depsRepo();
+    const layout = layoutFor();
+    const exits: number[] = [];
+    await runWorker(request(), layout, { env: envFor(scenario({ writeReport: "DONE\nok" })), exit: (c) => exits.push(c) });
+    expect(exits).toEqual([0]);
+    expect(readPhase(layout)?.deps).toEqual([{ dir: ".", outcome: "copied" }]);
+  });
+
+  test("T2: node_modules is already in the worker cwd when the agent process starts", async () => {
+    depsRepo();
+    const layout = layoutFor();
+    const listing = join(home, "listing.txt");
+    const sc = scenario({ writeReport: "DONE\nok" });
+    const [sh, ...fake] = JSON.parse(fakeCmd(sc, SCRIPT)) as string[];
+    const wrapped = ["/bin/sh", "-c", `ls node_modules > '${listing}'; exec "$@"`, sh, ...fake];
+    const env = { ...envFor(sc), MUSTER_AGENT_CMD: JSON.stringify(wrapped) };
+    await runWorker(request(), layout, { env, exit: () => {} });
+    expect(readFileSync(listing, "utf8")).toContain("x");
+  });
+
+  test("T3: a repo with no lockfile records an empty deps list", async () => {
+    const layout = layoutFor();
+    await runWorker(request(), layout, { env: envFor(scenario()), exit: () => {} });
+    expect(readPhase(layout)?.deps).toEqual([]);
+  });
+
+  test("T4: an uncommitted lockfile edit records lockfile-differs and the run still reaches done", async () => {
+    depsRepo();
+    writeFileSync(join(repo, "bun.lock"), "edited\n");
+    const layout = layoutFor();
+    const exits: number[] = [];
+    await runWorker(request(), layout, { env: envFor(scenario({ writeReport: "DONE\nok" })), exit: (c) => exits.push(c) });
+    expect(exits).toEqual([0]);
+    expect(readPhase(layout)?.deps).toEqual([{ dir: ".", outcome: "lockfile-differs", detail: "bun.lock" }]);
+    expect(readPhase(layout)?.phase).toBe("exited");
+  });
+});
+
 describe("recordFetch", () => {
   test("W3b: the head of the fetch that made the run collectable survives a later fetch of the same report", () => {
     const p = runPaths("w3", { MUSTER_HOME: join(home, "m"), HOME: home });

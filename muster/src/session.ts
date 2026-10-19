@@ -8,6 +8,7 @@ import { gateModel } from "./model-gate";
 import { enforceDefaultMode } from "./mode-gate";
 import { buildPrompt } from "./prompt";
 import { createRunDir, readPhase, writeAtomic, writePhase, type Phase, type RunPaths } from "./layout";
+import { copyDeps } from "./deps";
 import { createTerminator, killGraceMs, type TerminatorState } from "./termination";
 import { createWorkerWorktree, fetchBranchBack } from "./worktree";
 
@@ -70,6 +71,9 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
   );
   const prompt = buildPrompt({ worktree: wt.worktree, reportPath: layout.report, ticket: request.ticket });
   setPhase(layout, "starting");
+  writePhase(layout, {
+    deps: copyDeps({ repoRoot: request.repoRoot, baseSha: wt.baseSha, clone: wt.worktree }),
+  });
 
   const fetchBack = () => {
     const result = fetchBranchBack({ repoRoot: request.repoRoot, clone: wt.worktree, branch: wt.branch });
