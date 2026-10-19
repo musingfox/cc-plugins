@@ -23,7 +23,7 @@ export interface WorkerWorktree {
   baseSha: string;
 }
 
-function git(repoRoot: string, args: string[]): { ok: boolean; stdout: string; stderr: string } {
+export function git(repoRoot: string, args: string[]): { ok: boolean; stdout: string; stderr: string } {
   const proc = Bun.spawnSync(["git", "-C", repoRoot, ...args], { stdout: "pipe", stderr: "pipe" });
   return {
     ok: proc.exitCode === 0,
