@@ -88,6 +88,23 @@ describe("ModelGate", () => {
     expect(methods).not.toContain("session/prompt");
   });
 
+  test("T2b: the refusal pairs each value with its display name, so an alias's real model is visible", async () => {
+    const { ch } = await open();
+    const named = [
+      {
+        id: "model",
+        category: "model",
+        currentValue: "opus",
+        options: [{ value: "opus", name: "Opus 5.5" }, { value: "claude-opus-5", name: "Opus 5" }, { value: "haiku" }],
+      },
+    ];
+    const err = await gateModel(ch, { sessionId: "s1", configOptions: named, requestedModel: "claude-opus-5-5" }).catch(
+      (e) => e,
+    );
+    expect(err).toBeInstanceOf(ModelRefused);
+    expect(err.message).toContain("offered: [opus (Opus 5.5), claude-opus-5 (Opus 5), haiku]");
+  });
+
   test("T3: requested 'Haiku' or 'hai' is refused because matching is exact", async () => {
     for (const requestedModel of ["Haiku", "hai"]) {
       const { ch, eventsPath } = await open();

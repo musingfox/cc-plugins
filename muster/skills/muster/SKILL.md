@@ -11,7 +11,7 @@ Each worker is a Claude session in its own clone of the repository (called the w
 
 ## Dispatch
 
-Dispatch blocks until the worker ends, so start it with `Bash(run_in_background: true)`. `--model` must name a specific model; `default` is refused.
+Dispatch blocks until the worker ends, so start it with `Bash(run_in_background: true)`. `--model` must name a specific model; `default` is refused. The adapter offers the newest models only under their aliases (`opus`, `sonnet`, `haiku`, `fable`): a full ID such as `claude-opus-5` is an older generation, and the session's own ID such as `claude-opus-5-5` is refused. A refused model's report lists every offered value with its display name.
 
 ```
 bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts run --name NAME --model MODEL --repo /abs/path/to/repo --ticket "TICKET TEXT"
