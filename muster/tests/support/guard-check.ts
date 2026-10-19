@@ -67,6 +67,17 @@ export function decisionTable(env: Env): Case[] {
     // T4
     deny("T4 edit of the worktree .git", edit(join(wt, ".git"))),
     deny("T4 edit inside the worktree .git", edit(join(wt, ".git/config"))),
+    // T4 for .claude
+    deny("T4 edit of the worktree .claude", edit(join(wt, ".claude"))),
+    deny("T4 edit inside the worktree .claude", edit(join(wt, ".claude/settings.json"))),
+    deny("T4 edit of a new file deep inside the worktree .claude", edit(join(wt, ".claude/skills/x/SKILL.md"))),
+    deny("T4 edit through a symlink to the worktree .claude", edit(join(wt, "claude-link/settings.json"))),
+    ...["read", "delete", "move", "search"].flatMap((kind) => [
+      deny(`T4 ${kind} inside the worktree .git`, { kind, rawInput: { path: join(wt, ".git/HEAD") } }),
+      deny(`T4 ${kind} inside the worktree .claude`, { kind, rawInput: { path: join(wt, ".claude/settings.json") } }),
+    ]),
+    allow("T4 edit of a sibling that only shares the .claude prefix", edit(join(wt, ".claude-notes/a.md"))),
+    allow("T4 edit of .claude below another directory", edit(join(wt, "docs/.claude/a.md"))),
     // T5
     allow("T5 edit of exactly reportPath", {
       kind: "edit",

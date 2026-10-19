@@ -13,6 +13,7 @@ beforeAll(() => {
   const worktree = join(root, "wt");
   const outsideDir = join(root, "outside");
   mkdirSync(join(worktree, ".git"), { recursive: true });
+  mkdirSync(join(worktree, ".claude"));
   mkdirSync(outsideDir);
   mkdirSync(join(root, "wt-sibling"));
   const outsideFile = join(outsideDir, "outside.txt");
@@ -22,6 +23,7 @@ beforeAll(() => {
   const reportLink = join(root, "report-link.md");
   symlinkSync(outsideFile, reportLink);
   symlinkSync(outsideDir, join(worktree, "link"));
+  symlinkSync(join(worktree, ".claude"), join(worktree, "claude-link"));
   env = {
     worktree,
     sibling: join(root, "wt-sibling"),

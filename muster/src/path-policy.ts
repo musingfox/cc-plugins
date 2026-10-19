@@ -11,6 +11,8 @@ export type PathContext = { worktreeReal: string; reportPath: string };
 
 export type Decision = { allow: true } | { allow: false; reason: string };
 
+const ALWAYS_ASK_DIRS = [".git", ".claude"] as const;
+
 const PATH_KEYS = ["file_path", "notebook_path", "path"] as const;
 
 export function realpathDeepest(p: string): string {
@@ -58,16 +60,15 @@ export function decidePath(toolCall: ToolCall, ctx: PathContext): Decision {
     }
 
     const worktreeReal = ctx.worktreeReal;
-    const gitDir = join(worktreeReal, ".git");
+    const askDirs = ALWAYS_ASK_DIRS.map((d) => join(worktreeReal, d));
     const reportIsSymlink = isSymlink(ctx.reportPath);
     const reportReal = reportIsSymlink ? undefined : realpathDeepest(resolve(worktreeReal, ctx.reportPath));
 
     const resolved = [...new Set(candidates.map((c) => resolveRequestPath(c, worktreeReal)))];
 
     for (const real of resolved) {
-      if (real === gitDir || real.startsWith(gitDir + sep)) {
-        return { allow: false, reason: `path is inside .git: ${real}` };
-      }
+      const dir = askDirs.find((d) => real === d || real.startsWith(d + sep));
+      if (dir) return { allow: false, reason: `path is inside ${basename(dir)}: ${real}` };
     }
 
     if (

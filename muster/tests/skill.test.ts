@@ -115,6 +115,11 @@ describe("CoordinatorSkill", () => {
     expect(text).toContain("BUN_INSTALL_CACHE_DIR");
   });
 
+  test("K3: the skill says a file request inside the worktree's .git or .claude directory becomes a question", () => {
+    const text = body(SKILL);
+    expect(text).toMatch(/\.git[^\n]*\.claude[^\n]*question|question[^\n]*\.git[^\n]*\.claude/);
+  });
+
   test("T7: the default-hosts paragraph lists exactly DEFAULT_ALLOWED_HOSTS", () => {
     const text = body(SKILL);
     for (const host of DEFAULT_ALLOWED_HOSTS) expect(text).toContain(host);
