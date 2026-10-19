@@ -1,3 +1,5 @@
+import { join } from "node:path";
+import { CREDENTIAL_STORES } from "../src/sandbox";
 import { describe, expect, test } from "bun:test";
 import {
   checkAllowlistedProbe,
@@ -7,6 +9,7 @@ import {
   checkExecuteAllowedOnce,
   checkFetch,
   checkOnlyBranchRefChanged,
+  checkReadDenied,
   checkRefProtected,
   checkSessionSandbox,
   checkWorkerTools,
@@ -199,8 +202,8 @@ describe("execute permission receipt", () => {
     expect(checkExecuteAllowedOnce({ events, questions: [] }).ok).toBe(true);
   });
 
-  test("a stream with no execute request passes", () => {
-    expect(checkExecuteAllowedOnce({ events: blockedCurl("example.com"), questions: [] }).ok).toBe(true);
+  test("a stream with no execute request fails as no-execute-request", () => {
+    expect(checkExecuteAllowedOnce({ events: blockedCurl("example.com"), questions: [] })).toMatchObject({ ok: false, failure: "no-execute-request" });
   });
 
   test("an execute request answered reject fails as execute-not-allowed-once", () => {
@@ -318,6 +321,8 @@ describe("package install receipt", () => {
   });
 });
 
+const WHERE = { home: "/home/u", cache: "/run/accept-ok/cache" };
+
 describe("session/new receipt", () => {
   const sessionNew = (options: Record<string, unknown>): Event => ({
     dir: "out",
@@ -330,22 +335,33 @@ describe("session/new receipt", () => {
       autoAllowBashIfSandboxed: true,
       allowUnsandboxedCommands: false,
       network: { allowedDomains: ["registry.npmjs.org"] },
+      filesystem: { denyRead: CREDENTIAL_STORES.map((p) => join(WHERE.home, p)), allowWrite: [WHERE.cache] },
     },
     settings: { permissions: { ask: ["WebFetch"] }, disableClaudeAiConnectors: true },
     tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "ToolSearch"],
   };
 
   test("both new fields present pass", () => {
-    expect(checkSessionSandbox([sessionNew(good)]).ok).toBe(true);
+    expect(checkSessionSandbox([sessionNew(good)], WHERE).ok).toBe(true);
   });
 
   test("a missing tools field fails as tools-option-mismatch", () => {
     const { tools: _, ...rest } = good;
-    expect(checkSessionSandbox([sessionNew(rest)])).toMatchObject({ ok: false, failure: "tools-option-mismatch" });
+    expect(checkSessionSandbox([sessionNew(rest)], WHERE)).toMatchObject({ ok: false, failure: "tools-option-mismatch" });
+  });
+
+  test("a sandbox without denyRead fails as sandbox-filesystem-mismatch", () => {
+    const sandbox = { ...good.sandbox, filesystem: { allowWrite: [WHERE.cache] } };
+    expect(checkSessionSandbox([sessionNew({ ...good, sandbox })], WHERE)).toMatchObject({ ok: false, failure: "sandbox-filesystem-mismatch" });
+  });
+
+  test("a sandbox without the run-dir allowWrite fails as sandbox-filesystem-mismatch", () => {
+    const sandbox = { ...good.sandbox, filesystem: { denyRead: good.sandbox.filesystem.denyRead } };
+    expect(checkSessionSandbox([sessionNew({ ...good, sandbox })], WHERE)).toMatchObject({ ok: false, failure: "sandbox-filesystem-mismatch" });
   });
 
   test("connectors left on fail as settings-option-mismatch", () => {
-    const r = checkSessionSandbox([sessionNew({ ...good, settings: { permissions: { ask: ["WebFetch"] } } })]);
+    const r = checkSessionSandbox([sessionNew({ ...good, settings: { permissions: { ask: ["WebFetch"] } } })], WHERE);
     expect(r).toMatchObject({ ok: false, failure: "settings-option-mismatch" });
   });
 });
@@ -355,20 +371,43 @@ describe("source repo refs receipt", () => {
   const own = (sha: string) => `${sha} commit\trefs/heads/muster/x`;
 
   test("only the fetched branch appearing passes", () => {
-    expect(checkOnlyBranchRefChanged({ before: main, after: `${main}\n${own("bbb")}`, branch: "muster/x" }).ok).toBe(true);
+    expect(checkOnlyBranchRefChanged({ before: main, after: `${main}\n${own("bbb")}`, branches: ["muster/x"] }).ok).toBe(true);
   });
 
   test("a leaked tag fails as ref-leaked", () => {
     const after = `${main}\n${own("bbb")}\nccc commit\trefs/tags/release`;
-    expect(checkOnlyBranchRefChanged({ before: main, after, branch: "muster/x" })).toMatchObject({ ok: false, failure: "ref-leaked" });
+    expect(checkOnlyBranchRefChanged({ before: main, after, branches: ["muster/x"] })).toMatchObject({ ok: false, failure: "ref-leaked" });
   });
 
   test("a moved main fails as ref-leaked", () => {
     const after = `ddd commit\trefs/heads/main\n${own("bbb")}`;
-    expect(checkOnlyBranchRefChanged({ before: main, after, branch: "muster/x" })).toMatchObject({ ok: false, failure: "ref-leaked" });
+    expect(checkOnlyBranchRefChanged({ before: main, after, branches: ["muster/x"] })).toMatchObject({ ok: false, failure: "ref-leaked" });
   });
 
   test("no fetched branch fails as branch-not-fetched", () => {
-    expect(checkOnlyBranchRefChanged({ before: main, after: main, branch: "muster/x" })).toMatchObject({ ok: false, failure: "branch-not-fetched" });
+    expect(checkOnlyBranchRefChanged({ before: main, after: main, branches: ["muster/x"] })).toMatchObject({ ok: false, failure: "branch-not-fetched" });
+  });
+});
+
+describe("denied read receipt", () => {
+  const ls = "ls ~/Library/Keychains";
+
+  test("a command refused with Operation not permitted passes", () => {
+    const events = [...bashCommand("tc-ls", ls), bashFinished("tc-ls", "failed", "ls: /home/u/Library/Keychains: Operation not permitted")];
+    expect(checkReadDenied({ events, needle: "Library/Keychains" }).ok).toBe(true);
+  });
+
+  test("a listing that succeeded fails as not-eperm", () => {
+    const events = [...bashCommand("tc-ls", ls), bashFinished("tc-ls", "completed", "login.keychain-db")];
+    expect(checkReadDenied({ events, needle: "Library/Keychains" })).toMatchObject({ ok: false, failure: "not-eperm" });
+  });
+
+  test("a failure that is not EPERM fails as not-eperm", () => {
+    const events = [...bashCommand("tc-ls", ls), bashFinished("tc-ls", "failed", "ls: No such file or directory")];
+    expect(checkReadDenied({ events, needle: "Library/Keychains" })).toMatchObject({ ok: false, failure: "not-eperm" });
+  });
+
+  test("a stream without the command fails as not-attempted", () => {
+    expect(checkReadDenied({ events: blockedCurl("example.com"), needle: "Library/Keychains" })).toMatchObject({ ok: false, failure: "not-attempted" });
   });
 });

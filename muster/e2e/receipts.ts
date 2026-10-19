@@ -1,6 +1,9 @@
 // Pure checkers over events.jsonl lines for e2e/accept.ts. Each returns a named failure
 // instead of throwing, so the unit tests can assert which check tripped.
 
+import { join } from "node:path";
+import { CREDENTIAL_STORES } from "../src/sandbox";
+
 export type Event = { t?: string; dir: string; msg: any };
 export type Question = { kind?: string; title?: string; paths?: string[]; rawInput?: Record<string, any> };
 export type Result = { ok: true; detail: string } | { ok: false; failure: string; detail: string };
@@ -182,13 +185,18 @@ export function checkWebSearch(o: { events: Event[]; questions: Question[] }): R
 const DEFAULT_DOMAINS = ["registry.npmjs.org"];
 const WORKER_TOOLS = ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "ToolSearch"];
 
-export function checkSessionSandbox(events: Event[]): Result {
+export function checkSessionSandbox(events: Event[], where: { home: string; cache: string }): Result {
   const sn = events.find((e) => e.dir === "out" && e.msg?.method === "session/new");
   const sb = sn?.msg.params?._meta?.claudeCode?.options?.sandbox;
   const flags = { enabled: true, failIfUnavailable: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false };
   const flagsOk = Object.entries(flags).every(([k, v]) => sb?.[k] === v);
   const domainsOk = JSON.stringify(sb?.network?.allowedDomains) === JSON.stringify(DEFAULT_DOMAINS);
   if (!flagsOk || !domainsOk) return fail("sandbox-option-mismatch", JSON.stringify(sb ?? null));
+  const denyRead = CREDENTIAL_STORES.map((p) => join(where.home, p));
+  const fs = sb?.filesystem;
+  if (JSON.stringify(fs?.denyRead) !== JSON.stringify(denyRead) || JSON.stringify(fs?.allowWrite) !== JSON.stringify([where.cache])) {
+    return fail("sandbox-filesystem-mismatch", JSON.stringify(fs ?? null));
+  }
   const options = sn?.msg.params?._meta?.claudeCode?.options;
   if (JSON.stringify(options?.settings) !== JSON.stringify({ permissions: { ask: ["WebFetch"] }, disableClaudeAiConnectors: true })) {
     return fail("settings-option-mismatch", JSON.stringify(options?.settings ?? null));
@@ -196,7 +204,7 @@ export function checkSessionSandbox(events: Event[]): Result {
   if (JSON.stringify(options?.tools) !== JSON.stringify(WORKER_TOOLS)) {
     return fail("tools-option-mismatch", JSON.stringify(options?.tools ?? null));
   }
-  return pass(`sandbox on, allowedDomains ${JSON.stringify(DEFAULT_DOMAINS)}, WebFetch ask rule, connectors off, tools ${WORKER_TOOLS.join(",")}`);
+  return pass(`sandbox on, allowedDomains ${JSON.stringify(DEFAULT_DOMAINS)}, ${denyRead.length} denyRead entries, allowWrite ${where.cache}, WebFetch ask rule, connectors off, tools ${WORKER_TOOLS.join(",")}`);
 }
 
 const STEP_13_QUERY = "select:RemoteTrigger";
@@ -235,6 +243,7 @@ export function checkRefProtected(o: { events: Event[]; needle: string; before: 
 
 export function checkExecuteAllowedOnce(o: { events: Event[]; questions: Question[] }): Result {
   const reqs = requestsOf(o.events).filter((r) => r.toolCall.kind === "execute");
+  if (reqs.length === 0) return fail("no-execute-request", "the run raised no execute permission request, so nothing was checked");
   if (o.questions.some((q) => q.kind === "execute")) return fail("question-for-execute", "a QUESTION names an execute request");
   for (const req of reqs) {
     const kind = replyKind(o.events, req);
@@ -246,14 +255,23 @@ export function checkExecuteAllowedOnce(o: { events: Event[]; questions: Questio
   return pass(`${reqs.length} execute request(s), all allowed once by policy`);
 }
 
-// before/after are `git for-each-ref` output of the user's repo. Only the fetched-back branch may differ.
-export function checkOnlyBranchRefChanged(o: { before: string; after: string; branch: string }): Result {
+// before/after are `git for-each-ref` output of the user's repo. Only the fetched-back branches may differ.
+export function checkOnlyBranchRefChanged(o: { before: string; after: string; branches: string[] }): Result {
   const lines = (text: string) => text.split("\n").filter((l) => l.trim() !== "");
-  const own = (l: string) => l.endsWith(` refs/heads/${o.branch}`) || l.endsWith(`\trefs/heads/${o.branch}`);
+  const own = (l: string) => o.branches.some((b) => l.endsWith(`\trefs/heads/${b}`));
   const before = new Set(lines(o.before).filter((l) => !own(l)));
   const after = new Set(lines(o.after).filter((l) => !own(l)));
   const changed = [...before, ...after].filter((l) => !(before.has(l) && after.has(l)));
   if (changed.length > 0) return fail("ref-leaked", changed.join("; "));
-  if (!lines(o.after).some(own)) return fail("branch-not-fetched", `no refs/heads/${o.branch} after the run`);
-  return pass(`only refs/heads/${o.branch} differs`);
+  const missing = o.branches.filter((b) => !lines(o.after).some((l) => l.endsWith(`\trefs/heads/${b}`)));
+  if (missing.length > 0) return fail("branch-not-fetched", `no refs/heads/${missing.join(", refs/heads/")} after the run`);
+  return pass(`only refs/heads/${o.branches.join(", refs/heads/")} differ`);
+}
+
+// A read of a denied path is evidence only if the command ran and the OS refused it with EPERM.
+export function checkReadDenied(o: { events: Event[]; needle: string }): Result {
+  const attempts = attemptsFor(o.events, o.needle);
+  if (attempts.length === 0) return fail("not-attempted", `no Bash command contains ${o.needle}`);
+  if (!attempts.some((a) => /Operation not permitted/.test(a.output))) return fail("not-eperm", describeAttempts(attempts));
+  return pass(`attempted and refused with EPERM: ${o.needle}`);
 }

@@ -14,6 +14,7 @@ import {
   checkCompleted,
   checkExecuteAllowedOnce,
   checkOnlyBranchRefChanged,
+  checkReadDenied,
   checkFetch,
   checkRefProtected,
   checkSessionSandbox,
@@ -146,8 +147,11 @@ async function run(base: string): Promise<void> {
     `14. In Bash, run exactly this command and nothing else: git -C ${repo} update-ref refs/heads/main HEAD`,
     "15. In Bash, run exactly this command and nothing else: npm install --prefix scratch left-pad",
     "16. In Bash, run exactly this command and nothing else: git tag release",
-    "Then write the report to REPORT.md. Its first line must be exactly DONE, followed by one line per step 1 to 16 saying what happened.",
-    "Do not write BLOCKED for a refusal in steps 5 to 11 or step 14; those refusals are the expected result of this run.",
+    "17. In Bash, run exactly this command and nothing else: for f in a b; do echo $f 2>$TMPDIR/e; done",
+    "18. In Bash, run exactly this command and nothing else: ls ~/Library/Keychains",
+    "19. In Bash, run exactly this command and nothing else: FOO=$(pwd); echo \"$FOO\" > foo.txt",
+    "Then write the report to REPORT.md. Its first line must be exactly DONE, followed by one line per step 1 to 19 saying what happened.",
+    "Do not write BLOCKED for a refusal in steps 5 to 11, step 14 or step 18; those refusals are the expected result of this run.",
   ].join("\n");
 
   const name = "accept-ok";
@@ -198,8 +202,8 @@ async function run(base: string): Promise<void> {
     const settingSources = sessionNew?.msg.params?._meta?.claudeCode?.options?.settingSources;
     receipt("(5) session/new has settingSources []", Array.isArray(settingSources) && settingSources.length === 0, JSON.stringify(settingSources));
     check("(5) every tool the worker called or loaded is on the allowlist, and step 13 ran", checkWorkerTools(events));
-    check("(5) session/new carries the sandbox object, allowlist, tool allowlist and connectors-off setting", checkSessionSandbox(events));
-    check("(7) every execute permission request allowed once by policy, no QUESTION", checkExecuteAllowedOnce({ events, questions }));
+    check("(5) session/new carries the sandbox object, allowlist, denyRead and allowWrite, tool allowlist and connectors-off setting", checkSessionSandbox(events, { home: process.env.HOME ?? homedir(), cache: join(runDir, "cache") }));
+    check("(7) at least one execute permission request, every one allowed once by policy, no QUESTION", checkExecuteAllowedOnce({ events, questions }));
 
     const promptIdx = events.findIndex((e) => e.dir === "out" && e.msg.method === "session/prompt");
     const modeIdx = events.findIndex((e) => e.dir === "out" && e.msg.method === "session/set_config_option" && e.msg.params?.value === "default");
@@ -237,6 +241,7 @@ async function run(base: string): Promise<void> {
     const leftPad = join(meta.worktree, "scratch", "node_modules", "left-pad");
     receipt("(8) left-pad is in the scratch dir's node_modules", existsSync(leftPad), leftPad);
 
+    check("(8) ls of ~/Library/Keychains attempted and refused with EPERM", checkReadDenied({ events, needle: "ls ~/Library/Keychains" }));
     check("(8) git tag release in the clone completed", checkCompleted({ events, needle: "git tag release" }));
     receipt("(8) the tag exists in the clone", gitOut(meta.worktree, "tag", "--list", "release") === "release", meta.worktree);
 
@@ -271,8 +276,8 @@ async function run(base: string): Promise<void> {
     ]);
     receipt("(7) first client pid is dead after stop", !alive(first.pid), `pid=${first.pid}`);
     check(
-      "(8) the source repo's refs differ only in refs/heads/muster/<name>, after the stop-time fetch",
-      checkOnlyBranchRefChanged({ before: refsBefore, after: gitOut(repo, "for-each-ref"), branch: `muster/${name}` }),
+      "(8) the source repo's refs differ only in the refs/heads/muster/<name> branches, after the stop-time fetch",
+      checkOnlyBranchRefChanged({ before: refsBefore, after: gitOut(repo, "for-each-ref"), branches: [`muster/${name}`, `muster/${bad}`] }),
     );
     const status = await muster(["status", name], env);
     receipt("(5) models= matches haiku", /models=\S*haiku/i.test(status.stdout), status.stdout.trim());

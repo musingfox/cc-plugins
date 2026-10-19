@@ -27,7 +27,7 @@ export function resolveAllowedHosts(env: Env): string[] {
   return [...new Set([...DEFAULT_ALLOWED_HOSTS, ...extra])];
 }
 
-const CREDENTIAL_STORES = [
+export const CREDENTIAL_STORES = [
   ".npmrc",
   ".config/gh",
   ".git-credentials",
