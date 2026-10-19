@@ -10,7 +10,7 @@ export class UsageError extends Error {
   }
 }
 
-export type Env = { MUSTER_HOME?: string; HOME: string };
+export type Env = { MUSTER_HOME?: string; HOME: string; TMPDIR?: string };
 export type Phase = Record<string, unknown>;
 
 export interface RunPaths {

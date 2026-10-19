@@ -29,7 +29,7 @@ async function main(argv: string[]): Promise<number> {
   }
   if (verb === undefined || !VERBS.includes(verb)) return usage();
 
-  const env: Env = { MUSTER_HOME: process.env.MUSTER_HOME, HOME: process.env.HOME ?? "" };
+  const env: Env = { MUSTER_HOME: process.env.MUSTER_HOME, HOME: process.env.HOME ?? "", TMPDIR: process.env.TMPDIR };
   const [name] = args;
   if (verb !== "run" && verb !== "answer" && name === undefined) return usage();
 

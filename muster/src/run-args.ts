@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { dirname, sep } from "node:path";
 import { Env, UsageError, runPaths } from "./layout";
 
 export interface DispatchRequest {
@@ -34,6 +35,27 @@ function gitWorkTree(repo: string): string {
   const inside = spawnSync("git", ["-C", root, "rev-parse", "--is-inside-work-tree"], { encoding: "utf8" });
   if (inside.status !== 0 || inside.stdout.trim() !== "true") throw refuse();
   return root;
+}
+
+// The worker's sandbox leaves the system temp directories writable, so a repo or run directory there is not fenced.
+function realpathOfExisting(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    const parent = dirname(path);
+    return parent === path ? path : realpathOfExisting(parent);
+  }
+}
+
+function refuseUnderTemp(label: string, path: string, env: Env): void {
+  const real = realpathOfExisting(path);
+  for (const root of ["/tmp", "/private/tmp", env.TMPDIR]) {
+    if (!root) continue;
+    const realRoot = realpathOfExisting(root);
+    if (real === realRoot || real.startsWith(realRoot.endsWith(sep) ? realRoot : realRoot + sep)) {
+      throw new UsageError(`${label} "${path}" is under the temp directory ${realRoot}, which the worker's sandbox can write; use a path elsewhere`);
+    }
+  }
 }
 
 function resolvesToCommit(repoRoot: string, ref: string): boolean {
@@ -72,12 +94,13 @@ function ticketText(flags: Map<string, string>): string {
   return text;
 }
 
-export function parseRunArgs(argv: string[], env: Env = { MUSTER_HOME: process.env.MUSTER_HOME, HOME: process.env.HOME ?? "" }): DispatchRequest {
+export function parseRunArgs(argv: string[], env: Env = { MUSTER_HOME: process.env.MUSTER_HOME, HOME: process.env.HOME ?? "", TMPDIR: process.env.TMPDIR }): DispatchRequest {
   const flags = parseFlags(argv[0] === "run" ? argv.slice(1) : argv);
 
   const name = flags.get("--name");
   if (!name) throw new UsageError("--name is required");
   const paths = runPaths(name, env);
+  refuseUnderTemp("MUSTER_HOME", paths.runDir, env);
   if (existsSync(paths.runDir)) throw new UsageError(`run "${name}" already exists at ${paths.runDir}`);
 
   const model = flags.get("--model");
@@ -87,6 +110,7 @@ export function parseRunArgs(argv: string[], env: Env = { MUSTER_HOME: process.e
   const repo = flags.get("--repo");
   if (!repo) throw new UsageError("--repo is required");
   const repoRoot = gitWorkTree(repo);
+  refuseUnderTemp("--repo", repoRoot, env);
 
   const baseRef = flags.get("--base") ?? "HEAD";
   if (!resolvesToCommit(repoRoot, baseRef)) throw new UsageError(`unknown base ref "${baseRef}"`);

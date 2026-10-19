@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, symlinkSync, mkdtempSync, realpathSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { UsageError, runPaths } from "../src/layout";
@@ -112,5 +112,34 @@ describe("RunRefusal", () => {
     expect(err.message).toContain("muster/a1");
     expect(err.message).toContain("already exists");
     expect(existsSync(runPaths("a1", env).runDir)).toBe(false);
+  });
+
+  test("B2a: a --repo under /tmp is refused and no run dir is created", () => {
+    const inTmp = mkdtempSync("/tmp/muster-args-");
+    try {
+      execFileSync("git", ["-C", inTmp, "init", "-q"]);
+      const err = refusal(["run", "--name", "a1", "--model", "haiku", "--repo", inTmp, "--ticket", "t"]);
+      expect(err.message).toContain("--repo");
+      expect(err.message).toContain("temp directory");
+      expect(existsSync(runPaths("a1", env).runDir)).toBe(false);
+    } finally {
+      rmSync(inTmp, { recursive: true, force: true });
+    }
+  });
+
+  test("B2b: a --repo reached through a symlink is judged by its realpath against $TMPDIR", () => {
+    const link = join(home, "link");
+    symlinkSync(repo, link);
+    const argv = ["run", "--name", "a1", "--model", "haiku", "--repo", link, "--ticket", "t"];
+    expect(parseRunArgs(argv, env).repoRoot).toBe(realpathSync(repo));
+    env = { ...env, TMPDIR: realpathSync(home) };
+    expect(refusal(argv).message).toContain("temp directory");
+  });
+
+  test("B2c: a MUSTER_HOME under /tmp that does not exist yet is refused", () => {
+    env = { ...env, MUSTER_HOME: "/tmp/muster-args-nonexistent/m" };
+    const err = refusal(valid());
+    expect(err.message).toContain("MUSTER_HOME");
+    expect(err.message).toContain("temp directory");
   });
 });
