@@ -195,7 +195,7 @@ Unattended Claude workers over [ACP](https://agentclientprotocol.com) (claude-ag
 - **Report-file completion**: a run is done when the worker writes its report file
 - **Own clone per run**: each worker runs in a `git clone --no-hardlinks` of your repo under the run directory, so nothing it runs can move your refs; muster fetches its `muster/<name>` branch back when the worker goes idle and when the run ends, and cleanup is removing the run directory
 
-Bash runs inside Claude Code's OS sandbox: Bash writes are confined to the worktree and the system temp directories, and reads are not confined. Network for Bash and web fetch alike is limited to a built-in allowlist (registry.npmjs.org only; github.com is off it so a worker cannot push with your git credentials), extendable per dispatch through `MUSTER_ALLOW_HOSTS`; a host off the list, and any web search, is refused without a question. The worker's tools are a fixed list with claude.ai connectors off.
+Bash runs inside Claude Code's OS sandbox: Bash writes are confined to the worktree and the system temp directories, plus a per-run tool cache so `npm install` and `bun install` work, and reads are not confined, except for credential stores (`~/.npmrc`, `~/.config/gh`, `~/.git-credentials`, `~/.config/git/credentials`, `~/.netrc`, `~/.aws`, `~/.docker/config.json`, `~/Library/Keychains`), which are denied. Network for Bash and web fetch alike is limited to a built-in allowlist (registry.npmjs.org only; github.com is off it so a worker cannot push with your git credentials), extendable per dispatch through `MUSTER_ALLOW_HOSTS`; a host off the list, and any web search, is refused without a question. The worker's tools are a fixed list with claude.ai connectors off.
 
 **Installation:**
 ```bash

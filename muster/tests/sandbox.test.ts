@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { homedir } from "node:os";
 import * as sandbox from "../src/sandbox";
 import { resolveAllowedHosts, sandboxOption } from "../src/sandbox";
 
@@ -17,11 +18,28 @@ describe("sandbox settings", () => {
   });
 });
 
-describe("sandbox option has no filesystem rules", () => {
-  test("R2: sandboxOption has no filesystem key, exports no temp-root helper, and ignores tempRoots and runTmp", () => {
+describe("sandbox option filesystem rules", () => {
+  test("R2: filesystem denies the credential stores under HOME and allows writes to the cache only; no temp roots, no denyWrite", () => {
     expect("defaultTempRoots" in sandbox).toBe(false);
-    const option = sandboxOption({ env: {}, tempRoots: ["/t/a"], runTmp: "/t/run/tmp" } as Parameters<typeof sandboxOption>[0]);
-    expect(option).not.toHaveProperty("filesystem");
-    expect(JSON.stringify(option)).not.toMatch(/denyWrite|allowWrite/);
+    const option = sandboxOption({ env: { HOME: "/home/u" }, cache: "/r/cache" });
+    expect(option.filesystem).toStrictEqual({
+      denyRead: [
+        "/home/u/.npmrc",
+        "/home/u/.config/gh",
+        "/home/u/.git-credentials",
+        "/home/u/.config/git/credentials",
+        "/home/u/.netrc",
+        "/home/u/.aws",
+        "/home/u/.docker/config.json",
+        "/home/u/Library/Keychains",
+      ],
+      allowWrite: ["/r/cache"],
+    });
+    expect(JSON.stringify(option)).not.toMatch(/denyWrite|tempRoots|runTmp/);
+  });
+
+  test("R3: without HOME in the env the denied paths come from the user's home directory", () => {
+    const option = sandboxOption({ env: {}, cache: "/r/cache" });
+    expect(option.filesystem.denyRead.every((p) => p.startsWith(homedir() + "/"))).toBe(true);
   });
 });

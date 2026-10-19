@@ -17,6 +17,7 @@ export interface RunPaths {
   name: string;
   runDir: string;
   worktree: string;
+  cache: string;
   meta: string;
   events: string;
   stderrLog: string;
@@ -38,6 +39,7 @@ export function runPaths(name: string, env: Env): RunPaths {
     name,
     runDir,
     worktree: join(runDir, "worktree"),
+    cache: join(runDir, "cache"),
     meta: join(runDir, "meta.json"),
     events: join(runDir, "events.jsonl"),
     stderrLog: join(runDir, "stderr.log"),

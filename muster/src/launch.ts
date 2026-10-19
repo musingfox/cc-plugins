@@ -1,3 +1,5 @@
+import { join } from "node:path";
+
 export const ADAPTER_VERSION = "0.93.0";
 export const ADAPTER_SPEC = `@agentclientprotocol/claude-agent-acp@${ADAPTER_VERSION}`;
 
@@ -11,7 +13,10 @@ export function isExactPin(spec: string): boolean {
   return /^(?:@[^/]+\/)?[^@/]+@\d+\.\d+\.\d+$/.test(spec);
 }
 
-export function buildAgentLaunch(env: Record<string, string | undefined>): {
+export function buildAgentLaunch(
+  env: Record<string, string | undefined>,
+  cache: string,
+): {
   argv: string[];
   env: Record<string, string>;
 } {
@@ -22,6 +27,8 @@ export function buildAgentLaunch(env: Record<string, string | undefined>): {
     out[key] = value;
   }
   out.CLAUDE_CODE_DISABLE_ADVISOR_TOOL = "1";
+  out.npm_config_cache = join(cache, "npm");
+  out.BUN_INSTALL_CACHE_DIR = join(cache, "bun");
   return { argv, env: out };
 }
 

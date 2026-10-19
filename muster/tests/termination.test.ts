@@ -87,7 +87,7 @@ describe("WorkerTermination", () => {
       results: ADAPTER_RESULTS,
       silent: ["session/prompt"],
     });
-    const hs = await handshake(ch, { worktree: home });
+    const hs = await handshake(ch, { cache: "/tmp/muster-cache", worktree: home });
     const state: TerminatorState = { channel: ch, sessionId: hs.sessionId };
     state.turn = ch.request("session/prompt", { sessionId: hs.sessionId }).catch(() => {});
     const h = harness(layout, state);
@@ -107,7 +107,7 @@ describe("WorkerTermination", () => {
 
   test("T2: an existing DONE report is left byte-identical", async () => {
     const { ch, layout } = await setup({ results: ADAPTER_RESULTS, silent: ["session/prompt"] });
-    const hs = await handshake(ch, { worktree: home });
+    const hs = await handshake(ch, { cache: "/tmp/muster-cache", worktree: home });
     const state: TerminatorState = { channel: ch, sessionId: hs.sessionId };
     state.turn = ch.request("session/prompt", { sessionId: hs.sessionId }).catch(() => {});
     writeFileSync(layout.report, "DONE\nok");
@@ -126,7 +126,7 @@ describe("WorkerTermination", () => {
       results: ADAPTER_RESULTS,
       termination: { exitOnMethod: { "session/prompt": 3 } },
     });
-    const hs = await handshake(ch, { worktree: home });
+    const hs = await handshake(ch, { cache: "/tmp/muster-cache", worktree: home });
     const state: TerminatorState = { channel: ch, sessionId: hs.sessionId };
     const h = harness(layout, state);
     h.watch();
@@ -170,7 +170,7 @@ describe("WorkerTermination", () => {
 
   test("T6: a JSON-RPC error on session/prompt is recorded as BLOCKED prompt-error and exits 1", async () => {
     const { ch, layout } = await setup({ results: ADAPTER_RESULTS, errors: { "session/prompt": "model overloaded" } });
-    const hs = await handshake(ch, { worktree: home });
+    const hs = await handshake(ch, { cache: "/tmp/muster-cache", worktree: home });
     const state: TerminatorState = { channel: ch, sessionId: hs.sessionId };
     const h = harness(layout, state);
     const err = await ch.request("session/prompt", { sessionId: hs.sessionId }).catch((e: Error) => e);
@@ -221,7 +221,7 @@ describe("WorkerTermination", () => {
 
   test("T10: overlapping terminate calls share one result, one exit and one session/cancel", async () => {
     const { ch, layout } = await setup({ results: ADAPTER_RESULTS, silent: ["session/prompt"] });
-    const hs = await handshake(ch, { worktree: home });
+    const hs = await handshake(ch, { cache: "/tmp/muster-cache", worktree: home });
     const state: TerminatorState = { channel: ch, sessionId: hs.sessionId };
     state.turn = ch.request("session/prompt", { sessionId: hs.sessionId }).catch(() => {});
     const h = harness(layout, state);

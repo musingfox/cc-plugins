@@ -81,7 +81,7 @@ describe("QuestionTimeout", () => {
       stderrPath: layout.stderrLog,
     });
     channels.push(ch);
-    const hs = await handshake(ch, { worktree: home });
+    const hs = await handshake(ch, { cache: "/tmp/muster-cache", worktree: home });
     const state: TerminatorState = { channel: ch, sessionId: hs.sessionId };
     state.turn = ch.request("session/prompt", { sessionId: hs.sessionId }).catch(() => {});
 

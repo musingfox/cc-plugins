@@ -6,9 +6,11 @@ import {
   isExactPin,
 } from "../src/launch";
 
+const CACHE = "/runs/a1/cache";
+
 describe("buildAgentLaunch", () => {
   test("T1: default argv starts the pinned adapter with bunx", () => {
-    const { argv } = buildAgentLaunch({ PATH: "/bin" });
+    const { argv } = buildAgentLaunch({ PATH: "/bin" }, CACHE);
     expect(argv).toEqual(["bunx", "@agentclientprotocol/claude-agent-acp@0.93.0"]);
   });
 
@@ -42,21 +44,31 @@ describe("buildAgentLaunch", () => {
       "CLAUDE_CODE_SESSION_ID",
       "MUSTER_AGENT_CMD",
     ];
-    const { env } = buildAgentLaunch({
+    const { env } = buildAgentLaunch(
+      {
+        ...kept,
+        ...Object.fromEntries(dropped.map((k) => [k, k === "MUSTER_AGENT_CMD" ? '["bun","x.ts"]' : "leak"])),
+        npm_config_cache: "/caller/npm",
+        BUN_INSTALL_CACHE_DIR: "/caller/bun",
+      },
+      CACHE,
+    );
+    expect(env).toEqual({
       ...kept,
-      ...Object.fromEntries(dropped.map((k) => [k, k === "MUSTER_AGENT_CMD" ? '["bun","x.ts"]' : "leak"])),
+      CLAUDE_CODE_DISABLE_ADVISOR_TOOL: "1",
+      npm_config_cache: `${CACHE}/npm`,
+      BUN_INSTALL_CACHE_DIR: `${CACHE}/bun`,
     });
-    expect(env).toEqual({ ...kept, CLAUDE_CODE_DISABLE_ADVISOR_TOOL: "1" });
   });
 
   test("T4: MUSTER_AGENT_CMD overrides the default argv", () => {
-    const { argv } = buildAgentLaunch({ MUSTER_AGENT_CMD: '["bun","fake.ts"]' });
+    const { argv } = buildAgentLaunch({ MUSTER_AGENT_CMD: '["bun","fake.ts"]' }, CACHE);
     expect(argv).toEqual(["bun", "fake.ts"]);
   });
 
   test("T5: malformed MUSTER_AGENT_CMD throws UsageError", () => {
     for (const bad of ["nope", "[]", "[1]"]) {
-      expect(() => buildAgentLaunch({ MUSTER_AGENT_CMD: bad })).toThrow(UsageError);
+      expect(() => buildAgentLaunch({ MUSTER_AGENT_CMD: bad }, CACHE)).toThrow(UsageError);
     }
   });
 });

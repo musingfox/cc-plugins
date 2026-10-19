@@ -53,7 +53,7 @@ describe("AdapterVersionGate", () => {
 
   test("T2: adapter 0.94.0 is refused with the mismatch message and no session/prompt is sent", async () => {
     const { ch, eventsPath } = await open(withVersion("0.94.0"));
-    const err = await handshake(ch, { worktree: "/tmp/w" }).catch((e) => e);
+    const err = await handshake(ch, { cache: "/tmp/muster-cache", worktree: "/tmp/w" }).catch((e) => e);
     expect(err).toBeInstanceOf(HandshakeError);
     expect(err.message).toContain("adapter-version-mismatch");
     expect(err.message).toContain("0.94.0");
@@ -67,7 +67,7 @@ describe("AdapterVersionGate", () => {
 
   test("T4: agentInfo absent is refused with 'got none'", async () => {
     const { ch } = await open({});
-    const err = await handshake(ch, { worktree: "/tmp/w" }).catch((e) => e);
+    const err = await handshake(ch, { cache: "/tmp/muster-cache", worktree: "/tmp/w" }).catch((e) => e);
     expect(err).toBeInstanceOf(HandshakeError);
     expect(err.message).toContain("got none");
   });

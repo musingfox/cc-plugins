@@ -51,7 +51,7 @@ async function call(channel: Channel, method: string, params: unknown, ms: numbe
 
 export async function handshake(
   channel: Channel,
-  opts: { worktree: string; env?: Record<string, string | undefined> },
+  opts: { worktree: string; cache: string; env?: Record<string, string | undefined> },
 ): Promise<Handshake> {
   const env = opts.env ?? process.env;
   try {
@@ -60,7 +60,7 @@ export async function handshake(
     if (e instanceof InvalidAllowHost) throw new HandshakeError(e.message);
     throw e;
   }
-  const sandbox = sandboxOption({ env });
+  const sandbox = sandboxOption({ env, cache: opts.cache });
   const ms = handshakeTimeoutMs();
   const init = (await call(
     channel,

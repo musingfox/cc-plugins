@@ -27,6 +27,7 @@ describe("RunLayout", () => {
     const p = runPaths("a1", { MUSTER_HOME: "/tmp/m1", HOME: "/tmp/h" });
     expect(p.runDir).toBe("/tmp/m1/runs/a1");
     expect(p.worktree).toBe("/tmp/m1/runs/a1/worktree");
+    expect(p.cache).toBe("/tmp/m1/runs/a1/cache");
     expect(p.report).toBe("/tmp/m1/runs/a1/REPORT.md");
     expect(p.question(3)).toBe("/tmp/m1/runs/a1/QUESTION-3.json");
   });

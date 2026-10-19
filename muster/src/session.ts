@@ -1,3 +1,4 @@
+import { mkdirSync } from "node:fs";
 import { LaunchError, openChannel, type Channel } from "./channel";
 import { createPermissionHandler } from "./escalation";
 import { handshake } from "./handshake";
@@ -36,6 +37,7 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
   const env = opts.env ?? process.env;
   const exit = opts.exit ?? ((code: number) => process.exit(code));
   createRunDir(layout);
+  mkdirSync(layout.cache);
   const wt = createWorkerWorktree({
     repoRoot: request.repoRoot,
     baseRef: request.baseRef,
@@ -71,7 +73,7 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
 
   let channel: Channel;
   try {
-    const launch = buildAgentLaunch(env);
+    const launch = buildAgentLaunch(env, layout.cache);
     channel = await openChannel({
       argv: launch.argv,
       env: launch.env,
@@ -91,7 +93,7 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
 
   let sessionId: string;
   try {
-    const hs = await handshake(channel, { worktree: wt.worktree });
+    const hs = await handshake(channel, { worktree: wt.worktree, cache: layout.cache });
     sessionId = hs.sessionId;
     state.sessionId = sessionId;
     await gateModel(channel, { sessionId, configOptions: hs.configOptions, requestedModel: request.model });

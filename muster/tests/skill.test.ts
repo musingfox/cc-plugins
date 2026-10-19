@@ -106,6 +106,15 @@ describe("CoordinatorSkill", () => {
     expect(cleanup).toContain("RUNDIR");
   });
 
+  test("K2: the confinement section names the denied credential stores and the run-directory tool cache", () => {
+    const text = body(SKILL);
+    for (const store of [".npmrc", ".config/gh", ".git-credentials", ".netrc", ".aws", ".docker/config.json", "Library/Keychains"]) {
+      expect(text).toContain(store);
+    }
+    expect(text).toContain("npm_config_cache");
+    expect(text).toContain("BUN_INSTALL_CACHE_DIR");
+  });
+
   test("T7: the default-hosts paragraph lists exactly DEFAULT_ALLOWED_HOSTS", () => {
     const text = body(SKILL);
     for (const host of DEFAULT_ALLOWED_HOSTS) expect(text).toContain(host);

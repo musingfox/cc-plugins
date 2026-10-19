@@ -334,4 +334,15 @@ describe("WorkerSessionLoop", () => {
     expect(readPhase(layout)?.phase).toBe("exited");
     expect(String(readPhase(layout)?.fetchError)).toContain("checked out");
   });
+
+  test("C1: the cache dir exists, the agent env points npm and bun at it, and session/new allows writes to it only", async () => {
+    const layout = layoutFor();
+    await runWorker(request(), layout, { env: envFor(scenario({ echoEnv: true })), exit: () => {} });
+    expect(statSync(layout.cache).isDirectory()).toBe(true);
+    const echoed = JSON.parse(readFileSync(layout.stderrLog, "utf8")) as Record<string, string>;
+    expect(echoed.npm_config_cache).toBe(join(layout.cache, "npm"));
+    expect(echoed.BUN_INSTALL_CACHE_DIR).toBe(join(layout.cache, "bun"));
+    const sessionNew = events(layout.events).find((e) => e.dir === "out" && e.msg.method === "session/new");
+    expect(sessionNew?.msg.params._meta.claudeCode.options.sandbox.filesystem.allowWrite).toEqual([layout.cache]);
+  });
 });

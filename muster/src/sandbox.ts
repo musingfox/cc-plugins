@@ -1,3 +1,6 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
+
 export class InvalidAllowHost extends Error {
   override name = "InvalidAllowHost";
   constructor(readonly entry: string) {
@@ -24,12 +27,25 @@ export function resolveAllowedHosts(env: Env): string[] {
   return [...new Set([...DEFAULT_ALLOWED_HOSTS, ...extra])];
 }
 
-export function sandboxOption(opts: { env: Env }) {
+const CREDENTIAL_STORES = [
+  ".npmrc",
+  ".config/gh",
+  ".git-credentials",
+  ".config/git/credentials",
+  ".netrc",
+  ".aws",
+  ".docker/config.json",
+  "Library/Keychains",
+];
+
+export function sandboxOption(opts: { env: Env; cache: string }) {
+  const home = opts.env.HOME ?? homedir();
   return {
     enabled: true,
     failIfUnavailable: true,
     autoAllowBashIfSandboxed: true,
     allowUnsandboxedCommands: false,
     network: { allowedDomains: resolveAllowedHosts(opts.env), strictAllowlist: true },
+    filesystem: { denyRead: CREDENTIAL_STORES.map((p) => join(home, p)), allowWrite: [opts.cache] },
   };
 }

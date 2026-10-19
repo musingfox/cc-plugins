@@ -83,6 +83,8 @@ test('R1: muster README states the Bash write scope and unconfined reads, and th
   const section = musterSection(readme)
   expect(section).toContain('Bash writes are confined to the worktree and the system temp directories')
   expect(section).toContain('reads are not confined')
+  expect(section).toContain('~/.aws')
+  expect(section).toContain('~/Library/Keychains')
   const line = structureBlock(readme).split('\n').find((l) => l.startsWith('├── muster/'))
   expect(line).toMatch(/^├── muster\/\s+skills: muster · /)
 })

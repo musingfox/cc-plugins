@@ -12,6 +12,16 @@ const ADAPTER_RESULTS = {
   initialize: { agentInfo: { name: "claude-agent-acp", version: "0.93.0" } },
 };
 const DEFAULT_HOSTS = ["registry.npmjs.org"];
+const CREDENTIAL_STORES = [
+  ".npmrc",
+  ".config/gh",
+  ".git-credentials",
+  ".config/git/credentials",
+  ".netrc",
+  ".aws",
+  ".docker/config.json",
+  "Library/Keychains",
+].map((p) => `/home/u/${p}`);
 const T1_PARAMS = {
   cwd: "/w/x",
   mcpServers: [],
@@ -27,6 +37,7 @@ const T1_PARAMS = {
           autoAllowBashIfSandboxed: true,
           allowUnsandboxedCommands: false,
           network: { allowedDomains: DEFAULT_HOSTS, strictAllowlist: true },
+          filesystem: { denyRead: CREDENTIAL_STORES, allowWrite: ["/tmp/muster-cache"] },
         },
       },
     },
@@ -84,13 +95,13 @@ function sessionNew(path: string) {
 describe("SessionHandshake", () => {
   test("T1: session/new is sent with cwd, empty mcpServers, settingSources [], the WebFetch ask rule, connectors off, the tool allowlist and the sandbox option", async () => {
     const { ch, eventsPath } = await open();
-    await handshake(ch, { worktree: "/w/x", env: {} });
+    await handshake(ch, { cache: "/tmp/muster-cache", worktree: "/w/x", env: { HOME: "/home/u" } });
     expect(sessionNew(eventsPath)).toStrictEqual(T1_PARAMS);
   });
 
   test("T2: initialize is sent with protocolVersion 1 and fs/terminal capabilities off", async () => {
     const { ch, eventsPath } = await open();
-    await handshake(ch, { worktree: WORKTREE });
+    await handshake(ch, { cache: "/tmp/muster-cache", worktree: WORKTREE });
     const init = outMessages(eventsPath).find((m) => m.method === "initialize");
     expect(init.params).toStrictEqual({
       protocolVersion: 1,
@@ -103,7 +114,7 @@ describe("SessionHandshake", () => {
       results: ADAPTER_RESULTS,
       errors: { "session/new": "no auth" },
     });
-    const err = await handshake(ch, { worktree: WORKTREE }).catch((e) => e);
+    const err = await handshake(ch, { cache: "/tmp/muster-cache", worktree: WORKTREE }).catch((e) => e);
     expect(err).toBeInstanceOf(HandshakeError);
     expect(err.message).toContain("no auth");
     expect(outMessages(eventsPath).some((m) => m.method === "session/prompt")).toBe(false);
@@ -113,7 +124,7 @@ describe("SessionHandshake", () => {
     process.env.MUSTER_HANDSHAKE_TIMEOUT_MS = "200";
     const { ch } = await open({ results: ADAPTER_RESULTS, silent: ["initialize"] });
     const started = Date.now();
-    const err = await handshake(ch, { worktree: WORKTREE }).catch((e) => e);
+    const err = await handshake(ch, { cache: "/tmp/muster-cache", worktree: WORKTREE }).catch((e) => e);
     expect(err).toBeInstanceOf(HandshakeError);
     expect(err.message).toContain("timeout");
     expect(Date.now() - started).toBeLessThan(2000);
@@ -126,6 +137,7 @@ describe("SessionHandshake", () => {
   test("T6: MUSTER_ALLOW_HOSTS is trimmed, lower-cased, deduplicated and appended after the defaults", async () => {
     const { ch, eventsPath } = await open();
     await handshake(ch, {
+      cache: "/tmp/muster-cache",
       worktree: "/w/x",
       env: { MUSTER_ALLOW_HOSTS: " Example.org, *.corp.example ,registry.npmjs.org," },
     });
@@ -139,7 +151,7 @@ describe("SessionHandshake", () => {
   test("T7: an invalid MUSTER_ALLOW_HOSTS entry rejects with invalid-allow-host before any request is sent", async () => {
     for (const entry of ["https://x.org", "a.com/path", "a.com:443", "*", "localhost", "a b"]) {
       const { ch, eventsPath } = await open();
-      const err = await handshake(ch, { worktree: "/w/x", env: { MUSTER_ALLOW_HOSTS: entry } }).catch((e) => e);
+      const err = await handshake(ch, { cache: "/tmp/muster-cache", worktree: "/w/x", env: { MUSTER_ALLOW_HOSTS: entry } }).catch((e) => e);
       expect(err).toBeInstanceOf(HandshakeError);
       expect(err.message).toContain("invalid-allow-host");
       expect(err.message).toContain(entry);
@@ -148,19 +160,19 @@ describe("SessionHandshake", () => {
     }
   });
 
-  test("R2: session/new sandbox has no filesystem key and no denyWrite or allowWrite, for any worktree", async () => {
+  test("R2: session/new sandbox filesystem denies the credential stores and allows writes only to the run cache, with no denyWrite", async () => {
     const { ch, eventsPath } = await open();
-    await handshake(ch, { worktree: "/t/a/runs/w", env: {} });
+    await handshake(ch, { cache: "/t/a/runs/w/cache", worktree: "/t/a/runs/w/worktree", env: { HOME: "/home/u" } });
     const sandbox = sessionNew(eventsPath)._meta.claudeCode.options.sandbox;
-    expect(sandbox).not.toHaveProperty("filesystem");
-    expect(JSON.stringify(sandbox)).not.toMatch(/denyWrite|allowWrite/);
+    expect(sandbox.filesystem).toStrictEqual({ denyRead: CREDENTIAL_STORES, allowWrite: ["/t/a/runs/w/cache"] });
   });
 
   test("T10: no environment variable switches the sandbox off or allows unsandboxed commands", async () => {
     const { ch, eventsPath } = await open();
     await handshake(ch, {
+      cache: "/tmp/muster-cache",
       worktree: "/w/x",
-      env: { MUSTER_SANDBOX: "off", MUSTER_ALLOW_UNSANDBOXED: "1", MUSTER_ALLOW_HOSTS: "" },
+      env: { HOME: "/home/u", MUSTER_SANDBOX: "off", MUSTER_ALLOW_UNSANDBOXED: "1", MUSTER_ALLOW_HOSTS: "" },
     });
     expect(sessionNew(eventsPath)).toStrictEqual(T1_PARAMS);
   });
@@ -168,7 +180,7 @@ describe("SessionHandshake", () => {
   test("T11: the sandbox allowedDomains equal resolveAllowedHosts for the same env", async () => {
     const env = { MUSTER_ALLOW_HOSTS: "a.org" };
     const { ch, eventsPath } = await open();
-    await handshake(ch, { worktree: "/w/x", env });
+    await handshake(ch, { cache: "/tmp/muster-cache", worktree: "/w/x", env });
     expect(sessionNew(eventsPath)._meta.claudeCode.options.sandbox.network.allowedDomains).toStrictEqual([
       ...DEFAULT_HOSTS,
       "a.org",
