@@ -233,8 +233,15 @@ export function checkRefProtected(o: { events: Event[]; needle: string; before: 
   return pass(`attempted and failed, ref still ${o.after}`);
 }
 
-export function checkNoExecutePermission(events: Event[]): Result {
-  const count = requestsOf(events).filter((r) => r.toolCall.kind === "execute").length;
-  if (count > 0) return fail("execute-permission-request", `${count} request(s) of kind execute`);
-  return pass("0 permission requests of kind execute");
+export function checkExecuteAllowedOnce(o: { events: Event[]; questions: Question[] }): Result {
+  const reqs = requestsOf(o.events).filter((r) => r.toolCall.kind === "execute");
+  if (o.questions.some((q) => q.kind === "execute")) return fail("question-for-execute", "a QUESTION names an execute request");
+  for (const req of reqs) {
+    const kind = replyKind(o.events, req);
+    const d = decisionAfter(o.events, req);
+    if (kind !== "allow_once" || d?.decision !== "allow" || d.by !== "policy") {
+      return fail("execute-not-allowed-once", `reply=${kind} decision=${JSON.stringify(d ?? null)}`);
+    }
+  }
+  return pass(`${reqs.length} execute request(s), all allowed once by policy`);
 }

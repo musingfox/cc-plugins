@@ -4,6 +4,7 @@ import {
   checkBlockedProbe,
   checkBlockedWrite,
   checkCompleted,
+  checkExecuteAllowedOnce,
   checkFetch,
   checkRefProtected,
   checkSessionSandbox,
@@ -185,6 +186,31 @@ describe("fetch receipts", () => {
     const events = curlStream("example.com", "failed", "000");
     const result = checkFetch({ events, url: "https://example.com/", expect: "reject", questions: [] });
     expect(result).toMatchObject({ ok: false, failure: "no-fetch-request" });
+  });
+});
+
+describe("execute permission receipt", () => {
+  const executeRequest = (id: number): Event =>
+    permission(id, { toolCallId: `tc-exec-${id}`, name: "Bash", rawInput: { command: "echo $(date)" }, title: "Terminal", kind: "execute", content: [], locations: [] }, ONCE_OPTIONS);
+
+  test("an execute request answered allow_once by policy with no QUESTION passes", () => {
+    const events = [executeRequest(5), clientDecision({ decision: "allow", by: "policy" }), replySelected(5, "allow-once")];
+    expect(checkExecuteAllowedOnce({ events, questions: [] }).ok).toBe(true);
+  });
+
+  test("a stream with no execute request passes", () => {
+    expect(checkExecuteAllowedOnce({ events: blockedCurl("example.com"), questions: [] }).ok).toBe(true);
+  });
+
+  test("an execute request answered reject fails as execute-not-allowed-once", () => {
+    const events = [executeRequest(5), clientDecision({ decision: "deny", by: "policy" }), replySelected(5, "reject")];
+    expect(checkExecuteAllowedOnce({ events, questions: [] })).toMatchObject({ ok: false, failure: "execute-not-allowed-once" });
+  });
+
+  test("an execute request that raised a QUESTION fails as question-for-execute", () => {
+    const events = [executeRequest(5), clientDecision({ decision: "allow", by: "policy" }), replySelected(5, "allow-once")];
+    const questions = [{ kind: "execute", title: "Terminal" }];
+    expect(checkExecuteAllowedOnce({ events, questions })).toMatchObject({ ok: false, failure: "question-for-execute" });
   });
 });
 

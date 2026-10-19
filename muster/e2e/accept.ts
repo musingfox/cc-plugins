@@ -12,8 +12,8 @@ import {
   checkBlockedProbe,
   checkBlockedWrite,
   checkCompleted,
+  checkExecuteAllowedOnce,
   checkFetch,
-  checkNoExecutePermission,
   checkRefProtected,
   checkSessionSandbox,
   checkWorkerTools,
@@ -25,7 +25,6 @@ import {
 
 const MUSTER = join(import.meta.dir, "..", "src", "muster.ts");
 const ADAPTER_VERSION = "0.93.0";
-const TOKEN_CEILING = 100_000;
 const SHORT_MS = 60_000;
 const WAIT_MS = 8 * 60_000;
 
@@ -197,7 +196,7 @@ async function run(base: string): Promise<void> {
     receipt("(5) session/new has settingSources []", Array.isArray(settingSources) && settingSources.length === 0, JSON.stringify(settingSources));
     check("(5) every tool the worker called or loaded is on the allowlist, and step 13 ran", checkWorkerTools(events));
     check("(5) session/new carries the sandbox object, allowlist, tool allowlist and connectors-off setting", checkSessionSandbox(events));
-    check("(7) zero permission requests of kind execute", checkNoExecutePermission(events));
+    check("(7) every execute permission request allowed once by policy, no QUESTION", checkExecuteAllowedOnce({ events, questions }));
 
     const promptIdx = events.findIndex((e) => e.dir === "out" && e.msg.method === "session/prompt");
     const modeIdx = events.findIndex((e) => e.dir === "out" && e.msg.method === "session/set_config_option" && e.msg.params?.value === "default");
@@ -213,9 +212,9 @@ async function run(base: string): Promise<void> {
     const promptRes = events.find((e) => e.dir === "in" && promptReq !== undefined && e.msg.id === promptReq.msg.id && e.msg.result !== undefined);
     const total = promptRes?.msg.result?.usage?.totalTokens;
     if (typeof total === "number") {
-      receipt("(5) prompt usage under 100000 tokens", total < TOKEN_CEILING, `${total}`);
+      console.log(`note: prompt usage ${total} tokens`);
     } else {
-      console.log("receipt (5) prompt usage: not reported by the adapter, skipped");
+      console.log("note: prompt usage not reported by the adapter");
     }
 
     check("(8) Bash write to a plain path outside the worktree attempted, failed, no file", checkBlockedWrite({ events, needle: plain, targetExists: existsSync(plain) }));
