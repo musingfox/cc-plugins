@@ -15,15 +15,28 @@ export function copyDeps(
   cloneDir: (src: string, dst: string) => CloneResult = cloneDirectory,
 ): DepOutcome[] {
   const { repoRoot, baseSha, clone } = input;
-  const listed = git(repoRoot, ["ls-tree", "-r", "-z", "--name-only", baseSha]);
+  const listed = git(repoRoot, ["ls-tree", "-r", "-z", baseSha]);
   if (!listed.ok) throw new WorktreeError(`listing the tree at ${baseSha} failed`, listed.stderr);
 
-  const dirs = new Set<string>();
-  for (const path of listed.stdout.split("\0")) {
-    if (LOCKFILES.has(path.slice(path.lastIndexOf("/") + 1))) dirs.add(dirname(path));
+  const lockfiles = new Map<string, { path: string; sha: string }[]>();
+  for (const entry of listed.stdout.split("\0")) {
+    const tab = entry.indexOf("\t");
+    if (tab < 0) continue;
+    const path = entry.slice(tab + 1);
+    if (!LOCKFILES.has(path.slice(path.lastIndexOf("/") + 1))) continue;
+    const dir = dirname(path);
+    const sha = entry.slice(0, tab).split(" ")[2];
+    lockfiles.set(dir, [...(lockfiles.get(dir) ?? []), { path, sha }]);
   }
 
-  return [...dirs].sort().map((dir): DepOutcome => {
+  return [...lockfiles.keys()].sort().map((dir): DepOutcome => {
+    const drifted = lockfiles.get(dir)!.find(({ path, sha }) => {
+      const now = git(repoRoot, ["hash-object", `--path=${path}`, join(repoRoot, path)]);
+      return !now.ok || now.stdout !== sha;
+    });
+    if (drifted) {
+      return { dir, outcome: "lockfile-differs", detail: drifted.path.slice(drifted.path.lastIndexOf("/") + 1) };
+    }
     const result = cloneDir(join(repoRoot, dir, "node_modules"), join(clone, dir, "node_modules"));
     return result.ok ? { dir, outcome: "copied" } : { dir, outcome: "clonefile-error", detail: result.detail };
   });

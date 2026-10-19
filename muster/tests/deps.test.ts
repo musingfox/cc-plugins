@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cloneDirectory } from "../src/clonefile";
 import { copyDeps } from "../src/deps";
@@ -142,5 +142,70 @@ describe("copyDeps: RecordCloneFailure", () => {
       { dir: ".", outcome: "copied" },
       { dir: "packages/a b", outcome: "clonefile-error", detail: "errno=18" },
     ]);
+  });
+});
+
+describe("copyDeps: SkipOnLockfileDrift", () => {
+  test("T1: an uncommitted edit to the source lockfile skips the copy", () => {
+    const repo = makeRepo();
+    commitFile(repo, "bun.lock", "committed\n", "add lock");
+    writeIn(repo, "node_modules/x.txt", "x\n");
+    const { clone, baseSha } = cloneOf(repo);
+    writeFileSync(join(repo, "bun.lock"), "edited\n");
+
+    expect(copyDeps({ repoRoot: repo, baseSha, clone })).toEqual([
+      { dir: ".", outcome: "lockfile-differs", detail: "bun.lock" },
+    ]);
+    expect(existsSync(join(clone, "node_modules"))).toBe(false);
+  });
+
+  test("T2: the comparison binds to the base commit, not to the source HEAD", () => {
+    const repo = makeRepo();
+    commitFile(repo, "bun.lock", "base\n", "add lock");
+    writeIn(repo, "node_modules/x.txt", "x\n");
+    const { clone, baseSha } = cloneOf(repo);
+    commitFile(repo, "bun.lock", "newer\n", "bump lock");
+
+    expect(copyDeps({ repoRoot: repo, baseSha, clone })).toEqual([
+      { dir: ".", outcome: "lockfile-differs", detail: "bun.lock" },
+    ]);
+    expect(existsSync(join(clone, "node_modules"))).toBe(false);
+  });
+
+  test("T3: a deleted source lockfile is reported as differing without throwing", () => {
+    const repo = makeRepo();
+    commitFile(repo, "bun.lock", "committed\n", "add lock");
+    writeIn(repo, "node_modules/x.txt", "x\n");
+    const { clone, baseSha } = cloneOf(repo);
+    rmSync(join(repo, "bun.lock"));
+
+    expect(copyDeps({ repoRoot: repo, baseSha, clone })).toEqual([
+      { dir: ".", outcome: "lockfile-differs", detail: "bun.lock" },
+    ]);
+  });
+
+  test("T4: one edited lockfile in a directory skips that directory and names the edited file", () => {
+    const repo = makeRepo();
+    commitFile(repo, "bun.lock", "bun\n", "add bun lock");
+    commitFile(repo, "package-lock.json", "{}\n", "add npm lock");
+    writeIn(repo, "node_modules/x.txt", "x\n");
+    const { clone, baseSha } = cloneOf(repo);
+    writeFileSync(join(repo, "package-lock.json"), "{ \"edited\": true }\n");
+
+    expect(copyDeps({ repoRoot: repo, baseSha, clone })).toEqual([
+      { dir: ".", outcome: "lockfile-differs", detail: "package-lock.json" },
+    ]);
+    expect(existsSync(join(clone, "node_modules"))).toBe(false);
+  });
+
+  test("T5: a lockfile that only differs by a text/eol filter is not drift", () => {
+    const repo = makeRepo();
+    commitFile(repo, ".gitattributes", "bun.lock text eol=crlf\n", "add attributes");
+    commitFile(repo, "bun.lock", "lock\n", "add lock");
+    writeIn(repo, "node_modules/x.txt", "x\n");
+    const { clone, baseSha } = cloneOf(repo);
+    writeFileSync(join(repo, "bun.lock"), "lock\r\n");
+
+    expect(copyDeps({ repoRoot: repo, baseSha, clone })).toEqual([{ dir: ".", outcome: "copied" }]);
   });
 });
