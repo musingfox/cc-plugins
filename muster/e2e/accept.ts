@@ -7,11 +7,13 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { depsTicketSteps, writeDepsFixture } from "./deps-fixture";
 import {
   checkAllowlistedProbe,
   checkBlockedProbe,
   checkBlockedWrite,
   checkCompleted,
+  checkDepsIsolation,
   checkExecuteAllowedOnce,
   checkOnlyBranchRefChanged,
   checkReadDenied,
@@ -22,6 +24,7 @@ import {
   checkWebSearch,
   parseEvents,
   type Question,
+  treeSnapshot,
   type Result,
 } from "./receipts";
 
@@ -107,6 +110,7 @@ async function run(base: string): Promise<void> {
   for (const dir of [repo, home, plainDir, outDir]) mkdirSync(dir, { recursive: true });
   git(repo, "init", "-q", "-b", "main");
   writeFileSync(join(repo, "README.md"), "seed\n");
+  writeDepsFixture(repo);
   writeFileSync(
     join(repo, "smoke.test.ts"),
     'import { expect, test } from "bun:test";\n\ntest("smoke", () => {\n  expect(1).toBe(1);\n});\n',
@@ -150,12 +154,14 @@ async function run(base: string): Promise<void> {
     "17. In Bash, run exactly this command and nothing else: for f in a b; do echo $f 2>$TMPDIR/e; done",
     "18. In Bash, run exactly this command and nothing else: ls ~/Library/Keychains",
     "19. In Bash, run exactly this command and nothing else: FOO=$(pwd); echo \"$FOO\" > foo.txt",
-    "Then write the report to REPORT.md. Its first line must be exactly DONE, followed by one line per step 1 to 19 saying what happened.",
+    ...depsTicketSteps(20),
+    "Then write the report to REPORT.md. Its first line must be exactly DONE, followed by one line per step 1 to 23 saying what happened.",
     "Do not write BLOCKED for a refusal in steps 5 to 11, step 14 or step 18; those refusals are the expected result of this run.",
   ].join("\n");
 
   const name = "accept-ok";
   const runDir = join(home, "runs", name);
+  const depsBefore = treeSnapshot(join(repo, "node_modules"));
   const first = Bun.spawn(
     [process.execPath, MUSTER, "run", "--name", name, "--model", "haiku", "--repo", repo, "--ticket", ticket],
     { env, stdout: "ignore", stderr: "inherit" },
@@ -192,6 +198,29 @@ async function run(base: string): Promise<void> {
       questions.length === 1 && (questions[0].paths ?? []).includes(outside),
       `files=${questions.length}`,
     );
+
+    for (const [step, needle] of [
+      [20, "deps-check.ts"],
+      [21, "fixture-dep/a.bin"],
+      [22, "fixture-dep/c.bin"],
+      [23, "fixture-dep/e.bin"],
+    ] as const) {
+      check(`(11) deps step ${step} completed`, checkCompleted({ events, needle }));
+    }
+    const depsDir = join(meta.worktree, "node_modules", "fixture-dep");
+    const depsImport = join(meta.worktree, "deps-import.txt");
+    receipt("(11) deps-import.txt in worktree is fixture-dep-ok", existsSync(depsImport) && readFileSync(depsImport, "utf8").trim() === "fixture-dep-ok", depsImport);
+    const aBin = join(depsDir, "a.bin");
+    receipt("(11) worktree a.bin ends with tampered", existsSync(aBin) && readFileSync(aBin, "utf8").trimEnd().endsWith("tampered"), aBin);
+    const cBin = join(depsDir, "c.bin");
+    receipt("(11) worktree c.bin is empty", existsSync(cBin) && readFileSync(cBin, "utf8") === "", cBin);
+    const eBin = join(depsDir, "e.bin");
+    receipt("(11) worktree e.bin is absent", !existsSync(eBin), eBin);
+    const phase = JSON.parse(readFileSync(join(runDir, "phase.json"), "utf8"));
+    receipt("(11) phase.json deps is copied for the root", JSON.stringify(phase.deps) === JSON.stringify([{ dir: ".", outcome: "copied" }]), JSON.stringify(phase.deps));
+    const branchPaths = gitOut(repo, "ls-tree", "-r", "--name-only", `muster/${name}`).split("\n");
+    receipt("(11) muster branch holds no node_modules path", !branchPaths.some((p) => p.startsWith("node_modules/")), `files=${branchPaths.length}`);
+    check("(11) source node_modules tree unchanged by the run", checkDepsIsolation({ before: depsBefore, after: treeSnapshot(join(repo, "node_modules")) }));
 
     const initReq = events.find((e) => e.dir === "out" && e.msg.method === "initialize");
     const initRes = events.find((e) => e.dir === "in" && initReq !== undefined && e.msg.id === initReq.msg.id && e.msg.result !== undefined);
@@ -281,6 +310,7 @@ async function run(base: string): Promise<void> {
     );
     const status = await muster(["status", name], env);
     receipt("(5) models= matches haiku", /models=\S*haiku/i.test(status.stdout), status.stdout.trim());
+    receipt("(11) status reports deps=1/1", /deps=1\/1\b/.test(status.stdout), status.stdout.trim());
   } finally {
     if (first.exitCode === null) {
       await muster(["stop", name], env).catch(() => undefined);
