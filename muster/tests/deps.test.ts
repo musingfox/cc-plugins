@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cloneDirectory } from "../src/clonefile";
@@ -272,3 +272,31 @@ function longDir(length: number): string {
   }
   return dir;
 }
+
+describe("copyDeps: ExcludeCopiedNodeModules", () => {
+  test("T1: a node_modules ignored only by the source's info/exclude stays out of the clone's status", () => {
+    const repo = makeRepo();
+    commitFile(repo, "bun.lock", "lock\n", "add lock");
+    appendFileSync(join(repo, ".git", "info", "exclude"), "node_modules/\n");
+    writeIn(repo, "node_modules/x/index.js", "source-bytes\n");
+    const { clone, baseSha } = cloneOf(repo);
+
+    copyDeps({ repoRoot: repo, baseSha, clone });
+
+    expect(git(clone, ["status", "--porcelain"])).not.toContain("node_modules");
+  });
+
+  test("T2: copying twice writes the exclude line once", () => {
+    const repo = makeRepo();
+    commitFile(repo, "bun.lock", "lock\n", "add lock");
+    writeIn(repo, "node_modules/x/index.js", "source-bytes\n");
+    const { clone, baseSha } = cloneOf(repo);
+
+    copyDeps({ repoRoot: repo, baseSha, clone });
+    rmSync(join(clone, "node_modules"), { recursive: true });
+    copyDeps({ repoRoot: repo, baseSha, clone });
+
+    const exclude = readFileSync(git(clone, ["rev-parse", "--path-format=absolute", "--git-path", "info/exclude"]), "utf8");
+    expect(exclude.split("\n").filter((l) => l === "node_modules/")).toHaveLength(1);
+  });
+});
