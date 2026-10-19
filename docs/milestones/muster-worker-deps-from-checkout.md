@@ -1,6 +1,6 @@
 ---
 status: accepted
-delivered:
+delivered: e17edf9
 depends: [muster-acp-workers]
 ---
 

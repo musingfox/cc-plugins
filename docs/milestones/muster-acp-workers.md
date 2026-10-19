@@ -1,6 +1,6 @@
 ---
 status: accepted
-delivered:
+delivered: ecb9d8b  # muster v1 plus the injected-worker fence
 depends: []
 ---
 
