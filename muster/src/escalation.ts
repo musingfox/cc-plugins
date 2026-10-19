@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { decideBash } from "./bash-policy";
 import { writeAtomic, writePhase, type RunPaths } from "./layout";
 import { chooseOutcome, type PermissionOption, type PermissionOutcome } from "./outcome";
@@ -33,14 +34,22 @@ function policyDecision(toolCall: ToolCallRequest, layout: RunPaths, worktreeRea
   return { allow: false, reason: `kind ${toolCall.kind} needs an answer` };
 }
 
+function displayPath(p: string, worktreeReal: string): string {
+  try {
+    return resolveRequestPath(p, worktreeReal);
+  } catch {
+    return resolve(worktreeReal, p);
+  }
+}
+
 function requestPaths(toolCall: ToolCallRequest, worktreeReal: string): string[] {
   const out = new Set<string>();
   for (const loc of toolCall.locations ?? []) {
-    if (typeof loc.path === "string") out.add(resolveRequestPath(loc.path, worktreeReal));
+    if (typeof loc.path === "string") out.add(displayPath(loc.path, worktreeReal));
   }
   for (const key of PATH_KEYS) {
     const v = toolCall.rawInput?.[key];
-    if (typeof v === "string") out.add(resolveRequestPath(v, worktreeReal));
+    if (typeof v === "string") out.add(displayPath(v, worktreeReal));
   }
   return [...out];
 }

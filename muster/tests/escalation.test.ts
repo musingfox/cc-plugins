@@ -145,6 +145,23 @@ describe("EscalationRoundTrip", () => {
     await turn;
   });
 
+  test.each([
+    ["dangling", (link: string, home: string) => symlinkSync(join(home, "no-such-target"), link)],
+    ["looping", (link: string) => symlinkSync(link, link)],
+  ])("T2c: a Write to a %s symlink writes a QUESTION with the unresolved path instead of throwing", async (_kind, makeLink) => {
+    const runId = "run-bad-link";
+    const requested = join(runPaths(runId, { MUSTER_HOME: home, HOME: home }).worktree, "link.md");
+    const { ch, layout } = await setup({ permission: { toolCall: writeTool(requested) } }, runId);
+    makeLink(join(layout.worktree, "link.md"), home);
+    const turn = ch.request("session/prompt", { sessionId: "sess-1" });
+    expect(await waitFor(() => existsSync(layout.question(1)))).toBe(true);
+    const q = JSON.parse(readFileSync(layout.question(1), "utf8"));
+    expect(q.paths).toEqual([requested]);
+    expect(q.reason).toContain("could not be checked");
+    writeFileSync(layout.answer(1), JSON.stringify({ decision: "deny" }));
+    expect(await turn).toEqual({ stopReason: "end_turn" });
+  });
+
   test("T3: ANSWER deny replies reject and the agent's write never happens", async () => {
     const target = join(home, "denied.txt");
     const { ch, layout } = await setup({
