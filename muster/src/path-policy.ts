@@ -30,6 +30,10 @@ export function realpathDeepest(p: string): string {
   return join(realpathSync.native(existing), ...rest);
 }
 
+export function resolveRequestPath(p: string, worktreeReal: string): string {
+  return realpathDeepest(resolve(worktreeReal, p));
+}
+
 export function insideWorktree(p: string, worktreeReal: string): boolean {
   return p === worktreeReal || p.startsWith(worktreeReal + sep);
 }
@@ -58,7 +62,7 @@ export function decidePath(toolCall: ToolCall, ctx: PathContext): Decision {
     const reportIsSymlink = isSymlink(ctx.reportPath);
     const reportReal = reportIsSymlink ? undefined : realpathDeepest(resolve(worktreeReal, ctx.reportPath));
 
-    const resolved = [...new Set(candidates.map((c) => realpathDeepest(resolve(worktreeReal, c))))];
+    const resolved = [...new Set(candidates.map((c) => resolveRequestPath(c, worktreeReal)))];
 
     for (const real of resolved) {
       if (real === gitDir || real.startsWith(gitDir + sep)) {

@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { openChannel, type Channel } from "../src/channel";
 import { createPermissionHandler } from "../src/escalation";
 import { createRunDir, runPaths, type RunPaths } from "../src/layout";
+import { readStatus, renderStatus } from "../src/status";
 
 const FAKE = join(import.meta.dir, "support", "fake-agent.ts");
 const SCRIPT = join(import.meta.dir, "support", "scenarios", "permission-turn.ts");
@@ -113,7 +114,7 @@ describe("EscalationRoundTrip", () => {
       requestId: "perm-1",
       toolCallId: "t-w",
       kind: "edit",
-      paths: [OUTSIDE],
+      paths: [join(realpathSync("/tmp"), "muster-t", "outside.txt")],
       options: [
         { optionId: "allow-once", kind: "allow_once", name: "Allow once" },
         { optionId: "reject-once", kind: "reject_once", name: "Reject once" },
@@ -125,6 +126,23 @@ describe("EscalationRoundTrip", () => {
     expect(await turn).toEqual({ stopReason: "end_turn" });
     expect(outReplyFor(layout.events, "perm-1").result.outcome).toEqual({ outcome: "selected", optionId: "allow-once" });
     expect(decisions(layout.events)).toEqual([{ decision: "allow", by: "answer" }]);
+  });
+
+  test("T2b: a Write through a symlink out of the worktree shows the resolved path in QUESTION and status", async () => {
+    const outsideDir = join(home, "elsewhere");
+    mkdirSync(outsideDir);
+    const requested = join(runPaths("run-sym", { MUSTER_HOME: home, HOME: home }).worktree, "docs", "notes.md");
+    const { ch, layout } = await setup({ permission: { toolCall: writeTool(requested) } }, "run-sym");
+    symlinkSync(outsideDir, join(layout.worktree, "docs"));
+    const real = join(realpathSync(outsideDir), "notes.md");
+    const turn = ch.request("session/prompt", { sessionId: "sess-1" });
+    expect(await waitFor(() => existsSync(layout.question(1)))).toBe(true);
+    const q = JSON.parse(readFileSync(layout.question(1), "utf8"));
+    expect(q.paths).toEqual([real]);
+    expect(q.rawInput.file_path).toBe(requested);
+    expect(renderStatus(readStatus(layout.runDir))).toContain(`paths=${real}`);
+    writeFileSync(layout.answer(1), JSON.stringify({ decision: "deny" }));
+    await turn;
   });
 
   test("T3: ANSWER deny replies reject and the agent's write never happens", async () => {

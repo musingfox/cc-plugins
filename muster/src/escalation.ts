@@ -3,7 +3,7 @@ import { decideBash } from "./bash-policy";
 import { writeAtomic, writePhase, type RunPaths } from "./layout";
 import { chooseOutcome, type PermissionOption, type PermissionOutcome } from "./outcome";
 import { decideNetwork } from "./network-policy";
-import { decidePath, type Decision, type ToolCall } from "./path-policy";
+import { decidePath, resolveRequestPath, type Decision, type ToolCall } from "./path-policy";
 import { awaitAnswerWithin, questionTimeoutMs } from "./question-timeout";
 import { resolveAllowedHosts } from "./sandbox";
 import { pollMs, type Reason } from "./termination";
@@ -33,14 +33,14 @@ function policyDecision(toolCall: ToolCallRequest, layout: RunPaths, worktreeRea
   return { allow: false, reason: `kind ${toolCall.kind} needs an answer` };
 }
 
-function requestPaths(toolCall: ToolCallRequest): string[] {
+function requestPaths(toolCall: ToolCallRequest, worktreeReal: string): string[] {
   const out = new Set<string>();
   for (const loc of toolCall.locations ?? []) {
-    if (typeof loc.path === "string") out.add(loc.path);
+    if (typeof loc.path === "string") out.add(resolveRequestPath(loc.path, worktreeReal));
   }
   for (const key of PATH_KEYS) {
     const v = toolCall.rawInput?.[key];
-    if (typeof v === "string") out.add(v);
+    if (typeof v === "string") out.add(resolveRequestPath(v, worktreeReal));
   }
   return [...out];
 }
@@ -127,7 +127,7 @@ export function createPermissionHandler(opts: PermissionHandlerOptions) {
       toolCallId: toolCall.toolCallId,
       kind: toolCall.kind,
       title: toolCall.title ?? "",
-      paths: requestPaths(toolCall),
+      paths: requestPaths(toolCall, worktreeReal),
       reason: policy.reason,
       options,
       rawInput: truncateStrings(toolCall.rawInput ?? {}),
