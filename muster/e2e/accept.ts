@@ -135,10 +135,11 @@ async function run(base: string): Promise<void> {
     "7. In Bash, run exactly this command and nothing else: curl -sS -m 20 -o /dev/null -w '%{http_code}' https://example.com/",
     "8. Use the WebFetch tool once with two parameters: url https://registry.npmjs.org/ and prompt 'Say whether the page loaded'",
     "9. Use the WebFetch tool once with two parameters: url https://example.com/ and prompt 'Say whether the page loaded'",
-    "10. Use the WebSearch tool once for: bun test",
-    `11. Use the Write tool to create ${outside} with the exact content: outside`,
-    "Then write the report to REPORT.md. Its first line must be exactly DONE, followed by one line per step 1 to 11 saying what happened.",
-    "Do not write BLOCKED for a refusal in steps 5 to 10; those refusals are the expected result of this run.",
+    "10. Use the WebFetch tool once with two parameters: url https://docs.python.org/3/library/os.html and prompt 'Say whether the page loaded'",
+    "11. Use the WebSearch tool once for: bun test",
+    `12. Use the Write tool to create ${outside} with the exact content: outside`,
+    "Then write the report to REPORT.md. Its first line must be exactly DONE, followed by one line per step 1 to 12 saying what happened.",
+    "Do not write BLOCKED for a refusal in steps 5 to 11; those refusals are the expected result of this run.",
   ].join("\n");
 
   const name = "accept-ok";
@@ -225,6 +226,7 @@ async function run(base: string): Promise<void> {
 
     check("(10) WebFetch of allowlisted URL allowed once by policy, no QUESTION", checkFetch({ events, url: "https://registry.npmjs.org/", expect: "allow", questions }));
     check("(10) WebFetch of non-allowlisted URL rejected by policy, no QUESTION", checkFetch({ events, url: "https://example.com/", expect: "reject", questions }));
+    check("(10) WebFetch of a preapproved documentation host off the allowlist rejected by policy, no QUESTION", checkFetch({ events, url: "https://docs.python.org/3/library/os.html", expect: "reject", questions }));
     check("(10) WebSearch, if attempted, rejected by policy, no QUESTION", checkWebSearch({ events, questions }));
 
     const bad = "accept-bad";

@@ -188,7 +188,11 @@ export function checkSessionSandbox(events: Event[]): Result {
   const flagsOk = Object.entries(flags).every(([k, v]) => sb?.[k] === v);
   const domainsOk = JSON.stringify(sb?.network?.allowedDomains) === JSON.stringify(DEFAULT_DOMAINS);
   if (!flagsOk || !domainsOk) return fail("sandbox-option-mismatch", JSON.stringify(sb ?? null));
-  return pass(`sandbox on, allowedDomains ${JSON.stringify(DEFAULT_DOMAINS)}`);
+  const settings = sn?.msg.params?._meta?.claudeCode?.options?.settings;
+  if (JSON.stringify(settings) !== JSON.stringify({ permissions: { ask: ["WebFetch"] } })) {
+    return fail("settings-option-mismatch", JSON.stringify(settings ?? null));
+  }
+  return pass(`sandbox on, allowedDomains ${JSON.stringify(DEFAULT_DOMAINS)}, WebFetch ask rule`);
 }
 
 export function checkNoExecutePermission(events: Event[]): Result {

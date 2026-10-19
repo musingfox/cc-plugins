@@ -76,7 +76,17 @@ export async function handshake(
     {
       cwd: opts.worktree,
       mcpServers: [],
-      _meta: { claudeCode: { options: { settingSources: [], sandbox } } },
+      _meta: {
+        claudeCode: {
+          options: {
+            settingSources: [],
+            // Claude Code allows WebFetch to its preapproved documentation hosts without asking, which skips the
+            // client's allowlist; an ask rule is checked before that shortcut.
+            settings: { permissions: { ask: ["WebFetch"] } },
+            sandbox,
+          },
+        },
+      },
     },
     ms,
   )) as { sessionId: string; configOptions: unknown };
