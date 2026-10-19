@@ -12,17 +12,41 @@ describe("buildAgentLaunch", () => {
     expect(argv).toEqual(["bunx", "@agentclientprotocol/claude-agent-acp@0.93.0"]);
   });
 
-  test("T2: API key variables are dropped, PATH kept, advisor tool disabled", () => {
-    const { env } = buildAgentLaunch({
-      ANTHROPIC_API_KEY: "sk-leak",
-      ANTHROPIC_AUTH_TOKEN: "tok-leak",
+  test("T2: only allowlisted variables reach the agent, plus the advisor switch", () => {
+    const kept = {
       PATH: "/bin",
+      HOME: "/home/u",
+      USER: "u",
+      LOGNAME: "u",
+      SHELL: "/bin/zsh",
+      TMPDIR: "/tmp",
+      TERM: "xterm",
+      LANG: "en_US.UTF-8",
+      TZ: "UTC",
+      LC_ALL: "C",
+    };
+    const dropped = [
+      "GITHUB_TOKEN",
+      "GH_TOKEN",
+      "AWS_SECRET_ACCESS_KEY",
+      "CLOUDFLARE_API_TOKEN",
+      "OPENAI_API_KEY",
+      "CLAUDE_CODE_OAUTH_TOKEN",
+      "ANTHROPIC_API_KEY",
+      "ANTHROPIC_AUTH_TOKEN",
+      "ANTHROPIC_BASE_URL",
+      "CLAUDE_CODE_USE_BEDROCK",
+      "CLAUDECODE",
+      "CLAUDE_CODE_MESSAGING_SOCKET",
+      "CLAUDE_CODE_MESSAGING_TOKEN",
+      "CLAUDE_CODE_SESSION_ID",
+      "MUSTER_AGENT_CMD",
+    ];
+    const { env } = buildAgentLaunch({
+      ...kept,
+      ...Object.fromEntries(dropped.map((k) => [k, k === "MUSTER_AGENT_CMD" ? '["bun","x.ts"]' : "leak"])),
     });
-    expect(env).not.toHaveProperty("ANTHROPIC_API_KEY");
-    expect(env).not.toHaveProperty("ANTHROPIC_AUTH_TOKEN");
-    expect(Object.values(env).some((v) => v.includes("leak"))).toBe(false);
-    expect(env.PATH).toBe("/bin");
-    expect(env.CLAUDE_CODE_DISABLE_ADVISOR_TOOL).toBe("1");
+    expect(env).toEqual({ ...kept, CLAUDE_CODE_DISABLE_ADVISOR_TOOL: "1" });
   });
 
   test("T4: MUSTER_AGENT_CMD overrides the default argv", () => {

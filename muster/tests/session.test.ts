@@ -56,13 +56,21 @@ function scenario(extra: object = {}, offered: string[] = OFFERED) {
   return { results: session(offered), ...extra };
 }
 
+function fakeCmd(sc: object, script: string): string {
+  return JSON.stringify([
+    "env",
+    `FAKE_AGENT_SCENARIO=${JSON.stringify(sc)}`,
+    `FAKE_AGENT_SCRIPT=${script}`,
+    process.execPath,
+    FAKE,
+  ]);
+}
+
 function envFor(sc: object, extra: Record<string, string> = {}): Record<string, string> {
   return {
     HOME: home,
     MUSTER_HOME: home,
-    MUSTER_AGENT_CMD: JSON.stringify([process.execPath, FAKE]),
-    FAKE_AGENT_SCENARIO: JSON.stringify(sc),
-    FAKE_AGENT_SCRIPT: SCRIPT,
+    MUSTER_AGENT_CMD: fakeCmd(sc, SCRIPT),
     MUSTER_POLL_MS: "20",
     MUSTER_KILL_GRACE_MS: "200",
     ...extra,
@@ -271,7 +279,7 @@ describe("WorkerSessionLoop", () => {
     const layout = layoutFor();
     const exits: number[] = [];
     const sc = scenario({ writeReport: "DONE\nfirst" });
-    const run = runWorker(request(), layout, { env: envFor(sc, { FAKE_AGENT_SCRIPT: script }), exit: (c) => exits.push(c) });
+    const run = runWorker(request(), layout, { env: { ...envFor(sc), MUSTER_AGENT_CMD: fakeCmd(sc, script) }, exit: (c) => exits.push(c) });
     expect(await waitFor(() => readPhase(layout)?.phase === "idle")).toBe(true);
     writeFileSync(join(layout.runDir, "FOLLOWUP-1.md"), "second");
     await run;

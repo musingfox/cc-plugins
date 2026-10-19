@@ -1,7 +1,7 @@
 export const ADAPTER_VERSION = "0.93.0";
 export const ADAPTER_SPEC = `@agentclientprotocol/claude-agent-acp@${ADAPTER_VERSION}`;
 
-const SCRUBBED_KEYS = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"];
+const ENV_ALLOWLIST = new Set(["PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "TERM", "LANG", "TZ"]);
 
 export class UsageError extends Error {
   override name = "UsageError";
@@ -18,7 +18,7 @@ export function buildAgentLaunch(env: Record<string, string | undefined>): {
   const argv = parseAgentCmd(env.MUSTER_AGENT_CMD) ?? ["bunx", ADAPTER_SPEC];
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
-    if (value === undefined || SCRUBBED_KEYS.includes(key)) continue;
+    if (value === undefined || !(ENV_ALLOWLIST.has(key) || key.startsWith("LC_"))) continue;
     out[key] = value;
   }
   out.CLAUDE_CODE_DISABLE_ADVISOR_TOOL = "1";

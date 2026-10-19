@@ -47,10 +47,9 @@ export function handle(msg, io) {
     PATH: process.env.PATH ?? "",
     HOME: home,
     MUSTER_HOME: join(home, "m"),
-    MUSTER_AGENT_CMD: JSON.stringify(["bun", FAKE_AGENT]),
+    MUSTER_AGENT_CMD: fakeCmd(scenario({})),
     MUSTER_KILL_GRACE_MS: "300",
     MUSTER_POLL_MS: "50",
-    FAKE_AGENT_SCRIPT: hook,
   };
 });
 
@@ -108,12 +107,16 @@ async function waitFor(check: () => boolean, ms = 15000): Promise<void> {
 }
 
 // Starts `muster run` in the background; stdout goes to a file so the test can read RUNDIR=.
+function fakeCmd(scen: string): string {
+  return JSON.stringify(["env", `FAKE_AGENT_SCRIPT=${hook}`, `FAKE_AGENT_SCENARIO=${scen}`, "bun", FAKE_AGENT]);
+}
+
 function startRun(name: string, model = "haiku", scen = scenario({})) {
   const outFile = join(home, `${name}.out`);
   const proc = Bun.spawn(
     ["bun", CLI, "run", "--name", name, "--model", model, "--repo", repo, "--ticket", "write the file"],
     {
-      env: { ...env, FAKE_AGENT_SCENARIO: scen },
+      env: { ...env, MUSTER_AGENT_CMD: fakeCmd(scen) },
       stdout: Bun.file(outFile),
       stderr: "pipe",
     },
@@ -200,12 +203,11 @@ describe("VerbDispatch", () => {
   test("R3: the agent environment omits the API keys muster was started with, and no run file holds them", () => {
     const name = "d7";
     const envDump = join(home, "agent-env.json");
-    const agentCmd = ["bun", "-e", `require("node:fs").writeFileSync(process.env.ENV_DUMP, JSON.stringify(process.env))`];
+    const agentCmd = ["bun", "-e", `require("node:fs").writeFileSync(${JSON.stringify(envDump)}, JSON.stringify(process.env))`];
     Bun.spawnSync(["bun", CLI, "run", "--name", name, "--model", "haiku", "--repo", repo, "--ticket", "write the file"], {
       env: {
         ...env,
         MUSTER_AGENT_CMD: JSON.stringify(agentCmd),
-        ENV_DUMP: envDump,
         ANTHROPIC_API_KEY: "sk-test",
         ANTHROPIC_AUTH_TOKEN: "tok-test",
       },
@@ -262,7 +264,7 @@ describe("VerbDispatch", () => {
     const name = "d6";
     const r = Bun.spawnSync(
       ["bun", CLI, "run", "--name", name, "--model", "nope", "--repo", repo, "--ticket", "write the file"],
-      { env: { ...env, FAKE_AGENT_SCENARIO: scenario({}) }, stdout: "pipe", stderr: "pipe" },
+      { env: env, stdout: "pipe", stderr: "pipe" },
     );
     expect(r.exitCode).toBe(1);
     expect(r.stdout.toString().split("\n")[0]).toBe(`RUNDIR=${join(env.MUSTER_HOME, "runs", name)}`);
