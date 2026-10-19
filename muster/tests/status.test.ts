@@ -52,16 +52,32 @@ describe("StatusReader", () => {
   test("T4: a DONE report renders state=done with the absolute report path, whatever the stopReason", () => {
     for (const stopReason of ["end_turn", "refusal", "cancelled"]) {
       const p = makeRun();
-      writePhase(p, { phase: "idle", pid: process.pid, stopReason });
+      writePhase(p, { fetched: true, phase: "idle", pid: process.pid, stopReason });
       writeFileSync(p.report, "DONE\nok");
       expect(line(p)).toBe(`a1 state=done report=${p.report}`);
       rmSync(p.runDir, { recursive: true, force: true });
     }
   });
 
+  test("F1: a report whose fetch-back is not recorded yet reads running, then done once recorded", () => {
+    const p = makeRun();
+    writePhase(p, { phase: "running", pid: process.pid });
+    writeFileSync(p.report, "DONE\nok");
+    expect(line(p)).toBe("a1 state=running");
+    writePhase(p, { fetched: true });
+    expect(line(p)).toBe(`a1 state=done report=${p.report}`);
+  });
+
+  test("F2: a recorded fetch failure still reads done and shows the failure", () => {
+    const p = makeRun();
+    writePhase(p, { phase: "idle", pid: process.pid, fetched: true, fetchError: "refused" });
+    writeFileSync(p.report, "DONE\nok");
+    expect(line(p)).toBe(`a1 state=done report=${p.report} fetch-error=refused`);
+  });
+
   test("T5: BLOCKED report renders reason; a report with another first line is malformed", () => {
     const p = makeRun();
-    writePhase(p, { phase: "idle", pid: process.pid, stopReason: "end_turn" });
+    writePhase(p, { fetched: true, phase: "idle", pid: process.pid, stopReason: "end_turn" });
     writeFileSync(p.report, "BLOCKED\nneed key");
     expect(readStatus(p.runDir)).toMatchObject({ state: "blocked", reason: "need key" });
     expect(line(p)).toContain("state=blocked");
@@ -81,7 +97,7 @@ describe("StatusReader", () => {
 
   test("R1: a stopped run shows blocked reason=stopped even while an unanswered question file remains", () => {
     const p = makeRun();
-    writePhase(p, { phase: "exited", pid: 999999, stopReason: "stopped" });
+    writePhase(p, { fetched: true, phase: "exited", pid: 999999, stopReason: "stopped" });
     writeFileSync(p.question(1), JSON.stringify({ paths: ["/x"] }));
     writeFileSync(p.report, "BLOCKED\nstopped");
     expect(line(p)).toBe(`a1 state=blocked report=${p.report} reason=stopped`);
@@ -105,7 +121,7 @@ describe("StatusReader", () => {
 
   test("T8: exited phase with BLOCKED report reports models from the phase", () => {
     const p = makeRun();
-    writePhase(p, { phase: "exited", pid: 999999, models: ["claude-haiku-5-5"] });
+    writePhase(p, { fetched: true, phase: "exited", pid: 999999, models: ["claude-haiku-5-5"] });
     writeFileSync(p.report, "BLOCKED\nneed key");
     expect(readStatus(p.runDir).state).toBe("blocked");
     expect(line(p)).toContain("models=claude-haiku-5-5");

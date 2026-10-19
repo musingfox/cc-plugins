@@ -72,7 +72,7 @@ export async function runFollowupInbox(opts: {
       continue;
     }
     archiveReport(p);
-    writePhase(p, { phase: "running" });
+    writePhase(p, { phase: "running", fetched: false });
     const turn = channel.request("session/prompt", {
       sessionId,
       prompt: [{ type: "text", text: buildFollowup({ text, reportPath: p.report }) }],

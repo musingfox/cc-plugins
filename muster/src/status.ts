@@ -19,6 +19,7 @@ export interface StatusLine {
   paths?: string[];
   report?: string;
   stop?: string;
+  fetchError?: string;
   models?: string[];
   reason?: string;
 }
@@ -75,12 +76,16 @@ function classify(runDir: string, name: string): StatusLine {
     }
   }
 
-  if (report.kind === "done") return { name, state: "done", report: reportPath };
-  if (report.kind === "blocked") {
-    const reason = report.body.trim().replace(/\s*\n\s*/g, " ");
-    return { name, state: "blocked", report: reportPath, reason };
+  // The report can land before the turn ends; the branch is in the user's repo only once the fetch-back is recorded.
+  if (report.kind !== "none" && phase?.fetched === true) {
+    const fetchError = typeof phase.fetchError === "string" ? phase.fetchError : undefined;
+    if (report.kind === "done") return { name, state: "done", report: reportPath, fetchError };
+    if (report.kind === "blocked") {
+      const reason = report.body.trim().replace(/\s*\n\s*/g, " ");
+      return { name, state: "blocked", report: reportPath, reason, fetchError };
+    }
+    return { name, state: "malformed", fetchError };
   }
-  if (report.kind === "malformed") return { name, state: "malformed" };
 
   if (!phase) return { name, state: "dead", reason: "phase-unreadable" };
 
@@ -113,5 +118,6 @@ export function renderStatus(s: StatusLine): string {
   if (s.stop) parts.push(`stop=${s.stop}`);
   if (s.models?.length) parts.push(`models=${s.models.join(",")}`);
   if (s.reason) parts.push(`reason=${s.reason}`);
+  if (s.fetchError) parts.push(`fetch-error=${s.fetchError.replace(/\s*\n\s*/g, " ")}`);
   return parts.join(" ");
 }

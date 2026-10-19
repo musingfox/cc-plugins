@@ -47,6 +47,7 @@ describe("WatchCommand", () => {
     expect(w.settled()).toBeUndefined();
     expect(w.lines).toEqual(["w1 state=running"]);
     writeFileSync(p.report, "DONE\nok");
+    writePhase(p, { fetched: true });
     await w.done;
   });
 
@@ -65,7 +66,7 @@ describe("WatchCommand", () => {
 
   test("T3: a run already done prints one line and exits immediately", async () => {
     const p = makeRun();
-    writePhase(p, { phase: "idle", pid: process.pid, stopReason: "end_turn" });
+    writePhase(p, { phase: "idle", pid: process.pid, stopReason: "end_turn", fetched: true });
     writeFileSync(p.report, "DONE\nok");
     const result = await watchVerb("w1", env(), { intervalMs: 2000, write: () => {} });
     const lines: string[] = [];

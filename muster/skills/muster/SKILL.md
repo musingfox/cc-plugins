@@ -55,7 +55,7 @@ Use `followup NAME --file PATH` for longer text. Then wait again.
 
 ## Collect
 
-When the state is `done`, read the report and the worker's commits from the repository:
+When the state is `done`, read the report and the worker's commits from the repository. A report state appears only after the branch fetch-back has finished; a `fetch-error=` field on the status line means it failed and the branch may be missing:
 
 ```
 cat "<RUNDIR>/REPORT.md"

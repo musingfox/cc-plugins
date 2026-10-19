@@ -72,17 +72,6 @@ function alive(pid: number): boolean {
   }
 }
 
-// The branch is fetched back when the worker's turn ends, which can be after the report file appears.
-async function waitForIdle(runDir: string, ms: number): Promise<void> {
-  const until = Date.now() + ms;
-  for (;;) {
-    const phase = JSON.parse(readFileSync(join(runDir, "phase.json"), "utf8")) as { phase?: string };
-    if (phase.phase === "idle") return;
-    if (Date.now() > until) throw new Error(`timed out waiting for ${runDir} to go idle`);
-    await Bun.sleep(500);
-  }
-}
-
 async function waitForFile(path: string, ms: number): Promise<void> {
   const until = Date.now() + ms;
   while (!existsSync(path)) {
@@ -235,7 +224,6 @@ async function run(base: string): Promise<void> {
     receipt("(8) bash-ok.txt in worktree contains ok", existsSync(bashOk) && readFileSync(bashOk, "utf8").includes("ok"), bashOk);
     check("(8) bun test completed", checkCompleted({ events, needle: "bun test" }));
     check("(8) git commit completed", checkCompleted({ events, needle: "git commit" }));
-    await waitForIdle(runDir, SHORT_MS);
     const subject = gitOut(repo, "log", `muster/${name}`, "-1", "--format=%s");
     receipt("(8) commit on muster/<name> has subject feat: e2e", subject === "feat: e2e", subject);
 

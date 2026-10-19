@@ -65,7 +65,7 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
 
   const fetchBack = () => {
     const result = fetchBranchBack({ repoRoot: request.repoRoot, clone: wt.worktree, branch: wt.branch });
-    writePhase(layout, { fetchError: result.ok ? undefined : result.error });
+    writePhase(layout, { fetched: true, fetchError: result.ok ? undefined : result.error });
   };
 
   const state: TerminatorState = {};
