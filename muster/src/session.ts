@@ -33,6 +33,14 @@ function setPhase(layout: RunPaths, phase: string, extra: Phase = {}): void {
   writePhase(layout, { phase, pid: process.pid, updated: new Date().toISOString(), ...extra });
 }
 
+// head is the sha the coordinator should merge. A later fetch of the same report (idle timeout, stop) may
+// move the branch, so it keeps the head recorded by the fetch that made the run collectable.
+export function recordFetch(layout: RunPaths, result: ReturnType<typeof fetchBranchBack>): void {
+  const kept = readPhase(layout)?.fetched === true ? readPhase(layout)?.head : undefined;
+  const head = kept ?? (result.ok ? result.sha : undefined);
+  writePhase(layout, { fetched: true, fetchError: result.ok ? undefined : result.error, head });
+}
+
 export async function runWorker(request: DispatchRequest, layout: RunPaths, opts: WorkerOptions = {}): Promise<void> {
   const env = opts.env ?? process.env;
   const exit = opts.exit ?? ((code: number) => process.exit(code));
@@ -65,7 +73,7 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
 
   const fetchBack = () => {
     const result = fetchBranchBack({ repoRoot: request.repoRoot, clone: wt.worktree, branch: wt.branch });
-    writePhase(layout, { fetched: true, fetchError: result.ok ? undefined : result.error });
+    recordFetch(layout, result);
   };
 
   const state: TerminatorState = {};

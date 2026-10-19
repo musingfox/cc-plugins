@@ -87,24 +87,24 @@ describe("fetchBranchBack", () => {
     const { repo, clone, branch } = runClone("f1");
     const sha = commitFile(clone, "work.txt", "done\n", "feat: work");
 
-    expect(fetchBranchBack({ repoRoot: repo, clone, branch })).toEqual({ ok: true });
+    expect(fetchBranchBack({ repoRoot: repo, clone, branch })).toEqual({ ok: true, sha });
     expect(git(repo, ["rev-parse", branch])).toBe(sha);
   });
 
   test("F2: a branch the worker rewrote still comes back", () => {
     const { repo, clone, branch } = runClone("f2");
     commitFile(clone, "work.txt", "one\n", "feat: work");
-    expect(fetchBranchBack({ repoRoot: repo, clone, branch })).toEqual({ ok: true });
+    expect(fetchBranchBack({ repoRoot: repo, clone, branch })).toMatchObject({ ok: true });
     git(clone, ["commit", "-q", "--amend", "-m", "feat: work amended"]);
     const amended = git(clone, ["rev-parse", "HEAD"]);
 
-    expect(fetchBranchBack({ repoRoot: repo, clone, branch })).toEqual({ ok: true });
+    expect(fetchBranchBack({ repoRoot: repo, clone, branch })).toMatchObject({ ok: true });
     expect(git(repo, ["rev-parse", branch])).toBe(amended);
   });
 
   test("F3: a refused fetch is returned with git's stderr instead of thrown", () => {
     const { repo, clone, branch } = runClone("f3");
-    expect(fetchBranchBack({ repoRoot: repo, clone, branch })).toEqual({ ok: true });
+    expect(fetchBranchBack({ repoRoot: repo, clone, branch })).toMatchObject({ ok: true });
     git(repo, ["switch", "-q", branch]);
     commitFile(clone, "work.txt", "two\n", "feat: more");
 
@@ -123,7 +123,7 @@ describe("fetchBranchBack", () => {
     git(clone, ["reset", "-q", "--hard", evil]);
     const before = git(repo, ["for-each-ref", "--format=%(refname)"]);
 
-    expect(fetchBranchBack({ repoRoot: repo, clone, branch })).toEqual({ ok: true });
+    expect(fetchBranchBack({ repoRoot: repo, clone, branch })).toMatchObject({ ok: true });
     expect(git(repo, ["tag", "--list"])).toBe("");
     expect(git(repo, ["rev-parse", `refs/heads/${branch}`])).toBe(evil);
     expect(git(repo, ["for-each-ref", "--format=%(refname)"]).split("\n").filter((r) => !before.includes(r))).toEqual([

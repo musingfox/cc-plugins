@@ -20,6 +20,7 @@ export interface StatusLine {
   report?: string;
   stop?: string;
   fetchError?: string;
+  head?: string;
   models?: string[];
   reason?: string;
 }
@@ -79,7 +80,8 @@ function classify(runDir: string, name: string): StatusLine {
   // The report can land before the turn ends; the branch is in the user's repo only once the fetch-back is recorded.
   if (report.kind !== "none" && phase?.fetched === true) {
     const fetchError = typeof phase.fetchError === "string" ? phase.fetchError : undefined;
-    if (report.kind === "done") return { name, state: "done", report: reportPath, fetchError };
+    const head = typeof phase.head === "string" ? phase.head : undefined;
+    if (report.kind === "done") return { name, state: "done", report: reportPath, head, fetchError };
     if (report.kind === "blocked") {
       const reason = report.body.trim().replace(/\s*\n\s*/g, " ");
       return { name, state: "blocked", report: reportPath, reason, fetchError };
@@ -115,6 +117,7 @@ export function renderStatus(s: StatusLine): string {
   if (s.question !== undefined) parts.push(`question=${s.question}`);
   if (s.paths?.length) parts.push(`paths=${s.paths.join(",")}`);
   if (s.report) parts.push(`report=${s.report}`);
+  if (s.head) parts.push(`head=${s.head}`);
   if (s.stop) parts.push(`stop=${s.stop}`);
   if (s.models?.length) parts.push(`models=${s.models.join(",")}`);
   if (s.reason) parts.push(`reason=${s.reason}`);

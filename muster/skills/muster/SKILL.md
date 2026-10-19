@@ -59,8 +59,10 @@ When the state is `done`, read the report and the worker's commits from the repo
 
 ```
 cat "<RUNDIR>/REPORT.md"
-git log muster/NAME
+git log <baseSha>..<head sha>
 ```
+
+The status line of a `done` run carries `head=<sha>`, the commit the branch pointed at when the run became done. Review and merge that sha, not the branch name: a command the worker left running can still rewrite `muster/NAME` afterwards. `<baseSha>` is `baseSha` in `<RUNDIR>/meta.json`, so the commits you review are the ones you merge.
 
 If the state is `blocked` or `malformed`, read `REPORT.md` the same way before deciding what to do.
 
@@ -74,7 +76,7 @@ bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts stop NAME
 
 ## Cleanup
 
-After the run has exited, remove its run directory; this deletes the clone, the event log and the report. Branch `muster/NAME` stays in the repository, so `git log muster/NAME` still works. Read the report first. If `phase.json` in the run directory has a `fetchError`, the branch could not be fetched back and the commits exist only in the clone at `<RUNDIR>/worktree`; fetch them by hand before removing it.
+After the run has exited, remove its run directory; this deletes the clone, the event log and the report. Branch `muster/NAME` stays in the repository, so `git log <baseSha>..<head sha>` still works; note `baseSha` and the head sha before removing, since `meta.json` goes with the directory. Read the report first. If `phase.json` in the run directory has a `fetchError`, the branch could not be fetched back and the commits exist only in the clone at `<RUNDIR>/worktree`; fetch them by hand before removing it.
 
 ```
 rm -rf "<RUNDIR>"

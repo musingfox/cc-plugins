@@ -68,6 +68,13 @@ describe("StatusReader", () => {
     expect(line(p)).toBe(`a1 state=done report=${p.report}`);
   });
 
+  test("W3a: a done run prints the sha recorded at the fetch as head=", () => {
+    const p = makeRun();
+    writePhase(p, { phase: "idle", pid: process.pid, fetched: true, head: "abc123" });
+    writeFileSync(p.report, "DONE\nok");
+    expect(line(p)).toBe(`a1 state=done report=${p.report} head=abc123`);
+  });
+
   test("F2: a recorded fetch failure still reads done and shows the failure", () => {
     const p = makeRun();
     writePhase(p, { phase: "idle", pid: process.pid, fetched: true, fetchError: "refused" });

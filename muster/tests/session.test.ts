@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { runWorker, type DispatchRequest } from "../src/session";
-import { readPhase, runPaths, type RunPaths } from "../src/layout";
+import { recordFetch, runWorker, type DispatchRequest } from "../src/session";
+import { readPhase, runPaths, writePhase, type RunPaths } from "../src/layout";
 import { commitFile, git, makeRepo } from "./support/repo";
 
 const FAKE = join(import.meta.dir, "support", "fake-agent.ts");
@@ -344,5 +344,32 @@ describe("WorkerSessionLoop", () => {
     expect(echoed.BUN_INSTALL_CACHE_DIR).toBe(join(layout.cache, "bun"));
     const sessionNew = events(layout.events).find((e) => e.dir === "out" && e.msg.method === "session/new");
     expect(sessionNew?.msg.params._meta.claudeCode.options.sandbox.filesystem.allowWrite).toEqual([layout.cache]);
+  });
+});
+
+describe("recordFetch", () => {
+  test("W3b: the head of the fetch that made the run collectable survives a later fetch of the same report", () => {
+    const p = runPaths("w3", { MUSTER_HOME: join(home, "m"), HOME: home });
+    mkdirSync(p.runDir, { recursive: true });
+    recordFetch(p, { ok: true, sha: "first" });
+    recordFetch(p, { ok: true, sha: "second" });
+    expect(readPhase(p)).toMatchObject({ fetched: true, head: "first" });
+  });
+
+  test("W3c: a new turn clears fetched, so its fetch records its own head", () => {
+    const p = runPaths("w3", { MUSTER_HOME: join(home, "m"), HOME: home });
+    mkdirSync(p.runDir, { recursive: true });
+    recordFetch(p, { ok: true, sha: "first" });
+    writePhase(p, { fetched: false });
+    recordFetch(p, { ok: true, sha: "second" });
+    expect(readPhase(p)?.head).toBe("second");
+  });
+
+  test("W3d: a failed fetch records no head", () => {
+    const p = runPaths("w3", { MUSTER_HOME: join(home, "m"), HOME: home });
+    mkdirSync(p.runDir, { recursive: true });
+    recordFetch(p, { ok: false, error: "refused" });
+    expect(readPhase(p)).toMatchObject({ fetched: true, fetchError: "refused" });
+    expect(readPhase(p)?.head).toBeUndefined();
   });
 });

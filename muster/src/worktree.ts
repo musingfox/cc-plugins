@@ -63,7 +63,7 @@ export function fetchBranchBack(input: {
   repoRoot: string;
   clone: string;
   branch: string;
-}): { ok: true } | { ok: false; error: string } {
+}): { ok: true; sha: string } | { ok: false; error: string } {
   const { repoRoot, clone, branch } = input;
   const fetched = git(repoRoot, [
     "-c",
@@ -75,5 +75,7 @@ export function fetchBranchBack(input: {
     clone,
     `+refs/heads/${branch}:refs/heads/${branch}`,
   ]);
-  return fetched.ok ? { ok: true } : { ok: false, error: fetched.stderr };
+  if (!fetched.ok) return { ok: false, error: fetched.stderr };
+  const tip = git(repoRoot, ["rev-parse", "--verify", `refs/heads/${branch}^{commit}`]);
+  return tip.ok ? { ok: true, sha: tip.stdout } : { ok: false, error: tip.stderr };
 }
