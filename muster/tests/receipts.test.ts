@@ -3,7 +3,9 @@ import {
   checkAllowlistedProbe,
   checkBlockedProbe,
   checkBlockedWrite,
+  checkCompleted,
   checkFetch,
+  checkRefProtected,
   checkSessionSandbox,
   checkWorkerTools,
   parseEvents,
@@ -206,21 +208,86 @@ const toolReference = (toolName: string): Event => ({
   },
 });
 
+const toolSearch = (query: string): Event => ({
+  dir: "in",
+  msg: {
+    method: "session/update",
+    params: {
+      update: { sessionUpdate: "tool_call_update", toolCallId: "tc-ts", _meta: { claudeCode: { toolName: "ToolSearch" } }, rawInput: { query } },
+    },
+  },
+});
+
+const STEP_13 = toolSearch("select:RemoteTrigger,CronCreate,ScheduleWakeup,SendMessage");
+
 describe("worker tool receipt", () => {
-  test("calls to allowlisted tools pass", () => {
-    expect(checkWorkerTools([toolCall("Bash"), toolCall("ToolSearch"), toolReference("WebFetch")]).ok).toBe(true);
+  test("calls to allowlisted tools and the step 13 ToolSearch call pass", () => {
+    expect(checkWorkerTools([toolCall("Bash"), STEP_13, toolReference("WebFetch")]).ok).toBe(true);
   });
 
-  test.each(["RemoteTrigger", "CronCreate", "ScheduleWakeup", "Agent", "SendMessage", "mcp__claude_ai_Gmail__send_message"])(
-    "a called %s fails as forbidden-tool-seen",
+  test.each(["RemoteTrigger", "CronCreate", "ScheduleWakeup", "Agent", "SendMessage", "TodoWrite", "NotebookEdit", "mcp__claude_ai_Gmail__send_message"])(
+    "a called %s fails as tool-outside-allowlist",
     (name) => {
-      const r = checkWorkerTools([toolCall("Bash"), toolCall(name)]);
-      expect(r).toMatchObject({ ok: false, failure: "forbidden-tool-seen" });
+      const r = checkWorkerTools([toolCall("Bash"), STEP_13, toolCall(name)]);
+      expect(r).toMatchObject({ ok: false, failure: "tool-outside-allowlist" });
     },
   );
 
-  test("a forbidden tool loaded through ToolSearch fails as forbidden-tool-seen", () => {
-    expect(checkWorkerTools([toolReference("RemoteTrigger")])).toMatchObject({ ok: false, failure: "forbidden-tool-seen" });
+  test("a tool outside the allowlist loaded through ToolSearch fails as tool-outside-allowlist", () => {
+    expect(checkWorkerTools([STEP_13, toolReference("RemoteTrigger")])).toMatchObject({ ok: false, failure: "tool-outside-allowlist" });
+  });
+
+  test("a stream with no ToolSearch call at all fails as toolsearch-not-called", () => {
+    expect(checkWorkerTools([toolCall("Bash"), toolCall("Write")])).toMatchObject({ ok: false, failure: "toolsearch-not-called" });
+  });
+
+  test("a ToolSearch call that only loads WebFetch does not count as step 13", () => {
+    expect(checkWorkerTools([toolCall("Bash"), toolSearch("select:WebFetch")])).toMatchObject({ ok: false, failure: "toolsearch-not-called" });
+  });
+});
+
+describe("protected ref receipt", () => {
+  const NEEDLE = "update-ref refs/heads/main";
+  const command = "git -C /base/repo update-ref refs/heads/main HEAD";
+  const refused = [
+    ...bashCommand("tc-ref", command),
+    bashFinished("tc-ref", "failed", "Exit code 128\nfatal: Unable to create '/base/repo/.git/refs/heads/main.lock': Operation not permitted"),
+  ];
+
+  test("an attempted update-ref that failed with the ref unchanged passes", () => {
+    expect(checkRefProtected({ events: refused, needle: NEEDLE, before: "abc", after: "abc" }).ok).toBe(true);
+  });
+
+  test("a stream where the update-ref command never appears fails as not-attempted", () => {
+    const result = checkRefProtected({ events: blockedCurl("example.com"), needle: NEEDLE, before: "abc", after: "abc" });
+    expect(result).toMatchObject({ ok: false, failure: "not-attempted" });
+  });
+
+  test("an update-ref that completed fails as not-blocked even when the ref did not change", () => {
+    const events = [...bashCommand("tc-ref", command), bashFinished("tc-ref", "completed", "")];
+    expect(checkRefProtected({ events, needle: NEEDLE, before: "abc", after: "abc" })).toMatchObject({ ok: false, failure: "not-blocked" });
+  });
+
+  test("a failed update-ref with a moved ref fails as ref-moved", () => {
+    expect(checkRefProtected({ events: refused, needle: NEEDLE, before: "abc", after: "def" })).toMatchObject({ ok: false, failure: "ref-moved" });
+  });
+});
+
+describe("package install receipt", () => {
+  const install = "npm install --prefix scratch left-pad";
+
+  test("a left-pad install that completed passes", () => {
+    const events = [...bashCommand("tc-npm", install), bashFinished("tc-npm", "completed", "added 1 package")];
+    expect(checkCompleted({ events, needle: "left-pad" }).ok).toBe(true);
+  });
+
+  test("a left-pad install that failed fails as not-completed", () => {
+    const events = [...bashCommand("tc-npm", install), bashFinished("tc-npm", "failed", "npm error EPERM")];
+    expect(checkCompleted({ events, needle: "left-pad" })).toMatchObject({ ok: false, failure: "not-completed" });
+  });
+
+  test("a stream without the install fails as not-attempted", () => {
+    expect(checkCompleted({ events: blockedCurl("example.com"), needle: "left-pad" })).toMatchObject({ ok: false, failure: "not-attempted" });
   });
 });
 

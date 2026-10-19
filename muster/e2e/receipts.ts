@@ -199,20 +199,38 @@ export function checkSessionSandbox(events: Event[]): Result {
   return pass(`sandbox on, allowedDomains ${JSON.stringify(DEFAULT_DOMAINS)}, WebFetch ask rule, connectors off, tools ${WORKER_TOOLS.join(",")}`);
 }
 
-const FORBIDDEN_TOOLS = ["RemoteTrigger", "CronCreate", "ScheduleWakeup", "Agent", "SendMessage"];
+const STEP_13_QUERY = "select:RemoteTrigger";
 
 // The events carry the tools a worker called (_meta.claudeCode.toolName) and the tools ToolSearch loaded
-// (tool_reference blocks), not the tool list the model was given.
+// (tool_reference blocks), not the tool list the model was given. Step 13 must have run: a worker that
+// skipped it leaves nothing that could show a forbidden tool.
 export function checkWorkerTools(events: Event[]): Result {
   const seen = new Set<string>();
+  const toolSearchIds = new Set<string>();
+  const queries = new Map<string, string>();
   for (const e of events) {
     if (e.dir !== "in" || e.msg?.method !== "session/update") continue;
-    const text = JSON.stringify(e.msg.params?.update ?? null);
+    const update = e.msg.params?.update;
+    const text = JSON.stringify(update ?? null);
     for (const m of text.matchAll(/"(?:toolName|tool_name)":"([^"]+)"/g)) seen.add(m[1]);
+    const id = typeof update?.toolCallId === "string" ? update.toolCallId : "";
+    if (update?._meta?.claudeCode?.toolName === "ToolSearch") toolSearchIds.add(id);
+    if (typeof update?.rawInput?.query === "string") queries.set(id, update.rawInput.query);
   }
-  const outside = [...seen].filter((n) => FORBIDDEN_TOOLS.includes(n) || n.startsWith("mcp__"));
-  if (outside.length > 0) return fail("forbidden-tool-seen", outside.join(","));
+  const outside = [...seen].filter((n) => !WORKER_TOOLS.includes(n));
+  if (outside.length > 0) return fail("tool-outside-allowlist", outside.join(","));
+  const ranStep13 = [...toolSearchIds].some((id) => queries.get(id)?.includes(STEP_13_QUERY));
+  if (!ranStep13) return fail("toolsearch-not-called", `no ToolSearch call with ${STEP_13_QUERY}; tools seen: ${[...seen].sort().join(",")}`);
   return pass(`tools seen: ${[...seen].sort().join(",")}`);
+}
+
+// A command that is refused is only evidence if it ran: the same ref before and after proves nothing for a step the worker skipped.
+export function checkRefProtected(o: { events: Event[]; needle: string; before: string; after: string }): Result {
+  const attempts = attemptsFor(o.events, o.needle);
+  if (attempts.length === 0) return fail("not-attempted", `no Bash command contains ${o.needle}`);
+  if (!attempts.some((a) => a.failed)) return fail("not-blocked", describeAttempts(attempts));
+  if (o.before !== o.after) return fail("ref-moved", `${o.before} -> ${o.after}`);
+  return pass(`attempted and failed, ref still ${o.after}`);
 }
 
 export function checkNoExecutePermission(events: Event[]): Result {
