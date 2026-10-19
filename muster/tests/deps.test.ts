@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { cloneDirectory } from "../src/clonefile";
 import { copyDeps } from "../src/deps";
 import { createWorkerWorktree, WorktreeError } from "../src/worktree";
 import { commitFile, git, makeRepo, mkdirOutsideTemp, removeFixtures } from "./support/repo";
@@ -79,5 +80,67 @@ describe("copyDeps: CopyMatchingNodeModules", () => {
     expect(() =>
       copyDeps({ repoRoot: repo, baseSha: "0000000000000000000000000000000000000000", clone }),
     ).toThrow(WorktreeError);
+  });
+});
+
+describe("copyDeps: RecordCloneFailure", () => {
+  test("T1: a failed clone is recorded with its detail and leaves no node_modules", () => {
+    const repo = makeRepo();
+    commitFile(repo, "bun.lock", "lock\n", "add lock");
+    writeIn(repo, "node_modules/x.txt", "x\n");
+    const { clone, baseSha } = cloneOf(repo);
+
+    const outcomes = copyDeps({ repoRoot: repo, baseSha, clone }, () => ({ ok: false, detail: "errno=18" }));
+
+    expect(outcomes).toEqual([{ dir: ".", outcome: "clonefile-error", detail: "errno=18" }]);
+    expect(existsSync(join(clone, "node_modules"))).toBe(false);
+  });
+
+  test("T2: the detail returned by the clone adapter is reported verbatim", () => {
+    const repo = makeRepo();
+    commitFile(repo, "bun.lock", "lock\n", "add lock");
+    writeIn(repo, "node_modules/x.txt", "x\n");
+    const { clone, baseSha } = cloneOf(repo);
+    const message = "dlopen(/usr/lib/libSystem.B.dylib): symbol not found";
+
+    const outcomes = copyDeps({ repoRoot: repo, baseSha, clone }, () => ({ ok: false, detail: message }));
+
+    expect(outcomes).toEqual([{ dir: ".", outcome: "clonefile-error", detail: message }]);
+  });
+
+  test("T3: a node_modules tracked at the base commit fails with errno=17 and the committed files stay", () => {
+    const repo = makeRepo();
+    commitFile(repo, "bun.lock", "lock\n", "add lock");
+    writeIn(repo, "node_modules/committed.txt", "committed\n");
+    git(repo, ["add", "node_modules"]);
+    git(repo, ["commit", "-q", "-m", "track node_modules"]);
+    const { clone, baseSha } = cloneOf(repo);
+
+    const outcomes = copyDeps({ repoRoot: repo, baseSha, clone });
+
+    expect(outcomes).toEqual([{ dir: ".", outcome: "clonefile-error", detail: "errno=17" }]);
+    expect(readFileSync(join(clone, "node_modules/committed.txt"), "utf8")).toBe("committed\n");
+  });
+
+  test("T4: a failure in one directory does not stop the others", () => {
+    const repo = makeRepo();
+    commitFile(repo, "bun.lock", "root\n", "add root lock");
+    writeIn(repo, "packages/a b/package-lock.json", "{}\n");
+    git(repo, ["add", "packages"]);
+    git(repo, ["commit", "-q", "-m", "add package lock"]);
+    writeIn(repo, "node_modules/r.txt", "root\n");
+    writeIn(repo, "packages/a b/node_modules/p.txt", "pkg\n");
+    const { clone, baseSha } = cloneOf(repo);
+
+    const outcomes = copyDeps({ repoRoot: repo, baseSha, clone }, (src, dst) =>
+      src.includes("/packages/a b/")
+        ? { ok: false, detail: "errno=18" }
+        : (cloneDirectory(src, dst)),
+    );
+
+    expect(outcomes).toEqual([
+      { dir: ".", outcome: "copied" },
+      { dir: "packages/a b", outcome: "clonefile-error", detail: "errno=18" },
+    ]);
   });
 });

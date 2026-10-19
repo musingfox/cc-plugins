@@ -24,7 +24,7 @@ export function copyDeps(
   }
 
   return [...dirs].sort().map((dir): DepOutcome => {
-    cloneDir(join(repoRoot, dir, "node_modules"), join(clone, dir, "node_modules"));
-    return { dir, outcome: "copied" };
+    const result = cloneDir(join(repoRoot, dir, "node_modules"), join(clone, dir, "node_modules"));
+    return result.ok ? { dir, outcome: "copied" } : { dir, outcome: "clonefile-error", detail: result.detail };
   });
 }
