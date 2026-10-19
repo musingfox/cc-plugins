@@ -5,7 +5,7 @@ export class InvalidAllowHost extends Error {
   }
 }
 
-export const DEFAULT_ALLOWED_HOSTS = ["registry.npmjs.org", "github.com", "codeload.github.com"] as const;
+export const DEFAULT_ALLOWED_HOSTS = ["registry.npmjs.org"] as const;
 
 type Env = Record<string, string | undefined>;
 

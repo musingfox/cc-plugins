@@ -11,7 +11,7 @@ const WORKTREE = "/tmp/worktree-under-test";
 const ADAPTER_RESULTS = {
   initialize: { agentInfo: { name: "claude-agent-acp", version: "0.93.0" } },
 };
-const DEFAULT_HOSTS = ["registry.npmjs.org", "github.com", "codeload.github.com"];
+const DEFAULT_HOSTS = ["registry.npmjs.org"];
 const T1_PARAMS = {
   cwd: "/w/x",
   mcpServers: [],
@@ -127,7 +127,7 @@ describe("SessionHandshake", () => {
     const { ch, eventsPath } = await open();
     await handshake(ch, {
       worktree: "/w/x",
-      env: { MUSTER_ALLOW_HOSTS: " Example.org, *.corp.example ,github.com," },
+      env: { MUSTER_ALLOW_HOSTS: " Example.org, *.corp.example ,registry.npmjs.org," },
     });
     expect(sessionNew(eventsPath)._meta.claudeCode.options.sandbox.network.allowedDomains).toStrictEqual([
       ...DEFAULT_HOSTS,

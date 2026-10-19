@@ -179,7 +179,7 @@ export function checkWebSearch(o: { events: Event[]; questions: Question[] }): R
   return pass(`websearch denied by policy (${reqs.length})`);
 }
 
-const DEFAULT_DOMAINS = ["registry.npmjs.org", "github.com", "codeload.github.com"];
+const DEFAULT_DOMAINS = ["registry.npmjs.org"];
 const WORKER_TOOLS = ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "ToolSearch"];
 
 export function checkSessionSandbox(events: Event[]): Result {

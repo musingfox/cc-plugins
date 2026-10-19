@@ -10,7 +10,7 @@ import { resolveAllowedHosts, sandboxOption } from "../src/sandbox";
 const FAKE = join(import.meta.dir, "support", "fake-agent.ts");
 const SCRIPT = join(import.meta.dir, "support", "scenarios", "permission-turn.ts");
 const RUNS = join(import.meta.dir, "..", ".test-runs");
-const DEFAULT_HOSTS = ["registry.npmjs.org", "github.com", "codeload.github.com"];
+const DEFAULT_HOSTS = ["registry.npmjs.org"];
 
 let home: string;
 let channels: Channel[] = [];
@@ -126,9 +126,9 @@ describe("NetworkPolicy", () => {
     expect(existsSync(target)).toBe(true);
   });
 
-  test("T4: a fetch of a host off the list is denied and one of github.com is allowed", async () => {
+  test("T4: a fetch of a host off the list is denied and one of registry.npmjs.org is allowed", async () => {
     expect(decideNetwork(fetchCall("https://example.com/"), DEFAULT_HOSTS)).toMatchObject({ decision: "deny", host: "example.com" });
-    expect(decideNetwork(fetchCall("http://github.com/x"), DEFAULT_HOSTS)).toMatchObject({ decision: "allow", host: "github.com" });
+    expect(decideNetwork(fetchCall("http://registry.npmjs.org/x"), DEFAULT_HOSTS)).toMatchObject({ decision: "allow", host: "registry.npmjs.org" });
 
     const target = join(home, "denied-fetch.txt");
     const { ch, layout } = await setup({ permission: { toolCall: fetchCall("https://example.com/") }, writeOnAllow: { path: target, content: "x" } }, "run-t4");
@@ -137,32 +137,32 @@ describe("NetworkPolicy", () => {
     expect(existsSync(target)).toBe(false);
   });
 
-  test("T5: bypass-shaped fetch urls are denied, and an upper-case github host is allowed", async () => {
+  test("T5: bypass-shaped fetch urls are denied, and an upper-case registry host is allowed", async () => {
     const bypass = [
-      "https://github.com@evil.example/",
-      "https://evil.example/?u=github.com",
-      "https://github.com.evil.example/",
-      "https://github.com./",
-      "ftp://github.com/",
+      "https://registry.npmjs.org@evil.example/",
+      "https://evil.example/?u=registry.npmjs.org",
+      "https://registry.npmjs.org.evil.example/",
+      "https://registry.npmjs.org./",
+      "ftp://registry.npmjs.org/",
       "not a url",
       "",
       "https://127.0.0.1/",
-      "https://evil.example\\@github.com/",
+      "https://evil.example\\@registry.npmjs.org/",
     ];
     for (const url of bypass) expect(decideNetwork(fetchCall(url), DEFAULT_HOSTS)?.decision).toBe("deny");
     expect(decideNetwork({ kind: "fetch", rawInput: {} }, DEFAULT_HOSTS)?.decision).toBe("deny");
     expect(decideNetwork({ kind: "fetch" }, DEFAULT_HOSTS)?.decision).toBe("deny");
-    expect(decideNetwork(fetchCall("https://GITHUB.COM/x"), DEFAULT_HOSTS)).toMatchObject({ decision: "allow", host: "github.com" });
+    expect(decideNetwork(fetchCall("https://REGISTRY.NPMJS.ORG/x"), DEFAULT_HOSTS)).toMatchObject({ decision: "allow", host: "registry.npmjs.org" });
 
-    for (const [i, url] of [...bypass, "https://GITHUB.COM/x"].entries()) {
+    for (const [i, url] of [...bypass, "https://REGISTRY.NPMJS.ORG/x"].entries()) {
       const r = await viaHandler(fetchCall(url), {}, `run-t5-${i}`);
       expect(r.questionExists).toBe(false);
-      expect(r.reply).toEqual(url === "https://GITHUB.COM/x" ? { outcome: "selected", optionId: "allow-once" } : { outcome: "selected", optionId: "reject-once" });
+      expect(r.reply).toEqual(url === "https://REGISTRY.NPMJS.ORG/x" ? { outcome: "selected", optionId: "allow-once" } : { outcome: "selected", optionId: "reject-once" });
     }
   });
 
   test("T6: every web search is denied through the handler with no QUESTION file", async () => {
-    const searches = [{ kind: "fetch", rawInput: { query: "bun test docs" } }, { kind: "fetch", rawInput: { query: "x", url: "https://github.com/" } }];
+    const searches = [{ kind: "fetch", rawInput: { query: "bun test docs" } }, { kind: "fetch", rawInput: { query: "x", url: "https://registry.npmjs.org/" } }];
     for (const [i, call] of searches.entries()) {
       const r = await viaHandler(call, {}, `run-t6-${i}`);
       expect(r.questionExists).toBe(false);
@@ -225,7 +225,7 @@ describe("NetworkPolicy", () => {
     expect(denied.reply).toEqual({ outcome: "cancelled" });
     expect(denied.questionExists).toBe(false);
 
-    const allowed = await viaHandler(fetchCall("https://github.com/"), { options: [ONCE[1]] }, "run-t9b");
+    const allowed = await viaHandler(fetchCall("https://registry.npmjs.org/"), { options: [ONCE[1]] }, "run-t9b");
     expect(allowed.reply).toEqual({ outcome: "cancelled" });
     expect(allowed.questionExists).toBe(false);
   });
@@ -247,7 +247,7 @@ describe("NetworkPolicy", () => {
   test("T11: the table catches a guard that always returns undefined and one that always allows", () => {
     const table: Array<[object, string | undefined]> = [
       [hostCall("evil.example"), "deny"],
-      [fetchCall("https://github.com/x"), "allow"],
+      [fetchCall("https://registry.npmjs.org/x"), "allow"],
       [{ kind: "other", rawInput: { host: "x.org", file_path: "/etc/passwd" } }, undefined],
     ];
     const failures = (decide: (c: any, h: string[]) => NetworkDecision | undefined) =>

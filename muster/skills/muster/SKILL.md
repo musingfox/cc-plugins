@@ -87,8 +87,9 @@ If remove refuses, the worktree holds uncommitted changes. Read them before deci
 A worker does not get the main session's permissions.
 
 - Bash runs inside Claude Code's OS sandbox. Writes are confined to the worker's worktree and the system temp directories, which stay writable. Reads are not confined.
+- The worker's tools are a fixed list (Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch, ToolSearch), with claude.ai connectors off.
 - File tools are fenced by path. A file request outside the worktree becomes a `question` for you.
-- Network is limited to the default hosts: `registry.npmjs.org`, `github.com`, `codeload.github.com`. Hosts listed in `MUSTER_ALLOW_HOSTS` are added to them, set in the environment of `muster run`:
+- Network is limited to the default hosts: `registry.npmjs.org`. github.com is off the list because a worker can read your git credentials and would otherwise be able to push as you. Hosts listed in `MUSTER_ALLOW_HOSTS` are added to them, set in the environment of `muster run`:
 
 ```
 MUSTER_ALLOW_HOSTS=pypi.org,files.pythonhosted.org bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts run --name NAME --model MODEL --repo /abs/path/to/repo --ticket "TICKET TEXT"

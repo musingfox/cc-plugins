@@ -2,13 +2,18 @@ import { describe, expect, test } from "bun:test";
 import * as sandbox from "../src/sandbox";
 import { resolveAllowedHosts, sandboxOption } from "../src/sandbox";
 
-const DEFAULT_HOSTS = ["registry.npmjs.org", "github.com", "codeload.github.com"];
+const DEFAULT_HOSTS = ["registry.npmjs.org"];
 
 describe("sandbox settings", () => {
   test("T11: resolveAllowedHosts appends valid entries to the defaults and rejects a bare wildcard", () => {
     expect(resolveAllowedHosts({ MUSTER_ALLOW_HOSTS: "a.org" })).toStrictEqual([...DEFAULT_HOSTS, "a.org"]);
     expect(resolveAllowedHosts({})).toStrictEqual(DEFAULT_HOSTS);
     expect(() => resolveAllowedHosts({ MUSTER_ALLOW_HOSTS: "*" })).toThrow();
+  });
+
+  test("R1: github.com is off the defaults, because the worker can read git credentials, and MUSTER_ALLOW_HOSTS can still add it", () => {
+    expect(resolveAllowedHosts({})).not.toContain("github.com");
+    expect(resolveAllowedHosts({ MUSTER_ALLOW_HOSTS: "github.com" })).toStrictEqual([...DEFAULT_HOSTS, "github.com"]);
   });
 });
 

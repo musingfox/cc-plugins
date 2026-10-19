@@ -235,7 +235,7 @@ describe("session/new receipt", () => {
       failIfUnavailable: true,
       autoAllowBashIfSandboxed: true,
       allowUnsandboxedCommands: false,
-      network: { allowedDomains: ["registry.npmjs.org", "github.com", "codeload.github.com"] },
+      network: { allowedDomains: ["registry.npmjs.org"] },
     },
     settings: { permissions: { ask: ["WebFetch"] }, disableClaudeAiConnectors: true },
     tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "ToolSearch"],
