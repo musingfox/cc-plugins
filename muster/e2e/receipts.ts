@@ -180,6 +180,7 @@ export function checkWebSearch(o: { events: Event[]; questions: Question[] }): R
 }
 
 const DEFAULT_DOMAINS = ["registry.npmjs.org", "github.com", "codeload.github.com"];
+const WORKER_TOOLS = ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "ToolSearch"];
 
 export function checkSessionSandbox(events: Event[]): Result {
   const sn = events.find((e) => e.dir === "out" && e.msg?.method === "session/new");
@@ -188,11 +189,30 @@ export function checkSessionSandbox(events: Event[]): Result {
   const flagsOk = Object.entries(flags).every(([k, v]) => sb?.[k] === v);
   const domainsOk = JSON.stringify(sb?.network?.allowedDomains) === JSON.stringify(DEFAULT_DOMAINS);
   if (!flagsOk || !domainsOk) return fail("sandbox-option-mismatch", JSON.stringify(sb ?? null));
-  const settings = sn?.msg.params?._meta?.claudeCode?.options?.settings;
-  if (JSON.stringify(settings) !== JSON.stringify({ permissions: { ask: ["WebFetch"] } })) {
-    return fail("settings-option-mismatch", JSON.stringify(settings ?? null));
+  const options = sn?.msg.params?._meta?.claudeCode?.options;
+  if (JSON.stringify(options?.settings) !== JSON.stringify({ permissions: { ask: ["WebFetch"] }, disableClaudeAiConnectors: true })) {
+    return fail("settings-option-mismatch", JSON.stringify(options?.settings ?? null));
   }
-  return pass(`sandbox on, allowedDomains ${JSON.stringify(DEFAULT_DOMAINS)}, WebFetch ask rule`);
+  if (JSON.stringify(options?.tools) !== JSON.stringify(WORKER_TOOLS)) {
+    return fail("tools-option-mismatch", JSON.stringify(options?.tools ?? null));
+  }
+  return pass(`sandbox on, allowedDomains ${JSON.stringify(DEFAULT_DOMAINS)}, WebFetch ask rule, connectors off, tools ${WORKER_TOOLS.join(",")}`);
+}
+
+const FORBIDDEN_TOOLS = ["RemoteTrigger", "CronCreate", "ScheduleWakeup", "Agent", "SendMessage"];
+
+// The events carry the tools a worker called (_meta.claudeCode.toolName) and the tools ToolSearch loaded
+// (tool_reference blocks), not the tool list the model was given.
+export function checkWorkerTools(events: Event[]): Result {
+  const seen = new Set<string>();
+  for (const e of events) {
+    if (e.dir !== "in" || e.msg?.method !== "session/update") continue;
+    const text = JSON.stringify(e.msg.params?.update ?? null);
+    for (const m of text.matchAll(/"(?:toolName|tool_name)":"([^"]+)"/g)) seen.add(m[1]);
+  }
+  const outside = [...seen].filter((n) => FORBIDDEN_TOOLS.includes(n) || n.startsWith("mcp__"));
+  if (outside.length > 0) return fail("forbidden-tool-seen", outside.join(","));
+  return pass(`tools seen: ${[...seen].sort().join(",")}`);
 }
 
 export function checkNoExecutePermission(events: Event[]): Result {

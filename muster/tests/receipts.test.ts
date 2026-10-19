@@ -4,6 +4,8 @@ import {
   checkBlockedProbe,
   checkBlockedWrite,
   checkFetch,
+  checkSessionSandbox,
+  checkWorkerTools,
   parseEvents,
   type Event,
 } from "../e2e/receipts";
@@ -188,5 +190,68 @@ describe("parseEvents", () => {
   test("reads one JSON object per non-empty line", () => {
     const text = [JSON.stringify(bashStart("tc-x")), "", JSON.stringify(clientDecision({ decision: "allow" }))].join("\n");
     expect(parseEvents(text)).toHaveLength(2);
+  });
+});
+
+const toolCall = (toolName: string): Event => ({
+  dir: "in",
+  msg: { method: "session/update", params: { update: { sessionUpdate: "tool_call", _meta: { claudeCode: { toolName } } } } },
+});
+
+const toolReference = (toolName: string): Event => ({
+  dir: "in",
+  msg: {
+    method: "session/update",
+    params: { update: { sessionUpdate: "tool_call_update", content: [{ type: "tool_reference", tool_name: toolName }] } },
+  },
+});
+
+describe("worker tool receipt", () => {
+  test("calls to allowlisted tools pass", () => {
+    expect(checkWorkerTools([toolCall("Bash"), toolCall("ToolSearch"), toolReference("WebFetch")]).ok).toBe(true);
+  });
+
+  test.each(["RemoteTrigger", "CronCreate", "ScheduleWakeup", "Agent", "SendMessage", "mcp__claude_ai_Gmail__send_message"])(
+    "a called %s fails as forbidden-tool-seen",
+    (name) => {
+      const r = checkWorkerTools([toolCall("Bash"), toolCall(name)]);
+      expect(r).toMatchObject({ ok: false, failure: "forbidden-tool-seen" });
+    },
+  );
+
+  test("a forbidden tool loaded through ToolSearch fails as forbidden-tool-seen", () => {
+    expect(checkWorkerTools([toolReference("RemoteTrigger")])).toMatchObject({ ok: false, failure: "forbidden-tool-seen" });
+  });
+});
+
+describe("session/new receipt", () => {
+  const sessionNew = (options: Record<string, unknown>): Event => ({
+    dir: "out",
+    msg: { method: "session/new", params: { _meta: { claudeCode: { options } } } },
+  });
+  const good = {
+    sandbox: {
+      enabled: true,
+      failIfUnavailable: true,
+      autoAllowBashIfSandboxed: true,
+      allowUnsandboxedCommands: false,
+      network: { allowedDomains: ["registry.npmjs.org", "github.com", "codeload.github.com"] },
+    },
+    settings: { permissions: { ask: ["WebFetch"] }, disableClaudeAiConnectors: true },
+    tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "ToolSearch"],
+  };
+
+  test("both new fields present pass", () => {
+    expect(checkSessionSandbox([sessionNew(good)]).ok).toBe(true);
+  });
+
+  test("a missing tools field fails as tools-option-mismatch", () => {
+    const { tools: _, ...rest } = good;
+    expect(checkSessionSandbox([sessionNew(rest)])).toMatchObject({ ok: false, failure: "tools-option-mismatch" });
+  });
+
+  test("connectors left on fail as settings-option-mismatch", () => {
+    const r = checkSessionSandbox([sessionNew({ ...good, settings: { permissions: { ask: ["WebFetch"] } } })]);
+    expect(r).toMatchObject({ ok: false, failure: "settings-option-mismatch" });
   });
 });

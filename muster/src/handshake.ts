@@ -13,6 +13,8 @@ export type Handshake = {
   agentInfo?: AgentInfo;
 };
 
+const WORKER_TOOLS = ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "ToolSearch"];
+
 export const ADAPTER_VERSION = "0.93.0";
 
 const DEFAULT_HANDSHAKE_TIMEOUT_MS = 60000;
@@ -82,7 +84,10 @@ export async function handshake(
             settingSources: [],
             // Claude Code allows WebFetch to its preapproved documentation hosts without asking, which skips the
             // client's allowlist; an ask rule is checked before that shortcut.
-            settings: { permissions: { ask: ["WebFetch"] } },
+            settings: { permissions: { ask: ["WebFetch"] }, disableClaudeAiConnectors: true },
+            // Without an allowlist and with connectors on, the worker inherits the user's account-level tools
+            // (RemoteTrigger acted on cloud routines with no permission request).
+            tools: WORKER_TOOLS,
             sandbox,
           },
         },

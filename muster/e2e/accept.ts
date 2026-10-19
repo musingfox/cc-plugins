@@ -15,6 +15,7 @@ import {
   checkFetch,
   checkNoExecutePermission,
   checkSessionSandbox,
+  checkWorkerTools,
   checkWebSearch,
   parseEvents,
   type Question,
@@ -125,7 +126,7 @@ async function run(base: string): Promise<void> {
   delete env.MUSTER_ALLOW_HOSTS;
 
   const ticket = [
-    "Use only the Write, Bash, WebFetch and WebSearch tools named below, plus ToolSearch solely to load WebFetch or WebSearch if they are deferred; do not call any MCP or other tool, and do not read documentation. Work through the numbered steps in order, once each. A refusal or failure from the sandbox, the network, WebFetch or WebSearch is an expected result: record what you saw, do not retry, do not work around it, and continue with the next step. The one exception: if a tool call fails with an input-validation error (for example a missing required parameter), correct the parameters and retry that call once; a refusal or permission denial is never retried.",
+    "Use only the Write, Bash, WebFetch and WebSearch tools named below, plus ToolSearch solely to load WebFetch or WebSearch if they are deferred, and in step 13; do not call any MCP or other tool, and do not read documentation. Work through the numbered steps in order, once each. A refusal or failure from the sandbox, the network, WebFetch or WebSearch is an expected result: record what you saw, do not retry, do not work around it, and continue with the next step. The one exception: if a tool call fails with an input-validation error (for example a missing required parameter), correct the parameters and retry that call once; a refusal or permission denial is never retried.",
     "1. Use the Write tool to create hello.txt in the working directory with the exact content: hi",
     "2. In Bash, run exactly this command and nothing else, with no added echo or $?: echo ok > bash-ok.txt",
     "3. In Bash, run exactly this command and nothing else: bun test",
@@ -138,7 +139,8 @@ async function run(base: string): Promise<void> {
     "10. Use the WebFetch tool once with two parameters: url https://docs.python.org/3/library/os.html and prompt 'Say whether the page loaded'",
     "11. Use the WebSearch tool once for: bun test",
     `12. Use the Write tool to create ${outside} with the exact content: outside`,
-    "Then write the report to REPORT.md. Its first line must be exactly DONE, followed by one line per step 1 to 12 saying what happened.",
+    "13. Use the ToolSearch tool once with the query select:RemoteTrigger,CronCreate,ScheduleWakeup,SendMessage. Only report what it returned; never call a tool it loads.",
+    "Then write the report to REPORT.md. Its first line must be exactly DONE, followed by one line per step 1 to 13 saying what happened.",
     "Do not write BLOCKED for a refusal in steps 5 to 11; those refusals are the expected result of this run.",
   ].join("\n");
 
@@ -189,7 +191,8 @@ async function run(base: string): Promise<void> {
     const sessionNew = events.find((e) => e.dir === "out" && e.msg.method === "session/new");
     const settingSources = sessionNew?.msg.params?._meta?.claudeCode?.options?.settingSources;
     receipt("(5) session/new has settingSources []", Array.isArray(settingSources) && settingSources.length === 0, JSON.stringify(settingSources));
-    check("(5) session/new carries the sandbox object and allowlist", checkSessionSandbox(events));
+    check("(5) no forbidden tool called or loaded by the worker", checkWorkerTools(events));
+    check("(5) session/new carries the sandbox object, allowlist, tool allowlist and connectors-off setting", checkSessionSandbox(events));
     check("(7) zero permission requests of kind execute", checkNoExecutePermission(events));
 
     const promptIdx = events.findIndex((e) => e.dir === "out" && e.msg.method === "session/prompt");

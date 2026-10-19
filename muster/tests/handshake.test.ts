@@ -19,7 +19,8 @@ const T1_PARAMS = {
     claudeCode: {
       options: {
         settingSources: [],
-        settings: { permissions: { ask: ["WebFetch"] } },
+        settings: { permissions: { ask: ["WebFetch"] }, disableClaudeAiConnectors: true },
+        tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "ToolSearch"],
         sandbox: {
           enabled: true,
           failIfUnavailable: true,
@@ -81,7 +82,7 @@ function sessionNew(path: string) {
 }
 
 describe("SessionHandshake", () => {
-  test("T1: session/new is sent with cwd, empty mcpServers, settingSources [], the WebFetch ask rule and the sandbox option", async () => {
+  test("T1: session/new is sent with cwd, empty mcpServers, settingSources [], the WebFetch ask rule, connectors off, the tool allowlist and the sandbox option", async () => {
     const { ch, eventsPath } = await open();
     await handshake(ch, { worktree: "/w/x", env: {} });
     expect(sessionNew(eventsPath)).toStrictEqual(T1_PARAMS);
