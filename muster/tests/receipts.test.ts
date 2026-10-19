@@ -1,11 +1,13 @@
+import { appendFileSync, linkSync, mkdirSync, rmSync, truncateSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CREDENTIAL_STORES } from "../src/sandbox";
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import {
   checkAllowlistedProbe,
   checkBlockedProbe,
   checkBlockedWrite,
   checkCompleted,
+  checkDepsIsolation,
   checkExecuteAllowedOnce,
   checkFetch,
   checkOnlyBranchRefChanged,
@@ -14,8 +16,12 @@ import {
   checkSessionSandbox,
   checkWorkerTools,
   parseEvents,
+  treeSnapshot,
   type Event,
 } from "../e2e/receipts";
+import { mkdirOutsideTemp, removeFixtures } from "./support/repo";
+
+afterAll(removeFixtures);
 
 // Event shapes follow the prototype's events.jsonl (lines 29-33 and 93-98, and the
 // session/request_permission envelope of line 97): a tool_call with empty rawInput,
@@ -409,5 +415,76 @@ describe("denied read receipt", () => {
 
   test("a stream without the command fails as not-attempted", () => {
     expect(checkReadDenied({ events: blockedCurl("example.com"), needle: "Library/Keychains" })).toMatchObject({ ok: false, failure: "not-attempted" });
+  });
+});
+
+describe("source tree isolation check", () => {
+  let home: string;
+
+  beforeEach(() => {
+    home = mkdirOutsideTemp("muster-tree-");
+  });
+
+  function tree(name: string, files: Array<[string, string]>): string {
+    const dir = join(home, name);
+    mkdirSync(join(dir, "pkg"), { recursive: true });
+    for (const [file, body] of files) writeFileSync(join(dir, file), body);
+    return dir;
+  }
+
+  function linkedTree(name: string): string {
+    const dir = tree(name, [["a.txt", "same\n"], ["pkg/c.txt", "c\n"]]);
+    linkSync(join(dir, "a.txt"), join(dir, "b.txt"));
+    return dir;
+  }
+
+  test("T1: an unchanged tree with a hardlinked pair snapshots equal and checks ok", () => {
+    const dir = linkedTree("t1");
+    const before = treeSnapshot(dir);
+    const after = treeSnapshot(dir);
+    expect(after).toBe(before);
+    expect(checkDepsIsolation({ before, after }).ok).toBe(true);
+  });
+
+  test("T2: appending a byte to a file fails as source-tree-changed", () => {
+    const dir = linkedTree("t2");
+    const before = treeSnapshot(dir);
+    appendFileSync(join(dir, "pkg/c.txt"), "x");
+    expect(checkDepsIsolation({ before, after: treeSnapshot(dir) })).toMatchObject({ ok: false, failure: "source-tree-changed" });
+  });
+
+  test("T3: truncating a file to zero bytes fails the check", () => {
+    const dir = linkedTree("t3");
+    const before = treeSnapshot(dir);
+    truncateSync(join(dir, "pkg/c.txt"), 0);
+    expect(checkDepsIsolation({ before, after: treeSnapshot(dir) }).ok).toBe(false);
+  });
+
+  test("T4: deleting a file fails the check", () => {
+    const dir = linkedTree("t4");
+    const before = treeSnapshot(dir);
+    rmSync(join(dir, "pkg/c.txt"));
+    expect(checkDepsIsolation({ before, after: treeSnapshot(dir) }).ok).toBe(false);
+  });
+
+  test("T5: replacing a hardlinked name with an identical copy fails the check", () => {
+    const dir = linkedTree("t5");
+    const before = treeSnapshot(dir);
+    rmSync(join(dir, "b.txt"));
+    writeFileSync(join(dir, "b.txt"), "same\n");
+    expect(checkDepsIsolation({ before, after: treeSnapshot(dir) }).ok).toBe(false);
+  });
+
+  test("T6: the same files created in a different order snapshot equal", () => {
+    const one = tree("t6-one", [["a.txt", "a\n"], ["pkg/c.txt", "c\n"]]);
+    const two = join(home, "t6-two");
+    mkdirSync(join(two, "pkg"), { recursive: true });
+    writeFileSync(join(two, "pkg/c.txt"), "c\n");
+    writeFileSync(join(two, "a.txt"), "a\n");
+    expect(treeSnapshot(two)).toBe(treeSnapshot(one));
+  });
+
+  test("T7: a nonexistent directory makes treeSnapshot throw", () => {
+    expect(() => treeSnapshot(join(home, "missing"))).toThrow();
   });
 });

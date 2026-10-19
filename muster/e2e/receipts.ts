@@ -1,6 +1,8 @@
 // Pure checkers over events.jsonl lines for e2e/accept.ts. Each returns a named failure
 // instead of throwing, so the unit tests can assert which check tripped.
 
+import { createHash } from "node:crypto";
+import { lstatSync, readdirSync, readFileSync, readlinkSync, type Stats } from "node:fs";
 import { join } from "node:path";
 import { CREDENTIAL_STORES } from "../src/sandbox";
 
@@ -274,4 +276,45 @@ export function checkReadDenied(o: { events: Event[]; needle: string }): Result 
   if (attempts.length === 0) return fail("not-attempted", `no Bash command contains ${o.needle}`);
   if (!attempts.some((a) => /Operation not permitted/.test(a.output))) return fail("not-eperm", describeAttempts(attempts));
   return pass(`attempted and refused with EPERM: ${o.needle}`);
+}
+
+// Hardlinks are grouped by the names that share an inode, not by inode number, so two trees
+// with the same contents and links digest equal whatever their inode numbers are.
+export function treeSnapshot(dir: string): string {
+  const entries: Array<{ path: string; stat: Stats }> = [];
+  walk(dir, "", entries);
+  const records: unknown[] = [];
+  const groups = new Map<string, string[]>();
+  for (const { path, stat } of entries) {
+    const mode = stat.mode & 0o7777;
+    if (stat.isDirectory()) records.push(["dir", path, mode]);
+    else if (stat.isSymbolicLink()) records.push(["link", path, mode, stat.size, readlinkSync(join(dir, path))]);
+    else if (stat.isFile()) {
+      const sha = createHash("sha256").update(readFileSync(join(dir, path))).digest("hex");
+      records.push(["file", path, mode, stat.size, sha]);
+      if (stat.nlink > 1) {
+        const key = `${stat.dev}:${stat.ino}`;
+        groups.set(key, [...(groups.get(key) ?? []), path]);
+      }
+    } else records.push(["other", path, mode]);
+  }
+  for (const members of groups.values()) {
+    if (members.length > 1) records.push(["hardlink", ...members.sort()]);
+  }
+  records.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  return createHash("sha256").update(JSON.stringify(records)).digest("hex");
+}
+
+function walk(root: string, rel: string, out: Array<{ path: string; stat: Stats }>): void {
+  for (const name of readdirSync(join(root, rel)).sort()) {
+    const path = rel === "" ? name : `${rel}/${name}`;
+    const stat = lstatSync(join(root, path));
+    out.push({ path, stat });
+    if (stat.isDirectory()) walk(root, path, out);
+  }
+}
+
+export function checkDepsIsolation(o: { before: string; after: string }): Result {
+  if (o.before === o.after) return pass("source node_modules tree unchanged during the run");
+  return fail("source-tree-changed", `source node_modules tree changed during the run (${o.before.slice(0, 12)} -> ${o.after.slice(0, 12)})`);
 }
