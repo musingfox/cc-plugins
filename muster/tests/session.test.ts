@@ -1,9 +1,11 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { recordFetch, runWorker, type DispatchRequest } from "../src/session";
 import { readPhase, runPaths, writePhase, type RunPaths } from "../src/layout";
-import { commitFile, git, makeRepo } from "./support/repo";
+import { commitFile, git, makeRepo, removeFixtures } from "./support/repo";
+
+afterAll(removeFixtures);
 
 const FAKE = join(import.meta.dir, "support", "fake-agent.ts");
 const SCRIPT = join(import.meta.dir, "support", "scenarios", "permission-turn.ts");

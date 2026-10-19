@@ -1,9 +1,8 @@
 import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRunDir, runPaths, writeAtomic, writePhase } from "../src/layout";
-import { git, makeRepo } from "./support/repo";
+import { git, makeRepo, mkdirOutsideTemp, removeFixtures } from "./support/repo";
 
 const CLI = join(import.meta.dir, "..", "src", "muster.ts");
 const FAKE_AGENT = join(import.meta.dir, "support", "fake-agent.ts");
@@ -19,7 +18,7 @@ let hook: string;
 const live: { kill: () => void }[] = [];
 
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), "muster-dispatch-"));
+  home = mkdirOutsideTemp("muster-dispatch-");
   repo = makeRepo();
   outside = join(home, "outside.txt");
   hook = join(home, "turn-hook.ts");
@@ -52,6 +51,8 @@ export function handle(msg, io) {
     MUSTER_POLL_MS: "50",
   };
 });
+
+afterAll(removeFixtures);
 
 afterEach(() => {
   for (const p of live.splice(0)) p.kill();

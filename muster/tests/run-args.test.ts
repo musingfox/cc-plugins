@@ -1,17 +1,19 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, symlinkSync, mkdtempSync, realpathSync, rmSync, writeFileSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { UsageError, runPaths } from "../src/layout";
 import { parseRunArgs } from "../src/run-args";
+import { mkdirOutsideTemp, removeFixtures } from "./support/repo";
+
+afterAll(removeFixtures);
 
 let home: string;
 let env: { MUSTER_HOME: string; HOME: string };
 let repo: string;
 
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), "muster-args-"));
+  home = mkdirOutsideTemp("muster-args-");
   env = { MUSTER_HOME: join(home, "m"), HOME: home };
   repo = join(home, "repo");
   mkdirSync(repo);
@@ -70,7 +72,7 @@ describe("RunRefusal", () => {
   });
 
   test("T4: a non-git --repo is refused with 'not a git'", () => {
-    const plain = mkdtempSync(join(tmpdir(), "muster-plain-"));
+    const plain = mkdirOutsideTemp("muster-plain-");
     try {
       const argv = ["run", "--name", "a1", "--model", "haiku", "--repo", plain, "--ticket", "t"];
       expect(refusal(argv).message).toContain("not a git");

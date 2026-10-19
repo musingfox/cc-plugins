@@ -1,9 +1,11 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createWorkerWorktree, fetchBranchBack, WorktreeError } from "../src/worktree";
-import { commitFile, git, makeRepo } from "./support/repo";
+import { commitFile, git, makeRepo, removeFixtures } from "./support/repo";
+
+afterAll(removeFixtures);
 
 function freshPath(): string {
   return join(mkdtempSync(join(tmpdir(), "muster-wt-")), "wt");
