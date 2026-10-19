@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { WorktreeError } from "../src/worktree";
 import { recordFetch, runWorker, type DispatchRequest } from "../src/session";
 import { readPhase, runPaths, writePhase, type RunPaths } from "../src/layout";
 import { commitFile, git, makeRepo, removeFixtures } from "./support/repo";
@@ -127,6 +128,23 @@ describe("WorkerSessionLoop", () => {
     expect(existsSync(layout.report)).toBe(false);
     await done;
     expect(exits).toEqual([0]);
+  });
+
+  test("T1b: a copyDeps failure is recorded as depsError and the worker still runs to its normal exit", async () => {
+    const layout = layoutFor();
+    const exits: number[] = [];
+    const done = runWorker(request(), layout, {
+      env: envFor(scenario()),
+      exit: (c) => exits.push(c),
+      copyDeps: () => {
+        throw new WorktreeError("listing the tree at abc failed", "fatal: bad object");
+      },
+    });
+    expect(await waitFor(() => readPhase(layout)?.stopReason === "end_turn")).toBe(true);
+    await done;
+    expect(exits).toEqual([0]);
+    expect(readPhase(layout)?.deps).toEqual([]);
+    expect(String(readPhase(layout)?.depsError)).toContain("listing the tree at abc failed");
   });
 
   test("T2: a cancelled turn leaves a REPORT.md that the client did not touch", async () => {

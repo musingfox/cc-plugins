@@ -22,6 +22,7 @@ export type DispatchRequest = {
 export type WorkerOptions = {
   env?: Record<string, string | undefined>;
   exit?: (code: number) => void;
+  copyDeps?: typeof copyDeps;
 };
 
 type TurnResult = {
@@ -71,9 +72,12 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
   );
   const prompt = buildPrompt({ worktree: wt.worktree, reportPath: layout.report, ticket: request.ticket });
   setPhase(layout, "starting");
-  writePhase(layout, {
-    deps: copyDeps({ repoRoot: request.repoRoot, baseSha: wt.baseSha, clone: wt.worktree }),
-  });
+  try {
+    const deps = (opts.copyDeps ?? copyDeps)({ repoRoot: request.repoRoot, baseSha: wt.baseSha, clone: wt.worktree });
+    writePhase(layout, { deps });
+  } catch (e) {
+    writePhase(layout, { deps: [], depsError: e instanceof Error ? e.message : String(e) });
+  }
 
   const fetchBack = () => {
     const result = fetchBranchBack({ repoRoot: request.repoRoot, clone: wt.worktree, branch: wt.branch });
