@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cloneDirectory } from "../src/clonefile";
 import { copyDeps } from "../src/deps";
@@ -209,3 +209,66 @@ describe("copyDeps: SkipOnLockfileDrift", () => {
     expect(copyDeps({ repoRoot: repo, baseSha, clone })).toEqual([{ dir: ".", outcome: "copied" }]);
   });
 });
+
+describe("copyDeps: SkipUnusableNodeModules", () => {
+  test("T1: a directory without node_modules in the source reports no-node-modules", () => {
+    const repo = makeRepo();
+    commitFile(repo, "bun.lock", "lock\n", "add lock");
+    const { clone, baseSha } = cloneOf(repo);
+
+    expect(copyDeps({ repoRoot: repo, baseSha, clone })).toEqual([{ dir: ".", outcome: "no-node-modules" }]);
+  });
+
+  test("T2: a symlinked node_modules is never cloned", () => {
+    const repo = makeRepo();
+    commitFile(repo, "bun.lock", "lock\n", "add lock");
+    const real = join(mkdirOutsideTemp("muster-real-"), "nm");
+    writeIn(real, "x.txt", "x\n");
+    symlinkSync(real, join(repo, "node_modules"));
+    const { clone, baseSha } = cloneOf(repo);
+    let calls = 0;
+
+    const outcomes = copyDeps({ repoRoot: repo, baseSha, clone }, () => {
+      calls += 1;
+      return { ok: true };
+    });
+
+    expect(outcomes).toEqual([{ dir: ".", outcome: "no-node-modules", detail: "symlink" }]);
+    expect(calls).toBe(0);
+    expect(existsSync(join(clone, "node_modules"))).toBe(false);
+  });
+
+  test("T3: a regular file named node_modules reports no-node-modules without throwing", () => {
+    const repo = makeRepo();
+    commitFile(repo, "bun.lock", "lock\n", "add lock");
+    writeFileSync(join(repo, "node_modules"), "not a directory\n");
+    const { clone, baseSha } = cloneOf(repo);
+
+    expect(copyDeps({ repoRoot: repo, baseSha, clone })).toEqual([{ dir: ".", outcome: "no-node-modules" }]);
+  });
+});
+
+describe("copyDeps: SkipUnusableNodeModules (path limits)", () => {
+  test("R1: a lockfile path that fits PATH_MAX but whose node_modules path does not is an outcome, not a throw", () => {
+    const repo = makeRepo();
+    const dir = longDir(1020 - repo.length - "//bun.lock".length);
+    writeIn(repo, join(dir, "bun.lock"), "lock\n");
+    git(repo, ["add", "-A"]);
+    git(repo, ["commit", "-q", "-m", "add lock"]);
+    expect(join(repo, dir, "bun.lock").length).toBe(1020);
+    const { clone, baseSha } = cloneOf(repo);
+
+    const outcomes = copyDeps({ repoRoot: repo, baseSha, clone });
+
+    expect(outcomes.map((o) => [o.dir, o.outcome])).toEqual([[dir, "no-node-modules"]]);
+  });
+});
+
+function longDir(length: number): string {
+  let dir = "";
+  while (dir.length < length) {
+    const room = length - dir.length - (dir ? 1 : 0);
+    dir += (dir ? "/" : "") + "d".repeat(Math.min(200, room));
+  }
+  return dir;
+}

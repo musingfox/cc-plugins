@@ -1,3 +1,4 @@
+import { lstatSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { cloneDirectory, type CloneResult } from "./clonefile";
 import { git, WorktreeError } from "./worktree";
@@ -37,7 +38,16 @@ export function copyDeps(
     if (drifted) {
       return { dir, outcome: "lockfile-differs", detail: drifted.path.slice(drifted.path.lastIndexOf("/") + 1) };
     }
-    const result = cloneDir(join(repoRoot, dir, "node_modules"), join(clone, dir, "node_modules"));
+    const src = join(repoRoot, dir, "node_modules");
+    let stat;
+    try {
+      stat = lstatSync(src, { throwIfNoEntry: false });
+    } catch (error) {
+      return { dir, outcome: "no-node-modules", detail: (error as NodeJS.ErrnoException).code ?? String(error) };
+    }
+    if (stat?.isSymbolicLink()) return { dir, outcome: "no-node-modules", detail: "symlink" };
+    if (!stat?.isDirectory()) return { dir, outcome: "no-node-modules" };
+    const result = cloneDir(src, join(clone, dir, "node_modules"));
     return result.ok ? { dir, outcome: "copied" } : { dir, outcome: "clonefile-error", detail: result.detail };
   });
 }
