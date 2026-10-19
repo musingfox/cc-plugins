@@ -1,4 +1,4 @@
-import { lstatSync, realpathSync } from "node:fs";
+import { lstatSync, readlinkSync, realpathSync } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
 
 export type ToolCall = {
@@ -101,5 +101,16 @@ function isSymlink(p: string): boolean {
     return lstatSync(p).isSymbolicLink();
   } catch {
     return false;
+  }
+}
+
+export function danglingLinkTargetOutside(p: string, worktreeReal: string): string | undefined {
+  const link = resolve(worktreeReal, p);
+  try {
+    if (!lstatSync(link).isSymbolicLink()) return undefined;
+    const target = realpathDeepest(resolve(dirname(link), readlinkSync(link)));
+    return insideWorktree(target, worktreeReal) ? undefined : target;
+  } catch {
+    return undefined;
   }
 }

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { openChannel, type Channel } from "../src/channel";
 import { createPermissionHandler } from "../src/escalation";
 import { createRunDir, runPaths, type RunPaths } from "../src/layout";
@@ -146,9 +146,9 @@ describe("EscalationRoundTrip", () => {
   });
 
   test.each([
-    ["dangling", (link: string, home: string) => symlinkSync(join(home, "no-such-target"), link)],
-    ["looping", (link: string) => symlinkSync(link, link)],
-  ])("T2c: a Write to a %s symlink writes a QUESTION with the unresolved path instead of throwing", async (_kind, makeLink) => {
+    ["dangling", (link: string, home: string) => symlinkSync(join(home, "no-such-target"), link), (home: string) => join(realpathSync(home), "no-such-target")],
+    ["looping", (link: string) => symlinkSync(link, link), undefined],
+  ])("T2c: a Write to a %s symlink writes a QUESTION instead of throwing, showing the outside link target when there is one", async (_kind, makeLink, target) => {
     const runId = "run-bad-link";
     const requested = join(runPaths(runId, { MUSTER_HOME: home, HOME: home }).worktree, "link.md");
     const { ch, layout } = await setup({ permission: { toolCall: writeTool(requested) } }, runId);
@@ -156,10 +156,24 @@ describe("EscalationRoundTrip", () => {
     const turn = ch.request("session/prompt", { sessionId: "sess-1" });
     expect(await waitFor(() => existsSync(layout.question(1)))).toBe(true);
     const q = JSON.parse(readFileSync(layout.question(1), "utf8"));
-    expect(q.paths).toEqual([requested]);
+    expect(q.paths).toEqual([target?.(home) ?? requested]);
     expect(q.reason).toContain("could not be checked");
     writeFileSync(layout.answer(1), JSON.stringify({ decision: "deny" }));
     expect(await turn).toEqual({ stopReason: "end_turn" });
+  });
+
+  test("T2d: a Write through a relative dangling symlink shows the target resolved against the link's directory", async () => {
+    const runId = "run-rel-link";
+    const requested = join(runPaths(runId, { MUSTER_HOME: home, HOME: home }).worktree, "sub", "link.md");
+    const { ch, layout } = await setup({ permission: { toolCall: writeTool(requested) } }, runId);
+    mkdirSync(join(layout.worktree, "sub"));
+    symlinkSync("../../../outside-rel/new.md", join(layout.worktree, "sub", "link.md"));
+    const turn = ch.request("session/prompt", { sessionId: "sess-1" });
+    expect(await waitFor(() => existsSync(layout.question(1)))).toBe(true);
+    const q = JSON.parse(readFileSync(layout.question(1), "utf8"));
+    expect(q.paths).toEqual([join(dirname(realpathSync(layout.runDir)), "outside-rel", "new.md")]);
+    writeFileSync(layout.answer(1), JSON.stringify({ decision: "deny" }));
+    await turn;
   });
 
   test("T3: ANSWER deny replies reject and the agent's write never happens", async () => {

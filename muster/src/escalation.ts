@@ -4,7 +4,7 @@ import { decideBash } from "./bash-policy";
 import { writeAtomic, writePhase, type RunPaths } from "./layout";
 import { chooseOutcome, type PermissionOption, type PermissionOutcome } from "./outcome";
 import { decideNetwork } from "./network-policy";
-import { decidePath, resolveRequestPath, type Decision, type ToolCall } from "./path-policy";
+import { danglingLinkTargetOutside, decidePath, resolveRequestPath, type Decision, type ToolCall } from "./path-policy";
 import { awaitAnswerWithin, questionTimeoutMs } from "./question-timeout";
 import { resolveAllowedHosts } from "./sandbox";
 import { pollMs, type Reason } from "./termination";
@@ -38,7 +38,7 @@ function displayPath(p: string, worktreeReal: string): string {
   try {
     return resolveRequestPath(p, worktreeReal);
   } catch {
-    return resolve(worktreeReal, p);
+    return danglingLinkTargetOutside(p, worktreeReal) ?? resolve(worktreeReal, p);
   }
 }
 
