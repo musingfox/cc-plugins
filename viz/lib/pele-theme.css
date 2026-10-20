@@ -7,7 +7,7 @@
     --pele-line: #878580; /* --muted */
     --pele-surface: #282726; /* --surface-warm */
     --pele-surface-alt: #1c1b1a; /* --surface */
-    --pele-bg: var(--viz-diagram-bg, #1c1b1a); /* --surface; feedback shell sets #282726 */
+    --pele-bg: var(--viz-diagram-bg, #1c1b1a); /* --surface; feedback shell sets --surface-warm */
     --pele-border: #da702c; /* --accent */
     --pele-accent: #da702c; /* --accent */
     --pele-error: #ce5d97; /* --danger */
