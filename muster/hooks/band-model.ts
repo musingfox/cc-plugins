@@ -1,4 +1,4 @@
-import type { RunState } from '../types/index.d.ts'
+import type { BandRow, RunState } from '../types/index.d.ts'
 
 export type RunFacts = { phase: string | undefined; files?: string[]; report?: string }
 
@@ -67,3 +67,23 @@ export function figuresOf(phase: unknown): Figures {
     cost: typeof cost === 'number' && Number.isFinite(cost) ? cost : null,
   }
 }
+
+export const stateLabel = (state: RunState): string => (state === 'question' ? '? question' : state)
+
+// The theme keys the band paints each state with.
+export const STATE_COLOR: Record<RunState, string> = {
+  starting: 'inactive',
+  running: 'suggestion',
+  question: 'warning',
+  idle: 'permission',
+  done: 'success',
+  blocked: 'error',
+  malformed: 'error',
+  exited: 'inactive',
+}
+
+export const progressCell = (row: Pick<BandRow, 'plan' | 'tools'>): { text: string; dim: boolean } =>
+  row.plan ? { text: `${row.plan.done}/${row.plan.total}`, dim: false } : { text: `${row.tools} tools`, dim: true }
+
+export const costText = (cost: number | null): string =>
+  cost === null ? '' : `  $${cost.toLocaleString('en-US', { useGrouping: false, minimumFractionDigits: 1, maximumFractionDigits: 1 })}`
