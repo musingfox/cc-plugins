@@ -14,26 +14,35 @@
     <style>
         /* musingfox standalone token contract. */
         :root {
-            --bg: #07080a;
-            --surface: #181818;
-            --surface-warm: #222222;
+            --bg: #100f0f;
+            --surface: #1c1b1a;
+            --surface-warm: #282726;
 
-            --fg: #e8e8e5;
-            --fg-2: #c4c5b5;
-            --muted: #75715e;
-            --meta: #49483e;
+            --fg: #f2f0e5;
+            --fg-2: #cecdc3;
+            --muted: #878580;
+            --meta: #575653;
 
-            --border: #2e2e2e;
-            --border-soft: #1f1f1f;
+            --border: #343331;
+            --border-soft: #282726;
 
-            --accent: #fd971f;
-            --accent-on: #07080a;
-            --accent-hover: #ffb85a;
-            --accent-active: #c97608;
+            --accent: #da702c;
+            --accent-on: #100f0f;
+            --accent-hover: #ec8b49;
+            --accent-active: #cb6120;
 
-            --success: #98e024;
-            --warn: #e0d561;
-            --danger: #f4005f;
+            --success: #87d3c3;
+            --warn: #dfb431;
+            --danger: #ce5d97;
+
+            --red: #ff9baf;
+            --orange: #da702c;
+            --yellow: #e4b808;
+            --green: #46a069;
+            --cyan: #0fcedd;
+            --blue: #098eca;
+            --purple: #b491ff;
+            --magenta: #bd579a;
 
             --font-display: "Fira Code", "jf Open Huninn", "PingFang TC", "Microsoft JhengHei", ui-monospace, monospace;
             --font-body: "Fira Code", "jf Open Huninn", "PingFang TC", "Microsoft JhengHei", ui-monospace, monospace;
@@ -720,7 +729,7 @@
                     var page = document.implementation.createHTMLDocument('Diagram');
                     // Diagram colors live in the theme's --pele-* rules, so the tab
                     // carries a copy of that style block.
-                    var bg = '#07080a';
+                    var bg = '#100f0f';
                     page.body.setAttribute('style', 'margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:' + bg);
                     var style = page.createElement('style');
                     style.textContent = 'svg{max-width:95vw !important;max-height:95vh !important}';

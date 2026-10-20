@@ -1,35 +1,37 @@
 /* Diagram palette for Pele. Literal values mirror the page tokens in :root
-   (template.html and recipes/feedback.html); each line names its token. */
+   (template.html, recipes/feedback.html, recipes/pr-review.html); each line names its token.
+   Series 1..8 take the Musingfox hues in order: orange, cyan, magenta, yellow, blue, red, green, purple. */
 .mermaid, .pele {
-    --pele-fg: #e8e8e5; /* --fg */
-    --pele-muted: #75715e; /* --muted */
-    --pele-line: #75715e; /* --muted */
-    --pele-surface: #222222; /* --surface-warm */
-    --pele-surface-alt: #181818; /* --surface */
-    --pele-bg: var(--viz-diagram-bg, #181818); /* --surface; feedback shell sets #222222 */
-    --pele-border: #fd971f; /* --accent */
-    --pele-accent: #fd971f; /* --accent */
-    --pele-error: #f4005f; /* --danger */
-    --pele-critical: #f4005f; /* --danger */
+    --pele-fg: #f2f0e5; /* --fg */
+    --pele-muted: #878580; /* --muted */
+    --pele-line: #878580; /* --muted */
+    --pele-surface: #282726; /* --surface-warm */
+    --pele-surface-alt: #1c1b1a; /* --surface */
+    --pele-bg: var(--viz-diagram-bg, #1c1b1a); /* --surface; feedback shell sets #282726 */
+    --pele-border: #da702c; /* --accent */
+    --pele-accent: #da702c; /* --accent */
+    --pele-error: #ce5d97; /* --danger */
+    --pele-critical: #ce5d97; /* --danger */
     --pele-font: "Fira Code", "jf Open Huninn", "PingFang TC", "Microsoft JhengHei", ui-monospace, monospace;
     --pele-font-mono: "Fira Code", "JetBrains Mono", ui-monospace, monospace;
-    --pele-series-1: #fd971f; /* --accent */
-    --pele-series-2: #98e024; /* --success */
-    --pele-series-3: #f4005f; /* --danger */
-    --pele-series-4: #e0d561; /* --warn */
-    --pele-series-5: color-mix(in srgb, #fd971f 50%, #e8e8e5); /* accent toward --fg */
-    --pele-series-6: color-mix(in srgb, #98e024 50%, #e8e8e5); /* success toward --fg */
-    --pele-series-7: color-mix(in srgb, #f4005f 50%, #e8e8e5); /* danger toward --fg */
-    --pele-series-8: color-mix(in srgb, #e0d561 50%, #e8e8e5); /* warn toward --fg */
+    --pele-series-1: #da702c; /* --orange */
+    --pele-series-2: #0fcedd; /* --cyan */
+    --pele-series-3: #bd579a; /* --magenta */
+    --pele-series-4: #e4b808; /* --yellow */
+    --pele-series-5: #098eca; /* --blue */
+    --pele-series-6: #ff9baf; /* --red */
+    --pele-series-7: #46a069; /* --green */
+    --pele-series-8: #b491ff; /* --purple */
 }
-.pele-cluster > rect { stroke: #2e2e2e; } /* --border */
+.pele-cluster > rect { stroke: #343331; } /* --border */
 .pele-error {
-    color: #f4005f; /* --danger */
+    color: #ce5d97; /* --danger */
     font-family: var(--pele-font-mono);
     white-space: pre-wrap;
 }
 
-/* Ink-friendly palette for printing: same classes, light surfaces, dark series. */
+/* Ink-friendly palette for printing: same classes, light surfaces, dark series.
+   Each print series is round(0.6 x each channel) of the screen series; the static test checks it. */
 @media print {
     .mermaid, .pele {
         --pele-fg: #1f1f1f;
@@ -40,14 +42,14 @@
         --pele-bg: #ffffff;
         --pele-border: #8a8a8a;
         --pele-accent: #1f1f1f;
-        --pele-series-1: #985b13;
-        --pele-series-2: #5b8616;
-        --pele-series-3: #920039;
-        --pele-series-4: #86803a;
-        --pele-series-5: #4c2d09;
-        --pele-series-6: #2e430b;
-        --pele-series-7: #49001d;
-        --pele-series-8: #43401d;
+        --pele-series-1: #83431a;
+        --pele-series-2: #097c85;
+        --pele-series-3: #71345c;
+        --pele-series-4: #896e05;
+        --pele-series-5: #055579;
+        --pele-series-6: #995d69;
+        --pele-series-7: #2a603f;
+        --pele-series-8: #6c5799;
     }
     .pele-cluster > rect { stroke: #8a8a8a; }
     .mermaid-shell { background: #ffffff !important; }
