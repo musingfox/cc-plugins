@@ -81,14 +81,12 @@
             console.error('pele-glue: pele is not loaded; diagrams are left as source');
             return;
         }
-        const sources = [];
+        const logos = [];
         for (const node of Array.from(nodes)) {
             const src = node.dataset && node.dataset.src;
-            if (src != null) sources.push([node, src]);
-        }
-        const logos = sources.filter(([, src]) => src.includes('logos:'));
-        for (const [node, src] of sources) {
-            if (!src.includes('logos:')) drawNode(node, src, deps, () => null);
+            if (src == null) continue;
+            if (src.includes('logos:')) logos.push([node, src]);
+            else drawNode(node, src, deps, () => null);
         }
         if (logos.length === 0) return;
         const fetchJson = deps.fetchJson || defaultFetchJson;
