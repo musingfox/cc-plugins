@@ -7,26 +7,35 @@
 <style>
 /* musingfox standalone token contract. */
 :root {
-    --bg: #07080a;
-    --surface: #181818;
-    --surface-warm: #222222;
+    --bg: #100f0f;
+    --surface: #1c1b1a;
+    --surface-warm: #282726;
 
-    --fg: #e8e8e5;
-    --fg-2: #c4c5b5;
-    --muted: #75715e;
-    --meta: #49483e;
+    --fg: #f2f0e5;
+    --fg-2: #cecdc3;
+    --muted: #878580;
+    --meta: #575653;
 
-    --border: #2e2e2e;
-    --border-soft: #1f1f1f;
+    --border: #343331;
+    --border-soft: #282726;
 
-    --accent: #fd971f;
-    --accent-on: #07080a;
-    --accent-hover: #ffb85a;
-    --accent-active: #c97608;
+    --accent: #da702c;
+    --accent-on: #100f0f;
+    --accent-hover: #ec8b49;
+    --accent-active: #cb6120;
 
-    --success: #98e024;
-    --warn: #e0d561;
-    --danger: #f4005f;
+    --success: #87d3c3;
+    --warn: #dfb431;
+    --danger: #ce5d97;
+
+    --red: #ff9baf;
+    --orange: #da702c;
+    --yellow: #e4b808;
+    --green: #46a069;
+    --cyan: #0fcedd;
+    --blue: #098eca;
+    --purple: #b491ff;
+    --magenta: #bd579a;
 
     --font-display: "Fira Code", "jf Open Huninn", "PingFang TC", "Microsoft JhengHei", ui-monospace, monospace;
     --font-body: "Fira Code", "jf Open Huninn", "PingFang TC", "Microsoft JhengHei", ui-monospace, monospace;
@@ -163,7 +172,7 @@ main { max-width: 880px; margin: var(--space-6) auto var(--space-12); padding: 0
 .brief tr:last-child td { border-bottom: none; }
 .brief hr { border: none; border-top: 1px solid var(--border); margin: var(--space-8) 0; }
 .mermaid-shell {
-    --viz-diagram-bg: #222222;
+    --viz-diagram-bg: #282726;
     border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-4);
     background: var(--surface-warm); margin: var(--space-5) 0; text-align: center; overflow-x: auto;
     transition: border-color var(--motion-fast) var(--ease-standard);
@@ -992,7 +1001,7 @@ window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
                 });
             }
         } catch (err) {
-            document.body.innerHTML = '<pre style="padding:24px;color:#f4005f;font-family:monospace">'
+            document.body.innerHTML = '<pre style="padding:24px;color:#ce5d97;font-family:monospace">'
                 + escapeHtml('Recipe error: ' + (err && err.message ? err.message : err)) + '</pre>';
             console.error(err);
         }

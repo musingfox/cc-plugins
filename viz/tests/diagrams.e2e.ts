@@ -297,16 +297,16 @@ try {
     await open(edgeUrl);
     await waitFor(ALL_DRAWN);
     const [node, cluster] = await js(`[getComputedStyle(document.querySelector('.pele-node rect')).stroke, getComputedStyle(document.querySelector('.pele-cluster > rect')).stroke]`);
-    expectEq("DiagramPalette T1", "node and cluster strokes", [node, cluster], ["rgb(253, 151, 31)", "rgb(46, 46, 46)"]);
+    expectEq("DiagramPalette T1", "node and cluster strokes", [node, cluster], ["rgb(218, 112, 44)", "rgb(52, 51, 49)"]);
   });
   await scenario("DiagramPalette T2", async () => {
     await open(edgeUrl);
     await waitFor(ALL_DRAWN);
-    expectEq("DiagramPalette T2", "generic --pele-bg pixel", await js(`${diagramBg("document.querySelector('.mermaid')")}`), [24, 24, 24, 255]);
+    expectEq("DiagramPalette T2", "generic --pele-bg pixel", await js(`${diagramBg("document.querySelector('.mermaid')")}`), [28, 27, 26, 255]);
     await open(feedbackUrl);
     await js(PLAIN);
     await waitFor(BRIEF_DRAWN);
-    expectEq("DiagramPalette T2", "feedback --pele-bg pixel", await js(`${diagramBg("document.querySelector('#brief .mermaid')")}`), [34, 34, 34, 255]);
+    expectEq("DiagramPalette T2", "feedback --pele-bg pixel", await js(`${diagramBg("document.querySelector('#brief .mermaid')")}`), [40, 39, 38, 255]);
   });
   await scenario("DiagramPalette T3", async () => {
     await open(edgeUrl);
@@ -356,7 +356,7 @@ try {
     await waitFor(ALL_DRAWN);
     const err = await js(`(() => { const n = document.querySelector('.mermaid.pele-error'); const cs = getComputedStyle(n);
       return [cs.color, cs.whiteSpace]; })()`);
-    expectEq("DiagramPalette T5", "error color and whitespace", err, ["rgb(244, 0, 95)", "pre-wrap"]);
+    expectEq("DiagramPalette T5", "error color and whitespace", err, ["rgb(206, 93, 151)", "pre-wrap"]);
   });
   await scenario("DiagramPalette T6", async () => {
     await open(edgeUrl);
@@ -418,7 +418,7 @@ try {
     await sleep(200);
     await media("");
     await sleep(200);
-    expectEq("PrintPalette T4", "node stroke on screen", await js(`getComputedStyle(document.querySelector('.pele-node rect')).stroke`), "rgb(253, 151, 31)");
+    expectEq("PrintPalette T4", "node stroke on screen", await js(`getComputedStyle(document.querySelector('.pele-node rect')).stroke`), "rgb(218, 112, 44)");
     expectEq("PrintPalette T4", "marked svg kept", await js(`!!document.querySelector('svg[data-mark="1"]')`), true);
   });
   // StandaloneDiagramTab: the expanded diagram keeps the page's palette in its own tab.
@@ -439,9 +439,9 @@ try {
     const url = await openTab();
     expectEq("StandaloneDiagramTab T1", "captured blob URL", String(url).startsWith("blob:"), true);
     await tabFrame(url);
-    expectEq("StandaloneDiagramTab T1", "node stroke", await js(`getComputedStyle(window.__frame.contentDocument.querySelector('.pele-node rect')).stroke`), "rgb(253, 151, 31)");
-    expectEq("StandaloneDiagramTab T1", "cluster stroke", await js(`getComputedStyle(window.__frame.contentDocument.querySelector('.pele-cluster > rect')).stroke`), "rgb(46, 46, 46)");
-    expectEq("StandaloneDiagramTab T1", "body background", await js(`getComputedStyle(window.__frame.contentDocument.body).backgroundColor`), "rgb(7, 8, 10)");
+    expectEq("StandaloneDiagramTab T1", "node stroke", await js(`getComputedStyle(window.__frame.contentDocument.querySelector('.pele-node rect')).stroke`), "rgb(218, 112, 44)");
+    expectEq("StandaloneDiagramTab T1", "cluster stroke", await js(`getComputedStyle(window.__frame.contentDocument.querySelector('.pele-cluster > rect')).stroke`), "rgb(52, 51, 49)");
+    expectEq("StandaloneDiagramTab T1", "body background", await js(`getComputedStyle(window.__frame.contentDocument.body).backgroundColor`), "rgb(16, 15, 15)");
   });
   await scenario("StandaloneDiagramTab T2", async () => {
     await open(edgeUrl);
