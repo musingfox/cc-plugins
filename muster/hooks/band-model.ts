@@ -1,4 +1,4 @@
-import type { BandRow, RunState } from '../types/index.d.ts'
+import type { BandRow, LiveState, RunState } from '../types/index.d.ts'
 
 export type RunFacts = { phase: string | undefined; files?: string[]; report?: string }
 
@@ -87,3 +87,15 @@ export const progressCell = (row: Pick<BandRow, 'plan' | 'tools'>): { text: stri
 
 export const costText = (cost: number | null): string =>
   cost === null ? '' : `  $${cost.toLocaleString('en-US', { useGrouping: false, minimumFractionDigits: 1, maximumFractionDigits: 1 })}`
+
+// The header's words for the rows on the band and the runs waiting to be collected; a zero count is left out.
+export function summaryParts(rows: { state: RunState | LiveState }[], collect: number): string[] {
+  const count = (...states: string[]) => rows.filter((row) => states.includes(row.state)).length
+  const parts = [
+    [count('starting', 'running'), 'running'],
+    [count('question'), 'question'],
+    [count('idle'), 'idle'],
+    [collect, 'to collect'],
+  ] as const
+  return parts.filter(([n]) => n > 0).map(([n, word]) => `${n} ${word}`)
+}
