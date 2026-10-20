@@ -49,3 +49,21 @@ export function elapsedSeconds(startedIso: string, endedIso: string | null, nowM
   if (Number.isNaN(started) || Number.isNaN(ended)) return null
   return Math.max(0, Math.round((ended - started) / 1000))
 }
+
+export type Figures = { title: string; plan: { done: number; total: number } | null; tools: number; cost: number | null }
+
+const isCount = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0
+
+// Whatever phase.json holds, the band draws these fallbacks instead of a bad value.
+export function figuresOf(phase: unknown): Figures {
+  const fields = typeof phase === 'object' && phase !== null ? (phase as Record<string, unknown>) : {}
+  const { title, plan, tools, cost } = fields
+  const shown = typeof plan === 'object' && plan !== null ? (plan as Record<string, unknown>) : {}
+  const counted = isCount(shown.done) && isCount(shown.total) && shown.total > 0
+  return {
+    title: typeof title === 'string' && title.trim() !== '' ? title : '(no title yet)',
+    plan: counted ? { done: Math.min(shown.done as number, shown.total as number), total: shown.total as number } : null,
+    tools: isCount(tools) ? tools : 0,
+    cost: typeof cost === 'number' && Number.isFinite(cost) ? cost : null,
+  }
+}
