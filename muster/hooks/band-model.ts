@@ -34,3 +34,18 @@ export function classifyRun({ phase, files = [], report }: RunFacts): RunState {
       return 'exited'
   }
 }
+
+// Minutes round to the nearest, and carry into hours so 3599 s reads 1h0m, never 60m.
+export function elapsedText(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.round(seconds / 60)
+  return minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h${minutes % 60}m`
+}
+
+// Null when the start does not parse; an end that does not parse is treated the same way.
+export function elapsedSeconds(startedIso: string, endedIso: string | null, nowMs: number): number | null {
+  const started = Date.parse(startedIso)
+  const ended = endedIso === null ? nowMs : Date.parse(endedIso)
+  if (Number.isNaN(started) || Number.isNaN(ended)) return null
+  return Math.max(0, Math.round((ended - started) / 1000))
+}
