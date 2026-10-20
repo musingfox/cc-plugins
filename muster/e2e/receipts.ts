@@ -185,7 +185,7 @@ export function checkWebSearch(o: { events: Event[]; questions: Question[] }): R
 }
 
 const DEFAULT_DOMAINS = ["registry.npmjs.org"];
-const WORKER_TOOLS = ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "ToolSearch"];
+export const WORKER_TOOLS = ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "ToolSearch", "TodoWrite", "TaskCreate", "TaskUpdate", "TaskList"];
 
 export function checkSessionSandbox(events: Event[], where: { home: string; cache: string }): Result {
   const sn = events.find((e) => e.dir === "out" && e.msg?.method === "session/new");

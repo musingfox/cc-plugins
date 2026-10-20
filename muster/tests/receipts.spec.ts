@@ -1,6 +1,7 @@
 import { appendFileSync, linkSync, mkdirSync, rmSync, truncateSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CREDENTIAL_STORES } from "../src/sandbox";
+import { WORKER_TOOLS as HANDSHAKE_TOOLS } from "../src/handshake";
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import {
   checkAllowlistedProbe,
@@ -14,6 +15,7 @@ import {
   checkReadDenied,
   checkRefProtected,
   checkSessionSandbox,
+  WORKER_TOOLS,
   checkWorkerTools,
   parseEvents,
   treeSnapshot,
@@ -261,7 +263,7 @@ describe("worker tool receipt", () => {
     expect(checkWorkerTools([toolCall("Bash"), STEP_13, toolReference("WebFetch")]).ok).toBe(true);
   });
 
-  test.each(["RemoteTrigger", "CronCreate", "ScheduleWakeup", "Agent", "SendMessage", "TodoWrite", "NotebookEdit", "mcp__claude_ai_Gmail__send_message"])(
+  test.each(["RemoteTrigger", "CronCreate", "ScheduleWakeup", "Agent", "SendMessage", "ExitPlanMode", "NotebookEdit", "mcp__claude_ai_Gmail__send_message"])(
     "a called %s fails as tool-outside-allowlist",
     (name) => {
       const r = checkWorkerTools([toolCall("Bash"), STEP_13, toolCall(name)]);
@@ -344,11 +346,20 @@ describe("session/new receipt", () => {
       filesystem: { denyRead: CREDENTIAL_STORES.map((p) => join(WHERE.home, p)), allowWrite: [WHERE.cache] },
     },
     settings: { permissions: { ask: ["WebFetch"] }, disableClaudeAiConnectors: true },
-    tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "ToolSearch"],
+    tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "ToolSearch", "TodoWrite", "TaskCreate", "TaskUpdate", "TaskList"],
   };
 
   test("both new fields present pass", () => {
     expect(checkSessionSandbox([sessionNew(good)], WHERE).ok).toBe(true);
+  });
+
+  test("the task-list tools are allowed and the old nine-tool list fails as tools-option-mismatch", () => {
+    expect(checkSessionSandbox([sessionNew(good)], WHERE).ok).toBe(true);
+    expect(checkSessionSandbox([sessionNew({ ...good, tools: good.tools.slice(0, 9) })], WHERE)).toMatchObject({ ok: false, failure: "tools-option-mismatch" });
+  });
+
+  test("the acceptance copy of the worker tool list matches the handshake's", () => {
+    expect(WORKER_TOOLS).toEqual(HANDSHAKE_TOOLS);
   });
 
   test("a missing tools field fails as tools-option-mismatch", () => {

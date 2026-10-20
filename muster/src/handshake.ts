@@ -13,7 +13,7 @@ export type Handshake = {
   agentInfo?: AgentInfo;
 };
 
-const WORKER_TOOLS = ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "ToolSearch"];
+export const WORKER_TOOLS = ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "ToolSearch", "TodoWrite", "TaskCreate", "TaskUpdate", "TaskList"];
 
 export const ADAPTER_VERSION = "0.93.0";
 

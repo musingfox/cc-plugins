@@ -36,7 +36,7 @@ const T1_PARAMS = {
       options: {
         settingSources: [],
         settings: { permissions: { ask: ["WebFetch"] }, disableClaudeAiConnectors: true },
-        tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "ToolSearch"],
+        tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "ToolSearch", "TodoWrite", "TaskCreate", "TaskUpdate", "TaskList"],
         sandbox: {
           enabled: true,
           failIfUnavailable: true,
