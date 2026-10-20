@@ -1,0 +1,54 @@
+/* Diagram palette for Pele. Literal values mirror the page tokens in :root
+   (template.html and recipes/feedback.html); each line names its token. */
+.mermaid, .pele {
+    --pele-fg: #e8e8e5; /* --fg */
+    --pele-muted: #75715e; /* --muted */
+    --pele-line: #75715e; /* --muted */
+    --pele-surface: #222222; /* --surface-warm */
+    --pele-surface-alt: #181818; /* --surface */
+    --pele-bg: var(--viz-diagram-bg, #181818); /* --surface; feedback shell sets #222222 */
+    --pele-border: #fd971f; /* --accent */
+    --pele-accent: #fd971f; /* --accent */
+    --pele-error: #f4005f; /* --danger */
+    --pele-critical: #f4005f; /* --danger */
+    --pele-font: "Fira Code", "jf Open Huninn", "PingFang TC", "Microsoft JhengHei", ui-monospace, monospace;
+    --pele-font-mono: "Fira Code", "JetBrains Mono", ui-monospace, monospace;
+    --pele-series-1: #fd971f; /* --accent */
+    --pele-series-2: #98e024; /* --success */
+    --pele-series-3: #f4005f; /* --danger */
+    --pele-series-4: #e0d561; /* --warn */
+    --pele-series-5: color-mix(in srgb, #fd971f 50%, #e8e8e5); /* accent toward --fg */
+    --pele-series-6: color-mix(in srgb, #98e024 50%, #e8e8e5); /* success toward --fg */
+    --pele-series-7: color-mix(in srgb, #f4005f 50%, #e8e8e5); /* danger toward --fg */
+    --pele-series-8: color-mix(in srgb, #e0d561 50%, #e8e8e5); /* warn toward --fg */
+}
+.pele-cluster > rect { stroke: #2e2e2e; } /* --border */
+.pele-error {
+    color: #f4005f; /* --danger */
+    font-family: var(--pele-font-mono);
+    white-space: pre-wrap;
+}
+
+/* Ink-friendly palette for printing: same classes, light surfaces, dark series. */
+@media print {
+    .mermaid, .pele {
+        --pele-fg: #1f1f1f;
+        --pele-muted: #6e6e6e;
+        --pele-line: #1f1f1f;
+        --pele-surface: #f3f3f3;
+        --pele-surface-alt: #e6e6e6;
+        --pele-bg: #ffffff;
+        --pele-border: #8a8a8a;
+        --pele-accent: #1f1f1f;
+        --pele-series-1: #985b13;
+        --pele-series-2: #5b8616;
+        --pele-series-3: #920039;
+        --pele-series-4: #86803a;
+        --pele-series-5: #4c2d09;
+        --pele-series-6: #2e430b;
+        --pele-series-7: #49001d;
+        --pele-series-8: #43401d;
+    }
+    .pele-cluster > rect { stroke: #8a8a8a; }
+    .mermaid-shell { background: #ffffff !important; }
+}
