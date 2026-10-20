@@ -1,9 +1,27 @@
-import { atom, read } from 'claude-code'
+import { atom, read, update } from 'claude-code'
 import type { On } from 'claude-code'
 import type { BandRow, Board } from '../types/index.d.ts'
+import { readBoard } from './board.ts'
 import { STATE_COLOR, costText, elapsedText, progressCell, stateLabel, summaryParts } from './band-model.ts'
 
 export const board = atom({ plugin: 'muster', key: 'board' } as const, null as Board | null)
+
+const POLL_MS = 5000
+
+let timer: { cancel(): void } | null = null
+let polling = false
+
+// One read at a time: a tick that fires while a read is pending is skipped, and a read that never settles blocks only its own ticks.
+async function poll($: any) {
+  if (polling) return
+  polling = true
+  try {
+    const next = await readBoard($)
+    await update($, board, () => next)
+  } finally {
+    polling = false
+  }
+}
 
 // A run's name and title come from files, so they are drawn without control characters and capped in length.
 const drawable = (text: string): string => text.replace(/[\u0000-\u001f\u007f-\u009f]/g, '').slice(0, 10000)
@@ -36,6 +54,17 @@ async function drawBand($: any, e: any, beneath: unknown) {
 }
 
 export function register(on: On) {
+  on('session.start', async ($, e, next) => {
+    // A reload re-fires session.start on this instance; a second timer would double the cadence.
+    timer?.cancel()
+    timer = $.clock.every(POLL_MS, () => {
+      void poll($).catch(() => {})
+    })
+    // Not awaited: a read that never settles must not hold the session's start.
+    void poll($).catch(() => {})
+    return next(e)
+  })
+
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     // A survey takes the prompt area, and an unreadable board or a failed draw leaves what the layers beneath drew.
     if (e.props?.hasSurvey) return next(e)

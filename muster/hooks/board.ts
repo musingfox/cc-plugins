@@ -6,8 +6,9 @@ const COLLECT: ReadonlySet<RunState> = new Set(['done', 'blocked', 'malformed'])
 
 const trimSlashes = (path: string): string => path.replace(/\/+$/, '')
 
-const readText = ($: any, path: string): Promise<string | null> =>
-  Promise.resolve($.fs.read(path)).then((text: unknown) => (typeof text === 'string' ? text : null), () => null)
+function readText($: any, path: string): Promise<string | null> {
+  return Promise.resolve($.fs.read(path)).then((text: unknown) => (typeof text === 'string' ? text : null), () => null)
+}
 
 function objectOf(text: string | null): Record<string, unknown> | null {
   if (text === null) return null

@@ -4,6 +4,7 @@ export const NOW = Date.parse('2026-10-20T10:02:05Z')
 export const HOME = '/home/u'
 export const RUNS = `${HOME}/.cache/muster/runs`
 export const ROOT = '/r'
+export const SESSION = { surface: 'terminal', isInteractive: true, cwd: '/work' } as const
 
 type Entry = { name: string; kind: 'file' | 'dir' | 'other'; size: number; mtimeMs: number; isLink: boolean }
 export type Files = Record<string, string | { deny: string } | 'defer'>
@@ -48,7 +49,9 @@ export function kitWorld(on: any, options: { env?: Record<string, string>; root?
   mock.env(on, options.env ?? { HOME })
   const clock = mock.clock(on, { now: NOW })
   on('ui.render', { component: 'AbovePrompt' }, () => options.beneath ?? BENEATH)
-  on('session.root', () => ({ value: options.root ?? ROOT }))
+  const state = { rootDenied: false }
+  on('session.start', ($: any, e: any) => ({ cwd: e.cwd }))
+  on('session.root', () => (state.rootDenied ? { deny: 'root unavailable' } : { value: options.root ?? ROOT }))
   const files: Files = options.files ?? {}
   const dirs: Dirs = options.dirs ?? {}
   const reads: string[] = []
@@ -67,5 +70,5 @@ export function kitWorld(on: any, options: { env?: Record<string, string>; root?
     if (answer === 'defer') return new Promise(() => {})
     return 'deny' in (answer as object) ? answer : { value: answer }
   })
-  return { clock, files, dirs, reads, lists }
+  return { clock, files, dirs, reads, lists, state }
 }
