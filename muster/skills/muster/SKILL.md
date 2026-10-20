@@ -11,7 +11,16 @@ Each worker is a Claude session in its own clone of the repository (called the w
 
 ## Dispatch
 
-Dispatch blocks until the worker ends, so start it with `Bash(run_in_background: true)`. `--model` must name a specific model; `default` is refused. The adapter offers the newest models only under their aliases (`opus`, `sonnet`, `haiku`, `fable`): a full ID such as `claude-opus-5` is an older generation, and the session's own ID such as `claude-opus-5-5` is refused. A refused model's report lists every offered value with its display name.
+Dispatch blocks until the worker ends, so start it with `Bash(run_in_background: true)`. `--model` takes one of these values; pick by the shape of the ticket, and go one step up when in doubt:
+
+| `--model` | Model | Fits a ticket that |
+|---|---|---|
+| `haiku` | Haiku 5.5 | answers a known question from the code or docs, or makes a mechanical change checked against a stated red/green test |
+| `sonnet` | Sonnet 5.5 | implements a pinned contract, or runs many easy checks across a wide scope |
+| `opus` | Opus 5.5 | hinges on one hard judgment, enters unknown territory, plans, or verifies another worker's output |
+| `fable` | Fable 5.1 | stays hard after an `opus` attempt failed for lack of judgment, not for missing context |
+
+Use these aliases, not full IDs: the adapter offers the newest models only under them, a full ID such as `claude-opus-5` is an older generation, and the session's own ID such as `claude-opus-5-5` is refused. `default` is refused too. A refused model's report lists every offered value with its display name.
 
 ```
 bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts run --name NAME --model MODEL --repo /abs/path/to/repo --ticket "TICKET TEXT"
