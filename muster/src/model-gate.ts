@@ -32,32 +32,49 @@ function refuse(reason: string, offered: Offered[]): ModelRefused {
   return new ModelRefused(`${reason}; offered: [${listed}]`);
 }
 
-function modelOption(options: unknown): ConfigOption | undefined {
-  return (Array.isArray(options) ? (options as ConfigOption[]) : []).find((o) => o.category === "model");
+function optionIn(options: unknown, category: string): ConfigOption | undefined {
+  return (Array.isArray(options) ? (options as ConfigOption[]) : []).find((o) => o.category === category);
 }
 
-export async function gateModel(
+async function gateOption(
   channel: Channel,
-  opts: { sessionId: string; configOptions: unknown; requestedModel: string },
-): Promise<void> {
-  const option = modelOption(opts.configOptions);
-  if (!option) throw refuse("adapter offers no model option", []);
+  opts: { sessionId: string; configOptions: unknown; category: string; label: string; requested: string },
+): Promise<unknown> {
+  const option = optionIn(opts.configOptions, opts.category);
+  if (!option) throw refuse(`adapter offers no ${opts.label} option`, []);
   const offered = flatten(option.options ?? []);
-  if (!offered.some((o) => o.value === opts.requestedModel)) {
-    throw refuse(`requested model ${opts.requestedModel} is not offered`, offered);
+  if (!offered.some((o) => o.value === opts.requested)) {
+    throw refuse(`requested ${opts.label} ${opts.requested} is not offered`, offered);
   }
   let response: unknown;
   try {
     response = await channel.request("session/set_config_option", {
       sessionId: opts.sessionId,
       configId: option.id,
-      value: opts.requestedModel,
+      value: opts.requested,
     });
   } catch (e) {
     throw refuse(`set_config_option failed: ${(e as Error).message}`, offered);
   }
-  const after = modelOption((response as { configOptions?: unknown } | null)?.configOptions);
-  if (after?.currentValue !== opts.requestedModel) {
-    throw refuse(`adapter reports model ${String(after?.currentValue)}, not ${opts.requestedModel}`, offered);
+  const configOptions = (response as { configOptions?: unknown } | null)?.configOptions;
+  const after = optionIn(configOptions, opts.category);
+  if (after?.currentValue !== opts.requested) {
+    throw refuse(`adapter reports ${opts.label} ${String(after?.currentValue)}, not ${opts.requested}`, offered);
   }
+  return configOptions;
+}
+
+export function gateModel(
+  channel: Channel,
+  opts: { sessionId: string; configOptions: unknown; requestedModel: string },
+): Promise<unknown> {
+  return gateOption(channel, { ...opts, category: "model", label: "model", requested: opts.requestedModel });
+}
+
+// Effort levels are listed per model, so callers pass the configOptions gateModel returned.
+export function gateEffort(
+  channel: Channel,
+  opts: { sessionId: string; configOptions: unknown; requestedEffort: string },
+): Promise<unknown> {
+  return gateOption(channel, { ...opts, category: "thought_level", label: "effort", requested: opts.requestedEffort });
 }

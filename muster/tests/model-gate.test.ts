@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { openChannel, type Channel } from "../src/channel";
-import { ModelRefused, gateModel } from "../src/model-gate";
+import { ModelRefused, gateEffort, gateModel } from "../src/model-gate";
 
 const FAKE = join(import.meta.dir, "support", "fake-agent.ts");
 const RUNS = join(import.meta.dir, "..", ".test-runs");
@@ -152,5 +152,57 @@ describe("ModelGate", () => {
     );
     expect(err).toBeInstanceOf(ModelRefused);
     expect(outMethods(eventsPath)).not.toContain("session/set_config_option");
+  });
+});
+
+function effortOption(currentValue: string) {
+  return {
+    id: "effort",
+    category: "thought_level",
+    currentValue,
+    options: [{ value: "default" }, { value: "low" }, { value: "medium" }, { value: "high" }],
+  };
+}
+
+describe("EffortGate", () => {
+  test("E2: requested medium sends one set_config_option with the effort configId and value medium", async () => {
+    const { ch, eventsPath } = await open({
+      results: { "session/set_config_option": { configOptions: [effortOption("medium")] } },
+    });
+    await gateEffort(ch, { sessionId: "s1", configOptions: [effortOption("high")], requestedEffort: "medium" });
+    const sent = outMessages(eventsPath).filter((m) => m.method === "session/set_config_option");
+    expect(sent.length).toBe(1);
+    expect(sent[0].params).toStrictEqual({ sessionId: "s1", configId: "effort", value: "medium" });
+  });
+
+  test("E3: an effort the model does not offer is refused, lists the offered ones, and sends nothing", async () => {
+    const { ch, eventsPath } = await open();
+    const err = await gateEffort(ch, {
+      sessionId: "s1",
+      configOptions: [effortOption("high")],
+      requestedEffort: "xhigh",
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(ModelRefused);
+    expect(err.message).toContain("requested effort xhigh is not offered; offered: [default, low, medium, high]");
+    expect(outMethods(eventsPath)).not.toContain("session/set_config_option");
+  });
+
+  test("E4: a response whose effort currentValue differs from the request is refused", async () => {
+    const { ch } = await open({
+      results: { "session/set_config_option": { configOptions: [effortOption("high")] } },
+    });
+    const err = await gateEffort(ch, {
+      sessionId: "s1",
+      configOptions: [effortOption("high")],
+      requestedEffort: "low",
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(ModelRefused);
+  });
+
+  test("E5: gateModel returns the configOptions the adapter sent back, which carry the new model's efforts", async () => {
+    const after = [modelOption("haiku", [{ value: "haiku" }, { value: "sonnet" }]), effortOption("high")];
+    const { ch } = await open({ results: { "session/set_config_option": { configOptions: after } } });
+    const got = await gateModel(ch, { sessionId: "s1", configOptions: twoModels, requestedModel: "haiku" });
+    expect(got).toStrictEqual(after);
   });
 });

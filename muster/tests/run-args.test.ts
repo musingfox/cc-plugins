@@ -108,6 +108,12 @@ describe("RunRefusal", () => {
     expect(existsSync(runPaths("a1", env).runDir)).toBe(false);
   });
 
+  test("E1: --effort is optional and passes through when given", () => {
+    expect(parseRunArgs(valid(), env).effort).toBeUndefined();
+    expect(parseRunArgs(valid(["--effort", "medium"]), env).effort).toBe("medium");
+    expect(refusal(valid(["--effort", ""])).message).toContain("--effort");
+  });
+
   test("R1: a name whose muster/<name> branch exists in the repo is refused and no run dir is created", () => {
     execFileSync("git", ["-C", repo, "branch", "muster/a1"]);
     const err = refusal(valid());

@@ -6,12 +6,13 @@ import { Env, UsageError, runPaths } from "./layout";
 export interface DispatchRequest {
   name: string;
   model: string;
+  effort?: string;
   repoRoot: string;
   baseRef: string;
   ticket: string;
 }
 
-const VALUE_FLAGS = new Set(["--name", "--model", "--repo", "--base", "--ticket", "--ticket-file"]);
+const VALUE_FLAGS = new Set(["--name", "--model", "--effort", "--repo", "--base", "--ticket", "--ticket-file"]);
 
 function parseFlags(args: string[]): Map<string, string> {
   const flags = new Map<string, string>();
@@ -107,6 +108,9 @@ export function parseRunArgs(argv: string[], env: Env = { MUSTER_HOME: process.e
   if (model === undefined || model === "") throw new UsageError("--model is required and must name a specific model");
   if (model === "default") throw new UsageError('--model "default" is not allowed; name a specific model');
 
+  const effort = flags.get("--effort");
+  if (effort === "") throw new UsageError("--effort needs a value");
+
   const repo = flags.get("--repo");
   if (!repo) throw new UsageError("--repo is required");
   const repoRoot = gitWorkTree(repo);
@@ -119,5 +123,6 @@ export function parseRunArgs(argv: string[], env: Env = { MUSTER_HOME: process.e
     throw new UsageError(`branch muster/${name} already exists in ${repoRoot}; pick another name`);
   }
 
-  return { name, model, repoRoot, baseRef, ticket: ticketText(flags) };
+  const request = { name, model, repoRoot, baseRef, ticket: ticketText(flags) };
+  return effort === undefined ? request : { ...request, effort };
 }

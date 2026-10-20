@@ -4,7 +4,7 @@ import { createPermissionHandler } from "./escalation";
 import { handshake } from "./handshake";
 import { runFollowupInbox } from "./inbox";
 import { buildAgentLaunch } from "./launch";
-import { gateModel } from "./model-gate";
+import { gateEffort, gateModel } from "./model-gate";
 import { enforceDefaultMode } from "./mode-gate";
 import { buildPrompt } from "./prompt";
 import { createRunDir, readPhase, writeAtomic, writePhase, type Phase, type RunPaths } from "./layout";
@@ -15,6 +15,7 @@ import { createWorkerWorktree, fetchBranchBack } from "./worktree";
 export type DispatchRequest = {
   ticket: string;
   model: string;
+  effort?: string;
   repoRoot: string;
   baseRef: string;
 };
@@ -60,6 +61,7 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
       {
         name: layout.name,
         model: request.model,
+        ...(request.effort ? { effort: request.effort } : {}),
         repoRoot: request.repoRoot,
         worktree: wt.worktree,
         branch: wt.branch,
@@ -112,7 +114,10 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
     const hs = await handshake(channel, { worktree: wt.worktree, cache: layout.cache });
     sessionId = hs.sessionId;
     state.sessionId = sessionId;
-    await gateModel(channel, { sessionId, configOptions: hs.configOptions, requestedModel: request.model });
+    const afterModel = await gateModel(channel, { sessionId, configOptions: hs.configOptions, requestedModel: request.model });
+    if (request.effort) {
+      await gateEffort(channel, { sessionId, configOptions: afterModel, requestedEffort: request.effort });
+    }
     await enforceDefaultMode(channel, { configOptions: hs.configOptions, sessionId });
   } catch (e) {
     await term.terminate("handshake-failed", (e as Error).message);

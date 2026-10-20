@@ -13,17 +13,21 @@ Each worker is a Claude session in its own clone of the repository (called the w
 
 Dispatch blocks until the worker ends, so start it with `Bash(run_in_background: true)`. `--model` takes one of these values; pick by the shape of the ticket, and go one step up when in doubt:
 
-| `--model` | Model | Fits a ticket that |
-|---|---|---|
-| `haiku` | Haiku 5.5 | answers a known question from the code or docs, or makes a mechanical change checked against a stated red/green test |
-| `sonnet` | Sonnet 5.5 | implements a pinned contract, or runs many easy checks across a wide scope |
-| `opus` | Opus 5.5 | hinges on one hard judgment, enters unknown territory, plans, or verifies another worker's output |
-| `fable` | Fable 5.1 | stays hard after an `opus` attempt failed for lack of judgment, not for missing context |
+| `--model` | `--effort` | Model | Fits a ticket that |
+|---|---|---|---|
+| `haiku` | `medium` | Haiku 5.5 | answers a known question from the code or docs, or makes a mechanical change checked against a stated red/green test |
+| `sonnet` | `medium` | Sonnet 5.5 | implements a pinned contract |
+| `sonnet` | `high` | Sonnet 5.5 | runs many easy checks across a wide scope, or explores from a known starting point |
+| `opus` | `high` | Opus 5.5 | hinges on one hard judgment |
+| `opus` | `xhigh` | Opus 5.5 | enters unknown territory, plans, or verifies another worker's output |
+| `fable` | `high` | Fable 5.1 | stays hard after an `opus` attempt failed for lack of judgment, not for missing context |
 
-Use these aliases, not full IDs: the adapter offers the newest models only under them, a full ID such as `claude-opus-5` is an older generation, and the session's own ID such as `claude-opus-5-5` is refused. `default` is refused too. A refused model's report lists every offered value with its display name.
+The model sets the ceiling of what the worker can judge correctly; effort sets how far it searches and checks within it. A worker that is confidently wrong needs a stronger model; one that stops short or skips a check needs more effort first. Never use `low` with `haiku` or `sonnet`.
+
+Use these aliases, not full IDs: the adapter offers the newest models only under them, a full ID such as `claude-opus-5` is an older generation, and the session's own ID such as `claude-opus-5-5` is refused. `default` is refused too. `--effort` is optional; without it the worker runs at the adapter's default for that model (`high` for `haiku` in a real run). An effort the chosen model does not offer is refused. A refused model or effort's report lists every offered value with its display name.
 
 ```
-bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts run --name NAME --model MODEL --repo /abs/path/to/repo --ticket "TICKET TEXT"
+bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts run --name NAME --model MODEL [--effort EFFORT] --repo /abs/path/to/repo --ticket "TICKET TEXT"
 ```
 
 Use `--ticket-file PATH` instead of `--ticket` for a long ticket. Use `--base REF` to start from a ref other than HEAD. The first stdout line is `RUNDIR=<path>`; keep that path for collect.
