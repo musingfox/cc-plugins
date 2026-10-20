@@ -1,0 +1,61 @@
+/* Code-token palette for highlight.js, spliced into template.html by render.sh.
+   Every color is a page token from :root, so the palette follows the Musingfox tokens.
+   Tokens sit on --surface (the pre background), where --magenta is 4.1:1, so it is not used;
+   the other seven hues and --muted are each >= 4.5:1 there. Under deutan simulation --green
+   nearly matches --muted, so green goes to rare roles (meta, diff additions) and comments are
+   italic as well as muted. */
+.hljs { color: var(--fg-2); background: none; }
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-name,
+.hljs-template-tag,
+.hljs-doctag,
+.hljs-variable.language_,
+.hljs-bullet { color: var(--orange); }
+
+.hljs-string,
+.hljs-regexp,
+.hljs-meta .hljs-string,
+.hljs-char.escape_ { color: var(--cyan); }
+
+.hljs-number,
+.hljs-literal,
+.hljs-symbol { color: var(--yellow); }
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-section,
+.hljs-template-variable { color: var(--purple); }
+
+.hljs-title.class_,
+.hljs-title.class_.inherited__,
+.hljs-type,
+.hljs-built_in,
+.hljs-deletion { color: var(--red); }
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-property,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-selector-attr,
+.hljs-selector-pseudo,
+.hljs-link { color: var(--blue); }
+
+.hljs-meta,
+.hljs-meta .hljs-keyword,
+.hljs-addition { color: var(--green); }
+
+.hljs-comment,
+.hljs-quote { color: var(--muted); font-style: italic; }
+
+.hljs-section,
+.hljs-strong { font-weight: 700; }
+.hljs-emphasis { font-style: italic; }
+.hljs-link { text-decoration: underline; }
+
+/* Paper gets the page's single ink, like the rest of the print block. */
+@media print {
+    .hljs, .hljs * { color: #111 !important; }
+}

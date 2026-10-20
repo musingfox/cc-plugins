@@ -341,3 +341,97 @@ describe('DiagramTypesGuidance', () => {
         expect(README).toContain('Pele');
     });
 });
+
+// highlight.js: pinned script, colors from page tokens via the inlined hljs-theme.css.
+const HLJS_PIN = '11.12.0';
+const HLJS_TAG = `<script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@${HLJS_PIN}/highlight.min.js"></script>`;
+// Every highlight.js CDN reference must carry an exact x.y.z version.
+const hljsPinViolations = text =>
+    [...text.matchAll(/(?:highlightjs\/cdn-release|@highlightjs\/cdn-assets|highlight\.js)@([^\s"'`/)]*)/g)]
+        .filter(m => !/^\d+\.\d+\.\d+$/.test(m[1]))
+        .map(m => m[0]);
+
+// WCAG contrast ratio of two #rrggbb colors.
+const luminance = hex => {
+    const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+        .map(c => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a, b) => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+};
+
+// Problems with the screen colors of a highlight theme: each `color:` must be var(--token)
+// of a :root token that reaches 4.5:1 on --surface, the pre background.
+function codePaletteDrift(tokens, themeCss) {
+    const { screen } = blocks(themeCss);
+    const values = [...screen.matchAll(/(?<![-\w])color:\s*([^;}]+)/g)].map(m => m[1].trim());
+    if (!values.length) return ['the theme declares no color'];
+    return values.flatMap(value => {
+        const token = value.match(/^var\((--[\w-]+)\)$/)?.[1];
+        if (!token) return [`color ${value} is not a page token`];
+        if (!(token in tokens)) return [`${token} is missing from :root`];
+        const ratio = contrast(lastHex(tokens[token]), lastHex(tokens['--surface']));
+        return ratio >= 4.5 ? [] : [`${token} is ${ratio.toFixed(2)}:1 on --surface, under 4.5:1`];
+    });
+}
+
+describe('CodeBlocksUseMusingfoxPalette', () => {
+    const THEME = read('hljs-theme.css');
+    const template = PAGES['template.html'];
+
+    test('T1: no page loads a highlight.js stylesheet or names monokai', () => {
+        for (const [file, html] of Object.entries(PAGES)) {
+            expect({ file, links: html.match(/<link[^>]*highlight[^>]*>/gi) || [] }).toEqual({ file, links: [] });
+            expect({ file, monokai: /monokai/i.test(html) }).toEqual({ file, monokai: false });
+        }
+    });
+
+    test('T2: unpinned highlight.js references are reported; the template loads the pinned script once', () => {
+        for (const bad of ['highlightjs/cdn-release@latest', '@highlightjs/cdn-assets@11', 'highlight.js@^11.12.0']) {
+            expect(hljsPinViolations(bad).length).toBe(1);
+        }
+        expect(hljsPinViolations(`@highlightjs/cdn-assets@${HLJS_PIN}`)).toEqual([]);
+        for (const [file, html] of Object.entries(PAGES)) expect({ file, bad: hljsPinViolations(html) }).toEqual({ file, bad: [] });
+        expect(template.split(HLJS_TAG).length - 1).toBe(1);
+        expect(template).not.toContain('@latest');
+    });
+
+    test('T3: the template inlines hljs-theme.css once, inside a style element', () => {
+        expect(template.split('// @inline hljs-theme.css').length - 1).toBe(1);
+        expect(template).toMatch(/<style id="viz-hljs-theme">\s*\/\/ @inline hljs-theme\.css\s*<\/style>/);
+        expect(existsSync(join(LIB, 'hljs-theme.css'))).toBe(true);
+    });
+
+    test('T4: the recipes do not load highlight.js, so the theme is needed only by the template', () => {
+        for (const file of ['recipes/feedback.html', 'recipes/pr-review.html']) {
+            expect({ file, hljs: /highlight(\.min)?\.js|hljs/.test(PAGES[file]) }).toEqual({ file, hljs: false });
+        }
+    });
+
+    test('T5: every screen color in the theme is a page token readable on --surface', () => {
+        expect(codePaletteDrift(rootTokens(template), THEME)).toEqual([]);
+    });
+
+    test('T6: the theme uses the seven hues readable on --surface and leaves out --magenta', () => {
+        const used = new Set([...blocks(THEME).screen.matchAll(/var\((--[\w-]+)\)/g)].map(m => m[1]));
+        for (const hue of ['--red', '--orange', '--yellow', '--green', '--cyan', '--blue', '--purple']) expect(used.has(hue)).toBe(true);
+        expect(used.has('--magenta')).toBe(false);
+    });
+
+    test('T7: a hex color and a --magenta color are each one message', () => {
+        const tokens = rootTokens(template);
+        const hex = codePaletteDrift(tokens, '.hljs-keyword { color: #f92672; }');
+        expect(hex.length).toBe(1);
+        expect(hex[0]).toContain('#f92672');
+        const magenta = codePaletteDrift(tokens, '.hljs-keyword { color: var(--magenta); }');
+        expect(magenta.length).toBe(1);
+        expect(magenta[0]).toContain('--magenta');
+    });
+
+    test('T8: the theme carries no old-palette hex and its screen block no hex at all', () => {
+        expect(oldPaletteHits(THEME)).toEqual([]);
+        expect(blocks(THEME).screen.match(/#[0-9a-fA-F]{3,6}\b/g)).toBeNull();
+    });
+});

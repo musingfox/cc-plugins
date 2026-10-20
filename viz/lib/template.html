@@ -5,9 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DOC_NAME_PLACEHOLDER</title>
 
-    <!-- Code highlighting -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@latest/build/styles/monokai.min.css" id="hljs-theme">
-
     <!-- KaTeX math -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.33/dist/katex.min.css">
 
@@ -493,6 +490,9 @@
     <style id="viz-pele-theme">
 // @inline pele-theme.css
     </style>
+    <style id="viz-hljs-theme">
+// @inline hljs-theme.css
+    </style>
 </head>
 <body>
     <div id="content"></div>
@@ -508,8 +508,8 @@
 // @inline pele-glue.js
     </script>
 
-    <!-- Code highlighting -->
-    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@latest/build/highlight.min.js"></script>
+    <!-- Code highlighting: pinned script; token colors come from hljs-theme.css. -->
+    <script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.12.0/highlight.min.js"></script>
 
     <!-- KaTeX math -->
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.33/dist/katex.min.js"></script>
@@ -530,14 +530,8 @@
                 var docBase64 = "DOC_BASE64_PLACEHOLDER";
                 var docMarkdown = base64DecodeUTF8(docBase64);
 
-                // 2. Configure marked with highlight.js for syntax highlighting
+                // 2. Configure marked
                 marked.setOptions({
-                    highlight: function(code, lang) {
-                        if (lang && hljs.getLanguage(lang)) {
-                            return hljs.highlight(code, { language: lang }).value;
-                        }
-                        return hljs.highlightAuto(code).value;
-                    },
                     gfm: true,
                     breaks: false
                 });
@@ -550,6 +544,20 @@
                     ADD_ATTR: ['class', 'language', 'style']
                 });
                 document.getElementById('content').innerHTML = cleanHtml;
+
+                // 3b. Highlight code blocks. marked 11 has no highlight option, so this
+                //     runs on the DOM; hljs escapes the text it reads, and mermaid fences
+                //     are left for Pele. Without the script, code stays plain text.
+                if (window.hljs) document.querySelectorAll('#content pre > code').forEach(function(code) {
+                    var m = code.className.match(/language-(\S+)/);
+                    var lang = m ? m[1] : '';
+                    if (lang === 'mermaid') return;
+                    var result = lang && hljs.getLanguage(lang)
+                        ? hljs.highlight(code.textContent, { language: lang })
+                        : hljs.highlightAuto(code.textContent);
+                    code.innerHTML = result.value;
+                    code.classList.add('hljs');
+                });
 
                 // 4. KaTeX: render math expressions after DOM insertion
                 // Block math: $$...$$
