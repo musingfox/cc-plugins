@@ -1,3 +1,5 @@
+import { mock } from 'claude-code/testing'
+
 export const NOW = Date.parse('2026-10-20T10:02:05Z')
 export const HOME = '/home/u'
 export const RUNS = `${HOME}/.cache/muster/runs`
@@ -37,4 +39,33 @@ export function fakeEngine(options: { env?: Record<string, string | 'deny'>; roo
     },
   }
   return { $, reads, lists }
+}
+
+export const BENEATH = { type: 'Text', children: ['beneath'], part: { plugin: 'test' } }
+
+// A stub world beneath the band for the engine's own test body: env, clock, session root and the file reads are answered from the options, every read recorded.
+export function kitWorld(on: any, options: { env?: Record<string, string>; root?: string; files?: Files; dirs?: Dirs; beneath?: unknown } = {}) {
+  mock.env(on, options.env ?? { HOME })
+  const clock = mock.clock(on, { now: NOW })
+  on('ui.render', { component: 'AbovePrompt' }, () => options.beneath ?? BENEATH)
+  on('session.root', () => ({ value: options.root ?? ROOT }))
+  const files: Files = options.files ?? {}
+  const dirs: Dirs = options.dirs ?? {}
+  const reads: string[] = []
+  const lists: string[] = []
+  on('fs.read', (_: any, e: any) => {
+    reads.push(e.path)
+    const answer = files[e.path]
+    if (answer === undefined) return { deny: 'ENOENT' }
+    if (answer === 'defer') return new Promise(() => {})
+    return typeof answer === 'string' ? { value: answer } : answer
+  })
+  on('fs.list', (_: any, e: any) => {
+    lists.push(e.path)
+    const answer = dirs[e.path]
+    if (answer === undefined) return { deny: 'ENOENT' }
+    if (answer === 'defer') return new Promise(() => {})
+    return 'deny' in (answer as object) ? answer : { value: answer }
+  })
+  return { clock, files, dirs, reads, lists }
 }
