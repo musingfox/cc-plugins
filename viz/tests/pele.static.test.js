@@ -1,6 +1,6 @@
 import { test, expect, describe } from 'bun:test';
 import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 
 const LIB = join(import.meta.dir, '../lib');
 const read = rel => readFileSync(join(LIB, rel), 'utf8');
@@ -40,7 +40,10 @@ const PALETTE = [
 ];
 const RULES = [['.pele-cluster > rect', 'stroke', '--border'], ['.pele-error', 'color', '--danger']];
 
-// Musingfox tokens, Flexoki-based: hand copy of musingfox-design-system tokens.css at ace204d, the only pinned copy.
+// Musingfox tokens, Flexoki-based: vendored from musingfox-design-system tokens.css at DESIGN_TOKENS_COMMIT.
+// The design system is a separate private repo, so the pages are checked against this copy, and
+// DesignTokensMatchSource checks the copy against a local design-system checkout when there is one.
+const DESIGN_TOKENS_COMMIT = 'ace204d';
 const DESIGN_TOKENS = {
     '--bg': '#100f0f', '--surface': '#1c1b1a', '--surface-warm': '#282726',
     '--fg': '#f2f0e5', '--fg-2': '#cecdc3', '--muted': '#878580', '--meta': '#575653',
@@ -64,6 +67,22 @@ const rootTokens = html => {
     return Object.fromEntries([...block.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map(m => [m[1], m[2].trim()]));
 };
 const lastHex = value => (value.match(/#[0-9a-fA-F]{6}\b/g) || []).at(-1)?.toLowerCase();
+
+// Design-system checkout: $MUSINGFOX_DESIGN_SYSTEM, else a musingfox-design-system clone beside this repo.
+const DESIGN_SYSTEM = resolve(process.env.MUSINGFOX_DESIGN_SYSTEM || join(import.meta.dir, '../../../musingfox-design-system'));
+const TOKENS_CSS = join(DESIGN_SYSTEM, 'tokens.css');
+const NO_DESIGN_SYSTEM = existsSync(TOKENS_CSS) ? '' : ` [skipped: no ${TOKENS_CSS}; set MUSINGFOX_DESIGN_SYSTEM to the design-system checkout]`;
+
+// Color tokens of a tokens.css text: the :root properties whose value is a hex.
+const colorTokens = css => Object.fromEntries(Object.entries(rootTokens(css))
+    .filter(([, value]) => /^#[0-9a-fA-F]{6}$/.test(value)).map(([token, value]) => [token, value.toLowerCase()]));
+
+// One message per color the design system and the vendored copy disagree on, including a token only one side has.
+const sourceDrift = (source, vendored = DESIGN_TOKENS) => [...new Set([...Object.keys(vendored), ...Object.keys(source)])].flatMap(token => {
+    if (!(token in source)) return [`${token} is vendored but not in tokens.css`];
+    if (!(token in vendored)) return [`${token} is in tokens.css but not vendored`];
+    return source[token] === vendored[token] ? [] : [`${token} is ${source[token]} in tokens.css but vendored as ${vendored[token]}`];
+});
 
 // Value of the first `prop: value;` in a CSS text, or undefined when the text does not declare it.
 const decl = (css, prop) => css.match(new RegExp(`${prop}:\\s*([^;]+);`))?.[1].trim();
@@ -161,6 +180,38 @@ describe('FeedbackRendersDiagrams', () => {
         const targets = inlineTargets(feedback, RECIPES);
         expect(targets.length).toBeGreaterThan(0);
         for (const target of targets) expect(existsSync(target)).toBe(true);
+    });
+});
+
+describe('DesignTokensMatchSource', () => {
+    // bun test lists skipped tests only on a terminal, so the reason is also printed.
+    if (NO_DESIGN_SYSTEM) console.warn(`DesignTokensMatchSource T2, T3${NO_DESIGN_SYSTEM}`);
+
+    // A tokens.css text with the vendored colors plus overrides (undefined drops a token) and two non-color tokens.
+    const tokensCss = (overrides = {}) => `:root {\n${Object.entries({ ...DESIGN_TOKENS, ...overrides })
+        .filter(([, value]) => value !== undefined).map(([token, value]) => `  ${token}: ${value};\n`).join('')}  --font-mono: "Fira Code", monospace;\n  --space-1: 4px;\n}\n`;
+
+    test('T1: a changed, an added and a removed color are each one message naming the token; a wrong vendored value is too', () => {
+        expect(sourceDrift(colorTokens(tokensCss()))).toEqual([]);
+        for (const [overrides, token] of [[{ '--accent': '#ec8b49' }, '--accent'], [{ '--teal': '#3aa99f' }, '--teal'], [{ '--cyan': undefined }, '--cyan']]) {
+            const messages = sourceDrift(colorTokens(tokensCss(overrides)));
+            expect(messages.length).toBe(1);
+            expect(messages[0]).toContain(token);
+        }
+        const misCopied = sourceDrift(colorTokens(tokensCss()), { ...DESIGN_TOKENS, '--fg-2': '#b7b5ac' });
+        expect(misCopied.length).toBe(1);
+        expect(misCopied[0]).toContain('--fg-2');
+    });
+
+    test.skipIf(!!NO_DESIGN_SYSTEM)(`T2: the vendored copy equals every color in the design-system checkout's tokens.css${NO_DESIGN_SYSTEM}`, () => {
+        const drift = sourceDrift(colorTokens(readFileSync(TOKENS_CSS, 'utf8')));
+        expect({ tokensCss: TOKENS_CSS, vendoredFrom: DESIGN_TOKENS_COMMIT, drift }).toEqual({ tokensCss: TOKENS_CSS, vendoredFrom: DESIGN_TOKENS_COMMIT, drift: [] });
+    });
+
+    test.skipIf(!!NO_DESIGN_SYSTEM)(`T3: the vendored copy equals tokens.css at the recorded commit ${DESIGN_TOKENS_COMMIT}${NO_DESIGN_SYSTEM}`, () => {
+        const shown = Bun.spawnSync(['git', '-C', DESIGN_SYSTEM, 'show', `${DESIGN_TOKENS_COMMIT}:tokens.css`]);
+        expect({ exitCode: shown.exitCode, stderr: shown.stderr.toString().trim() }).toEqual({ exitCode: 0, stderr: '' });
+        expect(sourceDrift(colorTokens(shown.stdout.toString()))).toEqual([]);
     });
 });
 
