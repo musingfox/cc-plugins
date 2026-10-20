@@ -550,7 +550,7 @@ window.SRC_MTIME = "SOURCE_MTIME_PLACEHOLDER";
             pre.replaceWith(shell);
             mermaidNodes.push(div);
         });
-        if (mermaidNodes.length) renderDiagrams(mermaidNodes, { pele: window.pele });
+        if (mermaidNodes.length) vizPele.renderDiagrams(mermaidNodes, { pele: window.pele });
     }
 
     // Option cards for one question. Selection state lives in the caller
