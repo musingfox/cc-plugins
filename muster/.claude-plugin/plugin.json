@@ -1,6 +1,6 @@
 {
   "name": "muster",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "[Experimental] Unattended Claude workers over ACP — a coordinator dispatches headless workers with a permission fence, an event log, file-based escalation and report-file completion",
   "author": {
     "name": "Nick Huang",
@@ -14,5 +14,6 @@
     "dispatch",
     "claude-code"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "types": "./types/index.d.ts"
 }

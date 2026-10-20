@@ -1,0 +1,4 @@
+{
+  "description": "Shows the in-flight muster workers of this repository in a band above the prompt",
+  "modules": ["./register.ts"]
+}
