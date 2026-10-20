@@ -106,3 +106,64 @@ describe("AcpEventLog", () => {
     expect((b as any).echo.tag).toBe("b");
   });
 });
+
+describe("ChannelNotificationObserver", () => {
+  const emit = (ch: Channel, messages: object[]) => ch.request("fake/emit", { messages });
+  const note = (n: number) => ({ jsonrpc: "2.0", method: "session/update", params: { n } });
+
+  test("T1: a handler gets each notification's params in arrival order, after its line is recorded", async () => {
+    const { ch, eventsPath } = await open();
+    const seen: unknown[] = [];
+    const lines: number[] = [];
+    ch.onNotification("session/update", (params) => {
+      seen.push(params);
+      lines.push(events(eventsPath).filter((e) => e.dir === "in" && e.msg.method === "session/update").length);
+    });
+    await emit(ch, [note(1), note(2)]);
+    expect(seen).toEqual([{ n: 1 }, { n: 2 }]);
+    expect(lines).toEqual([1, 2]);
+  });
+
+  test("T2: a handler that throws does not stop later notifications or later requests", async () => {
+    const { ch, eventsPath } = await open();
+    const seen: unknown[] = [];
+    ch.onNotification("session/update", (params) => {
+      seen.push(params);
+      if ((params as { n: number }).n === 1) throw new Error("boom");
+    });
+    await emit(ch, [note(1), note(2)]);
+    expect(seen).toEqual([{ n: 1 }, { n: 2 }]);
+    expect(events(eventsPath).filter((e) => e.dir === "in" && e.msg.method === "session/update").length).toBe(2);
+    await expect(ch.request("fake/echo", { tag: "after" })).resolves.toBeDefined();
+  });
+
+  test("T3: a handler that rejects is swallowed and later notifications arrive", async () => {
+    const { ch } = await open();
+    const seen: unknown[] = [];
+    ch.onNotification("session/update", async (params) => {
+      seen.push(params);
+      if ((params as { n: number }).n === 1) throw new Error("rejected");
+    });
+    await emit(ch, [note(1), note(2)]);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(seen).toEqual([{ n: 1 }, { n: 2 }]);
+  });
+
+  test("T4: a request with an id never reaches the notification handler", async () => {
+    const { ch } = await open();
+    const seen: unknown[] = [];
+    ch.onNotification("session/update", (params) => {
+      seen.push(params);
+    });
+    await emit(ch, [{ jsonrpc: "2.0", id: 9, method: "session/update", params: { n: 9 } }]);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(seen).toEqual([]);
+  });
+
+  test("T5: a notification with no handler is recorded and nothing else happens", async () => {
+    const { ch, eventsPath } = await open();
+    await emit(ch, [note(1)]);
+    const inbound = events(eventsPath).filter((e) => e.dir === "in" && e.msg.method === "session/update");
+    expect(inbound.map((e) => e.msg.params)).toEqual([{ n: 1 }]);
+  });
+});
