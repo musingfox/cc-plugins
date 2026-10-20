@@ -1,3 +1,5 @@
+import { writePhase, type Phase, type RunPaths } from "./layout";
+
 const TITLE_MAX = 200;
 
 const clip = (text: string): string => Array.from(text).slice(0, TITLE_MAX).join("");
@@ -39,4 +41,34 @@ export function foldFigures(prev: Figures, update: unknown): Figures {
     default:
       return prev;
   }
+}
+
+type Projection = Phase;
+
+// The figures a phase.json carries; cost and plan appear once they have a value.
+const projectionOf = (figures: Figures, plan: Plan | null): Projection => ({
+  title: figures.title,
+  tools: figures.tools,
+  ...(figures.cost === null ? {} : { cost: figures.cost }),
+  ...(plan === null ? {} : { plan }),
+});
+
+const changedKeys = (prev: Projection, next: Projection): Phase =>
+  Object.fromEntries(Object.entries(next).filter(([key, value]) => JSON.stringify(prev[key]) !== JSON.stringify(value)));
+
+// Writes the worker's figures into the run's phase.json as its session/update notifications arrive.
+export function createProgressWriter(layout: RunPaths, ticket: string): (params: unknown) => void {
+  let figures: Figures = { title: ticketTitle(ticket), tools: 0, cost: null };
+  let plan: Plan | null = null;
+  let shown = projectionOf(figures, plan);
+  writePhase(layout, shown);
+  return (params) => {
+    const update = isRecord(params) ? params.update : undefined;
+    figures = foldFigures(figures, update);
+    plan = foldPlan(plan, update);
+    const next = projectionOf(figures, plan);
+    const patch = changedKeys(shown, next);
+    shown = next;
+    if (Object.keys(patch).length > 0) writePhase(layout, patch);
+  };
 }
