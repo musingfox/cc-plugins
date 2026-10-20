@@ -1,4 +1,4 @@
-import { writePhase, type Phase, type RunPaths } from "./layout";
+import { readPhase, writePhase, type Phase, type RunPaths } from "./layout";
 
 const TITLE_MAX = 200;
 
@@ -45,6 +45,15 @@ export function foldFigures(prev: Figures, update: unknown): Figures {
 
 type Projection = Phase;
 
+// An exited run keeps the phase.json termination wrote; a failed write (the run directory removed) is dropped.
+function persist(layout: RunPaths, patch: Phase): void {
+  try {
+    if (readPhase(layout)?.phase !== "exited") writePhase(layout, patch);
+  } catch {
+    // The worker keeps running without its band figures.
+  }
+}
+
 // The figures a phase.json carries; cost and plan appear once they have a value.
 const projectionOf = (figures: Figures, plan: Plan | null): Projection => ({
   title: figures.title,
@@ -61,7 +70,7 @@ export function createProgressWriter(layout: RunPaths, ticket: string): (params:
   let figures: Figures = { title: ticketTitle(ticket), tools: 0, cost: null };
   let plan: Plan | null = null;
   let shown = projectionOf(figures, plan);
-  writePhase(layout, shown);
+  persist(layout, shown);
   return (params) => {
     const update = isRecord(params) ? params.update : undefined;
     figures = foldFigures(figures, update);
@@ -69,6 +78,6 @@ export function createProgressWriter(layout: RunPaths, ticket: string): (params:
     const next = projectionOf(figures, plan);
     const patch = changedKeys(shown, next);
     shown = next;
-    if (Object.keys(patch).length > 0) writePhase(layout, patch);
+    if (Object.keys(patch).length > 0) persist(layout, patch);
   };
 }
