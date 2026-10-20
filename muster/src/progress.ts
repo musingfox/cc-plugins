@@ -21,3 +21,22 @@ export function foldPlan(prev: Plan | null, update: unknown): Plan | null {
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
+
+export type Figures = { title: string; tools: number; cost: number | null };
+
+// Each figure follows the worker's own updates; an update that moves none of them returns prev unchanged.
+export function foldFigures(prev: Figures, update: unknown): Figures {
+  if (!isRecord(update)) return prev;
+  switch (update.sessionUpdate) {
+    case "session_info_update":
+      return typeof update.title === "string" && update.title.trim() !== "" ? { ...prev, title: clip(update.title) } : prev;
+    case "tool_call":
+      return { ...prev, tools: prev.tools + 1 };
+    case "usage_update": {
+      const amount = isRecord(update.cost) ? update.cost.amount : undefined;
+      return typeof amount === "number" && Number.isFinite(amount) ? { ...prev, cost: amount } : prev;
+    }
+    default:
+      return prev;
+  }
+}
