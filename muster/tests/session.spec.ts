@@ -442,3 +442,32 @@ describe("recordFetch", () => {
     expect(readPhase(p)?.head).toBeUndefined();
   });
 });
+
+describe("SessionWiresProgress", () => {
+  test("T1: the run's phase file ends with the title, plan, tools and cost its session updates produced", async () => {
+    const layout = layoutFor();
+    const updates = [
+      { sessionUpdate: "plan", entries: [{ content: "a", priority: "high", status: "completed" }, { content: "b", priority: "low", status: "pending" }] },
+      { sessionUpdate: "tool_call", toolCallId: "t1" },
+      { sessionUpdate: "usage_update", size: 1, used: 1, cost: { amount: 0.5, currency: "USD" } },
+      { sessionUpdate: "session_info_update", title: "Real title" },
+    ];
+    await runWorker(request(), layout, { env: envFor(scenario({ updates })), exit: () => {} });
+    expect(readPhase(layout)).toMatchObject({ title: "Real title", plan: { done: 1, total: 2 }, tools: 1, cost: 0.5 });
+  });
+
+  test("T2: while the phase is starting the phase file already carries the ticket title and zero tools", async () => {
+    const layout = layoutFor();
+    const done = runWorker(request(), layout, { env: envFor(scenario({ initializeDelayMs: 200 })), exit: () => {} });
+    expect(await waitFor(() => readPhase(layout)?.title !== undefined)).toBe(true);
+    expect(readPhase(layout)).toMatchObject({ phase: "starting", title: "Write the hello file", tools: 0 });
+    await done;
+  });
+
+  test("T3: malformed update objects change no figure and the run still completes", async () => {
+    const layout = layoutFor();
+    await runWorker(request(), layout, { env: envFor(scenario({ updates: [null, 7, { sessionUpdate: "plan", entries: "x" }] })), exit: () => {} });
+    expect(readPhase(layout)?.stopReason).toBe("end_turn");
+    expect(readPhase(layout)).not.toHaveProperty("plan");
+  });
+});

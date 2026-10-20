@@ -6,6 +6,8 @@
 //   modelUsage                         [{model}] answered as _meta.quota.model_usage
 //   echoEnv                            writes its own environment to stderr at startup
 //   promptDelayMs                      delays the prompt answer
+//   updates                            session/update notifications sent before the prompt answer
+//   initializeDelayMs                  delays the initialize answer
 //   termination.exitOnMethod           exits with the given code on that method
 //   results["session/new"].configOptions  offered options; set_config_option echoes the value it was given
 
@@ -19,6 +21,8 @@ type Io = {
     modelUsage?: { model: string }[];
     echoEnv?: boolean;
     promptDelayMs?: number;
+    updates?: unknown[];
+    initializeDelayMs?: number;
     errors?: Record<string, string>;
     termination?: { exitOnMethod?: Record<string, number> };
     results?: Record<string, { configOptions?: { id: string }[] }>;
@@ -40,6 +44,9 @@ export function setup(io: Io): void {
 }
 
 function answerPrompt(io: Io, id: unknown): void {
+  for (const update of io.scenario.updates ?? []) {
+    io.out({ jsonrpc: "2.0", method: "session/update", params: { sessionId: "sess-1", update } });
+  }
   setTimeout(
     () =>
       io.out({
@@ -64,6 +71,11 @@ export function handle(msg: { id?: unknown; method?: string; params?: any; resul
     const offered = io.scenario.results?.["session/new"]?.configOptions ?? [];
     const configOptions = offered.map((o) => (configValues.has(o.id) ? { ...o, currentValue: configValues.get(o.id) } : o));
     io.out({ jsonrpc: "2.0", id: msg.id, result: { configOptions } });
+    return true;
+  }
+
+  if (msg.method === "initialize" && msg.id !== undefined && io.scenario.initializeDelayMs !== undefined) {
+    setTimeout(() => io.out({ jsonrpc: "2.0", id: msg.id, result: io.scenario.results?.initialize ?? {} }), io.scenario.initializeDelayMs);
     return true;
   }
 

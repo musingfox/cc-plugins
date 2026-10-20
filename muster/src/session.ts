@@ -7,6 +7,7 @@ import { buildAgentLaunch } from "./launch";
 import { gateEffort, gateModel } from "./model-gate";
 import { enforceDefaultMode } from "./mode-gate";
 import { buildPrompt } from "./prompt";
+import { createProgressWriter } from "./progress";
 import { createRunDir, readPhase, writeAtomic, writePhase, type Phase, type RunPaths } from "./layout";
 import { copyDeps } from "./deps";
 import { createTerminator, killGraceMs, type TerminatorState } from "./termination";
@@ -74,6 +75,7 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
   );
   const prompt = buildPrompt({ worktree: wt.worktree, reportPath: layout.report, ticket: request.ticket });
   setPhase(layout, "starting");
+  const observe = createProgressWriter(layout, request.ticket);
   try {
     const deps = (opts.copyDeps ?? copyDeps)({ repoRoot: request.repoRoot, baseSha: wt.baseSha, clone: wt.worktree });
     writePhase(layout, { deps });
@@ -139,6 +141,7 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
       env,
     }),
   );
+  channel.onNotification("session/update", observe);
 
   const failTurn = async (e: unknown) => {
     const grace = new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), killGraceMs(env)));

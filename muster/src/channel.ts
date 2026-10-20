@@ -21,11 +21,14 @@ export type Channel = {
   request(method: string, params?: unknown): Promise<unknown>;
   notify(method: string, params?: unknown): Promise<void>;
   onRequest(method: string, handler: Handler): void;
+  onNotification(method: string, handler: NotificationHandler): void;
   logDecision(msg: object): Promise<void>;
   close(): Promise<void>;
   pid: number;
   exited: Promise<number>;
 };
+
+type NotificationHandler = (params: unknown) => void | Promise<void>;
 
 type Pending = { resolve: (value: unknown) => void; reject: (err: Error) => void };
 
@@ -51,6 +54,7 @@ export async function openChannel(opts: OpenOptions): Promise<Channel> {
   let closed = false;
   let chain: Promise<void> = Promise.resolve();
   const handlers = new Map<string, Handler>();
+  const observers = new Map<string, NotificationHandler>();
 
   const rejectAll = (err: Error) => {
     for (const p of pending.values()) p.reject(err);
@@ -89,6 +93,17 @@ export async function openChannel(opts: OpenOptions): Promise<Channel> {
     await write("out", body).catch(() => {});
   };
 
+  // The observer sees the notification after it is recorded; a failing handler must not stop the read loop.
+  const observe = (method: string, params: unknown) => {
+    const handler = observers.get(method);
+    if (!handler) return;
+    try {
+      void Promise.resolve(handler(params)).catch(() => {});
+    } catch {
+      // Swallowed: the channel keeps reading.
+    }
+  };
+
   const handleLine = async (raw: string) => {
     let msg: Record<string, unknown>;
     try {
@@ -109,6 +124,8 @@ export async function openChannel(opts: OpenOptions): Promise<Channel> {
       } else {
         p.resolve(msg.result);
       }
+    } else if (msg.method !== undefined) {
+      observe(msg.method as string, msg.params);
     }
   };
 
@@ -141,6 +158,9 @@ export async function openChannel(opts: OpenOptions): Promise<Channel> {
     },
     onRequest(method, handler) {
       handlers.set(method, handler);
+    },
+    onNotification(method, handler) {
+      observers.set(method, handler);
     },
     logDecision(msg) {
       return record("client-decision", msg).catch(() => {});
