@@ -27,6 +27,7 @@ export function buildAgentLaunch(
     out[key] = value;
   }
   out.CLAUDE_CODE_DISABLE_ADVISOR_TOOL = "1";
+  out.CLAUDE_CODE_ENABLE_TODO_TOOLS = "1";
   out.npm_config_cache = join(cache, "npm");
   out.BUN_INSTALL_CACHE_DIR = join(cache, "bun");
   return { argv, env: out };
