@@ -37,7 +37,18 @@ async function drawBand($: any, e: any, beneath: unknown) {
 
 export function register(on: On) {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    // A survey takes the prompt area, and an unreadable board or a failed draw leaves what the layers beneath drew.
+    if (e.props?.hasSurvey) return next(e)
+    try {
+      if (!(await read($, board))) return next(e)
+    } catch {
+      return next(e)
+    }
     const beneath = await next(e)
-    return drawBand($, e, beneath)
+    try {
+      return await drawBand($, e, beneath)
+    } catch {
+      return beneath
+    }
   })
 }
