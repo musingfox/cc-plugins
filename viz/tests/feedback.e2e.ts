@@ -5,57 +5,30 @@
 // a double-click's second click and Space on a focused card only exist there.
 //
 // Env: VIZ_E2E_BROWSER — a Chromium binary (default: Brave on macOS).
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "fs";
-import { tmpdir } from "os";
+// The CDP plumbing lives in cdp-harness.ts.
+import { copyFileSync, readFileSync, statSync, writeFileSync } from "fs";
 import { join } from "path";
+import { VIZ, launchBrowser, makeChecks, makeWorkDir, renderBrief, sleep } from "./cdp-harness";
 
-const VIZ = join(import.meta.dir, "..");
-const BROWSER = process.env.VIZ_E2E_BROWSER ?? "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser";
 const CDP_PORT = 9333;
 
-const work = mkdtempSync(join(tmpdir(), "viz-e2e-"));
+const work = makeWorkDir("viz-e2e-");
 const PRISTINE = join(VIZ, "tests/fixtures/feedback/save.md");
 const BRIEF = join(work, "save.md");
 copyFileSync(PRISTINE, BRIEF);
+const URL = renderBrief(work, BRIEF, "save-e2e");
 
-// render.sh opens the page in the desktop browser; a no-op `open` keeps it headless.
-mkdirSync(join(work, "bin"));
-writeFileSync(join(work, "bin/open"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
-const render = Bun.spawnSync(["bash", join(VIZ, "lib/render.sh"), BRIEF, "save-e2e"], {
-  cwd: work, env: { ...process.env, PATH: `${work}/bin:${process.env.PATH}` },
-});
-const URL = render.stdout.toString().match(/^URL: (http:\S+)$/m)?.[1];
-if (!URL) throw new Error("render.sh gave no http URL:\n" + render.stdout + render.stderr);
-
-const browser = Bun.spawn([BROWSER, "--headless=new", "--disable-gpu", `--remote-debugging-port=${CDP_PORT}`,
-  "--window-size=1400,900", `--user-data-dir=${join(work, "profile")}`, "about:blank"], { stdout: "ignore", stderr: "ignore" });
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-let targets: any[] = [];
-for (let i = 0; i < 40 && !targets.length; i++) {
-  targets = await fetch(`http://127.0.0.1:${CDP_PORT}/json`).then((r) => r.json()).catch(() => []);
-  if (!targets.length) await sleep(250);
-}
-const ws = new WebSocket(targets.find((t: any) => t.type === "page").webSocketDebuggerUrl);
-await new Promise((r) => (ws.onopen = r));
-let id = 0, acceptDialog = true;
+let acceptDialog = true;
 const dialogs: string[] = [];
-const pending = new Map<number, (v: any) => void>();
-ws.onmessage = (e) => {
-  const m = JSON.parse(e.data as string);
-  if (m.id && pending.has(m.id)) { pending.get(m.id)!(m); pending.delete(m.id); }
-  if (m.method === "Page.javascriptDialogOpening") {
-    dialogs.push(m.params.message);
-    ws.send(JSON.stringify({ id: ++id, method: "Page.handleJavaScriptDialog", params: { accept: acceptDialog } }));
-  }
-};
-const cdp = (method: string, params: any = {}) =>
-  new Promise<any>((r) => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
-async function js(expr: string) {
-  const r = await cdp("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true });
-  if (r.result?.exceptionDetails) throw new Error(JSON.stringify(r.result.exceptionDetails));
-  return r.result?.result?.value;
-}
+const { cdp, js, close } = await launchBrowser({
+  port: CDP_PORT, work, windowSize: "1400,900",
+  onEvent(m, send) {
+    if (m.method === "Page.javascriptDialogOpening") {
+      dialogs.push(m.params.message);
+      send("Page.handleJavaScriptDialog", { accept: acceptDialog });
+    }
+  },
+});
 
 const CARD = (q: number, label: string) =>
   `[...document.querySelectorAll('.cv-decision')][${q - 1}].querySelector('.cv-card[data-label="${label}"]')`;
@@ -105,15 +78,7 @@ async function fresh() {
   await sleep(300);
 }
 
-const failures: string[] = [];
-function expectEq(name: string, what: string, got: unknown, want: unknown) {
-  if (JSON.stringify(got) !== JSON.stringify(want)) failures.push(`${name}: ${what} = ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
-}
-async function scenario(name: string, body: () => Promise<void>) {
-  await fresh();
-  try { await body(); } catch (e) { failures.push(`${name}: threw ${e}`); }
-  console.log(`${failures.some((f) => f.startsWith(name + ":")) ? "FAIL" : "ok  "} ${name}`);
-}
+const { expectEq, scenario, finish } = makeChecks(fresh);
 
 await cdp("Runtime.enable");
 await cdp("Page.enable");
@@ -190,11 +155,7 @@ try {
     expectEq("conflict stays on screen, clear of the banner", "disk", disk(), ["拉麵", "白開水", "布丁"]);
   });
 } finally {
-  ws.close();
-  browser.kill();
-  await browser.exited;
-  rmSync(work, { recursive: true, force: true });
+  await close(work);
 }
 
-if (failures.length) { console.error("\n" + failures.join("\n")); process.exit(1); }
-console.log("\nall scenarios passed");
+finish();

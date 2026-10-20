@@ -5,22 +5,18 @@
 // network requests a scenario deliberately fails through CDP Fetch.
 //
 // Env: VIZ_E2E_BROWSER — a Chromium binary (default: Brave on macOS).
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
-import { tmpdir } from "os";
+// The CDP plumbing lives in cdp-harness.ts.
+import { copyFileSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
+import { VIZ, launchBrowser, makeChecks, makeWorkDir, renderBrief, sleep } from "./cdp-harness";
 
-const VIZ = join(import.meta.dir, "..");
-const BROWSER = process.env.VIZ_E2E_BROWSER ?? "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser";
 const CDP_PORT = 9334;
 const FIXTURES = join(VIZ, "tests/fixtures/diagrams");
 const DIAGRAM_TYPES = join(VIZ, "skills/viz-render/references/diagram-types.md");
 const EDGE_CASES = join(FIXTURES, "edge-cases.md");
 const FEEDBACK = join(FIXTURES, "feedback.md");
 
-const work = mkdtempSync(join(tmpdir(), "viz-diagrams-e2e-"));
-mkdirSync(join(work, "bin"));
-// render.sh opens the page in the desktop browser; a no-op `open` keeps it headless.
-writeFileSync(join(work, "bin/open"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+const work = makeWorkDir("viz-diagrams-e2e-");
 
 let renderCount = 0;
 // Renders a markdown file (optionally with extra text appended) and returns its http URL.
@@ -29,46 +25,23 @@ function render(src: string, extra = ""): string {
   const brief = join(work, name + ".md");
   if (extra) writeFileSync(brief, readFileSync(src, "utf8") + extra);
   else copyFileSync(src, brief);
-  const r = Bun.spawnSync(["bash", join(VIZ, "lib/render.sh"), brief, name], {
-    cwd: work, env: { ...process.env, PATH: `${work}/bin:${process.env.PATH}` },
-  });
-  const url = r.stdout.toString().match(/^URL: (http:\S+)$/m)?.[1];
-  if (!url) throw new Error("render.sh gave no http URL:\n" + r.stdout + r.stderr);
-  return url;
+  return renderBrief(work, brief, name);
 }
 const countFences = (path: string) => (readFileSync(path, "utf8").match(/^```mermaid\s*$/gm) ?? []).length;
 
-const browser = Bun.spawn([BROWSER, "--headless=new", "--disable-gpu", "--force-color-profile=srgb", `--remote-debugging-port=${CDP_PORT}`,
-  "--window-size=1100,900", `--user-data-dir=${join(work, "profile")}`, "about:blank"], { stdout: "ignore", stderr: "ignore" });
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-let targets: any[] = [];
-for (let i = 0; i < 40 && !targets.length; i++) {
-  targets = await fetch(`http://127.0.0.1:${CDP_PORT}/json`).then((r) => r.json()).catch(() => []);
-  if (!targets.length) await sleep(250);
-}
-const ws = new WebSocket(targets.find((t: any) => t.type === "page").webSocketDebuggerUrl);
-await new Promise((r) => (ws.onopen = r));
-let id = 0;
 // Requests whose URL matches this pattern fail (BlockedByClient); all others continue.
 let blockedUrl: RegExp | null = null;
-const pending = new Map<number, (v: any) => void>();
-ws.onmessage = (e) => {
-  const m = JSON.parse(e.data as string);
-  if (m.id && pending.has(m.id)) { pending.get(m.id)!(m); pending.delete(m.id); }
-  if (m.method === "Fetch.requestPaused") {
-    const fail = blockedUrl?.test(m.params.request.url);
-    ws.send(JSON.stringify({ id: ++id, method: fail ? "Fetch.failRequest" : "Fetch.continueRequest",
-      params: fail ? { requestId: m.params.requestId, errorReason: "BlockedByClient" } : { requestId: m.params.requestId } }));
-  }
-};
-const cdp = (method: string, params: any = {}) =>
-  new Promise<any>((r) => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
-async function js(expr: string) {
-  const r = await cdp("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true });
-  if (r.result?.exceptionDetails) throw new Error(JSON.stringify(r.result.exceptionDetails));
-  return r.result?.result?.value;
-}
+const { cdp, js, close } = await launchBrowser({
+  port: CDP_PORT, work, windowSize: "1100,900", extraArgs: ["--force-color-profile=srgb"],
+  onEvent(m, send) {
+    if (m.method === "Fetch.requestPaused") {
+      const fail = blockedUrl?.test(m.params.request.url);
+      send(fail ? "Fetch.failRequest" : "Fetch.continueRequest",
+        fail ? { requestId: m.params.requestId, errorReason: "BlockedByClient" } : { requestId: m.params.requestId });
+    }
+  },
+});
+
 // Polls a page expression on the real clock, up to 30 s.
 async function waitFor(expr: string) {
   for (let i = 0; i < 300; i++) {
@@ -92,14 +65,7 @@ async function open(url: string, blockPattern: RegExp | null = null) {
   await waitFor(`document.readyState === 'complete'`);
 }
 
-const failures: string[] = [];
-function expectEq(name: string, what: string, got: unknown, want: unknown) {
-  if (JSON.stringify(got) !== JSON.stringify(want)) failures.push(`${name}: ${what} = ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
-}
-async function scenario(name: string, body: () => Promise<void>) {
-  try { await body(); } catch (e) { failures.push(`${name}: threw ${e}`); }
-  console.log(`${failures.some((f) => f.startsWith(name + ":")) ? "FAIL" : "ok  "} ${name}`);
-}
+const { expectEq, scenario, finish } = makeChecks();
 
 await cdp("Runtime.enable");
 await cdp("Page.enable");
@@ -463,11 +429,7 @@ try {
     expectEq("StandaloneDiagramTab T4", "svg within 95vw", await js(`window.__frame.contentDocument.querySelector('svg').getBoundingClientRect().width <= 0.95 * window.__frame.contentWindow.innerWidth + 1`), true);
   });
 } finally {
-  ws.close();
-  browser.kill();
-  await browser.exited;
-  rmSync(work, { recursive: true, force: true });
+  await close(work);
 }
 
-if (failures.length) { console.error("\n" + failures.join("\n")); process.exit(1); }
-console.log("\nall scenarios passed");
+finish();

@@ -207,10 +207,9 @@ describe('PageLiteralsFollowTokens', () => {
         expect(literal).toBe(rootTokens(PAGES['template.html'])['--bg']);
     });
 
-    test('T2: the feedback diagram shell equals its --surface-warm', () => {
-        const literal = PAGES['recipes/feedback.html'].match(/--viz-diagram-bg:\s*(#[0-9a-fA-F]{6})/)[1].toLowerCase();
-        expect(literal).toBe(DESIGN_TOKENS['--surface-warm']);
-        expect(literal).toBe(rootTokens(PAGES['recipes/feedback.html'])['--surface-warm']);
+    test('T2: the feedback diagram shell takes its --surface-warm, which equals the design token', () => {
+        expect(PAGES['recipes/feedback.html']).toMatch(/--viz-diagram-bg:\s*var\(--surface-warm\);/);
+        expect(rootTokens(PAGES['recipes/feedback.html'])['--surface-warm']).toBe(DESIGN_TOKENS['--surface-warm']);
     });
 
     test('T3: the inline error color on feedback and pr-review equals --danger on each page', () => {

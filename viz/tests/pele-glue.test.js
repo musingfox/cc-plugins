@@ -229,50 +229,27 @@ describe('LogosIconResolver', () => {
 describe('LogosFetchFailureTolerated', () => {
     const LOGOS_SRC = 'graph TD\nA-->B logos:aws-lambda';
 
-    test('T1: a rejected fetch draws the logos node with empty icons and one warning', async () => {
-        const warn = spyOn(console, 'warn').mockImplementation(() => {});
-        try {
-            const node = fakeNode(LOGOS_SRC);
-            const pele = fakePele();
-            await renderDiagrams([node], { pele, fetchJson: () => Promise.reject(new Error('net')), fontFamily: 'f' });
-            expect(node.innerHTML).toBe(SVG);
-            expect(node.classList.contains('pele-error')).toBe(false);
-            expect(pele.calls[0][1].icons('logos:aws-lambda')).toBeNull();
-            expect(warn).toHaveBeenCalledTimes(1);
-        } finally {
-            warn.mockRestore();
-        }
-    });
-
-    test('T2: a fetch resolving null behaves like T1', async () => {
-        const warn = spyOn(console, 'warn').mockImplementation(() => {});
-        try {
-            const node = fakeNode(LOGOS_SRC);
-            const pele = fakePele();
-            await renderDiagrams([node], { pele, fetchJson: async () => null, fontFamily: 'f' });
-            expect(node.innerHTML).toBe(SVG);
-            expect(node.classList.contains('pele-error')).toBe(false);
-            expect(pele.calls[0][1].icons('logos:aws-lambda')).toBeNull();
-            expect(warn).toHaveBeenCalledTimes(1);
-        } finally {
-            warn.mockRestore();
-        }
-    });
-
-    test('T3: a fetch resolving {icons:null} behaves like T1', async () => {
-        const warn = spyOn(console, 'warn').mockImplementation(() => {});
-        try {
-            const node = fakeNode(LOGOS_SRC);
-            const pele = fakePele();
-            await renderDiagrams([node], { pele, fetchJson: async () => ({ icons: null }), fontFamily: 'f' });
-            expect(node.innerHTML).toBe(SVG);
-            expect(node.classList.contains('pele-error')).toBe(false);
-            expect(pele.calls[0][1].icons('logos:aws-lambda')).toBeNull();
-            expect(warn).toHaveBeenCalledTimes(1);
-        } finally {
-            warn.mockRestore();
-        }
-    });
+    const CASES = [
+        ['T1: a rejected fetch', () => Promise.reject(new Error('net'))],
+        ['T2: a fetch resolving null', async () => null],
+        ['T3: a fetch resolving {icons:null}', async () => ({ icons: null })],
+    ];
+    for (const [title, fetchJson] of CASES) {
+        test(`${title} draws the logos node with empty icons and one warning`, async () => {
+            const warn = spyOn(console, 'warn').mockImplementation(() => {});
+            try {
+                const node = fakeNode(LOGOS_SRC);
+                const pele = fakePele();
+                await renderDiagrams([node], { pele, fetchJson, fontFamily: 'f' });
+                expect(node.innerHTML).toBe(SVG);
+                expect(node.classList.contains('pele-error')).toBe(false);
+                expect(pele.calls[0][1].icons('logos:aws-lambda')).toBeNull();
+                expect(warn).toHaveBeenCalledTimes(1);
+            } finally {
+                warn.mockRestore();
+            }
+        });
+    }
 });
 
 describe('LogosPrefetchGate', () => {
