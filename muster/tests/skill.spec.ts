@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_ALLOWED_HOSTS } from "../src/sandbox.ts";
+import { WORKER_TOOLS } from "../src/handshake.ts";
 
 const MUSTER_ROOT = join(import.meta.dir, "..");
 const SKILL = readFileSync(join(MUSTER_ROOT, "skills", "muster", "SKILL.md"), "utf8");
@@ -141,5 +142,33 @@ describe("CoordinatorSkill", () => {
     for (const f of fences(text)) {
       if (/<<\s*['"]?\w+/.test(f.content)) expect(f.content).not.toContain(PLACEHOLDER);
     }
+  });
+});
+
+describe("DocsDescribeBand", () => {
+  const README = readFileSync(join(MUSTER_ROOT, "..", "README.md"), "utf8");
+  const PLUGIN = JSON.parse(readFileSync(join(MUSTER_ROOT, ".claude-plugin", "plugin.json"), "utf8")) as { description: string };
+  const MARKET = JSON.parse(readFileSync(join(MUSTER_ROOT, "..", ".claude-plugin", "marketplace.json"), "utf8")) as {
+    plugins: { name: string; description: string }[];
+  };
+
+  test("T1: the Wait section names the band, its contents and the Claude Code version", () => {
+    const wait = /## Wait\n([\s\S]*?)(?=\n## Answer)/.exec(SKILL)?.[1] ?? "";
+    expect(wait).toContain("band");
+    expect(wait).toContain("Claude Code 2.1.304");
+    expect(wait).toContain("to collect");
+  });
+
+  test("T2: the confinement sentence names every worker tool and nothing else", () => {
+    const names = /The worker's tools are a fixed list \(([^)]*)\)/.exec(body(SKILL))?.[1].split(", ") ?? [];
+    expect([...names].sort()).toEqual([...WORKER_TOOLS].sort());
+  });
+
+  test("T3: the root README and both manifests carry the same Claude Code version note", () => {
+    const section = /### muster \(Experimental\)\n([\s\S]*?)(?=\n### |\n## |$)/.exec(README)?.[1] ?? "";
+    expect(section).toContain("2.1.304");
+    const market = MARKET.plugins.find((p) => p.name === "muster")?.description ?? "";
+    expect(PLUGIN.description).toBe(market);
+    expect(market).toContain("2.1.304");
   });
 });
