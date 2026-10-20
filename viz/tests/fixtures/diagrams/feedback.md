@@ -1,25 +1,25 @@
 ---
 viz: feedback
-title: 回饋頁裡的圖：正確的流程圖與壞掉的語法
-panel: 你的決定
-prompt: tests/diagrams.e2e.ts 用這份 brief 檢查回饋頁的 mermaid 圖。
-d1.title: 午餐吃什麼？
-d1.options: 便當 | 拉麵 | 沙拉
-d1.recommend: 便當
+title: Diagrams in the feedback page - a valid flowchart and broken syntax
+panel: Your decision
+prompt: tests/diagrams.e2e.ts uses this brief to check the feedback page's mermaid diagrams.
+d1.title: What for lunch?
+d1.options: Bento | Ramen | Salad
+d1.recommend: Bento
 d1.choice:
 d1.notes:
 notes:
 ---
 
-## 午餐吃什麼？
+## What for lunch?
 
-| 選項 | 好處 | 代價 | 改回成本 |
+| Option | Upside | Cost | Cost to reverse |
 |---|---|---|---|
-| 便當 | 便宜；快 | 油 | 低 |
-| 拉麵 | 好吃；熱 | 要排隊；鹹 | 中 |
-| 沙拉 | 清爽 | 吃不飽 | 低 |
+| Bento | Cheap; fast | Greasy | Low |
+| Ramen | Tasty; hot | Queue; salty | Medium |
+| Salad | Refreshing | Not filling | Low |
 
-## 流程
+## Flow
 
 ```mermaid
 graph TD
@@ -27,7 +27,7 @@ graph TD
     Decide -->|yes| Eat[Eat]
 ```
 
-## 壞掉的圖
+## Broken diagram
 
 ```mermaid
 graph TD
