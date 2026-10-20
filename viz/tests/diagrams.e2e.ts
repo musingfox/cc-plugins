@@ -15,6 +15,7 @@ const FIXTURES = join(VIZ, "tests/fixtures/diagrams");
 const DIAGRAM_TYPES = join(VIZ, "skills/viz-render/references/diagram-types.md");
 const EDGE_CASES = join(FIXTURES, "edge-cases.md");
 const FEEDBACK = join(FIXTURES, "feedback.md");
+const CODE = join(VIZ, "tests/fixtures/code/highlight.md");
 
 const work = makeWorkDir("viz-diagrams-e2e-");
 
@@ -427,6 +428,60 @@ try {
     await waitFor(ALL_DRAWN);
     await tabFrame(await openTab());
     expectEq("StandaloneDiagramTab T4", "svg within 95vw", await js(`window.__frame.contentDocument.querySelector('svg').getBoundingClientRect().width <= 0.95 * window.__frame.contentWindow.innerWidth + 1`), true);
+  });
+
+  // CodeBlocksUseMusingfoxPalette: the viewer shares this harness; code tokens take the page's hues.
+  const codeUrl = render(CODE);
+  const HIGHLIGHTED = `document.querySelectorAll('#content pre code.hljs').length > 0`;
+  const tokenColor = (sel: string) => js(`getComputedStyle(document.querySelector('${sel}')).color`);
+  await scenario("CodeBlocksUseMusingfoxPalette T1", async () => {
+    await open(codeUrl);
+    await waitFor(HIGHLIGHTED);
+    const T = "CodeBlocksUseMusingfoxPalette T1";
+    expectEq(T, "js keyword", await tokenColor("code.language-js .hljs-keyword"), "rgb(218, 112, 44)");
+    expectEq(T, "js string", await tokenColor("code.language-js .hljs-string"), "rgb(15, 206, 221)");
+    expectEq(T, "js number", await tokenColor("code.language-js .hljs-number"), "rgb(228, 184, 8)");
+    expectEq(T, "js function title", await tokenColor("code.language-js .hljs-title"), "rgb(180, 145, 255)");
+    expectEq(T, "js comment", await tokenColor("code.language-js .hljs-comment"), "rgb(135, 133, 128)");
+    expectEq(T, "comment style", await js(`getComputedStyle(document.querySelector('code.language-js .hljs-comment')).fontStyle`), "italic");
+    expectEq(T, "json key", await tokenColor("code.language-json .hljs-attr"), "rgb(9, 142, 202)");
+    expectEq(T, "plain code text", await tokenColor("code.language-js"), "rgb(206, 205, 195)");
+  });
+  await scenario("CodeBlocksUseMusingfoxPalette T2", async () => {
+    await open(codeUrl);
+    await waitFor(HIGHLIGHTED);
+    const T = "CodeBlocksUseMusingfoxPalette T2";
+    const loaded = await js(`performance.getEntriesByType('resource').map((e) => e.name).filter((u) => /highlight/.test(u))`);
+    expectEq(T, "highlight resources", loaded, ["https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.12.0/highlight.min.js"]);
+    expectEq(T, "stylesheet links", await js(`document.querySelectorAll('link[rel="stylesheet"][href*="highlight"]').length`), 0);
+    expectEq(T, "hljs version", await js(`hljs.versionString`), "11.12.0");
+    expectEq(T, "mermaid fences highlighted", await js(`document.querySelectorAll('.mermaid-shell .hljs, .mermaid .hljs').length`), 0);
+    expectEq(T, "mermaid fence drawn", await waitFor(`document.querySelector('.mermaid svg.pele')`), true);
+  });
+  await scenario("CodeBlocksUseMusingfoxPalette T3", async () => {
+    await open(codeUrl);
+    await waitFor(HIGHLIGHTED);
+    const T = "CodeBlocksUseMusingfoxPalette T3";
+    expectEq(T, "img elements in code", await js(`document.querySelectorAll('#content pre img').length`), 0);
+    expectEq(T, "markup kept as text", await js(`document.querySelector('code.language-html').textContent.includes('<img src=x')`), true);
+    expectEq(T, "window.__xss", await js(`typeof window.__xss`), "undefined");
+  });
+  await scenario("CodeBlocksUseMusingfoxPalette T4", async () => {
+    await open(codeUrl, /highlight\.min\.js/);
+    await sleep(1000);
+    const T = "CodeBlocksUseMusingfoxPalette T4";
+    expectEq(T, "highlighted blocks", await js(`document.querySelectorAll('code.hljs').length`), 0);
+    expectEq(T, "js code text", await js(`document.querySelector('code.language-js').textContent.includes('const greeting')`), true);
+    expectEq(T, "Error: prefix", await js(`document.body.innerText.startsWith('Error:')`), false);
+    await cdp("Fetch.disable");
+  });
+  await scenario("CodeBlocksUseMusingfoxPalette T5", async () => {
+    await open(codeUrl);
+    await waitFor(HIGHLIGHTED);
+    await media("print");
+    await sleep(300);
+    expectEq("CodeBlocksUseMusingfoxPalette T5", "printed keyword", await tokenColor("code.language-js .hljs-keyword"), "rgb(17, 17, 17)");
+    await media("");
   });
 } finally {
   await close(work);
