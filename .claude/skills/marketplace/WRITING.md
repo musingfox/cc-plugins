@@ -86,10 +86,6 @@ cases hold. The eval sandbox loads only the plugin under test, so a plugin with 
 `dependencies` list does not load at all and its numbers mean nothing: run it on a copy
 outside the repo with `dependencies` removed.
 
-Every skill in this repo is currently model-invoked. Treat that as an unexamined
-default, not a settled decision: `/obw:init` and this skill are the sort you always
-type by hand.
-
 Reference two user-invoked skills both need can live in neither — with no descriptions,
 neither can fire the other. Put it in a plain file both can point at, the way this file
 sits beside `SKILL.md`.
