@@ -40,4 +40,4 @@ assert_contains "$omp_row" 'overflow' "the OMP registry row is the overflow"
 
 # T7
 assert_contains "$(cat "$CFMD")" '[implement — Claude default, OMP overflow]' "pipeline overview names both builders"
-assert_contains "$(grep -m1 '^State to the human upfront' "$CFMD")" 'cf:implement' "Phase 3 opening names the builder"
+assert_contains "$(grep -m1 '^State to the human upfront' "$CF_TESTS_DIR/../docs/phase-3-implement.md")" 'cf:implement' "Phase 3 opening names the builder"

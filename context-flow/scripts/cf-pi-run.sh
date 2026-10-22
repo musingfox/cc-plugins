@@ -3,7 +3,7 @@
 # the plain form dispatches OMP; --prepare-only / --gates-only bracket a Claude
 # builder (cf:implement) that main dispatches between the two calls.
 # On OMP, main launches one background Bash per wave that starts this script once
-# per shard, with stdout and stderr in the shard's run.out (cf.md §3.6), and reads
+# per shard, with stdout and stderr in the shard's run.out (phase-3-implement.md §3.6), and reads
 # only OUTCOME_FILE -- it never sees brief/report/JSONL/test logs directly.
 #
 # Usage:   cf-pi-run.sh [--prepare-only|--gates-only] SHARD_SESSION GOAL_ONELINE CONSTRAINTS TEST_RUNNER
@@ -91,7 +91,7 @@ load_cf_flow_env "$FLOW_SESSION"
 START_TS=$(date +%s)
 
 # -------- 0. clear this round's artifacts -------------------------------
-# A re-launched shard (cf.md §3.5) reuses its session directory, and nothing
+# A re-launched shard (phase-3-implement.md §3.5) reuses its session directory, and nothing
 # else truncates these. Left behind, last round's copies are read as this
 # round's: a stale outcome.md makes main read the shard as finished (with the
 # stale status) before it started, escalate.md short-circuits step 6 into
@@ -393,7 +393,7 @@ trap on_exit EXIT
 
 # `bash -c` on a blank string exits 0, so gate 3 would pass and the revert gate
 # would name every contract. the integration gate refuses a blank runner too; this sits
-# after step 0 and the trap so this round's outcome.md exists for cf.md §3.2 step 2.
+# after step 0 and the trap so this round's outcome.md exists for phase-3-implement.md §3.2 step 2.
 case "$TEST_RUNNER" in
   *[![:space:]]*) ;;
   *)
@@ -656,7 +656,7 @@ compute_survivors() {
 # Called after EVERY dispatch: a worker can escalate on a re-brief too, and an
 # escalation reported as FAIL would be re-launched as an infra failure -- which
 # deletes the blocker text at step 0 instead of routing it to Plan. Pass the
-# survivors known at the call site: cf.md feeds them to Plan as "preserve these
+# survivors known at the call site: phase-3-implement.md feeds them to Plan as "preserve these
 # interfaces", so dropping them makes Plan re-plan contracts already committed
 # on the shard branch. Only the gate-3 site passes them -- there the survivor set
 # was established by an earlier, gate-1-valid report. Before gate 1 the only

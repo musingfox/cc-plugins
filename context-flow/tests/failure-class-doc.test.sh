@@ -8,7 +8,7 @@
 CFMD="$CF_TESTS_DIR/../commands/cf.md"
 
 # T1
-assert_eq "0" "$(grep -c 'Failure Class' "$CFMD" || true)" "cf.md has no Failure Class"
+assert_eq "0" "$(cat "$CFMD" "$CF_TESTS_DIR/../docs/phase-3-implement.md" | grep -c 'Failure Class' || true)" "cf.md and phase-3-implement.md have no Failure Class"
 
 # T2
 overview=$(awk '/^## Pipeline Overview/ {p=1; next} p && /^## / {exit} p' "$CFMD" | awk '/^```/ {n++; next} n == 1')

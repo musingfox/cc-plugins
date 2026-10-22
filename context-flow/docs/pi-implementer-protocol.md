@@ -191,7 +191,7 @@ Diagnose from the session JSONL first, stderr second; `cf-pi-postmortem.sh` for 
 | No JSONL within 60s | worker failed to start | check stderr; retry once |
 | JSONL stale > threshold | stall (network / lockup) | kill; read last events; route per gates |
 | Exits < 5s, no report | brief failed to load (`@file` path wrong) | check stderr; re-dispatch corrected |
-| Report exists, no `## Completed` | worker gave up mid-run | may be all-Unresolved; route by status per cf.md §3.4 (partial replan) |
+| Report exists, no `## Completed` | worker gave up mid-run | may be all-Unresolved; route by status per phase-3-implement.md §3.4 (partial replan) |
 | Tests pass for worker, fail for orchestrator | environment drift | re-run with env captured in brief; persistent → escalate |
 
 ---
@@ -199,4 +199,4 @@ Diagnose from the session JSONL first, stderr second; `cf-pi-postmortem.sh` for 
 ## 8. Out of Scope
 
 - External-API verification (ctx7) inside the worker — contracts needing it go to a `cf:implement` builder or get pre-resolved in planning; the worker reports Unresolved on unknown library behavior.
-- Cross-shard awareness — each worker sees only its own brief; parallel coordination is entirely the orchestrator's (cf-pi-shard.sh + cf.md Phase 3).
+- Cross-shard awareness — each worker sees only its own brief; parallel coordination is entirely the orchestrator's (cf-pi-shard.sh + phase-3-implement.md).

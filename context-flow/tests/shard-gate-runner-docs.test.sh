@@ -23,7 +23,7 @@ assert_contains "$header" 'cf-pi-revert-gate.sh SHARD_SESSION TEST_CMD [ARGS...]
 
 # D5, D6: a blank runner is refused the same way on every re-launch, so §3.4
 # hands it to the human instead of spending the one re-launch on it.
-any_fail="$(awk '/^#### Any FAIL/ { on = 1; next } on && /^####/ { exit } on' "$CF_TESTS_DIR/../commands/cf.md")"
+any_fail="$(awk '/^#### Any FAIL/ { on = 1; next } on && /^####/ { exit } on' "$CF_TESTS_DIR/../docs/phase-3-implement.md")"
 assert_contains "$(printf '%s\n' "$any_fail" | grep -m1 'exempt from the re-launch')" '`test-runner-missing`' \
   "D5 the exemption sentence lists test-runner-missing"
 assert_contains "$(printf '%s\n' "$any_fail" | grep -m1 '^\*\*`test-runner-missing`')" "Cause" \

@@ -3,7 +3,7 @@
 Status: implemented (Phase 3 of `/cf`)
 Scope: fan out `cf:implement` agents (default) and opt-in OMP workers in parallel; main reads paths-only outcomes and routes structured escalations without bouncing through the user.
 
-Operational detail lives in `commands/cf.md` (orchestration) and `docs/pi-implementer-protocol.md` (worker contract). This document records the architecture and the decisions behind it.
+Operational detail lives in `commands/cf.md` (orchestration entry), `docs/phase-3-implement.md` (the Phase 3 steps) and `docs/pi-implementer-protocol.md` (worker contract). This document records the architecture and the decisions behind it.
 
 ## 1. Architecture
 
@@ -87,7 +87,7 @@ Never enters main: `contracts.json` bodies, worker reports, JSONL event streams,
 
 Every read main performs on a flow artifact is bounded: `Read(file, limit=N)`, `jq '.field'`, `head/tail -N`, `sed -n '/^## X/,/^## Y/p'`. Unbounded `cat`/`Read` on any artifact > 1KB is forbidden.
 
-Anti-growth: `dispatch-state.json` holds only the latest round (~1KB); history is appended to `dispatch-state-archive.jsonl`, never read by main during a flow. Gate-3 retest, the gate-1 report-only re-brief, and in-shard resume re-briefs all happen inside `cf-pi-run.sh` on OMP rounds, so main re-launches there for an infrastructure FAIL, and after review for a Spec FAIL, whose repros `cf-pi-add-repros.sh` first adds to the failing contracts' test cases (cf.md §Handling the Verdict). On Claude rounds `--gates-only` instead prints one `REBRIEF tests|report <path>` per kind per round and main dispatches one fresh `cf:implement` for it (cf.md §3.2 step 5). An infrastructure re-launch is self-cleaning: `cf-pi-run.sh` clears the previous round's outcome/report/escalate/diff before dispatching, so the retry cannot be read through last round's artifacts.
+Anti-growth: `dispatch-state.json` holds only the latest round (~1KB); history is appended to `dispatch-state-archive.jsonl`, never read by main during a flow. Gate-3 retest, the gate-1 report-only re-brief, and in-shard resume re-briefs all happen inside `cf-pi-run.sh` on OMP rounds, so main re-launches there for an infrastructure FAIL, and after review for a Spec FAIL, whose repros `cf-pi-add-repros.sh` first adds to the failing contracts' test cases (cf.md §Handling the Verdict). On Claude rounds `--gates-only` instead prints one `REBRIEF tests|report <path>` per kind per round and main dispatches one fresh `cf:implement` for it (phase-3-implement.md §3.2 step 5). An infrastructure re-launch is self-cleaning: `cf-pi-run.sh` clears the previous round's outcome/report/escalate/diff before dispatching, so the retry cannot be read through last round's artifacts.
 
 ## 8. Observability
 

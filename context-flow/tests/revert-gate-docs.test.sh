@@ -7,7 +7,7 @@
 . "$CF_TESTS_DIR/lib/assert.sh"
 
 CF_ROOT="$(cd "$CF_TESTS_DIR/.." && pwd)"
-CFMD="$CF_ROOT/commands/cf.md"
+CFMD="$CF_ROOT/docs/phase-3-implement.md"
 DESIGN="$CF_ROOT/docs/parallel-sharded-design.md"
 PROTOCOL="$CF_ROOT/docs/pi-implementer-protocol.md"
 README="$CF_ROOT/README.md"

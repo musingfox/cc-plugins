@@ -6,7 +6,7 @@
 : "${CF_TESTS_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 . "$CF_TESTS_DIR/lib/assert.sh"
 
-CFMD="$CF_TESTS_DIR/../commands/cf.md"
+CFMD="$CF_TESTS_DIR/../docs/phase-3-implement.md"
 
 any_fail=$(awk '/^#### Any FAIL/ {p=1; next} p && /^####/ {exit} p' "$CFMD")
 replan=$(awk '/^#### Any NEEDS_REPLAN/ {p=1; next} p && /^(####|###) / {exit} p' "$CFMD")
