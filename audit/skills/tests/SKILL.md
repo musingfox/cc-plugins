@@ -62,9 +62,10 @@ Done when every tracer has returned.
 
 Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/assemble.sh" <scratch>/inventory.tsv <scratch>/reports`
 into `<scratch>/tests-audit.md`. A tracer that failed shows as `not traced`, and
-a missing report is never read as a clean milestone.
+a missing report is never read as a clean milestone. When it exits non-zero, print its
+stderr and stop: the redirect has left an empty or partial list behind.
 
-Done when `<scratch>/tests-audit.md` exists.
+Done when the script exited 0 and `<scratch>/tests-audit.md` exists.
 
 ## 6. Report
 
