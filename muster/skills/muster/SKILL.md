@@ -48,7 +48,7 @@ It exits on `question`, `idle`, `done`, `blocked`, `malformed`, or `dead`. To re
 bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts status NAME
 ```
 
-The status line carries `deps=<copied>/<total>` when the run records its dependency directories: how many of the directories holding a lockfile were copied into the worker's clone, out of how many hold one. `deps=0/0` means none holds a lockfile.
+The status line carries `deps=<copied>/<total>` when the run records its dependency directories: how many of the directories holding a lockfile were copied into the worker's worktree, out of how many hold one. `deps=0/0` means none holds a lockfile.
 
 ## Answer
 
@@ -93,7 +93,7 @@ bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts stop NAME
 
 ## Cleanup
 
-After the run has exited, remove its run directory; this deletes the clone, the event log and the report. Branch `muster/NAME` stays in the repository, so `git log <baseSha>..<head sha>` still works; note `baseSha` and the head sha before removing, since `meta.json` goes with the directory. Read the report first. If `phase.json` in the run directory has a `fetchError`, the branch could not be fetched back and the commits exist only in the clone at `<RUNDIR>/worktree`; fetch them by hand before removing it.
+After the run has exited, remove its run directory; this deletes the worktree, the event log and the report. Branch `muster/NAME` stays in the repository, so `git log <baseSha>..<head sha>` still works; note `baseSha` and the head sha before removing, since `meta.json` goes with the directory. Read the report first. If `phase.json` in the run directory has a `fetchError`, the branch could not be fetched back and the commits exist only in the worktree at `<RUNDIR>/worktree`; fetch them by hand before removing it.
 
 ```
 rm -rf "<RUNDIR>"
