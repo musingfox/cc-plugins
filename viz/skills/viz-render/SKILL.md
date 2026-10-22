@@ -85,7 +85,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/lib/render.sh" "/tmp/viz-diagram-{name}.md" "diagram
 When the user requests a diagram without providing the code:
 
 1. Pick a diagram type (see `references/diagram-types.md` for syntax)
-2. Keep it focused: 5–15 nodes, descriptive labels <30 chars, no-space IDs
+2. Keep it focused: descriptive labels <30 chars, no-space IDs
 3. If requirements are too broad, suggest splitting into multiple diagrams
 4. After rendering, ask the user to confirm the diagram drew: Pele runs in
    the browser, and a syntax error shows as red text in place of the diagram,

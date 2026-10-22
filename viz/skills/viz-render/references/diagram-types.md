@@ -156,7 +156,6 @@ pie title Distribution
 
 **DO**:
 - Use descriptive node labels (e.g., "User Authentication" not "Auth")
-- Keep diagrams focused: 5-15 nodes optimal
 - Use quotes for labels with spaces: `A["User Input"]`
 - Use subgraphs to organize complex flowcharts
 - Include meaningful arrow labels for decision branches
