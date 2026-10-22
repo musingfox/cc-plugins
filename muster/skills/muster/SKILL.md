@@ -83,6 +83,8 @@ The status line of a `done` run carries `head=<sha>`, the commit the branch poin
 
 If the state is `blocked` or `malformed`, read `REPORT.md` the same way before deciding what to do.
 
+If the state is `dead`, the `muster run` process is gone without finishing the run, or `phase.json` could not be read (`reason=phase-unreadable`). Read `REPORT.md` if it exists. The branch holds at most what the last idle fetched back; later commits exist only in `<RUNDIR>/worktree`, so fetch them by hand before Cleanup.
+
 ## Stop
 
 Stop asks the worker to end; it does not end it at once. Run `watch` until it reports a terminal state.
