@@ -1,5 +1,14 @@
 # Writing for agents
 
+**Contents**
+
+- [Context pointers](#context-pointers)
+- [The two loads](#the-two-loads)
+- [Information hierarchy](#information-hierarchy)
+- [Steps and completion criteria](#steps-and-completion-criteria)
+- [Words](#words)
+- [Pruning](#pruning)
+
 The judgment layer for any document an agent consumes: a skill, `CLAUDE.md`, a file
 reached by a pointer. It answers three questions the mechanics cannot: does this
 material earn its place, where on the hierarchy does it sit, and which words make it
