@@ -11,11 +11,12 @@
 . "$CF_TESTS_DIR/lib/assert.sh"
 
 CF_MD="$CF_TESTS_DIR/../commands/cf.md"
+P3MD="$CF_TESTS_DIR/../docs/phase-3-implement.md"
 RUNNER="bash -c 'echo \"it'\\''s green\"'"
 
-templates="$(grep -E '^[[:space:]]*".*cf-pi-run\.sh.*"\)$' "$CF_MD")"
+templates="$(cat "$CF_MD" "$P3MD" | grep -E '^[[:space:]]*".*cf-pi-run\.sh.*"\)$')"
 n=$(printf '%s\n' "$templates" | grep -c .)
-assert_eq "1" "$n" "cf.md has exactly one one-line cf-pi-run.sh template"
+assert_eq "1" "$n" "cf.md and phase-3-implement.md have exactly one one-line cf-pi-run.sh template"
 
 while IFS= read -r line; do
   [ -n "$line" ] || continue

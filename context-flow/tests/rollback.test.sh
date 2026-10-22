@@ -7,7 +7,7 @@
 . "$CF_TESTS_DIR/lib/assert.sh"
 
 SCRIPTS="$(cd "$CF_TESTS_DIR/../scripts" && pwd)"
-GUARD_FILTER=$(grep -o "jq -r '[^']*rollback-exhausted\"'" "$CF_TESTS_DIR/../commands/cf.md" | sed "s/^jq -r '//; s/'\$//")
+GUARD_FILTER=$(grep -o "jq -r '[^']*rollback-exhausted\"'" "$CF_TESTS_DIR/../docs/phase-3-implement.md" | sed "s/^jq -r '//; s/'\$//")
 TMP="$(mktemp -d /tmp/cf-rollback-XXXXXX)"
 REPO="$TMP/repo"
 FLOW="$TMP/flow"

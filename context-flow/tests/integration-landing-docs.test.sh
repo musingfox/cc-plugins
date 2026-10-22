@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Pins cf.md's description of linear landing after the integration suite.
+# Pins cf.md's (and docs/phase-3-implement.md's) description of linear landing after the integration suite.
 # NO set -e
 
 : "${CF_TESTS_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 . "$CF_TESTS_DIR/lib/assert.sh"
 
 CFMD="$(cd "$CF_TESTS_DIR/.." && pwd)/commands/cf.md"
+P3MD="$(cd "$CF_TESTS_DIR/.." && pwd)/docs/phase-3-implement.md"
+POSTMD="$(cd "$CF_TESTS_DIR/.." && pwd)/docs/post-pass-protocol.md"
 
 assert_ge1() {
   local n="$1" msg="$2"
@@ -22,28 +24,28 @@ phase4() {
 }
 
 # T1
-assert_ge1 "$(grep -cF 'lands the same tree here as linear history' "$CFMD" || true)" \
+assert_ge1 "$(grep -cF 'lands the same tree here as linear history' "$P3MD" || true)" \
   "cf.md: lands the same tree here as linear history"
 
 # T2
-assert_ge1 "$(grep -cF 'land the result on `cf/$CF_SLUG` as linear history' "$CFMD" || true)" \
+assert_ge1 "$(grep -cF 'land the result on `cf/$CF_SLUG` as linear history' "$P3MD" || true)" \
   "cf.md: land the result on cf/\$CF_SLUG as linear history"
 
 # T3
-lc_line=$(grep -F 'INT_STATUS=LINEARIZE_CONFLICT' "$CFMD" || true)
+lc_line=$(grep -F 'INT_STATUS=LINEARIZE_CONFLICT' "$P3MD" || true)
 assert_ge1 "$(printf '%s\n' "$lc_line" | grep -c . || true)" \
   "cf.md has INT_STATUS=LINEARIZE_CONFLICT"
 assert_contains "$lc_line" ".integration_branch" \
   "LINEARIZE_CONFLICT line names .integration_branch"
 assert_contains "$lc_line" ".reason, .offending_shard, .offending_commit" \
   "LINEARIZE_CONFLICT line tells the orchestrator to read the reason"
-assert_eq "0" "$(grep -cF 'cherry-pick onto `cf/$CF_SLUG` failed' "$CFMD" || true)" \
+assert_eq "0" "$(cat "$CFMD" "$P3MD" | grep -cF 'cherry-pick onto `cf/$CF_SLUG` failed' || true)" \
   "cf.md no longer blames every LINEARIZE_CONFLICT on a cherry-pick"
 
 # Every reason cf-pi-integrate.sh can emit is documented as its own bullet.
 for reason in parent_missing parent_wrong_branch parent_dirty dependency_cycle \
               no_shards_merged cherry_pick_conflict tree_mismatch; do
-  assert_ge1 "$(grep -cF "  - \`$reason\` — " "$CFMD" || true)" \
+  assert_ge1 "$(grep -cF "  - \`$reason\` — " "$P3MD" || true)" \
     "cf.md documents LINEARIZE_CONFLICT reason $reason"
   assert_ge1 "$(grep -cF "write_linearize_conflict $reason" \
       "$(cd "$CF_TESTS_DIR/.." && pwd)/scripts/cf-pi-integrate.sh" || true)" \
@@ -55,17 +57,17 @@ assert_ge1 "$(grep -cF "already carries the integration gate's linear landing" "
   "cf.md: already carries the integration gate's linear landing"
 
 # T5
-assert_eq "0" "$(grep -cF 'merges them back here' "$CFMD" || true)" \
+assert_eq "0" "$(cat "$CFMD" "$P3MD" | grep -cF 'merges them back here' || true)" \
   "cf.md does not say merges them back here"
 
 # T6
-assert_eq "0" "$(grep -cF 'written by the integration gate' "$CFMD" || true)" \
+assert_eq "0" "$(cat "$CFMD" "$P3MD" | grep -cF 'written by the integration gate' || true)" \
   "cf.md does not say written by the integration gate"
 
 # T6b — a stalled integration suite is documented and emitted
-assert_ge1 "$(grep -cF 'INT_STATUS=TEST_STALLED' "$CFMD" || true)" \
+assert_ge1 "$(grep -cF 'INT_STATUS=TEST_STALLED' "$P3MD" || true)" \
   "cf.md documents INT_STATUS=TEST_STALLED"
-assert_ge1 "$(grep -cF 'never funnel it into partial-replan' "$CFMD" || true)" \
+assert_ge1 "$(grep -cF 'never funnel it into partial-replan' "$P3MD" || true)" \
   "cf.md: a stalled suite is never funnelled into partial-replan"
 assert_ge1 "$(grep -cF 'integration_test_stalled' \
     "$(cd "$CF_TESTS_DIR/.." && pwd)/scripts/cf-pi-integrate.sh" || true)" \
@@ -79,21 +81,26 @@ else
   assert_eq "ok" "fail" "review-two-axis.test.sh still ok"
 fi
 got=$(phase4 | shasum -a 256 | awk '{print $1}')
-assert_eq "69e92850eb72e138c8b31f0378f7a5581c8a69b2e3903c413d1e34cc3ee71ef7" "$got" \
+assert_eq "caccf17ea2017be257b1eafbb36efe7ffb68b01b902bbca05ed8c196ff9f8c06" "$got" \
   "Phase 4 section is byte-identical"
-assert_eq "0" "$(phase4 | grep -cF 're-verifies on the NOOP path' || true)" \
+# The Post-PASS sections left Phase 4 for post-pass-protocol.md; pin them the same way,
+# and re-pin on any later edit to them.
+postpass_got=$(awk '/^## Post-PASS spec maintenance/ {p=1} p {print}' "$POSTMD" | shasum -a 256 | awk '{print $1}')
+assert_eq "e59daddb54206852ed390807c046db884470807e96ece66c5d2829cbc0694b02" "$postpass_got" \
+  "Post-PASS sections are byte-identical"
+assert_eq "0" "$(cat "$POSTMD" | grep -cF 're-verifies on the NOOP path' || true)" \
   "Phase 4 TESTFAIL row does not claim a NOOP re-verification"
-assert_ge1 "$(phase4 | grep -cF 'Ask the human how to proceed; shard re-runs cannot fix' || true)" \
+assert_ge1 "$(cat "$POSTMD" | grep -cF 'Ask the human how to proceed; shard re-runs cannot fix' || true)" \
   "Phase 4 TESTFAIL row goes to the human"
 
 # T9: every status cf-pi-integrate.sh writes has its own route in cf.md.
 INTEGRATE="$(cd "$CF_TESTS_DIR/.." && pwd)/scripts/cf-pi-integrate.sh"
 for st in $(grep -oE 'status: "[A-Z_]+"' "$INTEGRATE" | sort -u | sed 's/status: "//; s/"//'); do
-  assert_ge1 "$(grep -cF "\`INT_STATUS=$st\`" "$CFMD" || true)" "T9 cf.md routes INT_STATUS=$st"
+  assert_ge1 "$(grep -cF "\`INT_STATUS=$st\`" "$P3MD" || true)" "T9 cf.md routes INT_STATUS=$st"
 done
 
 # T10: a refused run (exit 4) writes no result, so the previous round's file must
 # be gone before the gate runs, or INT_STATUS reads last round's status.
-int_block=$(awk '/cf-pi-integrate.sh" "\$SESSION" "\$TEST_RUNNER"/{print prev; print; exit} {prev=$0}' "$CFMD")
+int_block=$(awk '/cf-pi-integrate.sh" "\$SESSION" "\$TEST_RUNNER"/{print prev; print; exit} {prev=$0}' "$P3MD")
 assert_contains "$int_block" 'rm -f "$SESSION/integration-result.json"' "T10 stale integration result removed before the gate"
-assert_ge1 "$(grep -cF 'no result file' "$CFMD" || true)" "T10b cf.md routes a missing integration result"
+assert_ge1 "$(grep -cF 'no result file' "$P3MD" || true)" "T10b cf.md routes a missing integration result"

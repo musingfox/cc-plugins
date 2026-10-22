@@ -94,4 +94,4 @@ Agents (`@cf:research`, `@cf:plan`, etc.) are designed to be dispatched by the `
 
 ## Design Documentation
 
-See [docs/](docs/): `parallel-sharded-design.md` (Phase 3 sharding), `pi-implementer-protocol.md` (the implementer brief, report schema and gates), `human-gate-protocol.md`, and `escalation-protocol.md`.
+See [docs/](docs/): `parallel-sharded-design.md` (Phase 3 sharding), `pi-implementer-protocol.md` (the implementer brief, report schema and gates), `human-gate-protocol.md`, `escalation-protocol.md`, `phase-3-implement.md` (the Phase 3 orchestration steps), and `post-pass-protocol.md` (spec maintenance and the rebase + delivery after a Spec APPROVE).
