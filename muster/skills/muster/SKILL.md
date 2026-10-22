@@ -9,6 +9,8 @@ Run these commands from the main session only. Background completions wake the m
 
 Each worker is a Claude session in its own clone of the repository (called the worktree below, under the run directory), on branch `muster/NAME`. Muster fetches that branch back into the repository each time the worker goes idle and when the run ends, so `git log muster/NAME` works from the repository. NAME must not already be a branch in the repository; a taken name is refused. NAME is the run name you choose; it must match `^[a-z0-9][a-z0-9-]{0,39}$`.
 
+Requires Bun and git. `run` starts each worker through the ACP adapter `@agentclientprotocol/claude-agent-acp`, which `bunx` fetches from registry.npmjs.org at the version pinned in `src/launch.ts`. Check with `bun --version` before the first dispatch.
+
 ## Dispatch
 
 Dispatch blocks until the worker ends, so start it with `Bash(run_in_background: true)`. `--model` takes one of these values; pick by the shape of the ticket, and go one step up when in doubt:
