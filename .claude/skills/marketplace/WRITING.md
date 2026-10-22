@@ -1,5 +1,14 @@
 # Writing for agents
 
+**Contents**
+
+- [Context pointers](#context-pointers)
+- [The two loads](#the-two-loads)
+- [Information hierarchy](#information-hierarchy)
+- [Steps and completion criteria](#steps-and-completion-criteria)
+- [Words](#words)
+- [Pruning](#pruning)
+
 The judgment layer for any document an agent consumes: a skill, `CLAUDE.md`, a file
 reached by a pointer. It answers three questions the mechanics cannot: does this
 material earn its place, where on the hierarchy does it sit, and which words make it
@@ -76,10 +85,6 @@ changing the description, and keep the change only if the should-fire and should
 cases hold. The eval sandbox loads only the plugin under test, so a plugin with a
 `dependencies` list does not load at all and its numbers mean nothing: run it on a copy
 outside the repo with `dependencies` removed.
-
-Every skill in this repo is currently model-invoked. Treat that as an unexamined
-default, not a settled decision: `/obw:init` and this skill are the sort you always
-type by hand.
 
 Reference two user-invoked skills both need can live in neither — with no descriptions,
 neither can fire the other. Put it in a plain file both can point at, the way this file

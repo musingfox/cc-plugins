@@ -1,8 +1,13 @@
 # Pre-commit Check Implementations
 
-Source of truth for `.githooks/pre-commit`. Include only enabled checks.
+**Contents**
 
-Contents: Script Skeleton, Security / File Integrity / Structure checks, Quality checks (with commands per language), Customization.
+- [Script Skeleton](#script-skeleton)
+- [Security, integrity, and structure checks](#security-integrity-and-structure-checks)
+- [Quality checks](#quality-checks)
+- [Customization](#customization)
+
+Source of truth for `.githooks/pre-commit`. Include only enabled checks.
 
 ## Script Skeleton
 
