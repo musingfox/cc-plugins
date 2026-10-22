@@ -1,6 +1,6 @@
 {
   "name": "muster",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "[Experimental] Unattended Claude workers over ACP — a coordinator dispatches headless workers with a permission fence, an event log, file-based escalation and report-file completion; a Claude Mod band shows in-flight workers (needs Claude Code 2.1.304+)",
   "author": {
     "name": "Nick Huang",
