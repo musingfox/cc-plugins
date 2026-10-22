@@ -9,6 +9,8 @@ Run these commands from the main session only. Background completions wake the m
 
 Each worker is a Claude session in its own clone of the repository (called the worktree below, under the run directory), on branch `muster/NAME`. Muster fetches that branch back into the repository each time the worker goes idle and when the run ends, so `git log muster/NAME` works from the repository. NAME must not already be a branch in the repository; a taken name is refused. NAME is the run name you choose; it must match `^[a-z0-9][a-z0-9-]{0,39}$`.
 
+Requires Bun, Node 22 or later, and git. `run` starts each worker through the ACP adapter `@agentclientprotocol/claude-agent-acp`, which `bunx` fetches from registry.npmjs.org at the version pinned in `src/launch.ts`; the adapter declares Node 22 or later, and `bunx` runs it under `node`. Check with `bun --version` and `node --version` before the first dispatch.
+
 ## Dispatch
 
 Dispatch blocks until the worker ends, so start it with `Bash(run_in_background: true)`. `--model` takes one of these values; pick by the shape of the ticket, and go one step up when in doubt:
@@ -48,7 +50,7 @@ It exits on `question`, `idle`, `done`, `blocked`, `malformed`, or `dead`. To re
 bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts status NAME
 ```
 
-The status line carries `deps=<copied>/<total>` when the run records its dependency directories: how many of the directories holding a lockfile were copied into the worker's clone, out of how many hold one. `deps=0/0` means none holds a lockfile.
+The status line carries `deps=<copied>/<total>` when the run records its dependency directories: how many of the directories holding a lockfile were copied into the worker's worktree, out of how many hold one. `deps=0/0` means none holds a lockfile.
 
 ## Answer
 
@@ -58,17 +60,19 @@ When the state is `question`, decide and answer it. The only decisions are `allo
 bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts answer NAME allow
 ```
 
-Add `--n N` when more than one question is pending. Then wait again.
+Add `--n N` when more than one question is pending. Then wait again. A question left unanswered for 30 minutes ends the run. If `REPORT.md` is missing or malformed, muster writes a `BLOCKED` one with `question-timeout` as the reason and the run ends `blocked`; a report the worker already wrote stands, so a `DONE` report ends the run `done`. Set `MUSTER_QUESTION_TIMEOUT_MS` in the environment of `muster run` to change the limit.
 
 ## Follow up
 
-When the state is `idle`, send the worker its next instruction. A `dead` or exited run refuses follow-ups.
+When the state is `idle`, send the worker its next instruction. A `dead` or exited run refuses follow-ups. A run left 15 minutes without a follow-up after its last turn exits, a `done` run included; set `MUSTER_IDLE_TIMEOUT_MS` in the environment of `muster run` to change that, or end it sooner with `stop`.
 
 ```
 bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts followup NAME "NEXT INSTRUCTION"
 ```
 
 Use `followup NAME --file PATH` for longer text. Then wait again.
+
+A run that exited on the idle timeout without a report still shows `state=idle`, with the same status line as before it exited. Tell it apart by its background `run` task having finished and by `"phase":"exited"` and `"reason":"idle-timeout"` in `<RUNDIR>/phase.json`; `followup` refuses it with `client exited; cannot follow up`. Its branch was fetched back as it exited, unless `phase.json` has a `fetchError`. Review `git log <baseSha>..muster/NAME`, then either dispatch a new run under a new NAME, adding `--base muster/NAME` to continue from its commits, or go to Cleanup.
 
 ## Collect
 
@@ -83,6 +87,12 @@ The status line of a `done` run carries `head=<sha>`, the commit the branch poin
 
 If the state is `blocked` or `malformed`, read `REPORT.md` the same way before deciding what to do.
 
+If the state is `dead`, the `muster run` process is gone without finishing the run, or `phase.json` is missing, is not a JSON object, or holds a `phase` value muster does not recognise (all three show `reason=phase-unreadable`). Read `REPORT.md` if it exists. The branch holds at most what the last idle fetched back; later commits exist only in `<RUNDIR>/worktree`. Before Cleanup, fetch them into the repository with the same fetch muster runs, where `/abs/path/to/repo` is the `--repo` path (`repoRoot` in `<RUNDIR>/meta.json`):
+
+```
+git -C /abs/path/to/repo -c fetch.fsckObjects=true fetch -q --no-tags --no-recurse-submodules "<RUNDIR>/worktree" +refs/heads/muster/NAME:refs/heads/muster/NAME
+```
+
 ## Stop
 
 Stop asks the worker to end; it does not end it at once. Run `watch` until it reports a terminal state.
@@ -93,7 +103,7 @@ bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts stop NAME
 
 ## Cleanup
 
-After the run has exited, remove its run directory; this deletes the clone, the event log and the report. Branch `muster/NAME` stays in the repository, so `git log <baseSha>..<head sha>` still works; note `baseSha` and the head sha before removing, since `meta.json` goes with the directory. Read the report first. If `phase.json` in the run directory has a `fetchError`, the branch could not be fetched back and the commits exist only in the clone at `<RUNDIR>/worktree`; fetch them by hand before removing it.
+After the run has exited, remove its run directory; this deletes the worktree, the event log and the report. Branch `muster/NAME` stays in the repository, so `git log <baseSha>..<head sha>` still works; note `baseSha` and the head sha before removing, since `meta.json` goes with the directory. Read the report first. If `phase.json` in the run directory has a `fetchError`, the branch could not be fetched back and the commits exist only in the worktree at `<RUNDIR>/worktree`; fetch them by hand before removing it.
 
 ```
 rm -rf "<RUNDIR>"
