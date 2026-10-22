@@ -60,11 +60,11 @@ When the state is `question`, decide and answer it. The only decisions are `allo
 bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts answer NAME allow
 ```
 
-Add `--n N` when more than one question is pending. Then wait again.
+Add `--n N` when more than one question is pending. Then wait again. A question left unanswered for 30 minutes ends the run as `blocked` with `question-timeout` as the reason; set `MUSTER_QUESTION_TIMEOUT_MS` in the environment of `muster run` to change that.
 
 ## Follow up
 
-When the state is `idle`, send the worker its next instruction. A `dead` or exited run refuses follow-ups.
+When the state is `idle`, send the worker its next instruction. A `dead` or exited run refuses follow-ups. A run left 15 minutes without a follow-up after its last turn exits, a `done` run included; set `MUSTER_IDLE_TIMEOUT_MS` in the environment of `muster run` to change that, or end it sooner with `stop`.
 
 ```
 bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts followup NAME "NEXT INSTRUCTION"
