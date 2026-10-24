@@ -9,7 +9,7 @@ Run the `obsidian` CLI directly — no sub-agent. Before any CLI call, invoke th
 
 **CLI gotcha**: `file=` resolves like a wikilink — bare note name only, no path, no `.md`. Use `path=` for vault-root-relative paths. If a command returns `File not found` after a `create`, fix the parameter — never re-run `create` (it makes `name 1.md` duplicates).
 
-**`property:set` gotcha**: one property per call, no batch form. Pass `type=list` for `tags`, `type=date` for `due`/`completed` — omit `type=` and it's stored as plain text.
+**`property:set` gotcha**: one property per call, no batch form. Pass `type=list` for `tags`, `type=date` for `due`/`completed` — omit `type=` and it's stored as plain text. Wikilinks in a list property (`blocked_by`, `related`) need a JSON array as the value, even for one link: plain words such as tags can go bare or comma-separated, but a bare or comma-separated wikilink is stored as one string. Example: `obsidian vault={vault} property:set path="pm/{project}/tasks/{kebab}.md" name=blocked_by value='["[[first-blocker]]","[[second-blocker]]"]' type=list`.
 
 ## Config (`.obsidian.yaml`)
 
@@ -68,7 +68,7 @@ Three link properties on tasks, all holding wikilinks: `blocked_by` (list), `rel
 
 Only the stated direction is stored. The inverse — who this task blocks, its subtasks — is read from Obsidian's backlinks pane or a Bases `file.hasLink()` filter. Never write a `blocks` or `subtasks` field: two fields for one edge drift apart.
 
-- **Link** → `property:set` with `type=list` for `blocked_by` / `related`, plain for `parent`. Values are `[[kebab-name]]` — resolve the target with `search` first if the name is uncertain, and refuse a link to a note that does not exist.
+- **Link** → `property:set` with `type=list` and a JSON array value for `blocked_by` / `related` (see the `property:set` gotcha), plain for `parent`. Values are `[[kebab-name]]` — resolve the target with `search` first if the name is uncertain, and refuse a link to a note that does not exist.
 - **`property:set` replaces, never appends** — there is no property-append verb. To add one blocker, `read` the task's current `blocked_by`, and set the full list back with the new entry included. Setting a bare new value silently drops the existing links.
 - **`blocked_by` implies status** — after adding a blocker, set `status=blocked`. After removing the last blocker, ask whether to return the task to `todo` or `in-progress`.
 - **Archiving cascades a prompt** — before archiving `X`, `search` `query="[type:task] [project:{project}] [blocked_by:X]" format=json`. If any task depends on `X`, list them and ask whether to drop `X` from their `blocked_by` (and un-block those left with none). Never edit dependents silently.
