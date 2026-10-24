@@ -187,17 +187,20 @@ export function checkWebSearch(o: { events: Event[]; questions: Question[] }): R
 const DEFAULT_DOMAINS = ["registry.npmjs.org"];
 export const WORKER_TOOLS = ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "ToolSearch", "TodoWrite", "TaskCreate", "TaskUpdate", "TaskList"];
 
-export function checkSessionSandbox(events: Event[], where: { home: string; cache: string }): Result {
+export function checkSessionSandbox(events: Event[], where: { home: string; cache: string; fenced: boolean }): Result {
   const sn = events.find((e) => e.dir === "out" && e.msg?.method === "session/new");
   const sb = sn?.msg.params?._meta?.claudeCode?.options?.sandbox;
-  const flags = { enabled: true, failIfUnavailable: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false };
-  const flagsOk = Object.entries(flags).every(([k, v]) => sb?.[k] === v);
-  const domainsOk = JSON.stringify(sb?.network?.allowedDomains) === JSON.stringify(DEFAULT_DOMAINS);
-  if (!flagsOk || !domainsOk) return fail("sandbox-option-mismatch", JSON.stringify(sb ?? null));
+  if (!where.fenced && sb !== undefined) return fail("sandbox-present-unfenced", JSON.stringify(sb));
   const denyRead = CREDENTIAL_STORES.map((p) => join(where.home, p));
-  const fs = sb?.filesystem;
-  if (JSON.stringify(fs?.denyRead) !== JSON.stringify(denyRead) || JSON.stringify(fs?.allowWrite) !== JSON.stringify([where.cache])) {
-    return fail("sandbox-filesystem-mismatch", JSON.stringify(fs ?? null));
+  if (where.fenced) {
+    const flags = { enabled: true, failIfUnavailable: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false };
+    const flagsOk = Object.entries(flags).every(([k, v]) => sb?.[k] === v);
+    const domainsOk = JSON.stringify(sb?.network?.allowedDomains) === JSON.stringify(DEFAULT_DOMAINS);
+    if (!flagsOk || !domainsOk) return fail("sandbox-option-mismatch", JSON.stringify(sb ?? null));
+    const fs = sb?.filesystem;
+    if (JSON.stringify(fs?.denyRead) !== JSON.stringify(denyRead) || JSON.stringify(fs?.allowWrite) !== JSON.stringify([where.cache])) {
+      return fail("sandbox-filesystem-mismatch", JSON.stringify(fs ?? null));
+    }
   }
   const options = sn?.msg.params?._meta?.claudeCode?.options;
   if (JSON.stringify(options?.settings) !== JSON.stringify({ permissions: { ask: ["WebFetch"] }, disableClaudeAiConnectors: true })) {
@@ -206,7 +209,9 @@ export function checkSessionSandbox(events: Event[], where: { home: string; cach
   if (JSON.stringify(options?.tools) !== JSON.stringify(WORKER_TOOLS)) {
     return fail("tools-option-mismatch", JSON.stringify(options?.tools ?? null));
   }
-  return pass(`sandbox on, allowedDomains ${JSON.stringify(DEFAULT_DOMAINS)}, ${denyRead.length} denyRead entries, allowWrite ${where.cache}, WebFetch ask rule, connectors off, tools ${WORKER_TOOLS.join(",")}`);
+  const tail = `WebFetch ask rule, connectors off, tools ${WORKER_TOOLS.join(",")}`;
+  if (!where.fenced) return pass(`no sandbox key (unfenced), ${tail}`);
+  return pass(`sandbox on, allowedDomains ${JSON.stringify(DEFAULT_DOMAINS)}, ${denyRead.length} denyRead entries, allowWrite ${where.cache}, ${tail}`);
 }
 
 const STEP_13_QUERY = "select:RemoteTrigger";
