@@ -80,8 +80,8 @@ function envFor(sc: object, extra: Record<string, string> = {}): Record<string, 
   };
 }
 
-function request(model = "claude-haiku-5-5"): DispatchRequest {
-  return { ticket: "Write the hello file", model, repoRoot: repo, baseRef: "HEAD" };
+function request(model = "claude-haiku-5-5", fenced = true): DispatchRequest {
+  return { ticket: "Write the hello file", model, repoRoot: repo, baseRef: "HEAD", fenced };
 }
 
 function layoutFor(name = "run-1"): RunPaths {
@@ -364,6 +364,13 @@ describe("WorkerSessionLoop", () => {
     expect(echoed.BUN_INSTALL_CACHE_DIR).toBe(join(layout.cache, "bun"));
     const sessionNew = events(layout.events).find((e) => e.dir === "out" && e.msg.method === "session/new");
     expect(sessionNew?.msg.params._meta.claudeCode.options.sandbox.filesystem.allowWrite).toEqual([layout.cache]);
+  });
+
+  test("F1: an unfenced run sends session/new without a sandbox key", async () => {
+    const layout = layoutFor();
+    await runWorker(request("claude-haiku-5-5", false), layout, { env: envFor(scenario({})), exit: () => {} });
+    const sessionNew = events(layout.events).find((e) => e.dir === "out" && e.msg.method === "session/new");
+    expect(sessionNew?.msg.params._meta.claudeCode.options).not.toHaveProperty("sandbox");
   });
 });
 

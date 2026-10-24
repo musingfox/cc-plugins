@@ -99,9 +99,9 @@ function sessionNew(path: string) {
 }
 
 describe("SessionHandshake", () => {
-  test("T1: session/new is sent with cwd, empty mcpServers, settingSources [], the WebFetch ask rule, connectors off, the tool allowlist and the sandbox option", async () => {
+  test("T1: a fenced session/new is sent with cwd, empty mcpServers, settingSources [], the WebFetch ask rule, connectors off, the tool allowlist and the sandbox option", async () => {
     const { ch, eventsPath } = await open();
-    await handshake(ch, { cache: "/tmp/muster-cache", worktree: "/w/x", env: { HOME: "/home/u" } });
+    await handshake(ch, { cache: "/tmp/muster-cache", worktree: "/w/x", fenced: true, env: { HOME: "/home/u" } });
     expect(sessionNew(eventsPath)).toStrictEqual(T1_PARAMS);
   });
 
@@ -145,6 +145,7 @@ describe("SessionHandshake", () => {
     await handshake(ch, {
       cache: "/tmp/muster-cache",
       worktree: "/w/x",
+      fenced: true,
       env: { MUSTER_ALLOW_HOSTS: " Example.org, *.corp.example ,registry.npmjs.org," },
     });
     expect(sessionNew(eventsPath)._meta.claudeCode.options.sandbox.network.allowedDomains).toStrictEqual([
@@ -168,25 +169,39 @@ describe("SessionHandshake", () => {
 
   test("R2: session/new sandbox filesystem denies the credential stores and allows writes only to the run cache, with no denyWrite", async () => {
     const { ch, eventsPath } = await open();
-    await handshake(ch, { cache: "/t/a/runs/w/cache", worktree: "/t/a/runs/w/worktree", env: { HOME: "/home/u" } });
+    await handshake(ch, { cache: "/t/a/runs/w/cache", worktree: "/t/a/runs/w/worktree", fenced: true, env: { HOME: "/home/u" } });
     const sandbox = sessionNew(eventsPath)._meta.claudeCode.options.sandbox;
     expect(sandbox.filesystem).toStrictEqual({ denyRead: CREDENTIAL_STORES, allowWrite: ["/t/a/runs/w/cache"] });
   });
 
-  test("T10: no environment variable switches the sandbox off or allows unsandboxed commands", async () => {
-    const { ch, eventsPath } = await open();
-    await handshake(ch, {
+  test("T10: only the fenced option turns the sandbox on; no environment variable turns it on or off", async () => {
+    const fenced = await open();
+    await handshake(fenced.ch, {
       cache: "/tmp/muster-cache",
       worktree: "/w/x",
+      fenced: true,
       env: { HOME: "/home/u", MUSTER_SANDBOX: "off", MUSTER_ALLOW_UNSANDBOXED: "1", MUSTER_ALLOW_HOSTS: "" },
     });
-    expect(sessionNew(eventsPath)).toStrictEqual(T1_PARAMS);
+    expect(sessionNew(fenced.eventsPath)).toStrictEqual(T1_PARAMS);
+  });
+
+  test("T10: without fenced no environment variable turns the sandbox on", async () => {
+    const { ch, eventsPath } = await open();
+    await handshake(ch, { cache: "/tmp/muster-cache", worktree: "/w/x", env: { HOME: "/home/u", MUSTER_SANDBOX: "on", MUSTER_ALLOW_UNSANDBOXED: "0" } });
+    expect(sessionNew(eventsPath)._meta.claudeCode.options).not.toHaveProperty("sandbox");
+  });
+
+  test("F1: without fenced, session/new equals the fenced params minus the sandbox key and nothing else", async () => {
+    const { ch, eventsPath } = await open();
+    await handshake(ch, { cache: "/tmp/muster-cache", worktree: "/w/x", fenced: false, env: { HOME: "/home/u" } });
+    const { sandbox: _drop, ...options } = T1_PARAMS._meta.claudeCode.options;
+    expect(sessionNew(eventsPath)).toStrictEqual({ ...T1_PARAMS, _meta: { claudeCode: { options } } });
   });
 
   test("T11: the sandbox allowedDomains equal resolveAllowedHosts for the same env", async () => {
     const env = { MUSTER_ALLOW_HOSTS: "a.org" };
     const { ch, eventsPath } = await open();
-    await handshake(ch, { cache: "/tmp/muster-cache", worktree: "/w/x", env });
+    await handshake(ch, { cache: "/tmp/muster-cache", worktree: "/w/x", fenced: true, env });
     expect(sessionNew(eventsPath)._meta.claudeCode.options.sandbox.network.allowedDomains).toStrictEqual([
       ...DEFAULT_HOSTS,
       "a.org",

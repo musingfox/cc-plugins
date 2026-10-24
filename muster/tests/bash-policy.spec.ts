@@ -45,15 +45,26 @@ describe("decideBash", () => {
 
   test("T3: every reason names the OS sandbox", () => {
     for (const c of table) {
-      const d = decideBash(c.command);
+      const d = decideBash(c.command, { fenced: true });
       expect(d.reason).toContain("sandbox");
     }
-    const allowed = decideBash("git status");
+    const allowed = decideBash("git status", { fenced: true });
     expect(allowed.allow).toBe(true);
     expect(allowed.reason).toContain("bash runs inside the OS sandbox");
     const denied = decideBash("");
     expect(denied.allow).toBe(false);
     expect(denied.reason).toBe(DENY_REASON);
+  });
+
+  test("F4: the allow reason tells the truth per mode and both modes allow the same commands", () => {
+    expect(decideBash("git init", { fenced: true }).reason).toBe("bash runs inside the OS sandbox");
+    for (const ctx of [undefined, {}, { fenced: false }]) {
+      const d = decideBash("git init", ctx);
+      expect(d.allow).toBe(true);
+      expect(d.reason).toBe("bash runs in the worker's worktree without an OS sandbox");
+    }
+    expect(failuresFor((command) => decideBash(command, { fenced: false }))).toEqual([]);
+    expect(failuresFor((command) => decideBash(command, { fenced: true }))).toEqual([]);
   });
 
   test("T4: the decision table reports failures against a deliberately broken () => ({allow:false}) guard", () => {
