@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Stands in for macOS open (and serves as $BROWSER) on the PATH of Rex shells.
+# An agent's lone http(s) URL opens in the agent Zen; anything else, and
+# anything from a human shell, goes to the real open unchanged.
+
+real="${ZEN_AGENT_REAL_OPEN:-/usr/bin/open}"
+zen="${ZEN_AGENT_BIN:-$(dirname "${BASH_SOURCE[0]}")/zen-agent}"
+
+if [ -n "${AI_AGENT:-}${CLAUDECODE:-}" ] && [ "$#" -eq 1 ] && [[ "$1" =~ ^https?:// ]]; then
+  exec "$zen" open "$1"
+fi
+exec "$real" "$@"

@@ -44,6 +44,11 @@
       "description": "Browser automation with agent-browser CLI, Playwright test generation, and debug-to-test workflows"
     },
     {
+      "name": "zen-agent",
+      "source": "./zen-agent",
+      "description": "A second Zen on its own profile for agents to drive over WebDriver BiDi, beside your everyday Zen: URL redirect in Rex, firefox-devtools MCP, per-domain cookie copy, human handoff"
+    },
+    {
       "name": "hook-guard",
       "source": "./hook-guard",
       "description": "One-stop hook setup — detect project environment, generate git pre-commit and commit-msg scripts with security checks and code quality gates"

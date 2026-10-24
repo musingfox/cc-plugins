@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# Run the agent Zen: a second Zen on its own profile, with WebDriver BiDi and
+# Marionette on, beside the user's everyday Zen.
+set -uo pipefail
+
+ZEN_BIN="${ZEN_AGENT_APP:-/Applications/Zen.app}/Contents/MacOS/zen"
+PROFILE="${ZEN_AGENT_PROFILE:-$HOME/.cache/zen-agent-profile}"
+BIDI_PORT="${ZEN_AGENT_BIDI_PORT:-9333}"
+MARIONETTE_PORT="${ZEN_AGENT_MARIONETTE_PORT:-2828}"
+LOG="${ZEN_AGENT_LOG:-${TMPDIR:-/tmp}/zen-agent.log}"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Pinned to the version this plugin was verified against.
+MCP_PKG="@mozilla/firefox-devtools-mcp@0.10.6"
+
+usage() {
+  cat <<EOF
+usage: zen-agent <command>
+  start              launch the agent Zen if it is not running
+  status             print whether it runs (exit 1 when it does not)
+  open URL           show URL in the agent Zen, launching it if needed
+  cookies DOMAIN...  copy DOMAIN's cookies from your everyday Zen profile
+  mcp                run the firefox-devtools MCP server against it
+  setup-shell        make agents in Rex shells open URLs in the agent Zen
+EOF
+}
+
+listening() { lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; }
+running() { listening "$BIDI_PORT"; }
+
+launch() {
+  [ -x "$ZEN_BIN" ] || { echo "zen-agent: Zen not found at $ZEN_BIN" >&2; return 1; }
+  mkdir -p "$PROFILE"
+  # --no-remote keeps this launch from being handed to the everyday Zen.
+  nohup "$ZEN_BIN" --profile "$PROFILE" --no-remote --marionette \
+    --remote-debugging-port "$BIDI_PORT" "$@" >"$LOG" 2>&1 &
+  for _ in $(seq 30); do
+    listening "$BIDI_PORT" && listening "$MARIONETTE_PORT" && return 0
+    sleep 0.5
+  done
+  echo "zen-agent: Zen did not open ports $BIDI_PORT/$MARIONETTE_PORT; see $LOG" >&2
+  return 1
+}
+
+cmd="${1:-}"; shift || true
+case "$cmd" in
+  start)
+    running && { echo "zen-agent: already running"; exit 0; }
+    launch && echo "zen-agent: started (BiDi $BIDI_PORT, Marionette $MARIONETTE_PORT)"
+    ;;
+  status)
+    if running; then echo "running (profile $PROFILE)"; else echo "not running"; exit 1; fi
+    ;;
+  open)
+    [ "$#" -eq 1 ] && [[ "$1" =~ ^https?:// ]] || { echo "usage: zen-agent open http(s)://..." >&2; exit 2; }
+    if running; then
+      # A launch on the same profile hands the URL to the running agent Zen.
+      "$ZEN_BIN" --profile "$PROFILE" "$1" >/dev/null 2>&1
+    else
+      launch "$1"
+    fi
+    ;;
+  cookies)
+    [ "$#" -ge 1 ] || { echo "usage: zen-agent cookies DOMAIN..." >&2; exit 2; }
+    running || { echo "zen-agent: not running; run zen-agent start" >&2; exit 1; }
+    exec bun "$HERE/../lib/cookies.ts" "$BIDI_PORT" "$@"
+    ;;
+  mcp)
+    exec npx -y "$MCP_PKG" --connect-existing --marionette-port "$MARIONETTE_PORT" --idle-timeout 120
+    ;;
+  setup-shell)
+    conf="$HOME/.config/fish/conf.d/zen-agent.fish"
+    mkdir -p "$(dirname "$conf")"
+    cat >"$conf" <<EOF
+# Written by zen-agent setup-shell. In Rex, agents' URLs open in the agent Zen;
+# bin/open hands everything from a human shell to /usr/bin/open.
+if test "\$TERM_PROGRAM" = rex
+    fish_add_path --global --move --prepend $HERE
+    set -gx BROWSER $HERE/open
+end
+EOF
+    echo "zen-agent: wrote $conf"
+    ;;
+  *) usage; [ -z "$cmd" ] || [ "$cmd" = help ] || exit 2 ;;
+esac
