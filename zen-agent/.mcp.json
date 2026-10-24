@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "zen": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/zen-agent",
+      "args": ["mcp"]
+    }
+  }
+}

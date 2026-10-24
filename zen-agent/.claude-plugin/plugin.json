@@ -1,0 +1,19 @@
+{
+  "name": "zen-agent",
+  "version": "0.1.0",
+  "description": "A second Zen on its own profile for agents to drive over WebDriver BiDi, beside your everyday Zen: URL redirect in Rex, firefox-devtools MCP, per-domain cookie copy, human handoff",
+  "author": {
+    "name": "musingfox"
+  },
+  "homepage": "https://github.com/musingfox/cc-plugins/tree/main/zen-agent",
+  "repository": "https://github.com/musingfox/cc-plugins",
+  "license": "MIT",
+  "keywords": [
+    "browser",
+    "zen",
+    "firefox",
+    "webdriver-bidi",
+    "mcp",
+    "rex"
+  ]
+}

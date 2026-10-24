@@ -1,0 +1,50 @@
+---
+name: zen-agent
+description: >-
+  Use for a visible browser the user can watch and take over: showing the user a page,
+  operating a site that needs JavaScript or a login, or handing a login, 2FA or payment
+  step to the user. Not for headless Chrome scripting or Playwright tests (use agent-browser).
+allowed-tools: Bash(zen-agent start) Bash(zen-agent status) Bash(zen-agent open *)
+---
+
+# zen-agent
+
+The agent Zen is a second Zen on its own profile, running beside the user's
+everyday Zen. Its window is visible, so the user sees every step and can click
+or type in it at any time. It never touches the everyday profile, except when
+the user approves copying one domain's cookies.
+
+## Start and open
+
+- `zen-agent start` launches it; `zen-agent status` checks it. The zen MCP tools
+  fail until it runs.
+- `zen-agent open URL` shows a page to the user. In a Rex shell a plain `open URL`
+  or `$BROWSER URL` from an agent lands there too.
+
+## Operate
+
+Use the zen MCP tools: `list_pages`, `navigate_page`, `take_snapshot`, then
+`click_by_uid` / `fill_by_uid`, and `screenshot_page` to check the result. Re-run
+`take_snapshot` after the user has acted in the window: the page may have changed.
+
+Firefox takes one automation client at a time. Call `close_firefox_session` when
+the browser part of the task is done, so the user, another agent or
+`zen-agent cookies` can connect.
+
+## When a login is needed
+
+1. Ask the user whether to copy that site's cookies from their everyday Zen.
+2. If yes: call `close_firefox_session`, then run `zen-agent cookies DOMAIN`
+   (for example `github.com`; it also covers subdomains). The user approves the
+   command at the permission prompt. Exit 3 means the session was still held.
+3. If no, or the site still shows a login: hand it over (below).
+
+## Hand over a critical step
+
+Login forms, 2FA, CAPTCHAs, payments, and anything irreversible are the user's to do.
+
+1. Navigate to the page and stop before the step.
+2. Tell the user what to do in the agent Zen window and that you are waiting.
+3. Continue only after the user says it is done, starting with `list_pages` and a
+   fresh `take_snapshot`: after two idle minutes the MCP reconnects to whichever tab
+   is active.
