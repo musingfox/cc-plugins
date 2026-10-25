@@ -52,14 +52,11 @@ Fetch Apple Podcasts episode audio download URLs:
 
 ### Context Flow (Experimental)
 
-Experimental agentic workflow based on the **Context + Goal + Tools** principle:
-- **Core Idea**: Agents are defined by what context they see and what tools they have — not by role-based personas
-- **4-Phase Pipeline**: Research → Plan → Implement → Review, with contract validation between phases
-- **Contract as Context**: Each phase's output schema serves as binding constraints for the next phase, enforced structurally (not via prompt)
-- **Minimal Agent Definitions**: Agent prompts are 1-16 lines; constraints come from context isolation and tool restrictions
-- **Human Gate**: Plan review before implementation — the highest-leverage review point
-- **Single Command**: `/cf "goal"` runs the full pipeline
-- **Progress Band** (Claude Mod, Claude Code 2.1.293+): a line above the prompt shows the running flow's name, phase and elapsed time, and keeps each ended flow's per-phase durations
+The contract-drafting and checking pieces of the contract-driven workflow, without an orchestrator:
+- **`cf:plan`**: drafts behavioral contracts with test cases and tiers each decision High/Medium/Low
+- **`cf:review`**: a read-only Spec reviewer that checks an implementation against its contracts
+- **Gate scripts**: `cf-pi-scope.sh`, `cf-pi-test.sh`, `cf-pi-revert-gate.sh` and `cf-pi-add-repros.sh` check a builder's file scope, test run, revert and repros
+- **Requirements**: bash, git, jq and shasum
 
 **Installation:**
 ```bash
@@ -357,7 +354,7 @@ cc-plugins/
 ├── apple-podcasts/     skills: apple-podcasts-fetch
 ├── audit/              skills: docs, tests · agents: docs-classifier, tests-tracer · scripts, tests
 ├── calendar/          hooks: register (Claude Mod) · tests
-├── context-flow/       commands: cf · agents: research, plan, implement, review · hooks: register (Claude Mod) · scripts, tests
+├── context-flow/       agents: plan, review · scripts, tests
 ├── deepen/             skills: survey · agents: explorer · scripts, docs, tests
 ├── diagnose/           skills: diagnose, diagnose-now · docs, scripts, tests
 ├── fizzy/              skills: fizzy
