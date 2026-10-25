@@ -14,7 +14,7 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 # An all-passing fixture root: two pi-dispatch suites, one bun test, a cf runner,
-# one method suite.
+# a method runner.
 fixture() {
   local root="$TMP/$1"
   mkdir -p "$root/pi-dispatch/tests" "$root/pi-dispatch/extensions" "$root/context-flow/tests" "$root/method/tests"
@@ -24,7 +24,7 @@ import { expect, test } from "bun:test";
 test("ok", () => { expect(1).toBe(1); });
 TS
   echo 'exit 0' > "$root/context-flow/tests/run.sh"
-  echo 'exit 0' > "$root/method/tests/ok.test.sh"
+  echo 'exit 0' > "$root/method/tests/run.sh"
   echo "$root"
 }
 
@@ -89,11 +89,25 @@ OUT="$(CF_BRANCH=junk-branch CF_SLUG=junk-slug SESSION=junk-session bash "$RUNNE
 check '[ "$RC" -eq 0 ]' "T8 fixture passes with a flow env exported"
 check 'grep -qx "LEAK=" <<<"$OUT"' "T8 suite sees no CF_BRANCH, CF_SLUG or SESSION"
 
-# T9: a root with no method/tests is a failing suite, never a skip.
+# T9: a root with no method runner is a failing suite, never a skip.
 F="$(fixture t9)"; rm -r "$F/method/tests"
 run "$F"
 check '[ "$RC" -eq 1 ]' "T9 missing method/tests exits 1"
-check 'grep -qx "not ok - method/tests (missing)" <<<"$OUT"' "T9 names the missing method/tests"
+check 'grep -qx "not ok - method/tests/run.sh" <<<"$OUT"' "T9 names the missing method runner"
+
+# T10: a failing method runner fails the whole run, named as one suite.
+F="$(fixture t10)"; echo 'exit 1' > "$F/method/tests/run.sh"
+run "$F"
+check '[ "$RC" -eq 1 ]' "T10 failing method runner exits 1"
+check 'grep -qx "not ok - method/tests/run.sh" <<<"$OUT"' "T10 names the method runner"
+
+# T11: the method runner is the only method suite run-all starts: a test file beside
+# it is the runner's to run, so run-all neither runs it nor counts it.
+F="$(fixture t11)"; echo 'exit 1' > "$F/method/tests/bad.test.sh"
+run "$F"
+check '[ "$RC" -eq 0 ]' "T11 a method test file beside the runner is not run by run-all"
+check '! grep -q "method/tests/bad.test.sh" <<<"$OUT"' "T11 no per-file method line"
+check 'grep -qx "ok   - method/tests/run.sh" <<<"$OUT"' "T11 one method runner line"
 
 echo "--- run-all: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
