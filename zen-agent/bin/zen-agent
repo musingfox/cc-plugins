@@ -20,6 +20,7 @@ usage: zen-agent <command>
   stop               quit the agent Zen; its tabs come back on the next launch
   headed | headless  make it run in that mode, restarting it if needed
   open URL           show URL in the agent Zen, launching it if needed
+  run SCRIPT.ts      run a puppeteer script against it; see lib/run.ts
   cookies DOMAIN...  copy DOMAIN's cookies from your everyday Zen profile
   mcp                run the firefox-devtools MCP server against it
   setup-shell        make agents in Rex shells open URLs in the agent Zen
@@ -106,6 +107,13 @@ case "$cmd" in
     else
       launch "$1"
     fi
+    ;;
+  run)
+    [ "$#" -eq 1 ] && [ -f "$1" ] || { echo "usage: zen-agent run SCRIPT.ts" >&2; exit 2; }
+    running || { echo "zen-agent: not running; run zen-agent start" >&2; exit 1; }
+    [ -d "$HERE/../node_modules/puppeteer-core" ] ||
+      bun install --cwd "$HERE/.." --frozen-lockfile >&2 || exit 1
+    exec bun "$HERE/../lib/run.ts" "$BIDI_PORT" "$1"
     ;;
   cookies)
     [ "$#" -ge 1 ] || { echo "usage: zen-agent cookies DOMAIN..." >&2; exit 2; }

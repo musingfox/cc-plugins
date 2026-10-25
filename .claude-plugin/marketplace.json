@@ -41,7 +41,7 @@
     {
       "name": "zen-agent",
       "source": "./zen-agent",
-      "description": "A second Zen on its own profile for agents to drive over WebDriver BiDi, beside your everyday Zen: URL redirect in Rex, firefox-devtools MCP, per-domain cookie copy, headless or headed, human handoff for logins and secrets"
+      "description": "A second Zen on its own profile for agents to drive over WebDriver BiDi, beside your everyday Zen: URL redirect in Rex, firefox-devtools MCP or puppeteer scripts, per-domain cookie copy, headless or headed, human handoff for logins and secrets"
     },
     {
       "name": "hook-guard",

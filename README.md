@@ -116,6 +116,7 @@ A visible browser agents drive and you can take over, beside your everyday Zen (
 - **Headless or headed**: `zen-agent start --headless`, and `zen-agent headed | headless` to switch by restarting; tabs come back
 - **Secrets stay with you**: the agent stops before any step that generates or reveals an API key, token or password, as it does for logins, 2FA and payments
 - **MCP**: Mozilla's `firefox-devtools-mcp` in connect-existing mode — snapshot, click, fill, screenshot
+- **Scripts**: `zen-agent run SCRIPT.ts` runs an agent-written puppeteer script over WebDriver BiDi in one call and prints only what it returns; installs `puppeteer-core` on first use
 - **Cookies on approval**: `zen-agent cookies DOMAIN` copies one domain's cookies from your everyday profile; never pre-approved
 - **Rex redirect**: `zen-agent setup-shell` makes an agent's `open URL` / `$BROWSER URL` in Rex shells land in the agent Zen; human shells are untouched. Re-run it after a plugin update
 
@@ -357,7 +358,7 @@ cc-plugins/
 ├── spec/               skills: spec, glossary · scripts: spec.sh · tests
 ├── viz/                skills: viz-inline, viz-render · lib, tests
 ├── wizard/             skills: wizard
-├── zen-agent/          skills: zen-agent · bin: zen-agent, open · lib · .mcp.json
+├── zen-agent/          skills: zen-agent · bin: zen-agent, open · lib · .mcp.json · package.json
 └── README.md
 ```
 

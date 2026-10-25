@@ -33,7 +33,16 @@ Use the zen MCP tools: `list_pages`, `navigate_page`, `take_snapshot`, then
 `click_by_uid` / `fill_by_uid`, and `screenshot_page` to check the result. Re-run
 `take_snapshot` after the user has acted in the window: the page may have changed.
 
-Firefox takes one automation client at a time. Call `close_firefox_session` when
+For a multi-step flow or an extraction on a page whose structure you already know,
+write a puppeteer script and run it with `zen-agent run SCRIPT.ts` instead: one
+call, and only what the script returns enters the context. The script
+default-exports `async ({ browser }) => result`; `browser` is a connected
+puppeteer-core `Browser`, and the result prints as JSON. Return the fields you
+need, never a whole page. Keep scripts in the scratchpad, not the user's repo.
+Look at an unfamiliar page with `take_snapshot` first, then script against it.
+
+Firefox takes one automation client at a time. `zen-agent run` holds it only while
+the script runs; exit 3 means another client (usually the MCP) holds it. Call `close_firefox_session` when
 the browser part of the task is done, so the user, another agent or
 `zen-agent cookies` can connect.
 
