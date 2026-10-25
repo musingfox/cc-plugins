@@ -6,8 +6,8 @@ Contract-driven development pieces: an agent that drafts behavioral contracts, a
 
 | Piece | Purpose |
 |-------|---------|
-| `agents/plan.md` (`cf:plan`) | Designs behavioral contracts with concrete test cases and tiers each decision High/Medium/Low. Runs on `sonnet` at `high`. |
-| `agents/review.md` (`cf:review`) | Verifies an implementation against its contracts: Standards and Spec reviews, read-only. Runs on `opus` at `high`. |
+| `agents/plan.md` (`cf:plan`) | Drafts behavioral contracts and test cases from the contract the main session pinned with the human, tiers each decision High/Medium/Low, and lists the load-bearing assumptions with a receipt or `unproven`. Runs on `sonnet` at `high`. |
+| `agents/review.md` (`cf:review`) | Verifies a builder's diff against the contracts on the Spec axis, read-only. Each FAIL and Blocker carries a layer (code, contract or milestone), and each advisory a repro command. Runs on `opus` at `high`. |
 | `scripts/cf-pi-scope.sh` | Gate: the files a shard changed are a subset of the files its contracts declared. |
 | `scripts/cf-pi-test.sh` | Gate: runs the test command with bounded output and emits `test_exit=` and `test_counts=` markers. |
 | `scripts/cf-pi-revert-gate.sh` | Gate: each contract's tests fail with its implementation reverted. |
