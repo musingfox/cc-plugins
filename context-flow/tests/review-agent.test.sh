@@ -86,3 +86,23 @@ assert_eq "model: opus" "$(grep -m1 '^model:' "$file")" "review: model opus"
 # The person is the human
 assert_contains "$doc" "the human" "review: says the human"
 assert_eq "" "$(grep -Eiwn 'the users?' "$file" || true)" "review: never says the user"
+
+# Observed output channels: the reviewer checks the channels a contract observes in
+# both directions, by running the test cases and probing
+cc=$(section '#### 1. Contract Compliance (binding)')
+obs=$(printf '%s\n' "$cc" | grep -F -- '- **Observed channels**')
+assert_eq "1" "$(printf '%s\n' "$cc" | grep -cF -- '- **Observed channels**' | tr -d ' ')" "review: Contract Compliance has one Observed channels clause"
+assert_contains "$obs" '`observes`' "review: clause reads the contract's observes"
+for ch in stdout stderr exit files; do
+  assert_contains "$obs" "\`$ch\`" "review: clause names channel $ch"
+done
+
+# Observed, written to, not asserted by any test case: missing or partial, contract layer
+assert_contains "$obs" "that no test case asserts, is a FAIL of class **missing or partial** with \`- **Layer**: contract\`" "review: unasserted observed channel is missing or partial at the contract layer"
+assert_contains "$obs" "A channel the contract observes that the implementation writes to" "review: the unasserted-channel clause is about a channel the implementation writes to"
+
+# Written to a channel the contract does not observe: implemented but wrong, code layer
+assert_contains "$obs" "a channel the contract does not observe (for example an unexpected stderr line) is a FAIL of class **implemented but wrong** with \`- **Layer**: code\`" "review: output on an unobserved channel is implemented but wrong at the code layer"
+
+# Both checks run, they are not read off the contract
+assert_contains "$obs" "running the test cases and probing, as for any other clause" "review: both checks are made by running the test cases and probing"
