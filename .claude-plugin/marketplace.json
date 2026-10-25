@@ -26,7 +26,7 @@
     {
       "name": "spiral",
       "source": "./spiral",
-      "description": "[Experimental] Spiral — turns a vague question into a goal ready for /cf, one layer of decisions at a time, without writing code"
+      "description": "[Experimental] Spiral — turns a vague question into a goal ready for the main session, one layer of decisions at a time, without writing code"
     },
     {
       "name": "spec",

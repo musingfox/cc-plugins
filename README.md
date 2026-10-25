@@ -71,7 +71,7 @@ Narrows a vague question into an implementation-sized goal, one layer at a time 
 - **Probes walk what you cannot settle from the page**: where candidates only differ once you take them, cheap throwaway descents run one per candidate and report the first hard thing each hits. A candidate that collides is dropped on evidence, never put to a vote. Where reading cannot settle it, a probe escalates to a **prototype** that builds and runs the smallest thing giving a red/green signal. A prototype can also go out without a probe, one per candidate on its own branch, when you ask to see the candidates built or when only a built thing can tell them apart.
 - **Convergence lands a layer**: what you settled becomes a plan or milestone — what this layer settles, what is concrete enough to build on, what it deliberately leaves to the next layer, and what would overturn it. Load-bearing facts cite their source.
 - **You own both directions**: the decision page renders in the browser; the depth gate afterwards is a one-line ask in the terminal, on a plan you already have. Dig another layer, stop, or — when a layer falsifies what the one above it rested on — go back up and retake that decision. It only widens again when you ask.
-- **Output is a goal, not code**: the run is promoted to `docs/milestones/<slug>.md`, composed from every layer that still stands — `.spiral/` is scratch, the milestone outlives it — then handed to `/cf` as a seed, not a contract set. No gate, nothing merged. A prototype may build a throwaway thing to settle a decision, but its code is evidence, abandoned on its own branch.
+- **Output is a goal, not code**: the run is promoted to `docs/milestones/<slug>.md`, composed from every layer that still stands — `.spiral/` is scratch, the milestone outlives it — then handed to the main session as a seed, not a contract set. No gate, nothing merged. A prototype may build a throwaway thing to settle a decision, but its code is evidence, abandoned on its own branch.
 - **Single command**: `/spiral "the question"`.
 
 See `spiral/docs/concept.md` for the full concept.
@@ -231,7 +231,7 @@ Generate an interactive bash wizard that walks a human through steps only they c
 
 Confirm the cause of a bug and leave one failing test on a branch — ported from [mattpocock/skills](https://github.com/mattpocock/skills) (`diagnosing-bugs`), MIT, Copyright (c) 2026 Matt Pocock:
 - **Own worktree**: diagnosis runs on a throwaway worktree; the current checkout stays untouched
-- **Stops at red**: a confirmed cause plus one failing test; applying the fix is `/cf`'s work
+- **Stops at red**: a confirmed cause plus one failing test; applying the fix is the main session's work
 - **Read the branch**: the branch is a source to read from, not something to check out
 - **Two entries**: `/diagnose:diagnose` asks before it starts; `/diagnose:diagnose-now` starts immediately
 
@@ -323,7 +323,7 @@ Repository audits that put each piece of knowledge where it cannot drift. Each a
 - **`/audit:docs`**: sorts every section of the repo's docs — `README.md`, `CONTRIBUTING.md`, `CLAUDE.md` and `AGENTS.md` at every level, `docs/`, spec and ADR entries — into history, constraint, decision or current state; current state is a cache of the code, so it is replaced by a pointer to its source, rules move into the directory they govern, decisions go to `/adr:adr` and silent invariants to `/spec:spec`
 - **Core plus modules**: every repo gets the core (`README.md`, `CLAUDE.md`); architecture, contributing, nested directories, UI design and operations are modules whose guidance loads only when the repo shows their signal, and a signal with no content gets a question, never an empty file
 - **`docs-classifier` agent**: classifies one long doc, samples its claims against the code, and writes a report; its output is a lead list the skill verifies before acting
-- **`/audit:tests`**: traces each commitment clause of the repo's standing milestones in `docs/milestones/` to the tests meant to guard it, and lists the clauses nothing guards, with one `/cf` line per delivered milestone to get those tests written; it reads assertions and never runs the repo's tests
+- **`/audit:tests`**: traces each commitment clause of the repo's standing milestones in `docs/milestones/` to the tests meant to guard it, and lists the clauses nothing guards, with one hand-off line per delivered milestone for the main session to get those tests written; it reads assertions and never runs the repo's tests
 - **`tests-tracer` agent**: traces one milestone's clauses and writes a verdict per clause to a report; the skill assembles the reports into one list
 - More audits (infrastructure config) are planned as further skills
 
