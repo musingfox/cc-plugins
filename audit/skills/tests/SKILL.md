@@ -75,7 +75,7 @@ Run `git -C <repo> status --porcelain` again and compare it with `before.txt`. W
 match, print `repo untouched`. Otherwise print `repo changed during the audit:` followed by
 the differing lines. The receipt reports and never aborts.
 
-Print the list path, the `## Counts` and `## Hand to cf` blocks from the list, and the
+Print the list path, the `## Counts` and `## Hand to the main session` blocks from the list, and the
 receipt.
 
 Done when the user has the list path, both blocks and the receipt.

@@ -32,7 +32,7 @@ section '## omega (done)' "$out" | grep -Fqx 'not traced: no report' || fail "T1
 section '## psi (done)' "$out" | grep -Fqx 'not traced: no clause lines in report' || fail "T1 psi"
 section '## Skipped' "$out" | grep -Fqx -- '- docs/milestones/gamma.md — superseded' || fail "T1 skipped"
 order="$(printf '%s\n' "$out" | grep '^## ' | paste -sd, -)"
-[ "$order" = '## Counts,## Hand to cf,## alpha (done),## beta (accepted),## omega (done),## psi (done),## Skipped' ] || fail "T1 section order: $order"
+[ "$order" = '## Counts,## Hand to the main session,## alpha (done),## beta (accepted),## omega (done),## psi (done),## Skipped' ] || fail "T1 section order: $order"
 
 out2="$(bash "$S" "$tmp/inv" "$tmp/no-such-dir")" || fail "T2 exit 0"
 [ "$(printf '%s\n' "$out2" | grep -cFx 'not traced: no report')" = 4 ] || fail "T2 four not traced lines"
@@ -72,23 +72,23 @@ sum="$(printf '%s\n' "$cols" | paste -sd+ - | bc)"
 printf '%s\n' "$cols" | while read -r c; do [ "$c" -ge 1 ] || fail "Counts T3 a verdict column is 0"; done
 
 # CfHandoffLine T1: only the done milestone, only its partly and unguarded clauses, in report order
-[ "$(printf '%s\n' "$out" | grep -c '^/cf ')" = 1 ] || fail "CfHandoff T1 exactly one /cf line"
-printf '%s\n' "$out" | grep -Fqx '/cf Add tests that guard these commitments of docs/milestones/alpha.md: L14-15 "refuses to overwrite"; L16 "exits 3 on a locked file"' || fail "CfHandoff T1 line text"
+[ "$(section '## Hand to the main session' "$out" | grep -c .)" = 1 ] || fail "CfHandoff T1 exactly one hand-off line"
+section '## Hand to the main session' "$out" | grep -Fqx 'Add tests that guard these commitments of docs/milestones/alpha.md: L14-15 "refuses to overwrite"; L16 "exits 3 on a locked file"' || fail "CfHandoff T1 line text"
 
 # CfHandoffLine T2: nothing unguarded or partly
 mkdir "$tmp/ok"
 printf 'trace\tdone\tdocs/milestones/alpha.md\n' > "$tmp/ok/inv"
 printf -- '- **guarded** L1 "a" — t:1 `x`\n- **retracted** L2 "b" — retracted at L9\n' > "$tmp/ok/alpha.md"
 out4="$(bash "$S" "$tmp/ok/inv" "$tmp/ok")"
-[ "$(printf '%s\n' "$out4" | grep -c '^/cf ')" = 0 ] || fail "CfHandoff T2 no /cf lines"
-section '## Hand to cf' "$out4" | grep -Fqx 'nothing to hand to cf' || fail "CfHandoff T2 nothing line"
+[ "$(section '## Hand to the main session' "$out4" | grep -c 'Add tests')" = 0 ] || fail "CfHandoff T2 no hand-off lines"
+section '## Hand to the main session' "$out4" | grep -Fqx 'nothing to hand to the main session' || fail "CfHandoff T2 nothing line"
 
 # CfHandoffLine T3: a | inside a clause survives the join
 mkdir "$tmp/pipe"
 printf 'trace\tdone\tdocs/milestones/a.md\n' > "$tmp/pipe/inv"
 printf -- '- **unguarded** L3 "exits 0 | 1 on success" — searched t/\n' > "$tmp/pipe/a.md"
 out6="$(bash "$S" "$tmp/pipe/inv" "$tmp/pipe")"
-printf '%s\n' "$out6" | grep -Fqx '/cf Add tests that guard these commitments of docs/milestones/a.md: L3 "exits 0 | 1 on success"' \
+section '## Hand to the main session' "$out6" | grep -Fqx 'Add tests that guard these commitments of docs/milestones/a.md: L3 "exits 0 | 1 on success"' \
   || fail "CfHandoff T3 a pipe inside a clause is kept"
 
 # UnguardedList T5: a directory is not an inventory
