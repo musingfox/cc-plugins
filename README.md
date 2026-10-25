@@ -81,6 +81,22 @@ See `spiral/docs/concept.md` for the full concept.
 /plugin install spiral
 ```
 
+### Method (Experimental)
+
+One skill that teaches a session to act as one **node** of a contract tree: take a contract from the layer above, deliver it, report back. It fires on its own for a goal whose scope is settled, and for a question not yet sure what to build:
+- **Do or split**: a node does its contract itself unless the work outruns one context, has parallel parts, or needs a different model; splitting makes it the author of the sub-contracts
+- **Sub-contracts written in place**: the node writes each sub-node's `contracts.json` itself — observed channels, file scope, test cases, decision tiering, atomicity, load-bearing assumptions — and checks it with `scripts/check-contracts.sh`
+- **Verbatim tickets**: `contracts.json` reaches a muster worker through `--ticket-file`, never retyped; nested muster runs carry a depth-2 tree back in one fetch
+- **One review per split**: `cf:review` checks a split node's integrated branch against the contract its author wrote; leaves run only the `cf-scope` and `cf-revert-gate` gates
+- **Fixed report shape**: `DONE` or `BLOCKED`, then the kind, the review layer, what was found and the options, so a rex pane and a muster worker report alike; a problem climbs one layer at a time, after one information round and at most two bounces
+- **Narrowing first**: spiral's diverge → round → probe → converge, ending in a contract the node does or splits
+- **Uses**: context-flow's `cf:review` and gate scripts, spiral's agents, and muster
+
+**Installation:**
+```bash
+/plugin install method
+```
+
 ### ADR (Architecture Decision Records)
 
 Lifecycle management for [MADR 4.0](https://adr.github.io/madr/) Architecture Decision Records with cross-reference consistency enforcement:
@@ -362,6 +378,7 @@ cc-plugins/
 ├── flashcards/        hooks: register (Claude Mod) · tests
 ├── hook-guard/         skills: hook-guard
 ├── mermaid-inline/     hooks: register (Claude Mod) · tests
+├── method/             skills: method · scripts · tests
 ├── muster/             skills: muster · hooks: register (Claude Mod) · src, e2e, tests
 ├── obsidian-workspace/ skills: init, jot, pm · templates, tests · hooks: register (Claude Mod)
 ├── omp-quota/          hooks: register (Claude Mod) · tests

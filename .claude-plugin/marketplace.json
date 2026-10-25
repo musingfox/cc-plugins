@@ -29,6 +29,11 @@
       "description": "[Experimental] Spiral — turns a vague question into a goal ready for the main session, one layer of decisions at a time, without writing code"
     },
     {
+      "name": "method",
+      "source": "./method",
+      "description": "[Experimental] One node of a contract tree — do a contract yourself or split it into sub-contracts you write, dispatch them, route what comes back, report up in a fixed shape; narrows a question that is not yet a contract first"
+    },
+    {
       "name": "spec",
       "source": "./spec",
       "description": "Architecture spec library — invariants and forward-looking interface contracts as verifiable, sliceable entries that reach workers through their briefs, plus a CONTEXT.md domain glossary"
