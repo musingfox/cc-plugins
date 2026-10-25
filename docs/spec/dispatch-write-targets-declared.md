@@ -5,8 +5,6 @@ scope:
   - "pi-dispatch/scripts/pi-dispatch.sh"
   - "pi-dispatch/extensions/worktree-fence.ts"
   - "pi-dispatch/agents/builder.md"
-  - "context-flow/scripts/cf-pi-dispatch.sh"
-  - "context-flow/scripts/cf-pi-brief.sh"
   - "context-flow/scripts/cf-pi-env.sh"
 verify: check:bash pi-dispatch/tests/writable-test.sh
 related: [dispatch-verdict-from-file, quota-ends-the-batch]

@@ -4,9 +4,6 @@ status: accepted
 scope:
   - "pi-dispatch/scripts/pi-poll.sh"
   - "pi-dispatch/scripts/pi-agent.sh"
-  - "context-flow/scripts/cf-pi-run.sh"
-  - "context-flow/commands/cf.md"
-  - "context-flow/docs/phase-3-implement.md"
 verify: null
 related: [dispatch-write-targets-declared, dispatch-verdict-from-file]
 source: dispatch-write-set-and-failure-routing
