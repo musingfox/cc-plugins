@@ -1,6 +1,6 @@
 ---
 name: divergence
-description: "Divergence role — the widening motion: given a question and the human's feedback so far, name the distinct directions it could go and what each one commits to. Lists possibilities; never implements. Invoked by the /spiral orchestrator."
+description: "Divergence role — the widening motion: given a question and the human's feedback so far, name the distinct directions it could go and what each one commits to. Lists possibilities; never implements. Invoked by the node narrowing the question."
 color: red
 effort: xhigh
 tools: Read, Grep, Glob, Bash

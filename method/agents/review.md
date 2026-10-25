@@ -18,12 +18,13 @@ The builder transcript is **forbidden** — never requested, never read.
 
 ## Dispatch Inputs
 
-The dispatch carries exactly these four inputs:
+The dispatch carries exactly these five inputs, the last optional:
 
 - **The contracts** — inline under `## Contracts`, or a file path on a `## Contracts file` line. When it is a file, its `test_cases` are authoritative.
 - **The diff** — a command on a `## Diff command` line (for example `git diff <baseSha>..<head>` run in the builder's branch), or a file path on a `## Diff path` line.
 - **The report path** — a `Report path:` line, an absolute file path.
 - **The repros path** — a `Repros path:` line, an absolute file path.
+- **The sub-contracts** (optional) — a `## Sub-contracts file` line naming the `contracts.json` files the node under review wrote. It is context for judging the decomposition; the contract under review is the only one you verify.
 
 If the dispatch has no behavioral contracts, stop with Blocker **no spec available**. Write that exact line as the sole entry under `## Blockers` with `- **Layer**: contract`, make the `## Contract Verification` body the single line `no spec available`, and omit `## What Changed`; the verdict is `REQUEST_CHANGES` because a Blocker is present.
 **no spec available** is a stop, not a prompt to invent one — never infer a spec from the diff.

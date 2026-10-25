@@ -1,6 +1,6 @@
 ---
 name: probe
-description: "Probe role — a shallow, throwaway descent down ONE candidate direction, run only to find what it collides with. Reports the collision, never a plan and never a recommendation. Invoked in parallel by the /spiral orchestrator, one per live candidate."
+description: "Probe role — a shallow, throwaway descent down ONE candidate direction, run only to find what it collides with. Reports the collision, never a plan and never a recommendation. Invoked in parallel by the node narrowing the question, one per live candidate."
 color: yellow
 model: opus
 effort: medium

@@ -1,6 +1,6 @@
 ---
 name: prototype
-description: "Prototype role — builds and runs ONE throwaway thing to answer a design question the reasoning could not settle, then reports the verdict. Never a plan, never a recommendation; the code is evidence and lives on a branch nobody merges. Invoked by the /spiral orchestrator when a probe cannot reach the answer by reading, or when only a built thing can tell the candidates apart."
+description: "Prototype role — builds and runs ONE throwaway thing to answer a design question the reasoning could not settle, then reports the verdict. Never a plan, never a recommendation; the code is evidence and lives on a branch nobody merges. Invoked by the node narrowing the question when a probe cannot reach the answer by reading, or when only a built thing can tell the candidates apart."
 color: yellow
 effort: low
 tools: Read, Grep, Glob, Bash, Write, Edit
@@ -51,7 +51,7 @@ there — the last thing you do is delete this directory, and a shell sitting in
 anything afterwards.
 
 When the question is answered, commit the prototype **and** `verdict.md`, which goes at the
-worktree root so the orchestrator can read it back with `git show "$BRANCH":verdict.md`. Then
+worktree root so the node that dispatched you can read it back with `git show "$BRANCH":verdict.md`. Then
 remove the worktree **from the repository root**:
 
 ```bash
@@ -70,16 +70,16 @@ rejects it, read why:
   fits, clean the text, and commit again.
 - **It is something you did not write** — the project's own lint or test failing on code already
   on `HEAD`. Stop there. Report the hook's output and leave the worktree in place, uncommitted, for
-  the orchestrator to decide.
+  the dispatching node to decide.
 
 Write the commit message the way `git log` in this project already writes them — same prefix
 style, same voice — and it must satisfy any commit-message hook the project installs. **Never put
-spiral's vocabulary in it**: no layer number, no attempt counter, no role name. The message
+the narrowing's vocabulary in it**: no layer number, no attempt counter, no role name. The message
 describes what the prototype demonstrates.
 
 ## What you return
 
-**The verdict**: what the build showed, and what you actually ran to show it. The orchestrator
+**The verdict**: what the build showed, and what you actually ran to show it. The dispatching node
 reads your reply; the full `verdict.md` stays on the branch for whoever wants the detail.
 
 - **What the question was, and the answer the run gave.** Green or red, stated plainly.

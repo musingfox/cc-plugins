@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Pins the text contract of agents/review.md for the shape where the main session
-# pins a contract with the human, a builder implements it, and cf:review judges
+# pins a contract with the human, a builder implements it, and method:review judges
 # the builder's diff on the Spec axis alone.
 # NO set -e
 
-. "$CF_TESTS_DIR/lib/assert.sh"
+. "$METHOD_TESTS_DIR/lib/assert.sh"
 
-file="$CF_TESTS_DIR/../agents/review.md"
+file="$METHOD_TESTS_DIR/../agents/review.md"
 doc=$(cat "$file")
 
 # Banned words, whole words, case-insensitive. Inflections of the same stems are
@@ -65,6 +65,15 @@ for k in '## Contracts file' '## Diff path' 'Report path:' 'Repros path:'; do
   assert_contains "$doc" "$k" "review: dispatch input $k"
 done
 assert_contains "$doc" "## Diff command" "review: dispatch may carry a diff command"
+
+# The fifth input: optional sub-contracts, context for the decomposition only
+inputs=$(section '## Dispatch Inputs')
+assert_contains "$inputs" "exactly these five inputs" "review: dispatch names five inputs"
+sub=$(printf '%s\n' "$inputs" | grep -F -- '`## Sub-contracts file`' || true)
+assert_contains "$sub" "optional" "review: sub-contracts input is optional"
+assert_contains "$sub" "contracts.json" "review: sub-contracts input names the contracts.json files the node wrote"
+assert_contains "$sub" "context for judging the decomposition" "review: sub-contracts are context for the decomposition"
+assert_contains "$sub" "only one you verify" "review: the contract under review stays the only one verified"
 
 # Kept clauses
 assert_contains "$doc" "**missing or partial**" "review: FAIL class missing or partial"
