@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(git rev-parse --show-toplevel)"
-
 fail() { echo "  ✗ $*"; exit 1; }
 
-script="$PWD/method/scripts/render-decision.sh"
+script="$(cd "$METHOD_TESTS_DIR/../scripts" && pwd)/render-decision.sh"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
@@ -12,7 +10,7 @@ trap 'rm -rf "$tmp"' EXIT
 # stub render.sh records that a render happened instead of opening a browser.
 root="$tmp/a/b/method"
 mkdir -p "$root" "$tmp/a/b/viz/lib"
-printf '#!/usr/bin/env bash\ntouch "%s/rendered"\necho "URL: http://localhost:0/x"\n' "$tmp" > "$tmp/a/b/viz/lib/render.sh"
+printf '#!/usr/bin/env bash\ntouch "%s/rendered"\necho "$2" > "%s/name"\necho "URL: http://localhost:0/x"\n' "$tmp" "$tmp" > "$tmp/a/b/viz/lib/render.sh"
 
 brief() {
   cat > "$tmp/brief.md" <<EOF
@@ -81,3 +79,22 @@ sed -i.bak 's/^notes:$/notes: x/' "$tmp/brief.md"
 run
 [ "$rc" -ne 0 ] || fail "T4: a pre-filled round-level notes must be refused"
 [ ! -f "$tmp/rendered" ] || fail "T4: a pre-filled round-level notes must not render"
+
+# R1: with no second argument the output name handed to viz is `decision`.
+brief
+rm -f "$tmp/name"
+CLAUDE_PLUGIN_ROOT="$root" bash "$script" "$tmp/brief.md" >/dev/null 2>&1 || fail "R1: a clean brief with no output name must render"
+[ "$(cat "$tmp/name" 2>/dev/null)" = "decision" ] || fail "R1: the default output name must be decision, got: $(cat "$tmp/name" 2>/dev/null)"
+
+# R2: the installed-cache layout, <marketplace>/method/<version>/scripts beside
+# <marketplace>/viz/<version>/lib, resolves with CLAUDE_PLUGIN_ROOT unset.
+mk="$tmp/cache/mk"
+mkdir -p "$mk/method/1.0.0/scripts" "$mk/viz/1.0.0/lib"
+cp "$script" "$mk/method/1.0.0/scripts/render-decision.sh"
+printf '#!/usr/bin/env bash\necho "URL: http://localhost:0/x"\n' > "$mk/viz/1.0.0/lib/render.sh"
+set +e
+out="$(env -u CLAUDE_PLUGIN_ROOT bash "$mk/method/1.0.0/scripts/render-decision.sh" "$tmp/brief.md" n 2>&1)"
+rc=$?
+set -e
+[ "$rc" -eq 0 ] || fail "R2: the versioned cache layout must resolve, exit $rc: $out"
+printf '%s\n' "$out" | grep -q 'save-mode=browser' || fail "R2: the versioned cache layout must reach viz, got: $out"
