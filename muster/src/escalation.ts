@@ -21,6 +21,7 @@ type Settled = { kind: "answer"; text: string } | { kind: "terminated" };
 export type PermissionHandlerOptions = {
   layout: RunPaths;
   worktreeReal: string;
+  fenced?: boolean;
   trackPending: (cancel: () => void) => () => void;
   terminate: (reason: Reason, detail?: string) => Promise<number>;
   logDecision: (msg: object) => Promise<void>;
@@ -28,9 +29,9 @@ export type PermissionHandlerOptions = {
   allowedHosts?: string[];
 };
 
-function policyDecision(toolCall: ToolCallRequest, layout: RunPaths, worktreeReal: string): Decision {
+function policyDecision(toolCall: ToolCallRequest, layout: RunPaths, worktreeReal: string, fenced?: boolean): Decision {
   if (PATH_KINDS.has(toolCall.kind)) return decidePath(toolCall, { worktreeReal, reportPath: layout.report });
-  if (toolCall.kind === "execute") return decideBash(toolCall.rawInput?.command, { worktreeReal });
+  if (toolCall.kind === "execute") return decideBash(toolCall.rawInput?.command, { worktreeReal, fenced });
   return { allow: false, reason: `kind ${toolCall.kind} needs an answer` };
 }
 
@@ -78,7 +79,7 @@ function parseAnswer(text: string): Verdict {
 }
 
 export function createPermissionHandler(opts: PermissionHandlerOptions) {
-  const { layout, worktreeReal, trackPending, terminate, logDecision } = opts;
+  const { layout, worktreeReal, fenced, trackPending, terminate, logDecision } = opts;
   const env = opts.env ?? process.env;
   const poll = pollMs(env);
   let questions = 0;
@@ -123,7 +124,7 @@ export function createPermissionHandler(opts: PermissionHandlerOptions) {
       return { outcome: chooseOutcome(options, network.decision) };
     }
 
-    const policy = policyDecision(toolCall, layout, worktreeReal);
+    const policy = policyDecision(toolCall, layout, worktreeReal, fenced);
     if (policy.allow) {
       await logDecision({ decision: "allow", by: "policy" });
       return { outcome: chooseOutcome(options, "allow") };

@@ -29,10 +29,10 @@ The model sets the ceiling of what the worker can judge correctly; effort sets h
 Use these aliases, not full IDs: the adapter offers the newest models only under them, a full ID such as `claude-opus-5` is an older generation, and the session's own ID such as `claude-opus-5-5` is refused. `default` is refused too. `--effort` is optional; without it the worker runs at the adapter's default for that model (`high` for `haiku` in a real run). An effort the chosen model does not offer is refused. A refused model or effort's report lists every offered value with its display name.
 
 ```
-bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts run --name NAME --model MODEL [--effort EFFORT] --repo /abs/path/to/repo --ticket "TICKET TEXT"
+bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts run --name NAME --model MODEL [--effort EFFORT] [--fenced] --repo /abs/path/to/repo --ticket "TICKET TEXT"
 ```
 
-Use `--ticket-file PATH` instead of `--ticket` for a long ticket. Use `--base REF` to start from a ref other than HEAD. The first stdout line is `RUNDIR=<path>`; keep that path for collect.
+Use `--ticket-file PATH` instead of `--ticket` for a long ticket. Use `--base REF` to start from a ref other than HEAD. Add `--fenced` to run the worker's Bash inside the OS sandbox; see Confinement. The first stdout line is `RUNDIR=<path>`; keep that path for collect.
 
 ## Wait
 
@@ -113,10 +113,11 @@ rm -rf "<RUNDIR>"
 
 A worker does not get the main session's permissions.
 
-- Bash runs inside Claude Code's OS sandbox. Writes are confined to the worker's worktree and the system temp directories, which stay writable, plus `<RUNDIR>/cache`, where `npm_config_cache` and `BUN_INSTALL_CACHE_DIR` point so package installs work. Reads are not confined except for credential stores, which the sandbox denies: `~/.npmrc`, `~/.config/gh`, `~/.git-credentials`, `~/.config/git/credentials`, `~/.netrc`, `~/.aws`, `~/.docker/config.json`, `~/.ssh`, `~/.pi`, `~/.config/gcloud`, `~/.kube`, `~/.cargo/credentials.toml`, `~/.pypirc`, `~/Library/Keychains`. The list is best-effort: it does not follow symlink targets or env overrides such as `XDG_CONFIG_HOME`. `muster run` refuses a `--repo` or `MUSTER_HOME` under `/tmp`, `/private/tmp` or `$TMPDIR`, because the sandbox leaves those writable and a worker could then write the repository's refs or answer its own questions.
+- By default (worktree only) the worker is isolated by its own clone of the repository and nothing else, and Bash is not confined. Bash can read credential stores, reach any host, push with your credentials and write anywhere you can. Test suites that run `git init` work, and a repository or run directory under the temp directories is accepted. File tools are still path-fenced, the tool allowlist and the web fetch host allowlist below still apply.
+- With `--fenced`, Bash runs inside Claude Code's OS sandbox. Writes are confined to the worker's worktree and the system temp directories, which stay writable, plus `<RUNDIR>/cache`, where `npm_config_cache` and `BUN_INSTALL_CACHE_DIR` point so package installs work. Reads are not confined except for credential stores, which the sandbox denies: `~/.npmrc`, `~/.config/gh`, `~/.git-credentials`, `~/.config/git/credentials`, `~/.netrc`, `~/.aws`, `~/.docker/config.json`, `~/.ssh`, `~/.pi`, `~/.config/gcloud`, `~/.kube`, `~/.cargo/credentials.toml`, `~/.pypirc`, `~/Library/Keychains`. The list is best-effort: it does not follow symlink targets or env overrides such as `XDG_CONFIG_HOME`. A fenced `muster run` refuses a `--repo` or `MUSTER_HOME` under `/tmp`, `/private/tmp` or `$TMPDIR`, because the sandbox leaves those writable and a worker could then write the repository's refs or answer its own questions. Apple `mktemp` needs a template there, and `git init` under the worktree fails with exit 128 because the sandbox protects `.git/hooks` and `.git/config` of every repository below it, so test suites that run `git init` cannot run fenced.
 - The worker's tools are a fixed list (Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch, ToolSearch, TodoWrite, TaskCreate, TaskUpdate, TaskList), with claude.ai connectors off.
 - File tools are fenced by path. A file request outside the worktree, or inside the worktree's `.git` or `.claude` directory, becomes a `question` for you.
-- Network is limited to the default hosts: `registry.npmjs.org`. github.com is off the list because a worker can read your git credentials and would otherwise be able to push as you. Hosts listed in `MUSTER_ALLOW_HOSTS` are added to them, set in the environment of `muster run`:
+- Web fetches, and Bash network access when `--fenced`, are limited to the default hosts: `registry.npmjs.org`. github.com is off the list because a worker can read your git credentials and would otherwise be able to push as you. Hosts listed in `MUSTER_ALLOW_HOSTS` are added to them, set in the environment of `muster run`:
 
 ```
 MUSTER_ALLOW_HOSTS=pypi.org,files.pythonhosted.org bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts run --name NAME --model MODEL --repo /abs/path/to/repo --ticket "TICKET TEXT"

@@ -113,7 +113,7 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
 
   let sessionId: string;
   try {
-    const hs = await handshake(channel, { worktree: wt.worktree, cache: layout.cache });
+    const hs = await handshake(channel, { worktree: wt.worktree, cache: layout.cache, fenced: request.fenced });
     sessionId = hs.sessionId;
     state.sessionId = sessionId;
     const afterModel = await gateModel(channel, { sessionId, configOptions: hs.configOptions, requestedModel: request.model });
@@ -135,6 +135,7 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
     createPermissionHandler({
       layout,
       worktreeReal: wt.worktree,
+      fenced: request.fenced,
       trackPending: term.trackPending,
       terminate: term.terminate,
       logDecision,

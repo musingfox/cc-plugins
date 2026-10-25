@@ -51,7 +51,7 @@ async function call(channel: Channel, method: string, params: unknown, ms: numbe
 
 export async function handshake(
   channel: Channel,
-  opts: { worktree: string; cache: string; env?: Record<string, string | undefined> },
+  opts: { worktree: string; cache: string; fenced?: boolean; env?: Record<string, string | undefined> },
 ): Promise<Handshake> {
   const env = opts.env ?? process.env;
   try {
@@ -60,7 +60,7 @@ export async function handshake(
     if (e instanceof InvalidAllowHost) throw new HandshakeError(e.message);
     throw e;
   }
-  const sandbox = sandboxOption({ env, cache: opts.cache });
+  const sandbox = opts.fenced ? sandboxOption({ env, cache: opts.cache }) : undefined;
   const ms = handshakeTimeoutMs();
   const init = (await call(
     channel,
@@ -88,7 +88,7 @@ export async function handshake(
             // Without an allowlist and with connectors on, the worker inherits the user's account-level tools
             // (RemoteTrigger acted on cloud routines with no permission request).
             tools: WORKER_TOOLS,
-            sandbox,
+            ...(sandbox ? { sandbox } : {}),
           },
         },
       },

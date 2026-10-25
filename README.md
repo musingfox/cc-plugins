@@ -201,7 +201,7 @@ Offload heavy work to [pi](https://github.com/earendil-works/pi) cheap/fast mode
 
 ### muster (Experimental)
 
-Unattended Claude workers over [ACP](https://agentclientprotocol.com) (claude-agent-acp, pinned by version): a coordinator dispatches headless workers, each under a permission fence, and collects their result from a report file:
+Unattended Claude workers over [ACP](https://agentclientprotocol.com) (claude-agent-acp, pinned by version): a coordinator dispatches headless workers, each optionally under a permission fence, and collects their result from a report file:
 - **Permission fence**: workers run in default mode with no setting sources; only one-time allow and reject decisions are answered
 - **Model and effort per dispatch**: `--model` takes an alias (`haiku`, `sonnet`, `opus`, `fable`), since the adapter offers the newest models only under them, and the optional `--effort` sets how hard that model works; a value the adapter does not offer is refused with the offered values and their display names
 - **Event log**: every worker run records its events for replay after the fact

@@ -10,19 +10,25 @@ export interface DispatchRequest {
   repoRoot: string;
   baseRef: string;
   ticket: string;
+  fenced: boolean;
 }
 
 const VALUE_FLAGS = new Set(["--name", "--model", "--effort", "--repo", "--base", "--ticket", "--ticket-file"]);
 
-function parseFlags(args: string[]): Map<string, string> {
+function parseFlags(args: string[]): { flags: Map<string, string>; fenced: boolean } {
   const flags = new Map<string, string>();
-  for (let i = 0; i < args.length; i += 2) {
+  let fenced = false;
+  for (let i = 0; i < args.length; i++) {
     const flag = args[i];
+    if (flag === "--fenced") {
+      fenced = true;
+      continue;
+    }
     if (!VALUE_FLAGS.has(flag)) throw new UsageError(`unknown argument "${flag}"`);
     if (args[i + 1] === undefined) throw new UsageError(`${flag} needs a value`);
-    flags.set(flag, args[i + 1]);
+    flags.set(flag, args[++i]);
   }
-  return flags;
+  return { flags, fenced };
 }
 
 function gitWorkTree(repo: string): string {
@@ -38,7 +44,8 @@ function gitWorkTree(repo: string): string {
   return root;
 }
 
-// The worker's sandbox leaves the system temp directories writable, so a repo or run directory there is not fenced.
+// A fenced worker's sandbox leaves the system temp directories writable, so a repo or run directory there is not
+// fenced; an unfenced run has no sandbox to leave open and accepts them.
 function realpathOfExisting(path: string): string {
   try {
     return realpathSync(path);
@@ -96,12 +103,12 @@ function ticketText(flags: Map<string, string>): string {
 }
 
 export function parseRunArgs(argv: string[], env: Env = { MUSTER_HOME: process.env.MUSTER_HOME, HOME: process.env.HOME ?? "", TMPDIR: process.env.TMPDIR }): DispatchRequest {
-  const flags = parseFlags(argv[0] === "run" ? argv.slice(1) : argv);
+  const { flags, fenced } = parseFlags(argv[0] === "run" ? argv.slice(1) : argv);
 
   const name = flags.get("--name");
   if (!name) throw new UsageError("--name is required");
   const paths = runPaths(name, env);
-  refuseUnderTemp("MUSTER_HOME", paths.runDir, env);
+  if (fenced) refuseUnderTemp("MUSTER_HOME", paths.runDir, env);
   if (existsSync(paths.runDir)) throw new UsageError(`run "${name}" already exists at ${paths.runDir}`);
 
   const model = flags.get("--model");
@@ -114,7 +121,7 @@ export function parseRunArgs(argv: string[], env: Env = { MUSTER_HOME: process.e
   const repo = flags.get("--repo");
   if (!repo) throw new UsageError("--repo is required");
   const repoRoot = gitWorkTree(repo);
-  refuseUnderTemp("--repo", repoRoot, env);
+  if (fenced) refuseUnderTemp("--repo", repoRoot, env);
 
   const baseRef = flags.get("--base") ?? "HEAD";
   if (!resolvesToCommit(repoRoot, baseRef)) throw new UsageError(`unknown base ref "${baseRef}"`);
@@ -123,6 +130,6 @@ export function parseRunArgs(argv: string[], env: Env = { MUSTER_HOME: process.e
     throw new UsageError(`branch muster/${name} already exists in ${repoRoot}; pick another name`);
   }
 
-  const request = { name, model, repoRoot, baseRef, ticket: ticketText(flags) };
+  const request = { name, model, repoRoot, baseRef, ticket: ticketText(flags), fenced };
   return effort === undefined ? request : { ...request, effort };
 }

@@ -1,6 +1,8 @@
 #!/usr/bin/env bun
 // End-to-end acceptance against the real claude-agent-acp adapter (bunx, pinned 0.93.0).
-// Run from muster/: bun e2e/accept.ts
+// Run from muster/: bun e2e/accept.ts [--fenced]
+// Without --fenced the worker is dispatched unfenced, like `muster run`; with it, `--fenced` is passed to `muster run`
+// and the sandbox receipts apply.
 // Needs the Claude Code login, bun, node and network. Not part of `bun test`.
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -32,6 +34,7 @@ const MUSTER = join(import.meta.dir, "..", "src", "muster.ts");
 const ADAPTER_VERSION = "0.93.0";
 const SHORT_MS = 60_000;
 const WAIT_MS = 8 * 60_000;
+const FENCED = process.argv.slice(2).includes("--fenced");
 
 type Env = Record<string, string | undefined>;
 
@@ -134,7 +137,7 @@ async function run(base: string): Promise<void> {
   delete env.MUSTER_ALLOW_HOSTS;
 
   const ticket = [
-    "Use only the Write, Bash, WebFetch and WebSearch tools named below, plus ToolSearch solely to load WebFetch or WebSearch if they are deferred, and in step 13; do not call any MCP or other tool, and do not read documentation. Work through the numbered steps in order, once each. A refusal or failure from the sandbox, the network, WebFetch or WebSearch is an expected result: record what you saw, do not retry, do not work around it, and continue with the next step. The one exception: if a tool call fails with an input-validation error (for example a missing required parameter), correct the parameters and retry that call once; a refusal or permission denial is never retried.",
+    "Use only the Write, Bash, WebFetch and WebSearch tools named below, plus ToolSearch solely to load WebFetch or WebSearch if they are deferred, and in step 13; do not call any MCP or other tool, and do not read documentation. Work through the numbered steps in order, once each. A refusal or failure from the sandbox, the network, WebFetch or WebSearch, or success where nothing blocks the step, is an expected result: record what you saw, do not retry, do not work around it, and continue with the next step. The one exception: if a tool call fails with an input-validation error (for example a missing required parameter), correct the parameters and retry that call once; a refusal or permission denial is never retried.",
     "1. Use the Write tool to create hello.txt in the working directory with the exact content: hi",
     "2. In Bash, run exactly this command and nothing else, with no added echo or $?: echo ok > bash-ok.txt",
     "3. In Bash, run exactly this command and nothing else: bun test",
@@ -156,14 +159,14 @@ async function run(base: string): Promise<void> {
     "19. In Bash, run exactly this command and nothing else: FOO=$(pwd); echo \"$FOO\" > foo.txt",
     ...depsTicketSteps(20),
     "Then write the report to REPORT.md. Its first line must be exactly DONE, followed by one line per step 1 to 23 saying what happened.",
-    "Do not write BLOCKED for a refusal in steps 5 to 11, step 14 or step 18; those refusals are the expected result of this run.",
+    "Do not write BLOCKED for a refusal in steps 5 to 11, step 14 or step 18; a refusal or a success there is the expected result of this run.",
   ].join("\n");
 
   const name = "accept-ok";
   const runDir = join(home, "runs", name);
   const depsBefore = treeSnapshot(join(repo, "node_modules"));
   const first = Bun.spawn(
-    [process.execPath, MUSTER, "run", "--name", name, "--model", "haiku", "--repo", repo, "--ticket", ticket],
+    [process.execPath, MUSTER, "run", "--name", name, "--model", "haiku", "--repo", repo, "--ticket", ticket, ...(FENCED ? ["--fenced"] : [])],
     { env, stdout: "ignore", stderr: "inherit" },
   );
   try {
@@ -231,7 +234,12 @@ async function run(base: string): Promise<void> {
     const settingSources = sessionNew?.msg.params?._meta?.claudeCode?.options?.settingSources;
     receipt("(5) session/new has settingSources []", Array.isArray(settingSources) && settingSources.length === 0, JSON.stringify(settingSources));
     check("(5) every tool the worker called or loaded is on the allowlist, and step 13 ran", checkWorkerTools(events));
-    check("(5) session/new carries the sandbox object, allowlist, denyRead and allowWrite, tool allowlist and connectors-off setting", checkSessionSandbox(events, { home: process.env.HOME ?? homedir(), cache: join(runDir, "cache") }));
+    check(
+      FENCED
+        ? "(5) session/new carries the sandbox object, allowlist, denyRead and allowWrite, tool allowlist and connectors-off setting"
+        : "(5) session/new carries no sandbox key, and the tool allowlist and connectors-off setting",
+      checkSessionSandbox(events, { home: process.env.HOME ?? homedir(), cache: join(runDir, "cache"), fenced: FENCED }),
+    );
     check("(7) at least one execute permission request, every one allowed once by policy, no QUESTION", checkExecuteAllowedOnce({ events, questions }));
 
     const promptIdx = events.findIndex((e) => e.dir === "out" && e.msg.method === "session/prompt");
@@ -253,7 +261,7 @@ async function run(base: string): Promise<void> {
       console.log("note: prompt usage not reported by the adapter");
     }
 
-    check("(8) Bash write to a plain path outside the worktree attempted, failed, no file", checkBlockedWrite({ events, needle: plain, targetExists: existsSync(plain) }));
+    if (FENCED) check("(8) Bash write to a plain path outside the worktree attempted, failed, no file", checkBlockedWrite({ events, needle: plain, targetExists: existsSync(plain) }));
     check("(8) in-worktree Bash write completed", checkCompleted({ events, needle: "bash-ok.txt" }));
     const bashOk = join(meta.worktree, "bash-ok.txt");
     receipt("(8) bash-ok.txt in worktree contains ok", existsSync(bashOk) && readFileSync(bashOk, "utf8").includes("ok"), bashOk);
@@ -262,21 +270,25 @@ async function run(base: string): Promise<void> {
     const subject = gitOut(repo, "log", `muster/${name}`, "-1", "--format=%s");
     receipt("(8) commit on muster/<name> has subject feat: e2e", subject === "feat: e2e", subject);
 
-    check(
-      "(8) git update-ref on the user's main attempted, refused, and main unchanged",
-      checkRefProtected({ events, needle: "update-ref refs/heads/main", before: mainBefore, after: gitOut(repo, "rev-parse", "refs/heads/main") }),
-    );
+    if (FENCED) {
+      check(
+        "(8) git update-ref on the user's main attempted, refused, and main unchanged",
+        checkRefProtected({ events, needle: "update-ref refs/heads/main", before: mainBefore, after: gitOut(repo, "rev-parse", "refs/heads/main") }),
+      );
+    } else {
+      receipt("(8) the user's main is unchanged", gitOut(repo, "rev-parse", "refs/heads/main") === mainBefore, mainBefore);
+    }
     check("(8) npm install of left-pad into a scratch dir completed", checkCompleted({ events, needle: "left-pad" }));
     const leftPad = join(meta.worktree, "scratch", "node_modules", "left-pad");
     receipt("(8) left-pad is in the scratch dir's node_modules", existsSync(leftPad), leftPad);
 
-    check("(8) ls of ~/Library/Keychains attempted and refused with EPERM", checkReadDenied({ events, needle: "ls ~/Library/Keychains" }));
+    if (FENCED) check("(8) ls of ~/Library/Keychains attempted and refused with EPERM", checkReadDenied({ events, needle: "ls ~/Library/Keychains" }));
     check("(8) git tag release in the clone completed", checkCompleted({ events, needle: "git tag release" }));
     receipt("(8) the tag exists in the clone", gitOut(meta.worktree, "tag", "--list", "release") === "release", meta.worktree);
 
     const registry = "registry.npmjs.org";
     check("(9) curl to allowlisted host raised no QUESTION and no host permission request", checkAllowlistedProbe({ events, needle: registry, host: registry, questions }));
-    check("(9) curl to non-allowlisted host attempted and blocked, no QUESTION", checkBlockedProbe({ events, needle: "example.com", host: "example.com", questions }));
+    if (FENCED) check("(9) curl to non-allowlisted host attempted and blocked, no QUESTION", checkBlockedProbe({ events, needle: "example.com", host: "example.com", questions }));
 
     check("(10) WebFetch of allowlisted URL allowed once by policy, no QUESTION", checkFetch({ events, url: "https://registry.npmjs.org/", expect: "allow", questions }));
     check("(10) WebFetch of non-allowlisted URL rejected by policy, no QUESTION", checkFetch({ events, url: "https://example.com/", expect: "reject", questions }));
@@ -285,7 +297,7 @@ async function run(base: string): Promise<void> {
 
     const bad = "accept-bad";
     const badRun = await muster(
-      ["run", "--name", bad, "--model", "not-a-model", "--repo", repo, "--ticket", ticket],
+      ["run", "--name", bad, "--model", "not-a-model", "--repo", repo, "--ticket", ticket, ...(FENCED ? ["--fenced"] : [])],
       env,
     );
     const badDir = join(home, "runs", bad);

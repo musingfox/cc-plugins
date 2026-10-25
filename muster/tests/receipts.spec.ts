@@ -329,7 +329,7 @@ describe("package install receipt", () => {
   });
 });
 
-const WHERE = { home: "/home/u", cache: "/run/accept-ok/cache" };
+const WHERE = { home: "/home/u", cache: "/run/accept-ok/cache", fenced: true };
 
 describe("session/new receipt", () => {
   const sessionNew = (options: Record<string, unknown>): Event => ({
@@ -348,6 +348,16 @@ describe("session/new receipt", () => {
     settings: { permissions: { ask: ["WebFetch"] }, disableClaudeAiConnectors: true },
     tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "ToolSearch", "TodoWrite", "TaskCreate", "TaskUpdate", "TaskList"],
   };
+
+  test("F8: unfenced passes with no sandbox key and fails when one is present; tools and settings are still checked", () => {
+    const { sandbox: _s, ...unfenced } = good;
+    const where = { ...WHERE, fenced: false };
+    expect(checkSessionSandbox([sessionNew(unfenced)], where).ok).toBe(true);
+    expect(checkSessionSandbox([sessionNew(good)], where)).toMatchObject({ ok: false, failure: "sandbox-present-unfenced" });
+    expect(checkSessionSandbox([sessionNew({ ...unfenced, tools: [] })], where)).toMatchObject({ ok: false, failure: "tools-option-mismatch" });
+    expect(checkSessionSandbox([sessionNew({ ...unfenced, settings: {} })], where)).toMatchObject({ ok: false, failure: "settings-option-mismatch" });
+    expect(checkSessionSandbox([sessionNew(unfenced)], WHERE)).toMatchObject({ ok: false, failure: "sandbox-option-mismatch" });
+  });
 
   test("both new fields present pass", () => {
     expect(checkSessionSandbox([sessionNew(good)], WHERE).ok).toBe(true);
