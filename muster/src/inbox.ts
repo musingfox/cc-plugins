@@ -1,7 +1,7 @@
 import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import type { Channel } from "./channel";
-import { type RunPaths, readPhase, writePhase } from "./layout";
+import { type RunPaths, UsageError, readPhase, writePhase } from "./layout";
 import { buildFollowup } from "./prompt";
 
 const DEFAULT_IDLE_TIMEOUT_MS = 900000;
@@ -10,7 +10,12 @@ const FOLLOWUP_RE = /^FOLLOWUP-(\d+)\.md$/;
 
 export function idleTimeoutMs(): number {
   const raw = process.env.MUSTER_IDLE_TIMEOUT_MS;
-  return raw === undefined ? DEFAULT_IDLE_TIMEOUT_MS : Number(raw);
+  if (raw === undefined) return DEFAULT_IDLE_TIMEOUT_MS;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) {
+    throw new UsageError(`MUSTER_IDLE_TIMEOUT_MS must be a positive number, got "${raw}"`);
+  }
+  return n;
 }
 
 export function pollMs(): number {

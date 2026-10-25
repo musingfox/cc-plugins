@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Channel, openChannel } from "../src/channel";
-import { type RunPaths, readPhase, runPaths, writePhase } from "../src/layout";
+import { type RunPaths, UsageError, readPhase, runPaths, writePhase } from "../src/layout";
 import { idleTimeoutMs, runFollowupInbox } from "../src/inbox";
 
 const FAKE = join(import.meta.dir, "support", "fake-agent.ts");
@@ -134,7 +134,9 @@ describe("FollowUpInbox", () => {
 
   test("T4: with MUSTER_IDLE_TIMEOUT_MS unset the idle timeout is 900000", () => {
     delete process.env.MUSTER_IDLE_TIMEOUT_MS;
+    const before = listRun();
     expect(idleTimeoutMs()).toBe(900000);
+    expect(listRun()).toEqual(before);
   });
 
   test("T5: an empty follow-up is marked sent, sends no prompt, and logs a client-decision warning", async () => {
@@ -162,5 +164,62 @@ describe("FollowUpInbox", () => {
     await waitFor(() => promptTexts().length === 1);
     await inbox;
     expect(promptTexts()[0]).toContain("do Y");
+  });
+
+  const IDLE_MSG = (raw: string) => `MUSTER_IDLE_TIMEOUT_MS must be a positive number, got "${raw}"`;
+  const listRun = () => readdirSync(paths.runDir).sort();
+
+  function expectRefused(raw: string) {
+    process.env.MUSTER_IDLE_TIMEOUT_MS = raw;
+    const before = listRun();
+    let err: unknown;
+    try {
+      idleTimeoutMs();
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(UsageError);
+    expect((err as Error).message).toBe(IDLE_MSG(raw));
+    expect(listRun()).toEqual(before);
+  }
+
+  test("T7: a positive numeric MUSTER_IDLE_TIMEOUT_MS is returned and writes no files", () => {
+    process.env.MUSTER_IDLE_TIMEOUT_MS = "300";
+    const before = listRun();
+    expect(idleTimeoutMs()).toBe(300);
+    expect(listRun()).toEqual(before);
+  });
+
+  test("T8: a non-numeric value throws UsageError and writes no files", () => {
+    expectRefused("30m");
+  });
+
+  test("T9: the empty string throws UsageError and writes no files", () => {
+    expectRefused("");
+  });
+
+  test("T10: zero and negative values throw UsageError and write no files", () => {
+    expectRefused("0");
+    expectRefused("-5");
+  });
+
+  test("T11: Infinity throws UsageError and writes no files", () => {
+    expectRefused("Infinity");
+  });
+
+  test("T12: runFollowupInbox rejects with UsageError on an invalid value and leaves phase idle", async () => {
+    process.env.MUSTER_IDLE_TIMEOUT_MS = "30m";
+    const ch = await open();
+    const timeout = new Promise<"timeout">((r) => setTimeout(() => r("timeout"), 3000));
+    const outcome = await Promise.race([
+      runFollowupInbox({ paths, channel: ch, sessionId: SESSION }).then(
+        () => "resolved" as const,
+        (e: unknown) => e,
+      ),
+      timeout,
+    ]);
+    expect(outcome).toBeInstanceOf(UsageError);
+    expect((outcome as Error).message).toBe(IDLE_MSG("30m"));
+    expect(readPhase(paths)).toEqual({ phase: "idle" });
   });
 });
