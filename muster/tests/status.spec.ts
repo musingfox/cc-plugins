@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRunDir, runPaths, writePhase, type RunPaths } from "../src/layout";
@@ -178,5 +178,39 @@ describe("StatusReader", () => {
     writePhase(p, { phase: "running", pid: process.pid });
     const result = statusVerb("a1", { MUSTER_HOME: home, HOME: home });
     expect(result).toEqual({ exitCode: 0, stdout: "a1 state=running\n", stderr: "" });
+  });
+});
+
+describe("TerminationReasonInStatus status line", () => {
+  const env = () => ({ MUSTER_HOME: home, HOME: home });
+
+  test("T3: exit-reason and JSON-quoted exit-detail come last on one line", () => {
+    const p = makeRun();
+    writePhase(p, { phase: "exited", reason: "agent-exited", detail: "line1\nline2", fetched: true });
+    writeFileSync(p.report, "BLOCKED\nwhy\n");
+    const before = readFileSync(p.phase, "utf8");
+    const r = statusVerb("a1", env());
+    expect(r).toEqual({
+      exitCode: 0,
+      stdout: `a1 state=blocked report=${p.report} reason=why exit-reason=agent-exited exit-detail="line1\\nline2"\n`,
+      stderr: "",
+    });
+    expect(readFileSync(p.phase, "utf8")).toBe(before);
+    expect(readFileSync(p.report, "utf8")).toBe("BLOCKED\nwhy\n");
+  });
+
+  test("T4: a non-exited phase gets neither field", () => {
+    const p = makeRun();
+    writePhase(p, { phase: "running", pid: process.pid, reason: "stopped" });
+    const before = readFileSync(p.phase, "utf8");
+    expect(statusVerb("a1", env())).toEqual({ exitCode: 0, stdout: "a1 state=running\n", stderr: "" });
+    expect(readFileSync(p.phase, "utf8")).toBe(before);
+    expect(existsSync(p.report)).toBe(false);
+  });
+
+  test("exited phase without a string reason adds no field", () => {
+    const p = makeRun();
+    writePhase(p, { phase: "exited", reason: 5 as any, detail: "x" });
+    expect(line(p)).toBe("a1 state=idle");
   });
 });

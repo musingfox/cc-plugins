@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { createRunDir, runPaths, writePhase } from "../src/layout.ts";
+import { statusVerb } from "../src/verbs/status.ts";
 import { join } from "node:path";
 import { DEFAULT_ALLOWED_HOSTS } from "../src/sandbox.ts";
 import { WORKER_TOOLS } from "../src/handshake.ts";
@@ -170,5 +173,23 @@ describe("DocsDescribeBand", () => {
     const market = MARKET.plugins.find((p) => p.name === "muster")?.description ?? "";
     expect(PLUGIN.description).toBe(market);
     expect(market).toContain("2.1.304");
+  });
+
+  test("T5: the skill documents exit-reason and exit-detail, and an idle-timeout run shows exit-reason", () => {
+    expect(SKILL).toContain("exit-reason=idle-timeout");
+    expect(SKILL).toContain("exit-reason=<reason>");
+    expect(SKILL).toContain("exit-detail=");
+    expect(SKILL).not.toContain("same status line as before it exited");
+    const home = mkdtempSync(join(tmpdir(), "muster-skill-"));
+    try {
+      const env = { MUSTER_HOME: home, HOME: home };
+      const p = runPaths("a1", env);
+      createRunDir(p);
+      writeFileSync(p.meta, JSON.stringify({ name: "a1" }));
+      writePhase(p, { phase: "exited", reason: "idle-timeout" });
+      expect(statusVerb("a1", env)).toEqual({ exitCode: 0, stdout: "a1 state=idle exit-reason=idle-timeout\n", stderr: "" });
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
   });
 });

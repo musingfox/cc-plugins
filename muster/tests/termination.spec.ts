@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { openChannel, type Channel } from "../src/channel";
 import { handshake } from "../src/handshake";
 import { createRunDir, runPaths, UsageError, type RunPaths } from "../src/layout";
+import { statusVerb } from "../src/verbs/status";
 import { createTerminator, killGraceMs, pollMs, type TerminatorState } from "../src/termination";
 
 const FAKE = join(import.meta.dir, "support", "fake-agent.ts");
@@ -254,5 +255,52 @@ describe("WorkerTermination", () => {
 
     expect(h.codes).toEqual([]);
     expect(existsSync(layout.report)).toBe(false);
+  });
+});
+
+describe("TerminationReasonInStatus", () => {
+  async function terminateAndStatus(reason: any, detail: string | undefined, report?: string) {
+    const layout = runPaths("a1", { MUSTER_HOME: home, HOME: home });
+    createRunDir(layout);
+    writeFileSync(layout.meta, JSON.stringify({ name: "a1" }));
+    if (report !== undefined) writeFileSync(layout.report, report);
+    const h = harness(layout, {});
+    const errs: string[] = [];
+    const orig = process.stderr.write;
+    process.stderr.write = ((c: any) => (errs.push(String(c)), true)) as any;
+    try {
+      await h.terminate(reason, detail);
+    } finally {
+      process.stderr.write = orig;
+    }
+    const result = statusVerb("a1", { MUSTER_HOME: home, HOME: home });
+    return { layout, h, errs, result, phase: JSON.parse(readFileSync(layout.phase, "utf8")) };
+  }
+
+  test("T1: a DONE report is kept and status shows reason and JSON-quoted detail", async () => {
+    const detail = 'MUSTER_IDLE_TIMEOUT_MS must be a positive number, got "30m"';
+    const { layout, h, errs, result, phase } = await terminateAndStatus("prompt-error", detail, "DONE\nok\n");
+    expect(readFileSync(layout.report, "utf8")).toBe("DONE\nok\n");
+    expect(phase).toMatchObject({ phase: "exited", reason: "prompt-error", detail });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.split("\n").length).toBe(2);
+    expect(result.stdout.endsWith(` exit-reason=prompt-error exit-detail=${JSON.stringify(detail)}\n`)).toBe(true);
+    expect(result.stderr).toBe("");
+    expect(errs).toEqual([]);
+    expect(h.codes).toEqual([1]);
+  });
+
+  test("T2: no detail leaves no detail key and no exit-detail field", async () => {
+    const { layout, h, errs, result, phase } = await terminateAndStatus("stopped", undefined);
+    expect(readFileSync(layout.report, "utf8")).toBe("BLOCKED\nreason: stopped\n");
+    expect(phase.phase).toBe("exited");
+    expect(phase.reason).toBe("stopped");
+    expect("detail" in phase).toBe(false);
+    expect(result.stdout.trimEnd().endsWith(" exit-reason=stopped")).toBe(true);
+    expect(result.stdout).not.toContain("exit-detail=");
+    expect(result.stderr).toBe("");
+    expect(errs).toEqual([]);
+    expect(result.exitCode).toBe(0);
+    expect(h.codes).toEqual([0]);
   });
 });

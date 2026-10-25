@@ -52,6 +52,8 @@ bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts status NAME
 
 The status line carries `deps=<copied>/<total>` when the run records its dependency directories: how many of the directories holding a lockfile were copied into the worker's worktree, out of how many hold one. `deps=0/0` means none holds a lockfile.
 
+Once a run has exited, the last fields of its status line are `exit-reason=<reason>` and, when the exit had a detail, `exit-detail=` followed by the detail as a JSON-quoted string. They appear whatever `REPORT.md` says, so a `done` run that later exited on the idle timeout carries them too; a run that has not exited carries neither.
+
 ## Answer
 
 When the state is `question`, decide and answer it. The only decisions are `allow` and `deny`; a decision covers that one request.
@@ -72,7 +74,7 @@ bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts followup NAME "NEXT INSTRUCTION"
 
 Use `followup NAME --file PATH` for longer text. Then wait again.
 
-A run that exited on the idle timeout without a report still shows `state=idle`, with the same status line as before it exited. Tell it apart by its background `run` task having finished and by `"phase":"exited"` and `"reason":"idle-timeout"` in `<RUNDIR>/phase.json`; `followup` refuses it with `client exited; cannot follow up`. Its branch was fetched back as it exited, unless `phase.json` has a `fetchError`. Review `git log <baseSha>..muster/NAME`, then either dispatch a new run under a new NAME, adding `--base muster/NAME` to continue from its commits, or go to Cleanup.
+A run that exited on the idle timeout without a report still shows `state=idle`, with `exit-reason=idle-timeout` at the end of its status line; that field is how you tell it apart from a live idle run. Its background `run` task has also finished, and `<RUNDIR>/phase.json` holds `"phase":"exited"` and `"reason":"idle-timeout"`; `followup` refuses it with `client exited; cannot follow up`. Its branch was fetched back as it exited, unless `phase.json` has a `fetchError`. Review `git log <baseSha>..muster/NAME`, then either dispatch a new run under a new NAME, adding `--base muster/NAME` to continue from its commits, or go to Cleanup.
 
 ## Collect
 

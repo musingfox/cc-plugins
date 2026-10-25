@@ -24,6 +24,8 @@ export interface StatusLine {
   models?: string[];
   deps?: { copied: number; total: number };
   reason?: string;
+  exitReason?: string;
+  exitDetail?: string;
 }
 
 type Json = Record<string, unknown>;
@@ -121,7 +123,12 @@ export function readStatus(runDir: string): StatusLine {
   const deps = depCounts(phase?.deps);
   const line = classify(runDir, name);
   const withModels = models.length > 0 ? { ...line, models } : line;
-  return deps ? { ...withModels, deps } : withModels;
+  const withDeps = deps ? { ...withModels, deps } : withModels;
+  if (phase?.phase === "exited" && typeof phase.reason === "string") {
+    const exitDetail = typeof phase.detail === "string" ? phase.detail : undefined;
+    return { ...withDeps, exitReason: phase.reason, ...(exitDetail !== undefined ? { exitDetail } : {}) };
+  }
+  return withDeps;
 }
 
 export function renderStatus(s: StatusLine): string {
@@ -135,5 +142,9 @@ export function renderStatus(s: StatusLine): string {
   if (s.deps) parts.push(`deps=${s.deps.copied}/${s.deps.total}`);
   if (s.reason) parts.push(`reason=${s.reason}`);
   if (s.fetchError) parts.push(`fetch-error=${s.fetchError.replace(/\s*\n\s*/g, " ")}`);
+  if (s.exitReason) {
+    parts.push(`exit-reason=${s.exitReason}`);
+    if (s.exitDetail !== undefined) parts.push(`exit-detail=${JSON.stringify(s.exitDetail)}`);
+  }
   return parts.join(" ");
 }

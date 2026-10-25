@@ -116,7 +116,7 @@ export function createTerminator(opts: TerminatorOptions) {
       log(`fetch-back failed: ${(e as Error).message}`);
     }
     try {
-      writePhase(layout, { phase: "exited", reason });
+      writePhase(layout, { phase: "exited", reason, ...(detail ? { detail } : {}) });
     } catch (e) {
       log(`phase write failed: ${(e as Error).message}`);
     }
