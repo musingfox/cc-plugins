@@ -4,7 +4,7 @@ description: >-
   Use for a visible browser the user can watch and take over: showing the user a page,
   operating a site that needs JavaScript or a login, or handing a login, 2FA, payment
   or API-key step to the user. Not for headless Chrome scripting or Playwright tests (use agent-browser).
-allowed-tools: Bash(zen-agent start) Bash(zen-agent start --headless) Bash(zen-agent status) Bash(zen-agent open *) Bash(zen-agent headed) Bash(zen-agent headless)
+allowed-tools: Bash(zen-agent start) Bash(zen-agent start --headless) Bash(zen-agent status) Bash(zen-agent open *) Bash(zen-agent headed) Bash(zen-agent headless) Bash(zen-agent run *)
 ---
 
 # zen-agent
