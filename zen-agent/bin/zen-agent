@@ -15,8 +15,10 @@ MCP_PKG="@mozilla/firefox-devtools-mcp@0.10.6"
 usage() {
   cat <<EOF
 usage: zen-agent <command>
-  start              launch the agent Zen if it is not running
-  status             print whether it runs (exit 1 when it does not)
+  start [--headless] launch the agent Zen if it is not running
+  status             print whether it runs, and in which mode (exit 1 when it does not)
+  stop               quit the agent Zen; its tabs come back on the next launch
+  headed | headless  make it run in that mode, restarting it if needed
   open URL           show URL in the agent Zen, launching it if needed
   cookies DOMAIN...  copy DOMAIN's cookies from your everyday Zen profile
   mcp                run the firefox-devtools MCP server against it
@@ -26,10 +28,43 @@ EOF
 
 listening() { lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; }
 running() { listening "$BIDI_PORT"; }
+pid() { lsof -nP -t -iTCP:"$BIDI_PORT" -sTCP:LISTEN 2>/dev/null | head -1; }
+mode() { ps -o args= -p "$(pid)" | grep -q -- --headless && echo headless || echo headed; }
+
+# Rewritten on every launch: the profile belongs to this script.
+prepare_profile() {
+  mkdir -p "$PROFILE/chrome"
+  cat >"$PROFILE/user.js" <<'EOF'
+user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
+user_pref("browser.startup.page", 3);
+// A restored tab left unloaded has no browsing context, so the MCP cannot list it.
+user_pref("browser.sessionstore.restore_on_demand", false);
+EOF
+  # A red frame and tint so the agent Zen never passes for the everyday one.
+  cat >"$PROFILE/chrome/userChrome.css" <<'EOF'
+#zen-tabbox-wrapper { outline: 3px solid #e5484d !important; outline-offset: -3px; }
+#navigator-toolbox { background-color: color-mix(in srgb, #e5484d 25%, transparent) !important; }
+EOF
+}
+
+stop() {
+  local p; p="$(pid)"
+  [ -n "$p" ] || return 0
+  # A quit request to this pid only: SIGTERM skips the session save that brings
+  # the tabs back, and quitting by bundle id would hit the everyday Zen too.
+  osascript -l JavaScript -e "ObjC.import('AppKit');
+    \$.NSRunningApplication.runningApplicationWithProcessIdentifier($p).terminate" >/dev/null
+  for _ in $(seq 30); do
+    running || return 0
+    sleep 0.5
+  done
+  echo "zen-agent: Zen (pid $p) did not quit" >&2
+  return 1
+}
 
 launch() {
   [ -x "$ZEN_BIN" ] || { echo "zen-agent: Zen not found at $ZEN_BIN" >&2; return 1; }
-  mkdir -p "$PROFILE"
+  prepare_profile
   # --no-remote keeps this launch from being handed to the everyday Zen.
   nohup "$ZEN_BIN" --profile "$PROFILE" --no-remote --marionette \
     --remote-debugging-port "$BIDI_PORT" "$@" >"$LOG" 2>&1 &
@@ -44,14 +79,27 @@ launch() {
 cmd="${1:-}"; shift || true
 case "$cmd" in
   start)
-    running && { echo "zen-agent: already running"; exit 0; }
-    launch && echo "zen-agent: started (BiDi $BIDI_PORT, Marionette $MARIONETTE_PORT)"
+    [ "$#" -eq 0 ] || [ "$*" = --headless ] || { echo "usage: zen-agent start [--headless]" >&2; exit 2; }
+    running && { echo "zen-agent: already running ($(mode))"; exit 0; }
+    launch "$@" && echo "zen-agent: started (BiDi $BIDI_PORT, Marionette $MARIONETTE_PORT)"
     ;;
   status)
-    if running; then echo "running (profile $PROFILE)"; else echo "not running"; exit 1; fi
+    if running; then echo "running $(mode) (profile $PROFILE)"; else echo "not running"; exit 1; fi
+    ;;
+  stop)
+    stop && echo "zen-agent: stopped"
+    ;;
+  headed|headless)
+    if running; then
+      [ "$(mode)" = "$cmd" ] && { echo "zen-agent: already $cmd"; exit 0; }
+      stop || exit 1
+    fi
+    if [ "$cmd" = headless ]; then launch --headless; else launch; fi && echo "zen-agent: running $cmd"
     ;;
   open)
     [ "$#" -eq 1 ] && [[ "$1" =~ ^https?:// ]] || { echo "usage: zen-agent open http(s)://..." >&2; exit 2; }
+    # A headless Zen would hide the page from the user.
+    running && [ "$(mode)" = headless ] && { stop || exit 1; }
     if running; then
       # A launch on the same profile hands the URL to the running agent Zen.
       "$ZEN_BIN" --profile "$PROFILE" "$1" >/dev/null 2>&1

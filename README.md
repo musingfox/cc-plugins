@@ -112,7 +112,9 @@ Browser automation and Playwright test authoring:
 ### zen-agent
 
 A visible browser agents drive and you can take over, beside your everyday Zen (macOS, Zen, bun, Node for `npx`):
-- **Agent Zen**: a second Zen on its own profile with WebDriver BiDi and Marionette on; `zen-agent start | status | open URL`
+- **Agent Zen**: a second Zen on its own profile with WebDriver BiDi and Marionette on, framed in red; `zen-agent start | status | stop | open URL`
+- **Headless or headed**: `zen-agent start --headless`, and `zen-agent headed | headless` to switch by restarting; tabs come back
+- **Secrets stay with you**: the agent stops before any step that generates or reveals an API key, token or password, as it does for logins, 2FA and payments
 - **MCP**: Mozilla's `firefox-devtools-mcp` in connect-existing mode — snapshot, click, fill, screenshot
 - **Cookies on approval**: `zen-agent cookies DOMAIN` copies one domain's cookies from your everyday profile; never pre-approved
 - **Rex redirect**: `zen-agent setup-shell` makes an agent's `open URL` / `$BROWSER URL` in Rex shells land in the agent Zen; human shells are untouched. Re-run it after a plugin update
