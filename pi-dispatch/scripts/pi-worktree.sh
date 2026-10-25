@@ -111,7 +111,7 @@ if ! git -C "$repo_root" config user.email >/dev/null 2>&1 && \
    ! git config --global user.email >/dev/null 2>&1; then
   cat >&2 <<'MSG'
 cf-pi-worktree: git user.email is not configured.
-Per-contract commits in $WORK will fail. Set identity before re-running /cf:
+Per-contract commits in $WORK will fail. Set identity before re-running the dispatch:
   git config --global user.email "you@example.com"
   git config --global user.name "Your Name"
 (Or set in this repo: drop `--global`.)
