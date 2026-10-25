@@ -1,46 +1,68 @@
 #!/usr/bin/env bash
 # Append review repros as test cases of the contracts they name.
 #
-# Usage: cf-pi-add-repros.sh FLOW_SESSION REPROS_FILE
-# Stdout: one line per repro — ADDED <contract> R<n> or DUPLICATE <contract> <id>
+# Usage: cf-add-repros.sh --contracts FILE REPROS_FILE
+# Stdout: one line per repro -- ADDED <contract> R<n> or DUPLICATE <contract> <id>
 # Exit:   0 applied (or nothing to do), 2 usage/missing file, 3 malformed,
-#         4 jq missing, 5 a repro names a contract that is not in contracts.json
+#         4 jq missing, 5 a repro names a contract that is not in FILE
 #
-# An archive of the previous contracts.json is written only when a case is
-# appended, as $FLOW_SESSION/contracts-prev-<ts>.json, never overwriting an
-# existing archive. The contracts.json write is atomic (temp file, then mv).
-# On any error the contracts file is left untouched and no archive is written.
+# An archive of the previous FILE is written only when a case is appended,
+# beside FILE as contracts-prev-<ts>.json, never overwriting an existing archive
+# (two writes inside one second get a -n suffix). The FILE write is atomic (temp
+# file beside it, then mv). On any error FILE is left untouched and no archive is
+# written.
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=cf-pi-env.sh
-. "$SCRIPT_DIR/cf-pi-env.sh"
-
 if ! command -v jq >/dev/null 2>&1; then
-  echo "cf-pi-add-repros: jq is required" >&2
+  echo "cf-add-repros: jq is required" >&2
   exit 4
 fi
 
-if [ $# -ne 2 ]; then
-  echo "Usage: cf-pi-add-repros.sh FLOW_SESSION REPROS_FILE" >&2
+usage() {
+  echo "Usage: cf-add-repros.sh --contracts FILE REPROS_FILE" >&2
+  exit 2
+}
+
+contracts=""
+repros_file=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --contracts)
+      [ $# -ge 2 ] || usage
+      contracts="$2"
+      shift 2 ;;
+    -*) usage ;;
+    *)
+      [ -z "$repros_file" ] || usage
+      repros_file="$1"
+      shift ;;
+  esac
+done
+[ -n "$contracts" ] && [ -n "$repros_file" ] || usage
+
+if [ ! -f "$contracts" ] || [ ! -f "$repros_file" ]; then
+  echo "cf-add-repros: missing contracts file or repros file" >&2
   exit 2
 fi
+dir="$(cd "$(dirname "$contracts")" && pwd)"
 
-flow_session="$1"
-repros_file="$2"
-contracts="$flow_session/contracts.json"
-
-if [ ! -d "$flow_session" ] || [ ! -f "$contracts" ] || [ ! -f "$repros_file" ]; then
-  echo "cf-pi-add-repros: missing contracts.json or repros file" >&2
-  exit 2
-fi
-
-load_cf_flow_env "$flow_session"
-contracts="$CONTRACTS_FILE"
+# archive_contracts: copies the contracts file to contracts-prev-<YYYYmmddHHMMSS>[-n].json
+#   beside it and prints that path. Never overwrites an earlier archive.
+archive_contracts() {
+  local ts archive n=0
+  ts=$(date +%Y%m%d%H%M%S)
+  archive="$dir/contracts-prev-${ts}.json"
+  while [ -e "$archive" ]; do
+    n=$((n + 1))
+    archive="$dir/contracts-prev-${ts}-${n}.json"
+  done
+  cp "$contracts" "$archive"
+  printf '%s\n' "$archive"
+}
 
 if ! jq -e '.contracts | type == "array"' "$contracts" >/dev/null 2>&1; then
-  echo "cf-pi-add-repros: malformed contracts.json" >&2
+  echo "cf-add-repros: malformed contracts.json" >&2
   exit 3
 fi
 
@@ -52,7 +74,7 @@ if ! jq -e '
     and (.expect   | type) == "string" and (.expect   | length) > 0
     and (.command  | type) == "string" and (.command  | length) > 0)
 ' "$repros_file" >/dev/null 2>&1; then
-  echo "cf-pi-add-repros: malformed repros or entry missing contract, given, expect, or command" >&2
+  echo "cf-add-repros: malformed repros or entry missing contract, given, expect, or command" >&2
   exit 3
 fi
 
@@ -75,7 +97,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-work=$(mktemp "$flow_session/.add-repros.XXXXXX")
+work=$(mktemp "$dir/.add-repros.XXXXXX")
 jq --slurpfile repros "$repros_file" '
   reduce $repros[0].repros[] as $rep (
     {doc: ., log: [], added: false, inserts: []};
@@ -105,7 +127,7 @@ jq --slurpfile repros "$repros_file" '
 ' "$contracts" > "$work"
 
 if [ "$(jq -r '.added' "$work")" = "true" ]; then
-  doc=$(mktemp "$flow_session/.contracts.XXXXXX")
+  doc=$(mktemp "$dir/.contracts.XXXXXX")
   python3 - "$contracts" "$work" "$doc" <<'PY'
 import json, sys
 
@@ -268,7 +290,7 @@ for pos, text in edits:
     out = out[:pos] + text + out[pos:]
 open(out_path, "w", encoding="utf-8", newline="").write(out)
 PY
-  archive_contracts "$flow_session" >/dev/null
+  archive_contracts >/dev/null
   mv "$doc" "$contracts"
   doc=""
 fi
