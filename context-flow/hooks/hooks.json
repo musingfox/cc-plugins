@@ -1,4 +1,0 @@
-{
-  "description": "Shows a running cf flow's phase and progress in a band above the prompt",
-  "modules": ["./register.ts"]
-}
