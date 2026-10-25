@@ -10,10 +10,10 @@ source: null
 adr: null
 ---
 Plugins that need pi-dispatch's runtime resolve it at execution time through a
-sibling resolver — never by vendoring a copy of the script. The canonical
-resolver is `resolve_canon_dispatch()` in `context-flow/scripts/cf-pi-env.sh`:
-it globs sibling and grandparent plugin roots, sorts by version, and takes the
-highest.
+sibling resolver — never by vendoring a copy of the script. No script in
+context-flow or spiral resolves it today, so what holds is that no copy of
+`pi-dispatch.sh` or `pi-worktree.sh` exists outside `pi-dispatch`, which is what
+this entry's verify checks.
 
 Each caller keeps its own failure branch (dispatch fails hard, poll fails soft
 with NO_PID, stop falls back to a nonexistent path). The resolver itself always

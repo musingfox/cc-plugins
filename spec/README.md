@@ -56,7 +56,7 @@ split, nothing needing a second pass before an agent can act on it.
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/spec.sh verify
-${CLAUDE_PLUGIN_ROOT}/scripts/spec.sh slice context-flow/scripts/cf-pi-env.sh
+${CLAUDE_PLUGIN_ROOT}/scripts/spec.sh slice context-flow/scripts/cf-revert-gate.sh
 ```
 
 Or through the `spec` skill, which covers the lifecycle: propose (`status:
