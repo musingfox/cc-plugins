@@ -7,6 +7,7 @@
 # anything already committed.
 #
 # Usage:   cf-scope.sh --repo DIR --base REV --head REV --contracts FILE
+#          DIR may be any directory inside the repository; the gate works on its top level.
 #          --base and --head are any revs that resolve to commits in DIR;
 #          FILE is cf:plan's contracts.json (schema_version 1).
 # Stdout:  ALLOWLISTED <csv>   (only when non-empty -- build/lock manifests and
@@ -65,6 +66,9 @@ done
 
 [ -d "$repo" ] || fail "repo-not-a-directory"
 git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || fail "repo-not-a-git-repo"
+# Contract paths are repo-root relative: a --repo inside the repository means its
+# top level. A bare repository has none and stays as given.
+top=$(git -C "$repo" rev-parse --show-toplevel 2>/dev/null) && repo="$top"
 base_sha=$(git -C "$repo" rev-parse --verify --quiet "$base^{commit}" 2>/dev/null) || fail "base-unresolvable"
 head_sha=$(git -C "$repo" rev-parse --verify --quiet "$head^{commit}" 2>/dev/null) || fail "head-unresolvable"
 
