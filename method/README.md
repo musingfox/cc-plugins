@@ -28,6 +28,8 @@ TEST_CMD runs from the repository root of the gate's worktree, so a suite that r
 
 The gates share one input: a repo, a base and a head (any revs that resolve to commits in the repo) and a `contracts.json` (`schema_version` 1). Bad input or a missing `jq` is a single `ERROR <reason>` line and exit 1. A gate never changes the repo's checkout, index, branches, tags or stash; the revert gate runs in a detached worktree of its own under a temporary directory and removes it on every exit, signals included.
 
+The decision page needs the `viz` plugin, which `plugin.json` declares as a dependency; without it a round falls back to `AskUserQuestion`.
+
 Run the plugin's own tests with `bash method/tests/run.sh`.
 
 ## Installation

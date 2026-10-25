@@ -16,6 +16,7 @@ Read a method file when its situation comes up, not up front. Each sits beside t
 | Situation | Read |
 |---|---|
 | You hold a question, not yet a contract: no settled scope, or the user is unsure what to build | `narrow.md` |
+| You narrow at the top and put a round, or the depth gate, on the browser page | `decision-page.md` (from `narrow.md`) |
 | You hold a contract and must choose between doing it and splitting it | `split.md` |
 | You split, and now write the sub-contracts and their `contracts.json` | `contracts.md` |
 | You hand a sub-contract to another session: ticket, `--ticket-file`, nested muster runs, agent seats | `dispatch.md` |

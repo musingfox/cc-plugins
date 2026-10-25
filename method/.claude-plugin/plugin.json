@@ -15,5 +15,8 @@
     "escalation",
     "muster"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": [
+    "viz"
+  ]
 }
