@@ -59,3 +59,37 @@ assert_eq "model: sonnet" "$(grep -m1 '^model:' "$file")" "plan: model unchanged
 # The person is the human
 assert_contains "$doc" "the human" "plan: says the human"
 assert_eq "" "$(grep -Eiwn 'the users?' "$file" || true)" "plan: never says the user"
+
+# Observed output channels: a contract names the channels its tests observe, so a
+# channel cannot be dropped between the plan and the brief
+schema=$(awk '/^### plan.md \(prose\)$/ {on=1; next} on && /^### contracts.json/ {exit} on' "$file")
+contract_block=$(printf '%s\n' "$schema" | awk '/^## Behavioral Contracts$/ {on=1; next} on && /^## Implementation Plan$/ {exit} on')
+sidecar=$(awk '/^### contracts.json/ {on=1; next} on && /^#### Worked example/ {exit} on' "$file")
+example=$(printf '%s\n' "$sidecar" | awk '/^```json$/ {on=1; next} on && /^```$/ {exit} on')
+checklist=$(awk '/^## Before Returning$/ {on=1; next} on' "$file")
+
+# contracts.json: example and field list
+assert_contains "$example" '"observes": ["stdout", "stderr", "exit", "files"]' "plan: contracts.json example shows observes with the four channels"
+assert_eq "1" "$(printf '%s\n' "$sidecar" | grep -c '^- \*\*`observes`\*\*')" "plan: field list has an observes rule"
+obs_rule=$(printf '%s\n' "$sidecar" | grep '^- \*\*`observes`\*\*')
+assert_contains "$obs_rule" "required" "plan: observes is required"
+assert_contains "$obs_rule" "non-empty array" "plan: observes is a non-empty array"
+for ch in stdout stderr exit files; do
+  assert_contains "$obs_rule" "\`$ch\`" "plan: observes rule names channel $ch"
+done
+
+# Markdown contract: an Observes line, matching observes
+assert_contains "$contract_block" '- **Observes**: <comma-separated channels' "plan: markdown contract carries an Observes line"
+assert_contains "$obs_rule" "Observes" "plan: observes rule ties the markdown Observes line to the field"
+assert_contains "$obs_rule" "matching" "plan: Observes line matches observes"
+
+# Test cases state an expected value for each observed channel; empty is a value
+tc_line=$(printf '%s\n' "$contract_block" | grep -A3 '^#### Test Cases$')
+assert_contains "$tc_line" "each channel" "plan: test case states an expected value for each observed channel"
+assert_contains "$tc_line" "stderr: empty" "plan: empty is a valid expected value, e.g. stderr: empty"
+assert_contains "$(printf '%s\n' "$sidecar" | grep '^- \*\*`test_cases`\*\*:')" "each channel" "plan: structured test_cases carry every observed channel"
+
+# Plan checklist requires it
+assert_contains "$checklist" '`observes`' "plan: Before Returning requires observes"
+assert_contains "$checklist" "Observes" "plan: Before Returning requires the Observes line"
+assert_contains "$checklist" "empty" "plan: Before Returning accepts empty as an expected value"

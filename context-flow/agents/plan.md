@@ -171,6 +171,7 @@ Both file paths are provided by the dispatch (`Report path:` for `plan.md`, `Con
 - **input**: [exact types/parameters — the interface a caller must know]
 - **output**: [exact return types]
 - **errors**: [error conditions and handling]
+- **Observes**: <comma-separated channels from stdout, stderr, exit, files — every channel a caller or test can see this contract's behaviour on>
 - **depends**: [other contracts this depends on]
 
 #### States _(required for user-facing contracts)_
@@ -183,9 +184,9 @@ Both file paths are provided by the dispatch (`Report path:` for `plan.md`, `Con
 (A contract is **user-facing** if it has any user-perceivable output: UI render path, HTTP response a frontend will consume, CLI stdout/stderr a person reads, generated file an end user opens. Pure internal helpers, schedulers, and machine-to-machine contracts skip this block. When in doubt, include it.)
 
 #### Test Cases
-- input [concrete value] → expected [concrete value]
+- input [concrete value] → expected [a concrete value for each channel the contract observes, e.g. `stdout: ok`, `stderr: empty`, `exit: 0`]
 
-(repeat for each contract — at least one test case per contract; for user-facing contracts, include at least one test case per non-trivial state)
+(repeat for each contract — at least one test case per contract; for user-facing contracts, include at least one test case per non-trivial state. A test case states an expected value for each channel its contract observes; `empty` is a valid expected value, and a channel left unstated is a channel no test asserts.)
 
 ## Implementation Plan
 ### Test Runner
@@ -219,6 +220,7 @@ Write a single JSON document conforming to schema_version 1:
       "input": "<the markdown contract's input line, verbatim>",
       "output": "<the markdown contract's output line, verbatim>",
       "errors": "<the markdown contract's errors line, verbatim>",
+      "observes": ["stdout", "stderr", "exit", "files"],
       "depends": ["<ContractName this one consumes>"],
       "touches_files": ["<path>", "<path>"],
       "test_files": ["<path>"],
@@ -241,11 +243,12 @@ Field rules:
 - **`input`**: the markdown contract's **input** line, verbatim. Optional — omit the key when the contract has no input line; do not emit `null` or `""`.
 - **`output`**: the markdown contract's **output** line, verbatim. Optional — same absence rule as `input`.
 - **`errors`**: the markdown contract's **errors** line, verbatim. Optional — same absence rule as `input`.
+- **`observes`** (required): a non-empty array whose values come from `stdout`, `stderr`, `exit`, `files` — the channels this contract's behaviour shows on. It is the channels of the markdown contract's `- **Observes**: <comma-separated channels>` line, matching channel for channel. Never omit it, never `[]`: a channel left out here is one no test case asserts.
 - **`implementation_plan`**: the `### Step N: ... — fulfills [Name]` steps that name this contract. A step that fulfills two contracts appears in both. Each entry is `{"title","target","approach","order"}`. Optional — default omit when no step names this contract.
 - **`depends`** (load-bearing): the markdown contract's **depends** line, carried verbatim — names of contracts in THIS plan whose interfaces this one consumes. Default `[]`. The main session uses it to order the builder's work; omitting a real dependency costs a guaranteed failed round. Dependencies on pre-existing code are NOT listed (only contracts of this plan).
 - **`touches_files`** (load-bearing): SUPERSET of every file the contract creates or modifies. **Test files count. Doc files count if the contract changes docs.** Underset is a bug — `cf-scope.sh` checks that the files the builder changed are a subset of the declared ones and fails on any file outside them, and `cf-revert-gate.sh` reads the set to know what to put back. Use repo-relative paths.
 - **`test_files`**: the entries of `touches_files` that are this contract's tests. `cf-revert-gate.sh` puts every other touched file back to the base and expects these tests to go red, so list exactly the test files, wherever they live (`spec/` is not a test directory in every repo). `[]` when the contract adds no test file.
-- **`test_cases`**: structured form of the markdown Test Cases.
+- **`test_cases`**: structured form of the markdown Test Cases. Each `expect` states a value for each channel in the contract's `observes` (`stderr: empty` counts).
 - **`fuzzy_criteria`**: default `[]`. ONLY for constraints that genuinely resist a concrete test case ("minimal memory footprint", "idiomatic to the codebase") — never a dumping ground for lazy test-casing; if a concrete input→output exists, it belongs in `test_cases`. Each entry is BINDING: `cf:review` must render an evidence-backed PASS/FAIL for it (measurement, comparison, or adversarial argument at the criterion's own precision), and a FAIL fails the contract like any other contract FAIL.
 
 #### Worked example — touches_files completeness
@@ -341,6 +344,7 @@ Run this self-check before producing your final output. If any item fails, fix t
 - [ ] Every High decision has Trade-off, Alternatives, and Rationale (not merged). Medium decisions have at least a Rationale line. Low decisions need only the Choice line.
 - [ ] No decision classified High unless it meets the Strategic-direction or Irreversible-technical criteria. (Over-escalating wastes the human's attention; under-escalating ships unauthorized commitments.)
 - [ ] Every behavioral contract has Effect, purpose, input, output, errors, depends, and ≥1 concrete test case.
+- [ ] Every contract has an `Observes` line and a matching non-empty `observes` array in `contracts.json`, drawn from `stdout`, `stderr`, `exit`, `files`; every test case states an expected value for each channel its contract observes (`empty` is a valid value, silence is not).
 - [ ] Each contract's tests can pass with only its own `touches_files` and those of the contracts in its `depends` in place. A test that needs a file another contract creates (a module a loader requires, a shared fixture) names that contract in `depends`, or the file moves into this contract.
 - [ ] Every test case that leans on existing code's behavior (what a model keeps, what a loader requires, what a route returns) is backed by a file:line you read this session, or is listed in Assumptions.
 - [ ] Every **user-facing** contract has a States block covering Loading / Empty / Error / Success (Partial/Stale where applicable), with at least one test case per non-trivial state.
@@ -348,4 +352,4 @@ Run this self-check before producing your final output. If any item fails, fix t
 - [ ] Every constraint in the pinned contract is either covered by a test case or listed in Unresolved with justification.
 - [ ] No "low confidence" guesses leaked into Decisions or Contracts — guesses live in Unresolved.
 - [ ] Implementation Plan steps each cite the contract they fulfill.
-- [ ] **contracts.json sidecar**: emitted with `schema_version=1` + every contract has `touches_files` (superset, includes test files and doc files) + `test_files` lists exactly its test files + `depends` mirrors each markdown contract's depends line (in-plan contract names only) + `input`, `output`, and `errors` copy those markdown lines verbatim + `implementation_plan` lists every step whose fulfills clause names this contract.
+- [ ] **contracts.json sidecar**: emitted with `schema_version=1` + every contract has `touches_files` (superset, includes test files and doc files) + `test_files` lists exactly its test files + `depends` mirrors each markdown contract's depends line (in-plan contract names only) + `observes` is a non-empty array of channels + `input`, `output`, and `errors` copy those markdown lines verbatim + `implementation_plan` lists every step whose fulfills clause names this contract.
