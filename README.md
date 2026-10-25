@@ -55,7 +55,7 @@ Fetch Apple Podcasts episode audio download URLs:
 The contract-drafting and checking pieces of the contract-driven workflow, without an orchestrator:
 - **`cf:plan`**: drafts behavioral contracts with test cases and tiers each decision High/Medium/Low
 - **`cf:review`**: a read-only Spec reviewer that checks an implementation against its contracts
-- **Gate scripts**: `cf-pi-scope.sh`, `cf-pi-test.sh`, `cf-pi-revert-gate.sh` and `cf-pi-add-repros.sh` check a builder's file scope, test run, revert and repros
+- **Gate scripts**: `cf-scope.sh`, `cf-revert-gate.sh` and `cf-add-repros.sh` check a builder's file scope, test run and revert, and file review repros
 - **Requirements**: bash, git, jq and shasum
 
 **Installation:**

@@ -4,13 +4,10 @@
 # Discovers every context-flow/tests/*.test.sh, runs each in its own bash
 # process, and reports TAP-ish lines. Exits 0 only if all test files pass.
 #
-# Wired as the gate-3 / integration TEST_RUNNER:
-#     TEST_RUNNER="bash context-flow/tests/run.sh"
-# gate-3 invokes it via cf-pi-test.sh (which emits its own test_exit= marker);
-# integration runs it through `bash -c` and reads $?. We also print test_exit= here so
-# the runner is self-describing when run standalone. Failing files print
-# "not ok" / failing assertions print "  ✗ " — both match
-# cf-pi-integrate.sh's failure-attribution grep.
+# Wired as a test gate's TEST_RUNNER:
+#     bash context-flow/tests/run.sh
+# cf-revert-gate.sh reads the exit code and the test_exit= line below from its
+# control run. Failing files print "not ok" / failing assertions print "  ✗ ".
 #
 # Exit: 0 = all passed, 1 = at least one test file failed.
 
@@ -19,22 +16,12 @@ set -uo pipefail
 CF_TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export CF_TESTS_DIR
 
-# Tests spawn real cf-pi-run.sh instances whose write_outcome appends to the
-# shared pi-runs ledger; unredirected, one sweep buries the operator's real run
-# diagnostics under hundreds of fixture STATUS=FAIL lines. (TMPDIR is NOT worth
-# setting here -- BSD mktemp on macOS ignores it; each test cleans its own.)
-CF_TEST_TMP="$(mktemp -d)"
-export PI_RUNS_DIR="$CF_TEST_TMP/pi-runs"
-trap 'rm -rf "$CF_TEST_TMP"' EXIT
-
-# Each test runs with a scrubbed environment. As a gate's TEST_RUNNER this
-# script inherits the flow env (cf-pi-env.sh exports it with set -a), and the
-# scripts under test default to CF_SLUG/SESSION/FLOW_SESSION when set, so a
-# fixture would land on the live shard's branch. The operator's PI_DISPATCH_CMD
-# routing must not reach the fixtures' stand-in agents either. PI_REAL_GIT is the
+# Each test runs with a scrubbed environment. The scripts under test must not pick
+# up the caller's GIT_*, CF_* or session variables, and the operator's
+# PI_DISPATCH_CMD routing must not reach the fixtures. PI_REAL_GIT is the
 # exception: inside a pi worker PATH starts with the git shim, which refuses to
 # run without it. PI_CWD stays out, so the shim passes straight through.
-KEEP=("CF_TESTS_DIR=$CF_TESTS_DIR" "PI_RUNS_DIR=$PI_RUNS_DIR")
+KEEP=("CF_TESTS_DIR=$CF_TESTS_DIR")
 for v in PATH HOME TMPDIR USER LOGNAME SHELL TERM LANG PI_REAL_GIT $(compgen -e | grep '^LC_'); do
   [ -n "${!v+x}" ] && KEEP+=("$v=${!v}")
 done
