@@ -19,8 +19,10 @@ n=$(printf '%s\n' "$range" | { grep -oi 'do not apply the fix' || true; } | wc -
 n=$(printf '%s\n' "$range" | { grep -oi 'apply the fix' || true; } | wc -l | tr -d ' ')
 [ "$n" -eq 1 ] || fail "T3: expected exactly one apply-the-fix guardrail, got $n"
 
-n=$(printf '%s\n' "$range" | grep -c '/cf' || true)
-[ "$n" -ge 1 ] || fail "T4: expected /cf in Phase 5"
+n=$(printf '%s\n' "$range" | grep -cF 'main session' || true)
+[ "$n" -ge 1 ] || fail "T4: expected the hand-off to the main session in Phase 5"
+n=$(printf '%s\n' "$range" | grep -cF '/cf' || true)
+[ "$n" -eq 0 ] || fail "T4: /cf must not appear in Phase 5, got $n"
 
 # The flip goes green only through the Phase 4 probe, which never reaches the commit.
 flip=$(printf '%s\n' "$range" | grep -ni 'flip it:' || true)

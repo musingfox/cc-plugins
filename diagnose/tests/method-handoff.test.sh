@@ -20,8 +20,11 @@ n=$(grep -ci 'do not check it out' diagnose/docs/method.md || true)
 n=$(grep -cF '.diagnose/<slug>.patch' diagnose/docs/method.md || true)
 [ "$n" -ge 1 ] || fail "T5: expected .diagnose/<slug>.patch"
 
-n=$(grep -c '/cf ' diagnose/docs/method.md || true)
-[ "$n" -ge 1 ] || fail "T6: expected a paste-ready /cf line"
+n=$(grep -cFx 'Cherry-pick <sha> from diagnose/<slug> (read the branch; do not check it out) and fix the confirmed cause.' diagnose/docs/method.md || true)
+[ "$n" -eq 1 ] || fail "T6: expected the paste-ready hand-off line once, without a /cf prefix, got $n"
+
+n=$(grep -cF '/cf' diagnose/docs/method.md || true)
+[ "$n" -eq 0 ] || fail "T6: /cf must not appear in method.md, got $n"
 
 n=$(grep -ci 'print nothing' diagnose/docs/method.md || true)
 [ "$n" -eq 0 ] || fail "T7: blanket 'print nothing' must be gone"

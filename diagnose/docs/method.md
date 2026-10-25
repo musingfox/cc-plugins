@@ -174,15 +174,15 @@ Phases 5 and 6 speak of "the confirmed cause". A hypothesis is **confirmed** onl
 - [ ] **Predicted**: a Phase 4 probe observed the effect the hypothesis predicted in Phase 3, at the boundary it named.
 - [ ] **Flips the loop both ways**: neutralising the suspected cause alone — a stubbed call, a reverted commit, a swapped config value, nothing else changed — turns the loop green, and restoring it turns the loop red again.
 
-The neutralising change is a probe, not a repair: make it in the worktree, run the loop, then discard it. It never reaches the commit, and it is not the fix — `/cf` decides what the correct change is. A hypothesis that survives on evidence that also fits another surviving hypothesis is not confirmed; go back to Phase 3 and find the probe that separates them. No confirmed cause, no Phase 5.
+The neutralising change is a probe, not a repair: make it in the worktree, run the loop, then discard it. It never reaches the commit, and it is not the fix — the main session decides what the correct change is. A hypothesis that survives on evidence that also fits another surviving hypothesis is not confirmed; go back to Phase 3 and find the probe that separates them. No confirmed cause, no Phase 5.
 
 ## Phase 5: Failing test at the seam
 
-Turn the minimised repro into a failing test at the correct seam. Watch it fail, then flip it against the Phase 4 probe. Commit it on the diagnose branch. Stop. The fix is `/cf`'s work; do not apply the fix.
+Turn the minimised repro into a failing test at the correct seam. Watch it fail, then flip it against the Phase 4 probe. Commit it on the diagnose branch. Stop. The fix is the main session's work; do not apply the fix.
 
 A correct seam is one where the test exercises the **real bug pattern** as it occurs at the call site. If the only available seam is too shallow (single-caller test when the bug needs multiple callers, unit test that can't replicate the chain that triggered the bug), a regression test there gives false confidence.
 
-If **no correct seam** exists, that itself is the finding. Commit the **minimised repro** under a clearly-marked debug location in the target repo, with the confirmed cause and the seam absence in the commit message. Label the closing line `Repro:` rather than `Test:`, and ask `/cf` to create the seam and promote the repro into a test.
+If **no correct seam** exists, that itself is the finding. Commit the **minimised repro** under a clearly-marked debug location in the target repo, with the confirmed cause and the seam absence in the commit message. Label the closing line `Repro:` rather than `Test:`, and ask the main session to create the seam and promote the repro into a test.
 
 If a correct seam exists:
 
@@ -190,7 +190,7 @@ If a correct seam exists:
 2. Watch it fail.
 3. Flip it: re-make the Phase 4 neutralising change, run the test, and see it go green; discard the change and see it red again. A test that stays red with the cause neutralised is catching some other failure — rework it at the seam before committing.
 4. Commit the failing test on the diagnose branch.
-5. Stop. Leave the rest to `/cf`.
+5. Stop. Leave the rest to the main session.
 
 ## Phase 6: Cleanup
 
@@ -214,10 +214,10 @@ On the success path, print exactly this:
 Branch: diagnose/<slug>
 Test: <sha>
 Cause: <confirmed cause>
-/cf Cherry-pick <sha> from diagnose/<slug> (read the branch; do not check it out) and fix the confirmed cause.
+Cherry-pick <sha> from diagnose/<slug> (read the branch; do not check it out) and fix the confirmed cause.
 Patch: .diagnose/<slug>.patch
 ```
 
 When the artifact is a repro rather than a test, label that line `Repro:` instead of `Test:`.
 
-If Phase 0 carried uncommitted changes, add one line, `Carried: uncommitted changes to tracked files`. The test is red against HEAD plus those changes, not against HEAD alone, so `/cf` must have the same changes in place before it expects red.
+If Phase 0 carried uncommitted changes, add one line, `Carried: uncommitted changes to tracked files`. The test is red against HEAD plus those changes, not against HEAD alone, so the main session must have the same changes in place before it expects red.
