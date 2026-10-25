@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The scope gate and the revert gate read the same "paths this shard touched"
+# The scope gate and the revert gate read the same "paths the builder touched"
 # list, so the three shapes that once split them -- a rename, a name git
 # C-quotes, a directory turned into a file -- get the same answer from both.
 # Real git fixtures, real scripts.
@@ -39,7 +39,10 @@ BASE_HEAD="$BASE_HEAD"
 EOF
 }
 
-scope() { SCOPE_OUT="$(bash "$SCRIPTS/cf-pi-scope.sh" "$SHARD" 2>&1)"; SCOPE_RC=$?; }
+scope() {
+  SCOPE_OUT="$(bash "$SCRIPTS/cf-scope.sh" --repo "$WORK" --base "$BASE_HEAD" --head HEAD --contracts "$FLOW/contracts.json" 2>&1)"
+  SCOPE_RC=$?
+}
 revert() { GATE_OUT="$(bash "$SCRIPTS/cf-pi-revert-gate.sh" "$SHARD" bash -c "$1" 2>/dev/null)"; GATE_RC=$?; }
 
 # --- T1: renaming an undeclared file onto a declared name --------------------
@@ -90,11 +93,13 @@ assert_eq "CLEAN 1" "$GATE_OUT" "T4 revert gate: reaches a verdict"
 assert_eq "file" "$([ -f "$WORK/src/d/x.sh" ] && echo file || echo other)" "T4 revert gate: restores the shard's tree"
 rm -rf "$FLOW"
 
-# --- T5: one list and one allowlist, defined once ----------------------------
-assert_eq "0" "$(grep -c 'BUILD_LOCK_ALLOWLIST=' "$SCRIPTS/cf-pi-scope.sh" "$SCRIPTS/cf-pi-revert-gate.sh" | awk -F: '{s+=$2} END {print s}')" \
-  "T5 neither gate defines its own build/lock allowlist"
-assert_eq "0" "$(grep -c 'log .*--name-only' "$SCRIPTS/cf-pi-scope.sh" "$SCRIPTS/cf-pi-revert-gate.sh" | awk -F: '{s+=$2} END {print s}')" \
-  "T5 neither gate lists its own paths"
+# --- T5: one allowlist, the same in both gates ---------------------------------
+# The revert gate never reverts what the scope gate allows; each script carries
+# its own copy of the regex, so the copies must not drift.
+allowlist_of() { sed -n "s/^CF_BUILD_LOCK_ALLOWLIST=//p" "$1"; }
+assert_eq "$(allowlist_of "$SCRIPTS/cf-pi-env.sh")" "$(allowlist_of "$SCRIPTS/cf-scope.sh")" \
+  "T5 the scope gate's build/lock allowlist is the revert gate's"
+assert_eq "1" "$(allowlist_of "$SCRIPTS/cf-scope.sh" | grep -c .)" "T5 the scope gate defines it once"
 
 # --- T6: the contract, not the path, says which files are its tests ---------
 # spec/scripts/x.sh is implementation (the spec plugin's own layout); a path

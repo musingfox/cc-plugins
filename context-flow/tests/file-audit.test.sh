@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Documentation-level regression pin for FileAuditGranularityRegression (#1 keep-as-is).
 # Pins the intended `comm -23 <(actual) <(declared)` undeclared-file semantics
-# over synthetic declared/actual lists (per-shard-union granularity).
+# over synthetic declared/actual lists (union of the contracts' touches_files).
 # This test asserts the contract behavior directly; it does NOT extract or
-# depend on the live implementation in cf-pi-scope.sh.
+# depend on the live implementation in cf-scope.sh (scope-gate.test.sh drives that).
 
 . "$CF_TESTS_DIR/lib/assert.sh"
 
@@ -26,7 +26,7 @@ undeclared=$(comm -23 <(sort "$actual_list") <(sort "$declared_list"))
 assert_eq "" "$undeclared" "T3: common file is not reported undeclared"
 
 # T4-T6: build/lock allowlist splits benign manifest touches from real violations.
-# Pins the BUILD_LOCK_ALLOWLIST regex semantics in cf-pi-run.sh step 10.
+# Pins the CF_BUILD_LOCK_ALLOWLIST regex semantics of cf-scope.sh and cf-revert-gate.sh.
 AL='^(pyproject\.toml|uv\.lock|requirements[^/]*\.txt|package\.json|package-lock\.json|bun\.lock(b)?|yarn\.lock|pnpm-lock\.yaml|Cargo\.(toml|lock)|go\.(mod|sum)|Gemfile(\.lock)?)$'
 undeclared=$'pyproject.toml\nuv.lock\nsrc/evil.py'
 allowlisted=$(printf '%s\n' "$undeclared" | grep -E "$AL" || true)
@@ -34,5 +34,9 @@ remaining=$(printf '%s\n' "$undeclared" | grep -vE "$AL" || true)
 assert_eq $'pyproject.toml\nuv.lock' "$allowlisted" "T4: root build/lock files are allowlisted"
 assert_eq "src/evil.py" "$remaining" "T5: non-manifest file still flagged undeclared"
 assert_eq "" "$(printf 'docs/uv.lock.md\n' | grep -E "$AL" || true)" "T6: nested/lookalike paths are NOT allowlisted"
+
+# T7: the pinned regex is the one the gate carries.
+live="$(sed -n 's/^CF_BUILD_LOCK_ALLOWLIST=//p' "$CF_TESTS_DIR/../scripts/cf-scope.sh")"
+assert_eq "'$AL'" "$live" "T7: cf-scope.sh carries the pinned build/lock allowlist"
 
 rm -f "$declared_list" "$actual_list"
