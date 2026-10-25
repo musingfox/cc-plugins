@@ -163,8 +163,10 @@ gate_run bash "$REPO_TOP/count.sh"
 assert_eq "3" "$(wc -l <"$REPO_TOP/counter" | tr -d ' ')" "T11 no cache: a second gate reruns all 3"
 drop_repo
 
-# T12: no own paths: nothing to revert, every contract's run is green
+# T12: no own paths: nothing to revert, every contract's run is green. The range
+# holds a commit (an empty range is `ERROR empty-range`, see empty-range.test.sh).
 new_repo; write_runner; base_commit
+git -C "$REPO" commit -q --allow-empty -m "no files"
 write_contracts "[$C1]"
 gate_run bash run-tests.sh
 assert_eq "STAYS_GREEN C1" "$GATE_LAST" "T12 empty own paths: verdict"

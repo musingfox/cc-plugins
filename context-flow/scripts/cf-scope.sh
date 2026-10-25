@@ -13,6 +13,8 @@
 #                               hook-made plugin version bumps)
 #          UNDECLARED  <csv>   (only when non-empty -- scope violation)
 #          ERROR <reason>      (alone, on missing or bad input)
+#          ERROR empty-range   when base..head holds no commit (base equal to head,
+#                               or a descendant of it)
 # Exit:    0 = clean (allowlisted touches still exit 0)
 #          2 = undeclared files present
 #          1 = error
@@ -75,6 +77,9 @@ jq -e '
     and (.touches_files | type == "array") and all(.touches_files[]; type == "string")
     and ((has("test_files") | not) or ((.test_files | type == "array") and all(.test_files[]; type == "string"))))
 ' "$contracts" >/dev/null 2>&1 || fail "contracts-malformed"
+
+# No commit in base..head is no evidence either way: the gate refuses it.
+[ "$(git -C "$repo" rev-list --count "$base_sha..$head_sha" 2>/dev/null)" -gt 0 ] 2>/dev/null || fail "empty-range"
 
 declared=$(jq -r '.contracts[].touches_files[]' "$contracts" | sort -u) || fail "contracts-malformed"
 

@@ -135,10 +135,12 @@ assert_eq "" "$OUT_TXT" "T11 uncommitted work is not charged: stdout"
 assert_eq "0" "$RC" "T11 uncommitted work is not charged: exit"
 drop_repo
 
-# T12: base equal to head -> no commits, clean
+# T12: commits that change no file -> clean (base equal to head holds no commit
+# and is `ERROR empty-range`, see empty-range.test.sh)
 fixture src/a.sh
 write_contracts '[{"name":"C1","touches_files":[]}]'
-scope HEAD HEAD
+git -C "$REPO" commit -q --allow-empty -m "no files"
+scope HEAD~1 HEAD
 assert_eq "0" "$RC" "T12 empty range: exit"
 assert_eq "" "$OUT_TXT" "T12 empty range: stdout"
 drop_repo

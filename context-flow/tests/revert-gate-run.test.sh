@@ -59,10 +59,12 @@ assert_eq "CLEAN 1" "$GATE_LAST" "T3 effective: verdict"
 assert_eq "1" "$(verdict_lines)" "T3 effective: exactly one verdict line"
 drop_repo
 
-# T4: a builder that committed nothing but whose contract is declared
+# T4: a builder whose commits changed no file but whose contract is declared (a
+# range with no commit at all is `ERROR empty-range`, see empty-range.test.sh)
 new_repo; write_runner; base_commit
 write_contracts "[$C1]"
-assert_eq "0" "$(git -C "$REPO" rev-list --count "$BASE..HEAD")" "T4 fixture has no commits beyond base"
+git -C "$REPO" commit -q --allow-empty -m "no files"
+assert_eq "1" "$(git -C "$REPO" rev-list --count "$BASE..HEAD")" "T4 fixture has one commit beyond base, changing no file"
 gate_run bash run-tests.sh
 assert_eq "2" "$GATE_RC" "T4 empty range: exit"
 assert_eq "STAYS_GREEN C1" "$GATE_LAST" "T4 empty range: verdict"

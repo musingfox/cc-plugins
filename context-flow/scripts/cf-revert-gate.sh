@@ -30,6 +30,7 @@
 #   TESTS_RED <test_exit>     exit 3    the control run was red; no contract run
 #   TESTS_STALLED <seconds>   exit 124  the control run outran the deadline
 #   ERROR <reason>            exit 1    no verdict
+# An empty range (no commit in base..head) is `ERROR empty-range`; no suite runs.
 # Bad or missing input is a lone ERROR line, and TEST_CMD never runs. jq absent
 # is `ERROR jq-missing`.
 #
@@ -268,6 +269,9 @@ jq -e '
     and (.touches_files | type == "array") and all(.touches_files[]; type == "string")
     and ((has("test_files") | not) or ((.test_files | type == "array") and all(.test_files[]; type == "string"))))
 ' "$contracts" >/dev/null 2>&1 || fail "contracts-malformed"
+
+# No commit in base..head is no evidence either way: the gate refuses it.
+[ "$(git -C "$repo" rev-list --count "$base_sha..$head_sha" 2>/dev/null)" -gt 0 ] 2>/dev/null || fail "empty-range"
 
 mkdir -p "$out" 2>/dev/null && [ -d "$out" ] && [ -w "$out" ] || fail "out-unusable"
 out=$(cd "$out" && pwd)
