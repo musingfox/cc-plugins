@@ -1,5 +1,5 @@
 ---
-description: "Narrow a vague question, one layer at a time, into a goal you can hand to /cf to implement; writes no code. Use when the user is not yet sure what to build, asks to think a direction through (\"help me think this through\", \"I'm not sure what to do here\", \"how would this idea actually land?\"), or brings a fuzzy goal that needs deciding before any code."
+description: "Narrow a vague question, one layer at a time, into a goal you can hand to the main session to implement; writes no code. Use when the user is not yet sure what to build, asks to think a direction through (\"help me think this through\", \"I'm not sure what to do here\", \"how would this idea actually land?\"), or brings a fuzzy goal that needs deciding before any code."
 argument-hint: "<the question or vague goal>"
 allowed-tools: [Agent, Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion]
 ---
@@ -15,7 +15,7 @@ between them.
 Each **layer** lands one plan or milestone, concrete at that layer's grain and no finer. The
 next layer diverges from *that plan*, so the spiral descends — vague question → approach →
 milestone → an implementation-sized goal. It stops where the human says it is concrete enough,
-and `/cf` takes the goal from there.
+and the main session takes the goal from there.
 
 A layer takes as many **rounds** as it needs. A round is one demand on the human's attention:
 every decision that is askable now, asked at once, answered, and folded back in — which is what
@@ -346,7 +346,7 @@ notes: <their reasoning, verbatim — empty if they gave none>
 Recording it is not optional: on the 再挖一層 path those notes are what the next Divergence
 diverges with, and they are the only account of *why* a layer was settled once your context has
 rolled over. That block is scaffolding, not content: whoever reads the plan next (the next
-layer's Divergence, `/cf`, a human) ignores it.
+layer's Divergence, the main session, a human) ignores it.
 
 - **夠了** → **promote, then report.** `.spiral/` is scratch — gitignored, and it dies with the
   run. What the run decided is the one thing that must outlive it. Check
@@ -383,9 +383,9 @@ layer's Divergence, `/cf`, a human) ignores it.
   collides across runs. `status: done` with an empty `delivered:` is a claim with no receipt;
   the two move together.
 
-  The promoted file is the deliverable: hand it to `/cf <the goal, one line>` with the file as
-  context — it is a **seed**, not a contract set, so `/cf` still runs its own research → plan →
-  gate. Then stop. Executing is not yours.
+  The promoted file is the deliverable: hand the main session `<the goal, one line>` with the file
+  as context — it is a **seed**, not a contract set: the main session pins the contract with the human.
+  Then stop. Executing is not yours.
 - **再挖一層** → `L+1`, round back to `a1`, and back to step 1 — diverging from *this plan*
   and carrying their notes.
 - **退回上一層** → `L-1`, reopened. Read `${CLAUDE_PLUGIN_ROOT}/docs/ascent.md` and follow it
@@ -434,7 +434,7 @@ It ends with `[spiral] save-mode=browser|inline`. A brief it refuses exits 1 wit
 ## Rules
 
 - **Spiral plans; it ships no code.** No gate, no deliverable, nothing merged. If the question is
-  already determinate — "how do I implement X" — say so and point at `/cf`; a settled task does
+  already determinate — "how do I implement X" — say so and point at the main session; a settled task does
   not need divergence. The one place code gets written is a prototype (§3): that code is evidence
   for a decision, it is built in its own worktree, and it is abandoned on a branch. You yourself
   never write code at any depth.

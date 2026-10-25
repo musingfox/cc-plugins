@@ -56,3 +56,11 @@ n=$(grep -c '^## Suggested skills' "$cmd" || true)
 
 n=$(grep -cF 'closes the body' "$cmd" || true)
 [ "$n" -eq 0 ] || fail "must not claim last-section slot, got $n"
+
+n=$(grep -cF 'the main session pins the contract with the human' "$cmd" || true)
+[ "$n" -eq 1 ] || fail "the seed is handed to the main session, which pins the contract, got $n"
+
+for f in "$cmd" spiral/.claude-plugin/plugin.json .claude-plugin/marketplace.json; do
+  n=$({ grep -F '/cf' "$f" || true; } | { grep -vF '/cf-' || true; } | wc -l | tr -d ' ')
+  [ "$n" -eq 0 ] || fail "/cf must not be named as a command in $f, got $n"
+done

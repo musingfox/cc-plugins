@@ -1,7 +1,7 @@
 {
   "name": "spiral",
-  "version": "0.4.8",
-  "description": "[Experimental] Spiral — turns a vague question into a goal ready for /cf, one layer of decisions at a time, without writing code",
+  "version": "0.4.9",
+  "description": "[Experimental] Spiral — turns a vague question into a goal ready for the main session, one layer of decisions at a time, without writing code",
   "author": {
     "name": "Nick Huang",
     "email": "nick12703990@gmail.com"
