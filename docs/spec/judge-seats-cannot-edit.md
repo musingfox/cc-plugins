@@ -3,8 +3,8 @@ id: judge-seats-cannot-edit
 status: accepted
 scope:
   - "pi-dispatch/agents/reviewer.md"
-  - "context-flow/agents/review.md"
-verify: check:! grep -h '^tools:' pi-dispatch/agents/reviewer.md context-flow/agents/review.md | grep -qw Edit
+  - "method/agents/review.md"
+verify: check:! grep -h '^tools:' pi-dispatch/agents/reviewer.md method/agents/review.md | grep -qw Edit
 related: [dispatch-verdict-from-file]
 source: null
 adr: null
@@ -20,4 +20,4 @@ changing the line that failed, and the deliverable still looks like the
 deliverable.
 
 The rule binds the judgement seats specifically. Seats that widen rather than
-decide (spiral's divergence) are out of scope — they render no verdict.
+decide (method's divergence) are out of scope — they render no verdict.

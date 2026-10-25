@@ -87,10 +87,11 @@ One skill that teaches a session to act as one **node** of a contract tree: take
 - **Do or split**: a node does its contract itself unless the work outruns one context, has parallel parts, or needs a different model; splitting makes it the author of the sub-contracts
 - **Sub-contracts written in place**: the node writes each sub-node's `contracts.json` itself — observed channels, file scope, test cases, decision tiering, atomicity, load-bearing assumptions — and checks it with `scripts/check-contracts.sh`
 - **Verbatim tickets**: `contracts.json` reaches a muster worker through `--ticket-file`, never retyped; nested muster runs carry a depth-2 tree back in one fetch
-- **One review per split**: `cf:review` checks a split node's integrated branch against the contract its author wrote; leaves run only the `cf-scope` and `cf-revert-gate` gates
+- **One review per split**: `method:review` checks a split node's integrated branch against the contract its author wrote; leaves run only the `scope-gate.sh` and `revert-gate.sh` gates
 - **Fixed report shape**: `DONE` or `BLOCKED`, then the kind, the review layer, what was found and the options, so a rex pane and a muster worker report alike; a problem climbs one layer at a time, after one information round and at most two bounces
-- **Narrowing first**: spiral's diverge → round → probe → converge, ending in a contract the node does or splits
-- **Uses**: context-flow's `cf:review` and gate scripts, spiral's agents, and muster
+- **Narrowing first**: diverge → round → probe → converge, ending in a contract the node does or splits; at the top a round goes on a browser decision page (`render-decision.sh`, `wait-decision.sh`), with `AskUserQuestion` as the fallback
+- **Carries its own seats and gates**: agents `method:review`, `method:probe`, `method:prototype` and `method:divergence`; scripts `scope-gate.sh`, `revert-gate.sh`, `add-repros.sh`, `render-decision.sh`, `wait-decision.sh` and `check-contracts.sh`
+- **Uses**: muster to run nested nodes, and viz to render the decision page
 
 **Installation:**
 ```bash
