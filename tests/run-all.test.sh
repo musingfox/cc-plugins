@@ -13,16 +13,18 @@ RUNNER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/run-all.sh"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-# An all-passing fixture root: two pi-dispatch suites, one bun test, a cf runner.
+# An all-passing fixture root: two pi-dispatch suites, one bun test, a cf runner,
+# one method suite.
 fixture() {
   local root="$TMP/$1"
-  mkdir -p "$root/pi-dispatch/tests" "$root/pi-dispatch/extensions" "$root/context-flow/tests"
+  mkdir -p "$root/pi-dispatch/tests" "$root/pi-dispatch/extensions" "$root/context-flow/tests" "$root/method/tests"
   echo 'exit 0' > "$root/pi-dispatch/tests/ok.sh"
   cat > "$root/pi-dispatch/extensions/ok.test.ts" <<'TS'
 import { expect, test } from "bun:test";
 test("ok", () => { expect(1).toBe(1); });
 TS
   echo 'exit 0' > "$root/context-flow/tests/run.sh"
+  echo 'exit 0' > "$root/method/tests/ok.test.sh"
   echo "$root"
 }
 
@@ -86,6 +88,12 @@ SH
 OUT="$(CF_BRANCH=junk-branch CF_SLUG=junk-slug SESSION=junk-session bash "$RUNNER" "$F" 2>&1)"; RC=$?
 check '[ "$RC" -eq 0 ]' "T8 fixture passes with a flow env exported"
 check 'grep -qx "LEAK=" <<<"$OUT"' "T8 suite sees no CF_BRANCH, CF_SLUG or SESSION"
+
+# T9: a root with no method/tests is a failing suite, never a skip.
+F="$(fixture t9)"; rm -r "$F/method/tests"
+run "$F"
+check '[ "$RC" -eq 1 ]' "T9 missing method/tests exits 1"
+check 'grep -qx "not ok - method/tests (missing)" <<<"$OUT"' "T9 names the missing method/tests"
 
 echo "--- run-all: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

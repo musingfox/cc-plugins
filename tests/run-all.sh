@@ -4,7 +4,7 @@
 # Usage: bash tests/run-all.sh [ROOT]   (ROOT defaults to the repo root)
 #
 # Order: each pi-dispatch/tests/*.sh, the bun suite in pi-dispatch/extensions/,
-# context-flow/tests/run.sh, then each tests/*.test.sh. One "ok   - <suite>" or
+# context-flow/tests/run.sh, each method/tests/*.test.sh, then each tests/*.test.sh. One "ok   - <suite>" or
 # "not ok - <suite>" line per suite, then "suites: N, failed: M" as the last
 # line. Exit 0 only when M is 0. A missing suite directory or a missing bun is
 # a failure, never a skip. Deliberately no test_exit= line: cf-revert-gate.sh's
@@ -58,6 +58,14 @@ else
 fi
 
 clean bash "$ROOT/context-flow/tests/run.sh"; report $? "context-flow/tests/run.sh"
+
+if [ -d "$ROOT/method/tests" ]; then
+  for f in "$ROOT"/method/tests/*.test.sh; do
+    (cd "$ROOT" && clean bash "$f"); report $? "method/tests/$(basename "$f")"
+  done
+else
+  report 1 "method/tests (missing)"
+fi
 
 for f in "$ROOT"/tests/*.test.sh; do
   (cd "$ROOT" && clean bash "$f"); report $? "tests/$(basename "$f")"

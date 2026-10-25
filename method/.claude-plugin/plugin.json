@@ -1,0 +1,19 @@
+{
+  "name": "method",
+  "version": "0.1.0",
+  "description": "[Experimental] One node of a contract tree — do a contract yourself or split it into sub-contracts you write, dispatch them, route what comes back, report up in a fixed shape; narrows a question that is not yet a contract first",
+  "author": {
+    "name": "Nick Huang",
+    "email": "nick12703990@gmail.com"
+  },
+  "repository": "https://github.com/musingfox/cc-plugins",
+  "homepage": "https://github.com/musingfox/cc-plugins/tree/main/method",
+  "keywords": [
+    "contracts",
+    "decomposition",
+    "review",
+    "escalation",
+    "muster"
+  ],
+  "license": "MIT"
+}
