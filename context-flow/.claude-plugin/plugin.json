@@ -1,6 +1,6 @@
 {
   "name": "cf",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Contract-drafting agent (cf:plan), Spec reviewer (cf:review) and the gate scripts that check a builder's scope, tests, revert and repros",
   "author": {
     "name": "Nick Huang"
