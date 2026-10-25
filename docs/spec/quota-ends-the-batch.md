@@ -4,7 +4,7 @@ status: accepted
 scope:
   - "pi-dispatch/scripts/pi-poll.sh"
   - "pi-dispatch/scripts/pi-agent.sh"
-verify: null
+verify: check:bash pi-dispatch/tests/poll-test.sh && bash pi-dispatch/tests/agent-test.sh
 related: [dispatch-write-targets-declared, dispatch-verdict-from-file]
 source: dispatch-write-set-and-failure-routing
 adr: null
