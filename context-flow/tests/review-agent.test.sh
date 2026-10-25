@@ -101,6 +101,9 @@ done
 assert_contains "$obs" "that no test case asserts, is a FAIL of class **missing or partial** with \`- **Layer**: contract\`" "review: unasserted observed channel is missing or partial at the contract layer"
 assert_contains "$obs" "A channel the contract observes that the implementation writes to" "review: the unasserted-channel clause is about a channel the implementation writes to"
 
+# A test case states a channel's expected value but the builder's tests never check it: missing or partial, code layer
+assert_contains "$obs" "A channel a test case states an expected value for, but that the diff's tests never check (for example they discard stderr with \`2>/dev/null\`), is a FAIL of class **missing or partial** with \`- **Layer**: code\`, even when the behaviour itself is right" "review: a test case channel the builder's tests do not check is missing or partial at the code layer"
+
 # Written to a channel the contract does not observe: implemented but wrong, code layer
 assert_contains "$obs" "a channel the contract does not observe (for example an unexpected stderr line) is a FAIL of class **implemented but wrong** with \`- **Layer**: code\`" "review: output on an unobserved channel is implemented but wrong at the code layer"
 
