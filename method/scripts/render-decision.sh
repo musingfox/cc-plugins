@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Render a spiral decision brief to HTML via the sibling `viz` plugin, then open it.
+# Render a method decision brief to HTML via the sibling `viz` plugin, then open it.
 # Falls back to printing the brief inline when viz is absent (uninstalled / headless),
 # so a decision is never reduced to bare AskUserQuestion labels.
 #
@@ -11,10 +11,10 @@
 #   - installed cache (versioned):  <marketplace>/viz/<version>/lib/render.sh
 
 brief="${1:?usage: render-decision.sh <brief.md> <output-name>}"
-name="${2:-spiral-decision}"
+name="${2:-decision}"
 
 if [ ! -f "$brief" ]; then
-  echo "[spiral] brief not found: $brief" >&2
+  echo "[method] brief not found: $brief" >&2
   exit 1
 fi
 
@@ -55,13 +55,13 @@ problems="$(LC_ALL=C awk '
   }
 ' "$brief")"
 if [ -n "$problems" ]; then
-  printf '[spiral] brief rejected: %s\n' "$brief" >&2
-  printf '%s\n' "$problems" | sed 's/^/[spiral]   /' >&2
-  echo "[spiral] fix the brief and run render-decision again" >&2
+  printf '[method] brief rejected: %s\n' "$brief" >&2
+  printf '%s\n' "$problems" | sed 's/^/[method]   /' >&2
+  echo "[method] fix the brief and run render-decision again" >&2
   exit 1
 fi
 
-# spiral's own root: CLAUDE_PLUGIN_ROOT when invoked by the plugin, else this script's parent.
+# method's own root: CLAUDE_PLUGIN_ROOT when invoked by the plugin, else this script's parent.
 root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 
 # Search both layouts at both depths; if several match, take the highest version.
@@ -79,14 +79,14 @@ if [ -n "$render" ] && [ -f "$render" ]; then
   out="$(bash "$render" "$brief" "$name")"
   printf '%s\n' "$out"
   if printf '%s\n' "$out" | grep -q 'URL: http://'; then
-    echo "[spiral] save-mode=browser"
+    echo "[method] save-mode=browser"
   else
-    echo "[spiral] save-mode=inline   # viz Save unavailable — use terminal fallback"
+    echo "[method] save-mode=inline   # viz Save unavailable — use terminal fallback"
   fi
   exit 0
 fi
 
-echo "[spiral] viz render.sh not found — decision brief (read inline):" >&2
+echo "[method] viz render.sh not found — decision brief (read inline):" >&2
 echo "----------------------------------------------------------------------" >&2
 cat "$brief"
-echo "[spiral] save-mode=inline   # viz absent — use terminal fallback"
+echo "[method] save-mode=inline   # viz absent — use terminal fallback"

@@ -4,13 +4,13 @@ cd "$(git rev-parse --show-toplevel)"
 
 fail() { echo "  ✗ $*"; exit 1; }
 
-script="$PWD/spiral/scripts/render-decision.sh"
+script="$PWD/method/scripts/render-decision.sh"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 # Nested so every viz lookup render-decision makes stays inside $tmp, where a
 # stub render.sh records that a render happened instead of opening a browser.
-root="$tmp/a/b/spiral"
+root="$tmp/a/b/method"
 mkdir -p "$root" "$tmp/a/b/viz/lib"
 printf '#!/usr/bin/env bash\ntouch "%s/rendered"\necho "URL: http://localhost:0/x"\n' "$tmp" > "$tmp/a/b/viz/lib/render.sh"
 

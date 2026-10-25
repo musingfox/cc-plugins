@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Block until a spiral decision brief is written back by the in-browser Save,
+# Block until a method decision brief is written back by the in-browser Save,
 # then print the answer frontmatter and exit 0; exit 2 on timeout.
 #
 # The wake condition is "a Save happened", not "everything was answered": the
@@ -21,7 +21,7 @@ interval=2
 elapsed=0
 
 if [ ! -f "$brief" ]; then
-  echo "[spiral] wait-decision: brief not found: $brief" >&2
+  echo "[method] wait-decision: brief not found: $brief" >&2
   exit 1
 fi
 
@@ -53,14 +53,14 @@ start="$(mtime_of "$brief")"
 while [ "$elapsed" -lt "$timeout" ]; do
   now="$(mtime_of "$brief")"
   if [ -n "$now" ] && [ "$now" != "$start" ]; then
-    answers || echo "[spiral] saved, but no choice/notes keys in the frontmatter"
+    answers || echo "[method] saved, but no choice/notes keys in the frontmatter"
     exit 0
   fi
   sleep "$interval"
   elapsed=$((elapsed + interval))
 done
 
-echo "[spiral] wait-decision: timeout after ${timeout}s — no Save detected. The page is still" >&2
-echo "[spiral] live and the brief is unchanged; re-arm this waiter on the same file, or take a" >&2
-echo "[spiral] typed answer in the terminal instead." >&2
+echo "[method] wait-decision: timeout after ${timeout}s — no Save detected. The page is still" >&2
+echo "[method] live and the brief is unchanged; re-arm this waiter on the same file, or take a" >&2
+echo "[method] typed answer in the terminal instead." >&2
 exit 2
