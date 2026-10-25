@@ -3,10 +3,10 @@
 # repository must give the answer --repo naming its top level gives.
 # NO set -e
 
-. "$CF_TESTS_DIR/lib/assert.sh"
-. "$CF_TESTS_DIR/lib/repo.sh"
+. "$METHOD_TESTS_DIR/lib/assert.sh"
+. "$METHOD_TESTS_DIR/lib/repo.sh"
 
-SCRIPTS="$(cd "$CF_TESTS_DIR/../scripts" && pwd)"
+SCRIPTS="$(cd "$METHOD_TESTS_DIR/../scripts" && pwd)"
 
 # scope: the only commit in base..head changes only the top-level version line of
 # p/.claude-plugin/plugin.json; sub/ is a directory of the repository
@@ -21,7 +21,7 @@ commit_all bump
 write_contracts '[{"name":"C1","touches_files":[]}]'
 for dir in "$REPO" "$REPO/sub"; do
   label="S1 --repo ${dir#"$REPO"}"
-  out="$(bash "$SCRIPTS/cf-scope.sh" --repo "$dir" --base "$BASE" --head HEAD --contracts "$CONTRACTS" 2>&1)"
+  out="$(bash "$SCRIPTS/scope-gate.sh" --repo "$dir" --base "$BASE" --head HEAD --contracts "$CONTRACTS" 2>&1)"
   rc=$?
   assert_eq "ALLOWLISTED p/.claude-plugin/plugin.json" "$out" "$label: stdout"
   assert_eq "0" "$rc" "$label: exit"
@@ -42,7 +42,7 @@ write_contracts '[{"name":"C1","touches_files":["src/a.sh","tests/a.sh"],"test_f
 for dir in "$REPO" "$REPO/sub"; do
   label="S2 revert --repo ${dir#"$REPO"}"
   before="$(git -C "$REPO" worktree list)"
-  out="$(bash "$SCRIPTS/cf-revert-gate.sh" --repo "$dir" --base "$BASE" --head HEAD --contracts "$CONTRACTS" --out "$OUT" \
+  out="$(bash "$SCRIPTS/revert-gate.sh" --repo "$dir" --base "$BASE" --head HEAD --contracts "$CONTRACTS" --out "$OUT" \
     -- bash -c '[ -f src/a.sh ] || exit 1' 2>&1)"
   rc=$?
   assert_eq "CLEAN 1" "$(printf '%s\n' "$out" | tail -1)" "$label: verdict"

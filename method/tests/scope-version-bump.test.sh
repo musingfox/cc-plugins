@@ -3,13 +3,13 @@
 # .githooks/pre-commit stages into its first commit touching a plugin, and must
 # still charge it for any other edit to that plugin.json.
 #
-# Drives the REAL cf-scope.sh over a REAL git repo: what counts as "only the
+# Drives the REAL scope-gate.sh over a REAL git repo: what counts as "only the
 # version changed" is decided by the git command the gate runs.
 
-. "$CF_TESTS_DIR/lib/assert.sh"
-. "$CF_TESTS_DIR/lib/repo.sh"
+. "$METHOD_TESTS_DIR/lib/assert.sh"
+. "$METHOD_TESTS_DIR/lib/repo.sh"
 
-SCOPE="$(cd "$CF_TESTS_DIR/../scripts" && pwd)/cf-scope.sh"
+SCOPE="$(cd "$METHOD_TESTS_DIR/../scripts" && pwd)/scope-gate.sh"
 MANIFEST="foo/.claude-plugin/plugin.json"
 
 # build_fixture -- the contract declares only foo/skill.md; plugin.json exists at base.

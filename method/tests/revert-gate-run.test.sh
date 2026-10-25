@@ -8,10 +8,10 @@
 # The last stdout line is exactly one verdict. C1 is effective, C2 vacuous.
 # NO set -e
 
-. "$CF_TESTS_DIR/lib/assert.sh"
-. "$CF_TESTS_DIR/lib/repo.sh"
+. "$METHOD_TESTS_DIR/lib/assert.sh"
+. "$METHOD_TESTS_DIR/lib/repo.sh"
 
-GATE="$(cd "$CF_TESTS_DIR/../scripts" && pwd)/cf-revert-gate.sh"
+GATE="$(cd "$METHOD_TESTS_DIR/../scripts" && pwd)/revert-gate.sh"
 
 # verdict_lines: how many stdout lines are verdicts
 verdict_lines() {
@@ -21,7 +21,7 @@ verdict_lines() {
 # mutant PERL_SUBSTITUTION -> MUT, a copy of the gate with that one change.
 mutant() {
   mkdir -p "$REPO_TOP/mut"
-  MUT="$REPO_TOP/mut/cf-revert-gate.sh"
+  MUT="$REPO_TOP/mut/revert-gate.sh"
   perl -0777 -pe "$1" "$GATE" >"$MUT"
   local applied=yes
   cmp -s "$GATE" "$MUT" && applied=no

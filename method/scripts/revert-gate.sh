@@ -4,11 +4,11 @@
 # claims to cover proves nothing, and the scope gate and a green suite both let
 # it through.
 #
-# Usage:   cf-revert-gate.sh --repo DIR --base REV --head REV --contracts FILE \
+# Usage:   revert-gate.sh --repo DIR --base REV --head REV --contracts FILE \
 #                            --out DIR -- TEST_CMD [ARGS...]
 #          DIR may be any directory inside the repository; the gate works on its top level.
 #          --base and --head are any revs that resolve to commits in DIR;
-#          FILE is cf:plan's contracts.json (schema_version 1).
+#          FILE is a contracts.json (schema_version 1), as method/skills/method/contracts.md writes it.
 #
 # One control run at head, then one run per contract in .contracts[] order. A
 # contract's run puts every own path (the paths the commits in base..head
@@ -55,7 +55,7 @@ export LC_ALL=C
 # Root build/lock manifests a builder may touch: an isolated worktree may have to
 # add a missing dev dependency to run its tests (e.g. `uv add --dev pytest`).
 # The scope gate reports them instead of failing; this gate never reverts them,
-# because a run needs them to install or build. cf-scope.sh carries the same line.
+# because a run needs them to install or build. scope-gate.sh carries the same line.
 CF_BUILD_LOCK_ALLOWLIST='^(pyproject\.toml|uv\.lock|requirements[^/]*\.txt|package\.json|package-lock\.json|bun\.lock(b)?|yarn\.lock|pnpm-lock\.yaml|Cargo\.(toml|lock)|go\.(mod|sum)|Gemfile(\.lock)?)$'
 
 tmp="" wt="" wt_admin="" sup=""
@@ -282,7 +282,7 @@ out=$(cd "$out" && pwd)
 LOG="$out/revert-gate.log"
 : >"$LOG" 2>/dev/null || fail "out-unusable"
 
-# The set cf-scope.sh charges: the commit union of base..head.
+# The set scope-gate.sh charges: the commit union of base..head.
 # --no-renames: rename detection lists only the new name, so the old path would
 #   escape the gate.
 # -z: git C-quotes a name holding a quote, backslash or control character even
@@ -298,7 +298,7 @@ done < <(own_log 2>/dev/null | sort -zu)
 
 # ---- the worktree ----
 
-tmp=$(mktemp -d "${TMPDIR:-/tmp}/cf-revert-gate.XXXXXX") || fail "tmpdir-unusable"
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/revert-gate.XXXXXX") || fail "tmpdir-unusable"
 STALL_MARK="$tmp/stalled.mark"
 wt="$tmp/wt"
 # --no-checkout, then a reset: `worktree add` runs the post-checkout hook after a

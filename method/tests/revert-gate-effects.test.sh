@@ -6,10 +6,10 @@
 # the same before and after.
 # NO set -e
 
-. "$CF_TESTS_DIR/lib/assert.sh"
-. "$CF_TESTS_DIR/lib/repo.sh"
+. "$METHOD_TESTS_DIR/lib/assert.sh"
+. "$METHOD_TESTS_DIR/lib/repo.sh"
 
-GATE="$(cd "$CF_TESTS_DIR/../scripts" && pwd)/cf-revert-gate.sh"
+GATE="$(cd "$METHOD_TESTS_DIR/../scripts" && pwd)/revert-gate.sh"
 
 # ==== ERROR: one line on stdout, exit 1, and the suite never ran ====
 

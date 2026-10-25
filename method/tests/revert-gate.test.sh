@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# Revert gate (cf-revert-gate.sh), driven against real git fixtures.
+# Revert gate (revert-gate.sh), driven against real git fixtures.
 #
 # Fixture: a base commit with run-tests.sh, src/base.sh and tests/base.test.sh,
 # plus the commits a case needs. Red-first cases run a copy of the gate with one
 # change and assert the case it targets no longer holds.
 # NO set -e
 
-. "$CF_TESTS_DIR/lib/assert.sh"
-. "$CF_TESTS_DIR/lib/repo.sh"
+. "$METHOD_TESTS_DIR/lib/assert.sh"
+. "$METHOD_TESTS_DIR/lib/repo.sh"
 
-GATE="$(cd "$CF_TESTS_DIR/../scripts" && pwd)/cf-revert-gate.sh"
+GATE="$(cd "$METHOD_TESTS_DIR/../scripts" && pwd)/revert-gate.sh"
 
 # mutant PERL_SUBSTITUTION -> MUT, a copy of the gate with that one change.
 mutant() {
   mkdir -p "$REPO_TOP/mut"
-  MUT="$REPO_TOP/mut/cf-revert-gate.sh"
+  MUT="$REPO_TOP/mut/revert-gate.sh"
   perl -0777 -pe "$1" "$GATE" >"$MUT"
   local applied=yes
   cmp -s "$GATE" "$MUT" && applied=no

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Append review repros as test cases of the contracts they name.
 #
-# Usage: cf-add-repros.sh --contracts FILE REPROS_FILE
+# Usage: add-repros.sh --contracts FILE REPROS_FILE
 # Stdout: one line per repro -- ADDED <contract> R<n> or DUPLICATE <contract> <id>
 # Exit:   0 applied (or nothing to do), 2 usage/missing file, 3 malformed,
 #         4 jq missing, 5 a repro names a contract that is not in FILE
@@ -15,12 +15,12 @@
 set -euo pipefail
 
 if ! command -v jq >/dev/null 2>&1; then
-  echo "cf-add-repros: jq is required" >&2
+  echo "add-repros: jq is required" >&2
   exit 4
 fi
 
 usage() {
-  echo "Usage: cf-add-repros.sh --contracts FILE REPROS_FILE" >&2
+  echo "Usage: add-repros.sh --contracts FILE REPROS_FILE" >&2
   exit 2
 }
 
@@ -42,7 +42,7 @@ done
 [ -n "$contracts" ] && [ -n "$repros_file" ] || usage
 
 if [ ! -f "$contracts" ] || [ ! -f "$repros_file" ]; then
-  echo "cf-add-repros: missing contracts file or repros file" >&2
+  echo "add-repros: missing contracts file or repros file" >&2
   exit 2
 fi
 dir="$(cd "$(dirname "$contracts")" && pwd)"
@@ -62,7 +62,7 @@ archive_contracts() {
 }
 
 if ! jq -e '.contracts | type == "array"' "$contracts" >/dev/null 2>&1; then
-  echo "cf-add-repros: malformed contracts.json" >&2
+  echo "add-repros: malformed contracts.json" >&2
   exit 3
 fi
 
@@ -74,7 +74,7 @@ if ! jq -e '
     and (.expect   | type) == "string" and (.expect   | length) > 0
     and (.command  | type) == "string" and (.command  | length) > 0)
 ' "$repros_file" >/dev/null 2>&1; then
-  echo "cf-add-repros: malformed repros or entry missing contract, given, expect, or command" >&2
+  echo "add-repros: malformed repros or entry missing contract, given, expect, or command" >&2
   exit 3
 fi
 

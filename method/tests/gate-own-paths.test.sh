@@ -5,11 +5,11 @@
 # Real git fixtures, real scripts.
 # NO set -e
 
-. "$CF_TESTS_DIR/lib/assert.sh"
-. "$CF_TESTS_DIR/lib/repo.sh"
+. "$METHOD_TESTS_DIR/lib/assert.sh"
+. "$METHOD_TESTS_DIR/lib/repo.sh"
 
-SCRIPTS="$(cd "$CF_TESTS_DIR/../scripts" && pwd)"
-GATE="$SCRIPTS/cf-revert-gate.sh"
+SCRIPTS="$(cd "$METHOD_TESTS_DIR/../scripts" && pwd)"
+GATE="$SCRIPTS/revert-gate.sh"
 
 # new_fixture DECLARED_JSON_ARRAY [EXTRA_C1_FIELDS]: an empty repo whose one
 # contract C1 touches DECLARED. Callers build the base commit, then call begins.
@@ -20,7 +20,7 @@ new_fixture() {
 begins() { BASE="$(head_sha)"; }
 
 scope() {
-  SCOPE_OUT="$(bash "$SCRIPTS/cf-scope.sh" --repo "$REPO" --base "$BASE" --head HEAD --contracts "$CONTRACTS" 2>&1)"
+  SCOPE_OUT="$(bash "$SCRIPTS/scope-gate.sh" --repo "$REPO" --base "$BASE" --head HEAD --contracts "$CONTRACTS" 2>&1)"
   SCOPE_RC=$?
 }
 revert() { gate_run bash -c "$1"; }
@@ -77,14 +77,14 @@ drop_repo
 # The revert gate never reverts what the scope gate allows; each script carries
 # its own copy of the regex, so the copies must not drift.
 allowlist_of() { sed -n "s/^CF_BUILD_LOCK_ALLOWLIST=//p" "$1"; }
-assert_eq "1" "$(allowlist_of "$SCRIPTS/cf-scope.sh" | grep -c .)" "T5 the scope gate defines the allowlist once"
-assert_eq "1" "$(allowlist_of "$SCRIPTS/cf-revert-gate.sh" | grep -c .)" "T5 the revert gate defines the allowlist once"
-assert_eq "$(allowlist_of "$SCRIPTS/cf-scope.sh")" "$(allowlist_of "$SCRIPTS/cf-revert-gate.sh")" \
+assert_eq "1" "$(allowlist_of "$SCRIPTS/scope-gate.sh" | grep -c .)" "T5 the scope gate defines the allowlist once"
+assert_eq "1" "$(allowlist_of "$SCRIPTS/revert-gate.sh" | grep -c .)" "T5 the revert gate defines the allowlist once"
+assert_eq "$(allowlist_of "$SCRIPTS/scope-gate.sh")" "$(allowlist_of "$SCRIPTS/revert-gate.sh")" \
   "T5 the scope gate's build/lock allowlist is the revert gate's"
 
 # --- T6: the same list of own paths, by the same git command -----------------
 # Both read the commit union with rename detection off and NUL separators.
-for g in cf-scope.sh cf-revert-gate.sh; do
+for g in scope-gate.sh revert-gate.sh; do
   line="$(grep -E 'log -z .*--no-renames .*--name-only' "$SCRIPTS/$g")"
   assert_eq "1" "$(printf '%s\n' "$line" | grep -c .)" "T6 $g lists own paths with log -z --no-renames --name-only"
 done

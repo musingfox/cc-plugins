@@ -5,13 +5,13 @@
 # --base. Pass the original base and they are in range, so they are charged: the
 # gate has no list of checkpoints to subtract, and says so by naming the files.
 #
-# Real git repo, real cf-scope.sh -- the bug lives in the choice of git command.
+# Real git repo, real scope-gate.sh -- the bug lives in the choice of git command.
 # NO set -e
 
-. "$CF_TESTS_DIR/lib/assert.sh"
-. "$CF_TESTS_DIR/lib/repo.sh"
+. "$METHOD_TESTS_DIR/lib/assert.sh"
+. "$METHOD_TESTS_DIR/lib/repo.sh"
 
-SCOPE="$(cd "$CF_TESTS_DIR/../scripts" && pwd)/cf-scope.sh"
+SCOPE="$(cd "$METHOD_TESTS_DIR/../scripts" && pwd)/scope-gate.sh"
 
 # build_fixture ROGUE_FILE   (empty = the builder stays inside its declared scope)
 # Leaves REPO on main: base, a merge of the prerequisite's checkpoint (src/lib.py),

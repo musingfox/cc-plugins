@@ -2,7 +2,7 @@
 # Self-validation for the test harness itself (run.sh + lib/assert.sh).
 # Discovered and executed by run.sh like any other *.test.sh.
 
-. "$CF_TESTS_DIR/lib/assert.sh"
+. "$METHOD_TESTS_DIR/lib/assert.sh"
 
 # Positive cases.
 assert_eq "abc" "abc" "assert_eq matches equal strings"
@@ -18,11 +18,11 @@ assert_json "$tmp" '.n' "3" "assert_json reads a numeric field"
 rm -f "$tmp"
 
 # Meta: a failing assertion must make a test file exit nonzero.
-assert_exit 1 bash -c ". \"$CF_TESTS_DIR/lib/assert.sh\"; assert_eq 1 2" \
+assert_exit 1 bash -c ". \"$METHOD_TESTS_DIR/lib/assert.sh\"; assert_eq 1 2" \
   "a failing assertion yields nonzero exit"
 
 # Meta: a clean test file must exit zero.
-assert_exit 0 bash -c ". \"$CF_TESTS_DIR/lib/assert.sh\"; assert_eq ok ok" \
+assert_exit 0 bash -c ". \"$METHOD_TESTS_DIR/lib/assert.sh\"; assert_eq ok ok" \
   "a passing assertion yields zero exit"
 
 # Inside a pi worker PATH starts with the git shim, which refuses to run without
@@ -30,8 +30,8 @@ assert_exit 0 bash -c ". \"$CF_TESTS_DIR/lib/assert.sh\"; assert_eq ok ok" \
 # still drops PI_CWD, so no fixture sees the live worktree.
 sandbox="$(mktemp -d)"
 mkdir -p "$sandbox/tests/lib" "$sandbox/shim"
-cp "$CF_TESTS_DIR/run.sh" "$sandbox/tests/run.sh"
-cp "$CF_TESTS_DIR/lib/assert.sh" "$sandbox/tests/lib/assert.sh"
+cp "$METHOD_TESTS_DIR/run.sh" "$sandbox/tests/run.sh"
+cp "$METHOD_TESTS_DIR/lib/assert.sh" "$sandbox/tests/lib/assert.sh"
 printf '%s\n' '#!/usr/bin/env bash' '[ -n "${PI_REAL_GIT:-}" ] || exit 127' 'exec "$PI_REAL_GIT" "$@"' > "$sandbox/shim/git"
 printf '%s\n' '#!/usr/bin/env bash' 'git --version >/dev/null || exit 1' '[ -z "${PI_CWD:-}" ] || exit 2' > "$sandbox/tests/probe.test.sh"
 chmod +x "$sandbox/shim/git"

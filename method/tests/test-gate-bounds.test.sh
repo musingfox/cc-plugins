@@ -13,10 +13,10 @@
 #     suite's last output
 # NO set -e
 
-. "$CF_TESTS_DIR/lib/assert.sh"
-. "$CF_TESTS_DIR/lib/repo.sh"
+. "$METHOD_TESTS_DIR/lib/assert.sh"
+. "$METHOD_TESTS_DIR/lib/repo.sh"
 
-GATE="$(cd "$CF_TESTS_DIR/../scripts" && pwd)/cf-revert-gate.sh"
+GATE="$(cd "$METHOD_TESTS_DIR/../scripts" && pwd)/revert-gate.sh"
 
 # fixture: C1 effective, so that a green control run would end in CLEAN 1
 fixture() { new_repo; write_runner; base_commit; add_effective; write_contracts "[$C1]"; }

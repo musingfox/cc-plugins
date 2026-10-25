@@ -6,10 +6,10 @@
 # is a range like any other.
 # NO set -e
 
-. "$CF_TESTS_DIR/lib/assert.sh"
-. "$CF_TESTS_DIR/lib/repo.sh"
+. "$METHOD_TESTS_DIR/lib/assert.sh"
+. "$METHOD_TESTS_DIR/lib/repo.sh"
 
-SCRIPTS="$(cd "$CF_TESTS_DIR/../scripts" && pwd)"
+SCRIPTS="$(cd "$METHOD_TESTS_DIR/../scripts" && pwd)"
 
 # fixture: base commit, then one commit adding src/a.sh and tests/a.sh; C1 touches both
 fixture() {
@@ -27,12 +27,12 @@ fixture() {
 
 # run_scope BASE HEAD / run_revert BASE HEAD -> OUT_TXT, RC
 run_scope() {
-  OUT_TXT="$(bash "$SCRIPTS/cf-scope.sh" --repo "$REPO" --base "$1" --head "$2" --contracts "$CONTRACTS" 2>/dev/null)"
+  OUT_TXT="$(bash "$SCRIPTS/scope-gate.sh" --repo "$REPO" --base "$1" --head "$2" --contracts "$CONTRACTS" 2>/dev/null)"
   RC=$?
 }
 run_revert() {
   rm -f "$REPO_TOP/ran"
-  OUT_TXT="$(bash "$SCRIPTS/cf-revert-gate.sh" --repo "$REPO" --base "$1" --head "$2" --contracts "$CONTRACTS" --out "$OUT" \
+  OUT_TXT="$(bash "$SCRIPTS/revert-gate.sh" --repo "$REPO" --base "$1" --head "$2" --contracts "$CONTRACTS" --out "$OUT" \
     -- bash -c ": >'$REPO_TOP/ran'" 2>/dev/null)"
   RC=$?
 }

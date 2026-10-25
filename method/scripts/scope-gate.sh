@@ -6,10 +6,10 @@
 # substitute: the builder commits with `git add -A`, and porcelain is blind to
 # anything already committed.
 #
-# Usage:   cf-scope.sh --repo DIR --base REV --head REV --contracts FILE
+# Usage:   scope-gate.sh --repo DIR --base REV --head REV --contracts FILE
 #          DIR may be any directory inside the repository; the gate works on its top level.
 #          --base and --head are any revs that resolve to commits in DIR;
-#          FILE is cf:plan's contracts.json (schema_version 1).
+#          FILE is a contracts.json (schema_version 1), as method/skills/method/contracts.md writes it.
 # Stdout:  ALLOWLISTED <csv>   (only when non-empty -- build/lock manifests and
 #                               hook-made plugin version bumps)
 #          UNDECLARED  <csv>   (only when non-empty -- scope violation)
@@ -38,7 +38,7 @@ export LC_ALL=C
 # Root build/lock manifests a builder may touch: an isolated worktree may have to
 # add a missing dev dependency to run its tests (e.g. `uv add --dev pytest`).
 # The scope gate reports them instead of failing; the revert gate never reverts
-# them, because a run needs them to install or build. cf-revert-gate.sh carries
+# them, because a run needs them to install or build. revert-gate.sh carries
 # the same line.
 CF_BUILD_LOCK_ALLOWLIST='^(pyproject\.toml|uv\.lock|requirements[^/]*\.txt|package\.json|package-lock\.json|bun\.lock(b)?|yarn\.lock|pnpm-lock\.yaml|Cargo\.(toml|lock)|go\.(mod|sum)|Gemfile(\.lock)?)$'
 

@@ -4,9 +4,9 @@
 # Such a test can never go red: clean up inline at the end, or chain
 # _assert_summary_on_exit last in the new trap.
 
-. "$CF_TESTS_DIR/lib/assert.sh"
+. "$METHOD_TESTS_DIR/lib/assert.sh"
 
-for f in "$CF_TESTS_DIR"/*.test.sh; do
+for f in "$METHOD_TESTS_DIR"/*.test.sh; do
   grep -q 'lib/assert.sh' "$f" || continue
   assert_eq "" "$(grep -nE '^[[:space:]]*trap .*EXIT' "$f" | grep -v '_assert_summary_on_exit')" \
     "$(basename "$f") keeps assert.sh's EXIT trap"

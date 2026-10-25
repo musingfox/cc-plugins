@@ -15,10 +15,10 @@
 #   - red:   test_exit=<n>, test_counts=, the last 30 lines and up to 10 failure markers
 # NO set -e
 
-. "$CF_TESTS_DIR/lib/assert.sh"
-. "$CF_TESTS_DIR/lib/repo.sh"
+. "$METHOD_TESTS_DIR/lib/assert.sh"
+. "$METHOD_TESTS_DIR/lib/repo.sh"
 
-GATE="$(cd "$CF_TESTS_DIR/../scripts" && pwd)/cf-revert-gate.sh"
+GATE="$(cd "$METHOD_TESTS_DIR/../scripts" && pwd)/revert-gate.sh"
 
 # control CMD...: the gate over a repo whose control run is CMD -> GATE_OUT
 control() {

@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Review repros become test cases of the contract they failed:
-#   cf-add-repros.sh --contracts FILE REPROS_FILE
+#   add-repros.sh --contracts FILE REPROS_FILE
 # exit 0 applied (or nothing to do), 2 usage/missing file, 3 malformed, 4 jq
 # missing, 5 unknown contract; the archive lands beside FILE.
 # NO set -e
 
-. "$CF_TESTS_DIR/lib/assert.sh"
+. "$METHOD_TESTS_DIR/lib/assert.sh"
 
-SCRIPTS="$(cd "$CF_TESTS_DIR/../scripts" && pwd)"
-ADD="$SCRIPTS/cf-add-repros.sh"
+SCRIPTS="$(cd "$METHOD_TESTS_DIR/../scripts" && pwd)"
+ADD="$SCRIPTS/add-repros.sh"
 
 # add DIR REPROS [ARGS...]: the CLI over DIR/contracts.json. stderr goes to DIR/err.
 add() { local d="$1" r="$2"; shift 2; "$ADD" --contracts "$d/contracts.json" "$r" "$@" 2>"$d/err"; }
@@ -152,7 +152,7 @@ assert_eq "0" "$?" "T4 file unchanged"
 # The mutant lives in the fixture, not under scripts/: a copy there survives an
 # interrupted run and `git add -A` takes it.
 mkdir "$FLOW/mut"
-mut="$FLOW/mut/cf-add-repros.sh"
+mut="$FLOW/mut/add-repros.sh"
 sed '/# unknown-name check/,/# end unknown-name check/d' "$ADD" > "$mut"
 chmod +x "$mut"
 cp "$FLOW/contracts.orig" "$FLOW/contracts.json"

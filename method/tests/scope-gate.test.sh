@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# cf-scope.sh: every stdout line and exit code of the scope gate's contract,
+# scope-gate.sh: every stdout line and exit code of the scope gate's contract,
 # against real git repos built under mktemp -d.
 #   exit 0 clean (ALLOWLISTED alone still exits 0), 2 UNDECLARED present, 1 ERROR
 # NO set -e
 
-. "$CF_TESTS_DIR/lib/assert.sh"
-. "$CF_TESTS_DIR/lib/repo.sh"
+. "$METHOD_TESTS_DIR/lib/assert.sh"
+. "$METHOD_TESTS_DIR/lib/repo.sh"
 
-SCOPE="$(cd "$CF_TESTS_DIR/../scripts" && pwd)/cf-scope.sh"
+SCOPE="$(cd "$METHOD_TESTS_DIR/../scripts" && pwd)/scope-gate.sh"
 
 # scope BASE [HEAD]: the gate over REPO and CONTRACTS -> OUT_TXT, RC
 scope() {
