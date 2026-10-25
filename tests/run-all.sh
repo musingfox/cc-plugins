@@ -7,8 +7,8 @@
 # context-flow/tests/run.sh, then each tests/*.test.sh. One "ok   - <suite>" or
 # "not ok - <suite>" line per suite, then "suites: N, failed: M" as the last
 # line. Exit 0 only when M is 0. A missing suite directory or a missing bun is
-# a failure, never a skip. Deliberately no test_exit= line: cf-pi-test.sh adds
-# its own, and the summary must stay the last line.
+# a failure, never a skip. Deliberately no test_exit= line: cf-revert-gate.sh's
+# control run adds its own, and the summary must stay the last line.
 
 set -uo pipefail
 
