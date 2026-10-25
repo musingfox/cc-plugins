@@ -1,15 +1,15 @@
 # One review per split
 
-A builder never verifies itself. Verification costs a context, and review was 77–85% of measured subagent spend, so it runs once per split, not once per leaf. A review per leaf would multiply that cost and still pass a wrong decomposition, because review checks contracts as written (`context-flow/agents/review.md:216`). The review of a split is the one place the decomposition itself is judged.
+A builder never verifies itself. Verification costs a context, and review was 77–85% of measured subagent spend, so it runs once per split, not once per leaf. A review per leaf would multiply that cost and still pass a wrong decomposition, because review checks contracts as written (`<plugin root>/agents/review.md:217`). The review of a split is the one place the decomposition itself is judged.
 
 ## Leaf
 
 A node that did its contract itself gets no review. It runs the mechanical gates over its own commits, `<base>..HEAD`, against the `contracts.json` from its ticket written back out to a file, and quotes each verdict line in its report:
 
-- `context-flow/scripts/cf-scope.sh`: every changed file is declared.
-- `context-flow/scripts/cf-revert-gate.sh`: each contract's tests go red with its implementation put back.
+- `<plugin root>/scripts/scope-gate.sh`: every changed file is declared.
+- `<plugin root>/scripts/revert-gate.sh`: each contract's tests go red with its implementation put back.
 
-Their usage, verdict lines and exit codes are in each script's header and in `context-flow/README.md`. A gate verdict is mechanical, so running it on your own work is no self-verification. A red gate is a code problem: fix it and run the gates again before reporting.
+Their usage, verdict lines and exit codes are in each script's header and in `<plugin root>/README.md`. A gate verdict is mechanical, so running it on your own work is no self-verification. A red gate is a code problem: fix it and run the gates again before reporting.
 
 ## Who reviews a split
 
@@ -19,7 +19,7 @@ At the top the author is the human. A main session that split dispatches its own
 
 ## Dispatching it
 
-Dispatch `cf:review` (`dispatch.md` "Agent seats") with the four inputs `context-flow/agents/review.md` "Dispatch Inputs" names:
+Dispatch `method:review` (`dispatch.md` "Agent seats") with the inputs `<plugin root>/agents/review.md` "Dispatch Inputs" names, four required and one optional:
 
 - **`## Contracts file`**: a `contracts.json` holding only the contract you wrote for that node, the one under review.
 - **`## Diff command`**: `git diff <base>..<head>` over its **integrated branch**, the head sha its report names, run in the repository its branch was fetched into.
@@ -30,11 +30,11 @@ Attach its sub-contracts as context: a `## Sub-contracts file` line naming the `
 ## Reading the verdict
 
 - **`APPROVE`**: merge that head sha into your branch.
-- **`APPROVE-with-advisories`**: merge, then turn each advisory into a test case or drop it; never apply a reviewer's suggested fix by hand (`context-flow/agents/review.md:78`).
+- **`APPROVE-with-advisories`**: merge, then turn each advisory into a test case or drop it; never apply a reviewer's suggested fix by hand (`<plugin root>/agents/review.md:79`).
 - **`REQUEST_CHANGES`**: the next line is the `Layer:`. Route it with `route.md`.
 
 ## Repros
 
-Before a `code` round goes back down, add the review's repros to the contracts the builder holds: `context-flow/scripts/cf-add-repros.sh --contracts <its contracts.json> <repros file>`. Each repro becomes an `R<n>` test case the next build and the next review both run.
+Before a `code` round goes back down, add the review's repros to the contracts the builder holds: `<plugin root>/scripts/add-repros.sh --contracts <its contracts.json> <repros file>`. Each repro becomes an `R<n>` test case the next build and the next review both run.
 
 Done: every split you authored that reported `DONE` has a review report on disk, and its verdict is merged, routed, or reported up.

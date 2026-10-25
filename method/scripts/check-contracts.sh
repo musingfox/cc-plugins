@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Acceptance check: a contracts.json document follows the schema in
-# context-flow/agents/plan.md ("contracts.json (machine-readable sidecar)").
+# method/skills/method/contracts.md ("contracts.json").
 #
 # Usage:   check-contracts.sh FILE
 # Stdout:  always empty

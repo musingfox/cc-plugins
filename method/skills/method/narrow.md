@@ -38,7 +38,7 @@ Keep two counters, `L` (layer) and `a` (round), starting at `L1-a1`. Write each 
 
 ## 1. Diverge
 
-Dispatch `spiral:divergence` (`dispatch.md` "Agent seats"). Divergence is the one seat that must not see your hypotheses, so its dispatch carries only:
+Dispatch `method:divergence` (`dispatch.md` "Agent seats"). Divergence is the one seat that must not see your hypotheses, so its dispatch carries only:
 
 - **What to widen from**: the question at `L1-a1`; the previous layer's result at `L<N>-a1`; the same source as `a1` in a later round of the same layer.
 - **The carry-over, verbatim**: every direction already rejected at this layer with the feedback on it, and every decision already settled here.
@@ -59,14 +59,14 @@ Read the answers back:
 
 ## 3. Probe what stays open
 
-A decision with one pick is settled. Where several candidates were kept alive, dispatch one `spiral:probe` per live candidate, in parallel. Each gets **one** candidate, what taking it commits to, and what this layer widens from; a probe that sees the others starts comparing. Give no model override: the probe's definition pins its seat, and a cheaper one has returned a false wall.
+A decision with one pick is settled. Where several candidates were kept alive, dispatch one `method:probe` per live candidate, in parallel. Each gets **one** candidate, what taking it commits to, and what this layer widens from; a probe that sees the others starts comparing. Give no model override: the probe's definition pins its seat, and a cheaper one has returned a false wall.
 
 Sort what the probes bring back:
 
 - **Collided with something hard** → dead by right/wrong. Drop it and record the collision.
 - **Still standing** → it survived the walk.
 - **Falsified a premise, not the candidate** → the whole menu is re-priced, the unwalked candidates included. Re-price before sorting anything.
-- **Reading cannot answer it** → dispatch `spiral:prototype` with the question the build must answer, what counts as red and what as green, the candidate, what this layer widens from, and the branch `spiral/prototype-<question-slug>`. **You draw the red/green line**, concretely enough that the run meets it or does not; a prototype that draws its own can move it. Record the branch it reports back; that branch is the durable evidence.
+- **Reading cannot answer it** → dispatch `method:prototype` with the question the build must answer, what counts as red and what as green, the candidate, what this layer widens from, and the branch `spiral/prototype-<question-slug>`. **You draw the red/green line**, concretely enough that the run meets it or does not; a prototype that draws its own can move it. Record the branch it reports back; that branch is the durable evidence.
 
 Then take one exit:
 

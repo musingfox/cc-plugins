@@ -9,7 +9,7 @@ You are a **node**. A node takes one contract from the layer above, delivers it,
 
 A node's vehicle is a Claude session in a rex pane or a muster worker. Both write the same report file; only the upward channel differs. A problem reaches the human only when every layer between judged it beyond its own authority.
 
-The plugin root is `${CLAUDE_PLUGIN_ROOT}`. The other method files call it "the plugin root SKILL.md names": read the path here, because the variable is substituted only in this file and is not exported to Bash. Scripts live at `${CLAUDE_PLUGIN_ROOT}/scripts/`.
+The plugin root is `${CLAUDE_PLUGIN_ROOT}`. The other method files call it "the plugin root SKILL.md names": read the path here, because the variable is substituted only in this file and is not exported to Bash. Scripts live at `${CLAUDE_PLUGIN_ROOT}/scripts/` and agent definitions at `${CLAUDE_PLUGIN_ROOT}/agents/`.
 
 Read a method file when its situation comes up, not up front. Each sits beside this file.
 

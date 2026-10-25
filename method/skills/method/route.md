@@ -4,7 +4,7 @@ A sub-node reported `BLOCKED`, or a review of a split came back `REQUEST_CHANGES
 
 ## A review Layer picks the route
 
-A `REQUEST_CHANGES` verdict carries a `Layer:` line (`context-flow/agents/review.md` "Layers"):
+A `REQUEST_CHANGES` verdict carries a `Layer:` line (`<plugin root>/agents/review.md` "Layers"):
 
 - **`code`**: the implementation is wrong against a sound contract. Send it back to the builder: a `followup` while its run is idle, or a new run with `--base` at its branch. First add the review's repros to that builder's `contracts.json` (`review.md` "Repros"). It counts toward the bounce cap.
   A split node that receives a `code` finding over its integrated branch routes it down to the leaf whose sub-contract the FAIL concerns.

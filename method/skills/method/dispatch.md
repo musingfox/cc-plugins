@@ -22,7 +22,7 @@ Pick each run's `--model` and `--effort` by the muster skill's table. Independen
 
 ## Agent seats
 
-Review, probe, prototype and divergence are agents: each needs a context of its own and the model its definition pins. With the Agent tool, dispatch them by `subagent_type` (`cf:review`, `spiral:probe`, `spiral:prototype`, `spiral:divergence`). A muster worker has no Agent tool. There, dispatch the seat as a nested muster run whose ticket file is `cat` of the agent's definition (`context-flow/agents/review.md`, `spiral/agents/<seat>.md`) followed by its inputs, on the model and effort that definition pins (`opus` `high` for review). Merge nothing from a seat's run: read its report and its files only.
+Review, probe, prototype and divergence are agents: each needs a context of its own and the model its definition pins. With the Agent tool, dispatch them by `subagent_type` (`method:review`, `method:probe`, `method:prototype`, `method:divergence`). A muster worker has no Agent tool. There, dispatch the seat as a nested muster run whose ticket file is `cat` of the agent's definition (`<plugin root>/agents/<seat>.md`) followed by its inputs, on the model and effort that definition pins (`opus` `high` for review). Merge nothing from a seat's run: read its report and its files only.
 
 ## An information session
 
