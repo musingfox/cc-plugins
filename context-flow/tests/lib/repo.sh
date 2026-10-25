@@ -73,3 +73,49 @@ without_jq() {
   done
   printf '%s' "$d"
 }
+
+# ---- the suite fixture the revert gate tests share ----
+# Base commit: run-tests.sh (runs tests/*.test.sh), src/base.sh, tests/base.test.sh.
+#   write_runner [GUARD_LINE]   run-tests.sh, with an optional first line
+#   base_commit                 commits the base; sets BASE
+#   add_effective               c1: src/add.sh + a test that fails without it
+#   add_vacuous [test-only]     c2: src/mul.sh + a test that is always green
+#   gate_run CMD [ARGS...]      the revert gate over REPO..HEAD -> GATE_OUT, GATE_RC
+# GATE and BASE are the caller's; gate_run runs the script in $GATE.
+
+write_runner() {
+  mkdir -p "$REPO/src" "$REPO/tests"
+  {
+    [ -z "${1:-}" ] || printf '%s\n' "$1"
+    printf '%s\n' 'for f in tests/*.test.sh; do bash "$f" || exit 1; done'
+  } >"$REPO/run-tests.sh"
+}
+
+base_commit() {
+  mkdir -p "$REPO/src" "$REPO/tests"
+  printf '%s\n' 'echo base' >"$REPO/src/base.sh"
+  printf '%s\n' '[ "$(bash src/base.sh)" = base ]' >"$REPO/tests/base.test.sh"
+  commit_all base
+  BASE="$(head_sha)"
+}
+
+add_effective() {
+  printf '%s\n' 'echo $(($1 + $2))' >"$REPO/src/add.sh"
+  printf '%s\n' '[ "$(bash src/add.sh 2 3)" = 5 ]' >"$REPO/tests/add.test.sh"
+  commit_all c1
+}
+
+add_vacuous() {
+  [ "${1:-}" = test-only ] || printf '%s\n' 'echo $(($1 * $2))' >"$REPO/src/mul.sh"
+  printf '%s\n' 'exit 0' >"$REPO/tests/mul.test.sh"
+  commit_all c2
+}
+
+C1='{"name":"C1","touches_files":["src/add.sh","tests/add.test.sh"]}'
+C2='{"name":"C2","touches_files":["src/mul.sh","tests/mul.test.sh"]}'
+
+gate_run() {
+  GATE_OUT="$(bash "$GATE" --repo "$REPO" --base "$BASE" --head HEAD --contracts "$CONTRACTS" --out "$OUT" -- "$@" 2>"$REPO_TOP/gate.err")"
+  GATE_RC=$?
+  GATE_LAST="$(printf '%s\n' "$GATE_OUT" | tail -1)"
+}
