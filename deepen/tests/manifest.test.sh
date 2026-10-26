@@ -14,7 +14,7 @@ printf '%s\n' "$v" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' || fail "T2 version mus
 [ "$(jq -r .homepage deepen/.claude-plugin/plugin.json)" = 'https://github.com/musingfox/cc-plugins/tree/main/deepen' ] || fail "T3 homepage"
 deps="$(jq -r '.dependencies[]' deepen/.claude-plugin/plugin.json)"
 [ "$deps" = viz ] || fail "T4 dependencies must be exactly viz, got '$deps'"
-printf '%s\n' "$(jq -r '.plugins[].name' .claude-plugin/marketplace.json)" | grep -qx viz || fail "T4 viz is not a marketplace entry name"
+grep -qx viz <<<"$(jq -r '.plugins[].name' .claude-plugin/marketplace.json)" || fail "T4 viz is not a marketplace entry name"
 [ "$(jq 'has("commands") or has("skills")' deepen/.claude-plugin/plugin.json)" = false ] || fail "T5 no component keys"
 
 unanchored=0
