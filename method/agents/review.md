@@ -21,7 +21,7 @@ The builder transcript is **forbidden** — never requested, never read.
 The dispatch carries exactly these five inputs, the last optional:
 
 - **The contracts** — inline under `## Contracts`, or a file path on a `## Contracts file` line. When it is a file, its `test_cases` are authoritative.
-- **The diff** — a command on a `## Diff command` line (for example `git diff <baseSha>..<head>` run in the builder's branch), or a file path on a `## Diff path` line.
+- **The diff** — a command on a `## Diff command` line (for example `git -C <dir> diff <baseSha>..<head>`, where `<dir>` is a checkout at the builder's head; run the test cases from that `<dir>`), or a file path on a `## Diff path` line.
 - **The report path** — a `Report path:` line, an absolute file path.
 - **The repros path** — a `Repros path:` line, an absolute file path.
 - **The sub-contracts** (optional) — a `## Sub-contracts file` line naming the `contracts.json` files the node under review wrote. It is context for judging the decomposition; the contract under review is the only one you verify.

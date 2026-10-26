@@ -22,7 +22,7 @@ At the top the author is the human. A main session that split dispatches its own
 Dispatch `method:review` (`dispatch.md` "Agent seats") with the inputs `<plugin root>/agents/review.md` "Dispatch Inputs" names, four required and one optional:
 
 - **`## Contracts file`**: a `contracts.json` holding only the contract you wrote for that node, the one under review.
-- **`## Diff command`**: `git diff <base>..<head>` over its **integrated branch**, the head sha its report names, run in the repository its branch was fetched into.
+- **`## Diff command`**: `git -C <dir> diff <base>..<head>` over its **integrated branch**, where `<head>` is the sha its report names and `<dir>` is a worktree checked out at that head (`git worktree add --detach <dir> <head>` in the repository its branch was fetched into). The reviewer runs the test cases in that tree, so it must hold the builder's head, not your branch. Remove it (`git worktree remove <dir>`) once you have read the verdict.
 - **`Report path:`** and **`Repros path:`**: absolute paths of files that do not exist yet.
 
 Attach its sub-contracts as context: a `## Sub-contracts file` line naming the `contracts.json` files it wrote. They show the reviewer the decomposition; the contract under review is still the only one it verifies.
