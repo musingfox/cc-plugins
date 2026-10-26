@@ -10,15 +10,16 @@ fail() { echo "  ✗ $1" >&2; exit 1; }
 v="$(jq -r .version diagnose/.claude-plugin/plugin.json)"
 printf '%s\n' "$v" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' || fail "T2 version must be semver, got '$v'"
 [ "$(grep -c "^  \"version\": \"$v\",\$" diagnose/.claude-plugin/plugin.json)" = 1 ] || fail "T2 version line must be in the form the pre-commit hook rewrites"
-# A dependency resolves within the same marketplace by the marketplace entry
-# name, which is what /plugin install and enabledPlugins key on — not by the
-# dependency's own plugin.json name when the two differ (context-flow vs cf).
-deps="$(jq -r '.dependencies[]' diagnose/.claude-plugin/plugin.json)"
-[ -n "$deps" ] || fail "T3 dependencies must not be empty"
+# diagnose stands alone. Any dependency it ever declares resolves within the same
+# marketplace by the marketplace entry name, which is what /plugin install and
+# enabledPlugins key on — not by the dependency's own plugin.json name.
+deps="$(jq -r '.dependencies[]?' diagnose/.claude-plugin/plugin.json)"
 entries="$(jq -r '.plugins[].name' .claude-plugin/marketplace.json)"
 while IFS= read -r d; do
+  [ -n "$d" ] || continue
   printf '%s\n' "$entries" | grep -qx "$d" || fail "T3 dependency '$d' is not a marketplace entry name"
 done <<< "$deps"
+[ "$(jq 'has("dependencies")' diagnose/.claude-plugin/plugin.json)" = false ] || fail "T3 diagnose declares no dependency"
 [ "$(jq 'has("commands") or has("skills")' diagnose/.claude-plugin/plugin.json)" = false ] || fail "T4 no component keys"
 [ "$(jq -r .homepage diagnose/.claude-plugin/plugin.json)" = 'https://github.com/musingfox/cc-plugins/tree/main/diagnose' ] || fail "T5 homepage"
 

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Run every pi-dispatch and context-flow test suite from one command.
+# Run every pi-dispatch and method test suite from one command.
 #
 # Usage: bash tests/run-all.sh [ROOT]   (ROOT defaults to the repo root)
 #
 # Order: each pi-dispatch/tests/*.sh, the bun suite in pi-dispatch/extensions/,
-# context-flow/tests/run.sh, method/tests/run.sh, then each tests/*.test.sh. One "ok   - <suite>" or
+# method/tests/run.sh, then each tests/*.test.sh. One "ok   - <suite>" or
 # "not ok - <suite>" line per suite, then "suites: N, failed: M" as the last
 # line. Exit 0 only when M is 0. A missing suite directory or a missing bun is
 # a failure, never a skip. Deliberately no test_exit= line: the revert gate's
@@ -20,8 +20,8 @@ SCRATCH="$(mktemp -d)"
 export PI_RUNS_DIR="$SCRATCH/pi-runs"
 trap 'rm -rf "$SCRATCH"' EXIT
 
-# Suites run with a scrubbed environment: the cf gate sources the flow env with
-# set -a, and cf's own integration tests read CF_BRANCH/CF_SLUG/SESSION if set.
+# Suites run with a scrubbed environment: a gate that sources a flow env with
+# set -a, and integration tests that read CF_BRANCH/CF_SLUG/SESSION, must not see the caller's.
 KEEP=("PI_RUNS_DIR=$PI_RUNS_DIR")
 for v in PATH HOME TMPDIR USER LOGNAME SHELL TERM LANG $(compgen -e | grep '^LC_'); do
   [ -n "${!v+x}" ] && KEEP+=("$v=${!v}")
@@ -56,8 +56,6 @@ else
   # bun treats path arguments as filters over its cwd, so run it inside the dir.
   (cd "$ROOT/pi-dispatch/extensions" && clean bun test); report $? "bun test pi-dispatch/extensions/"
 fi
-
-clean bash "$ROOT/context-flow/tests/run.sh"; report $? "context-flow/tests/run.sh"
 
 (cd "$ROOT" && clean bash "$ROOT/method/tests/run.sh"); report $? "method/tests/run.sh"
 

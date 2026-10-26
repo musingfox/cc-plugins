@@ -7,8 +7,8 @@ fail() { echo "  ✗ $1" >&2; exit 1; }
 [ "$(grep -c '/plugin install diagnose' README.md)" -eq 1 ] || fail "T2 install command"
 [ "$(grep -c 'Copyright (c) 2026 Matt Pocock' README.md)" -ge 2 ] || fail "T3 Matt Pocock copyright"
 
-want='├── context-flow/,├── diagnose/,├── fizzy/'
-got="$(grep -oE '^├── (context-flow|diagnose|fizzy)/' README.md | paste -sd, -)"
+want='├── deepen/,├── diagnose/,├── fizzy/'
+got="$(grep -oE '^├── (deepen|diagnose|fizzy)/' README.md | paste -sd, -)"
 [ "$got" = "$want" ] || fail "T4 tree order: got $got"
 
 tmp="$(mktemp)"
@@ -17,7 +17,7 @@ awk '
   /^├── fizzy\// { print; if (diag != "") print diag; next }
   { print }
 ' README.md > "$tmp"
-mut="$(grep -oE '^├── (context-flow|diagnose|fizzy)/' "$tmp" | paste -sd, -)"
+mut="$(grep -oE '^├── (deepen|diagnose|fizzy)/' "$tmp" | paste -sd, -)"
 rm -f "$tmp"
 [ "$mut" != "$want" ] || fail "T5 negative control should mismatch"
 

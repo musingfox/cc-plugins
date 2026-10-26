@@ -12,13 +12,13 @@ for w in layer port adapter seam module interface; do
   [ "$n" -ge 1 ] || fail "T1: '$w' must appear as a word, got $n"
 done
 
-for p in 'Design Vocabulary' 'context-flow' 'keep their own meaning'; do
+for p in 'Design Vocabulary' 'deepen/agents/explorer.md' 'keep their own meaning'; do
   n=$(printf '%s\n' "$range" | grep -c "$p" || true)
   [ "$n" -ge 1 ] || fail "T2: '$p' missing"
 done
 
-n=$(printf '%s\n' "$range" | grep -c 'defined in context-flow' || true)
-[ "$n" -eq 0 ] || fail "T3: must not claim defined in context-flow"
+n=$(printf '%s\n' "$range" | grep -c 'defined in deepen/agents/explorer.md' || true)
+[ "$n" -eq 0 ] || fail "T3: must not claim defined in deepen/agents/explorer.md"
 
 n=$(printf '%s\n' "$range" | sed 's/port//g' | grep -cw 'port' || true)
 [ "$n" -eq 0 ] || fail "T4: after deleting port via sed, grep -cw port must be 0, got $n"

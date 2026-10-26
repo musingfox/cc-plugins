@@ -13,8 +13,8 @@ printf '%s\n' "$section" | grep -Fq 'improve-codebase-architecture' || fail "T9 
 
 [ "$(grep -c 'skills: survey · agents: explorer · scripts, docs, tests' README.md)" -eq 1 ] || fail "T10 tree skills listing"
 
-want='├── context-flow/,├── deepen/,├── diagnose/'
-got="$(grep -oE '^├── (context-flow|deepen|diagnose)/' README.md | paste -sd, -)"
+want='├── audit/,├── deepen/,├── diagnose/'
+got="$(grep -oE '^├── (audit|deepen|diagnose)/' README.md | paste -sd, -)"
 [ "$got" = "$want" ] || fail "T11 tree order: got $got"
 
 tmp="$(mktemp)"
@@ -23,6 +23,6 @@ awk '
   /^├── diagnose\// { print; if (deep != "") print deep; next }
   { print }
 ' README.md > "$tmp"
-mut="$(grep -oE '^├── (context-flow|deepen|diagnose)/' "$tmp" | paste -sd, -)"
+mut="$(grep -oE '^├── (audit|deepen|diagnose)/' "$tmp" | paste -sd, -)"
 rm -f "$tmp"
 [ "$mut" != "$want" ] || fail "T11 negative control should mismatch"

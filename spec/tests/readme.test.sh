@@ -13,8 +13,8 @@ n="$(printf '%s\n' "$section" | grep -c 'CONTEXT.md' || true)"
 n="$(printf '%s\n' "$section" | grep -cF '/spec:glossary' || true)"
 [ "$n" -ge 1 ] || fail "Spec section must mention /spec:glossary"
 
-order="$(grep -oE '^├── (pi-dispatch|spec|spiral)/' README.md | paste -sd, -)"
-[ "$order" = '├── pi-dispatch/,├── spec/,├── spiral/' ] || fail "tree order is $order"
+order="$(grep -oE '^├── (pi-dispatch|spec|viz)/' README.md | paste -sd, -)"
+[ "$order" = '├── pi-dispatch/,├── spec/,├── viz/' ] || fail "tree order is $order"
 
 n="$(grep -c 'CONTEXT.md' spec/README.md || true)"
 [ "$n" -ge 1 ] || fail "spec/README.md must mention CONTEXT.md"
@@ -26,5 +26,5 @@ moved="$(awk '
   /^├── spiral\// { print; if (spec != "") print spec; spec = ""; next }
   { print }
 ' README.md)"
-moved_order="$(printf '%s\n' "$moved" | grep -oE '^├── (pi-dispatch|spec|spiral)/' | paste -sd, -)"
+moved_order="$(printf '%s\n' "$moved" | grep -oE '^├── (pi-dispatch|spec|viz)/' | paste -sd, -)"
 [ "$moved_order" != "$order" ] || fail "moving spec after spiral must change tree order"

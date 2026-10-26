@@ -13,17 +13,15 @@ RUNNER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/run-all.sh"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-# An all-passing fixture root: two pi-dispatch suites, one bun test, a cf runner,
-# a method runner.
+# An all-passing fixture root: two pi-dispatch suites, one bun test and a method runner.
 fixture() {
   local root="$TMP/$1"
-  mkdir -p "$root/pi-dispatch/tests" "$root/pi-dispatch/extensions" "$root/context-flow/tests" "$root/method/tests"
+  mkdir -p "$root/pi-dispatch/tests" "$root/pi-dispatch/extensions" "$root/method/tests"
   echo 'exit 0' > "$root/pi-dispatch/tests/ok.sh"
   cat > "$root/pi-dispatch/extensions/ok.test.ts" <<'TS'
 import { expect, test } from "bun:test";
 test("ok", () => { expect(1).toBe(1); });
 TS
-  echo 'exit 0' > "$root/context-flow/tests/run.sh"
   echo 'exit 0' > "$root/method/tests/run.sh"
   echo "$root"
 }
@@ -37,10 +35,10 @@ check '[ "$RC" -eq 1 ]' "T2 failing pi-dispatch suite exits 1"
 check 'grep -qx "not ok - pi-dispatch/tests/bad.sh" <<<"$OUT"' "T2 names the failing suite"
 check 'grep -q "failed: 1" <<<"$OUT"' "T2 counts one failure"
 
-# T3: a failing context-flow runner fails the whole run.
-F="$(fixture t3)"; echo 'exit 1' > "$F/context-flow/tests/run.sh"
+# T3: a failing method runner fails the whole run.
+F="$(fixture t3)"; echo 'exit 1' > "$F/method/tests/run.sh"
 run "$F"
-check '[ "$RC" -eq 1 ]' "T3 failing context-flow runner exits 1"
+check '[ "$RC" -eq 1 ]' "T3 failing method runner exits 1"
 
 # T4: a failing bun expect fails the whole run.
 F="$(fixture t4)"

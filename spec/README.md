@@ -38,8 +38,8 @@ id: judge-seats-cannot-edit
 status: accepted            # proposed | accepted | superseded
 scope:
   - "pi-dispatch/agents/reviewer.md"
-  - "context-flow/agents/review.md"
-verify: check:! grep -h '^tools:' pi-dispatch/agents/reviewer.md context-flow/agents/review.md | grep -qw Edit
+  - "method/agents/review.md"
+verify: check:! grep -h '^tools:' pi-dispatch/agents/reviewer.md method/agents/review.md | grep -qw Edit
 related: [dispatch-verdict-from-file]
 source: null                # milestone slug it came from
 adr: null
@@ -56,7 +56,7 @@ split, nothing needing a second pass before an agent can act on it.
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/spec.sh verify
-${CLAUDE_PLUGIN_ROOT}/scripts/spec.sh slice context-flow/scripts/cf-revert-gate.sh
+${CLAUDE_PLUGIN_ROOT}/scripts/spec.sh slice method/scripts/revert-gate.sh
 ```
 
 Or through the `spec` skill, which covers the lifecycle: propose (`status:
@@ -87,5 +87,5 @@ verify filled in once it lands.
 ## Not done yet
 
 Brief injection is manual: run `slice`, paste the output. Wiring it into a
-dispatcher (context-flow's brief builder) and a pre-commit reminder are the
+dispatcher (`method/skills/method/dispatch.md`) and a pre-commit reminder are the
 next steps, deliberately deferred until slicing has run against real work.

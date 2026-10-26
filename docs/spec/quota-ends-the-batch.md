@@ -14,7 +14,7 @@ never re-dispatches that work on the same routing, and it stops every sibling
 still running in the batch. `pi-poll.sh` applies `quota_class` on every failure
 branch. Every tag contains `QUOTA`, so a consumer matching `*QUOTA*` must test
 it before any other failure pattern. `pi-agent.sh watch` stops only the names
-it was given. `cf-pi-run.sh` records the wall at the parent session, and each
+it was given. The consumer records the wall at the parent session, and each
 sibling checks that record on every poll round. Every sibling stopped this way
 carries the tag of the wall that stopped it.
 
