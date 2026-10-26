@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 // End-to-end acceptance against the real claude-agent-acp adapter (bunx, pinned 0.93.0).
-// Run from muster/: bun e2e/accept.ts [--fenced]
-// Without --fenced the worker is dispatched unfenced, like `muster run`; with it, `--fenced` is passed to `muster run`
-// and the sandbox receipts apply.
+// Run from muster/: bun e2e/accept.ts [--unfenced]
+// Without --unfenced the worker is dispatched fenced, like `muster run`, and the sandbox receipts apply; with it,
+// `--unfenced` is passed to `muster run`.
 // Needs the Claude Code login, bun, node and network. Not part of `bun test`.
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -35,7 +35,7 @@ const MUSTER = join(import.meta.dir, "..", "src", "muster.ts");
 const ADAPTER_VERSION = "0.93.0";
 const SHORT_MS = 60_000;
 const WAIT_MS = 8 * 60_000;
-const FENCED = process.argv.slice(2).includes("--fenced");
+const FENCED = !process.argv.slice(2).includes("--unfenced");
 
 type Env = Record<string, string | undefined>;
 
@@ -167,7 +167,7 @@ async function run(base: string): Promise<void> {
   const runDir = join(home, "runs", name);
   const depsBefore = treeSnapshot(join(repo, "node_modules"));
   const first = Bun.spawn(
-    [process.execPath, MUSTER, "run", "--name", name, "--model", "haiku", "--repo", repo, "--ticket", ticket, ...(FENCED ? ["--fenced"] : [])],
+    [process.execPath, MUSTER, "run", "--name", name, "--model", "haiku", "--repo", repo, "--ticket", ticket, ...(FENCED ? [] : ["--unfenced"])],
     { env, stdout: "ignore", stderr: "inherit" },
   );
   try {
@@ -298,7 +298,7 @@ async function run(base: string): Promise<void> {
 
     const bad = "accept-bad";
     const badRun = await muster(
-      ["run", "--name", bad, "--model", "not-a-model", "--repo", repo, "--ticket", ticket, ...(FENCED ? ["--fenced"] : [])],
+      ["run", "--name", bad, "--model", "not-a-model", "--repo", repo, "--ticket", ticket, ...(FENCED ? [] : ["--unfenced"])],
       env,
     );
     const badDir = join(home, "runs", bad);

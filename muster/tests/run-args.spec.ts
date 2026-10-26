@@ -104,7 +104,7 @@ describe("RunRefusal", () => {
       repoRoot: realpathSync(repo),
       baseRef: "HEAD",
       ticket: "do it",
-      fenced: false,
+      fenced: true,
     });
     expect(existsSync(runPaths("a1", env).runDir)).toBe(false);
   });
@@ -123,26 +123,27 @@ describe("RunRefusal", () => {
     expect(existsSync(runPaths("a1", env).runDir)).toBe(false);
   });
 
-  test("F2: --fenced is a valueless flag, accepted in any position, false when absent", () => {
-    expect(parseRunArgs(valid(), env).fenced).toBe(false);
-    expect(parseRunArgs([...valid(), "--fenced"], env).fenced).toBe(true);
-    expect(parseRunArgs(["run", "--fenced", ...valid().slice(1)], env).fenced).toBe(true);
-    expect(parseRunArgs(valid(["--fenced", "--effort", "medium"]), env)).toMatchObject({ fenced: true, effort: "medium" });
-    expect(parseRunArgs(valid(["--effort", "medium", "--fenced"]), env)).toMatchObject({ fenced: true, effort: "medium" });
-    expect(refusal(valid(["--fenced", "--bogus"])).message).toContain("--bogus");
-    expect(refusal(valid(["--fenced=1"])).message).toContain("--fenced=1");
+  test("F2: runs are fenced by default; --unfenced is a valueless opt-out accepted in any position, and --fenced is gone", () => {
+    expect(parseRunArgs(valid(), env).fenced).toBe(true);
+    expect(parseRunArgs([...valid(), "--unfenced"], env).fenced).toBe(false);
+    expect(parseRunArgs(["run", "--unfenced", ...valid().slice(1)], env).fenced).toBe(false);
+    expect(parseRunArgs(valid(["--unfenced", "--effort", "medium"]), env)).toMatchObject({ fenced: false, effort: "medium" });
+    expect(parseRunArgs(valid(["--effort", "medium", "--unfenced"]), env)).toMatchObject({ fenced: false, effort: "medium" });
+    expect(refusal(valid(["--unfenced", "--bogus"])).message).toContain("--bogus");
+    expect(refusal(valid(["--unfenced=1"])).message).toContain("--unfenced=1");
+    expect(refusal(valid(["--fenced"])).message).toContain("--fenced");
   });
 
-  test("F3: unfenced accepts a --repo and a MUSTER_HOME under /tmp", () => {
+  test("F3: --unfenced accepts a --repo and a MUSTER_HOME under /tmp", () => {
     const inTmp = mkdtempSync("/tmp/muster-args-");
     try {
       execFileSync("git", ["clone", "-q", repo, inTmp]);
       const tmpEnv = { ...env, MUSTER_HOME: "/tmp/muster-args-nonexistent/m" };
       const argv = ["run", "--name", "a1", "--model", "haiku", "--repo", inTmp, "--ticket", "t"];
-      const req = parseRunArgs(argv, tmpEnv);
+      const req = parseRunArgs([...argv, "--unfenced"], tmpEnv);
       expect(req.repoRoot).toBe(realpathSync(inTmp));
       expect(req.fenced).toBe(false);
-      expect(refusal([...argv, "--fenced"]).message).toContain("temp directory");
+      expect(refusal(argv).message).toContain("temp directory");
     } finally {
       rmSync(inTmp, { recursive: true, force: true });
     }
@@ -152,7 +153,7 @@ describe("RunRefusal", () => {
     const inTmp = mkdtempSync("/tmp/muster-args-");
     try {
       execFileSync("git", ["-C", inTmp, "init", "-q"]);
-      const err = refusal(["run", "--name", "a1", "--model", "haiku", "--repo", inTmp, "--ticket", "t", "--fenced"]);
+      const err = refusal(["run", "--name", "a1", "--model", "haiku", "--repo", inTmp, "--ticket", "t"]);
       expect(err.message).toContain("--repo");
       expect(err.message).toContain("temp directory");
       expect(existsSync(runPaths("a1", env).runDir)).toBe(false);
@@ -164,7 +165,7 @@ describe("RunRefusal", () => {
   test("B2b: a --repo reached through a symlink is judged by its realpath against $TMPDIR", () => {
     const link = join(home, "link");
     symlinkSync(repo, link);
-    const argv = ["run", "--name", "a1", "--model", "haiku", "--repo", link, "--ticket", "t", "--fenced"];
+    const argv = ["run", "--name", "a1", "--model", "haiku", "--repo", link, "--ticket", "t"];
     expect(parseRunArgs(argv, env).repoRoot).toBe(realpathSync(repo));
     env = { ...env, TMPDIR: realpathSync(home) };
     expect(refusal(argv).message).toContain("temp directory");
@@ -172,7 +173,7 @@ describe("RunRefusal", () => {
 
   test("B2c: a MUSTER_HOME under /tmp that does not exist yet is refused", () => {
     env = { ...env, MUSTER_HOME: "/tmp/muster-args-nonexistent/m" };
-    const err = refusal(valid(["--fenced"]));
+    const err = refusal(valid());
     expect(err.message).toContain("MUSTER_HOME");
     expect(err.message).toContain("temp directory");
   });

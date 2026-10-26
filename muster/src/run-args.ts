@@ -17,11 +17,11 @@ const VALUE_FLAGS = new Set(["--name", "--model", "--effort", "--repo", "--base"
 
 function parseFlags(args: string[]): { flags: Map<string, string>; fenced: boolean } {
   const flags = new Map<string, string>();
-  let fenced = false;
+  let fenced = true;
   for (let i = 0; i < args.length; i++) {
     const flag = args[i];
-    if (flag === "--fenced") {
-      fenced = true;
+    if (flag === "--unfenced") {
+      fenced = false;
       continue;
     }
     if (!VALUE_FLAGS.has(flag)) throw new UsageError(`unknown argument "${flag}"`);
@@ -45,7 +45,7 @@ function gitWorkTree(repo: string): string {
 }
 
 // A fenced worker's sandbox leaves the system temp directories writable, so a repo or run directory there is not
-// fenced; an unfenced run has no sandbox to leave open and accepts them.
+// fenced; an --unfenced run has no sandbox to leave open and accepts them.
 function realpathOfExisting(path: string): string {
   try {
     return realpathSync(path);
