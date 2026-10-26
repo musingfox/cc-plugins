@@ -47,7 +47,13 @@ export function createWorkerWorktree(input: WorkerWorktreeInput): WorkerWorktree
     stdout: "pipe",
     stderr: "pipe",
   });
-  const switched = cloned.exitCode === 0 ? git(worktreePath, ["switch", "-q", "-c", branch, baseSha]) : undefined;
+  // A clone does not copy the source's local config; carry core.hooksPath over so the repository's hooks run on the worker's commits.
+  const hooksPath = cloned.exitCode === 0 ? git(repoRoot, ["config", "--local", "--get", "core.hooksPath"]) : undefined;
+  const hooked = hooksPath?.ok ? git(worktreePath, ["config", "--local", "core.hooksPath", hooksPath.stdout]) : undefined;
+  const switched =
+    cloned.exitCode === 0 && (hooked === undefined || hooked.ok)
+      ? git(worktreePath, ["switch", "-q", "-c", branch, baseSha])
+      : hooked;
   if (cloned.exitCode !== 0 || !switched?.ok) {
     if (!existed) rmSync(worktreePath, { recursive: true, force: true });
     const stderr = cloned.exitCode !== 0 ? cloned.stderr.toString().trim() : (switched?.stderr ?? "");

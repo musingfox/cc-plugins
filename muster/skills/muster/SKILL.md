@@ -7,7 +7,7 @@ description: Dispatch unattended Claude worker sessions over ACP from the main s
 
 Run these commands from the main session only. Background completions wake the main session, not a subagent, so the wait loop belongs there.
 
-Each worker is a Claude session in its own clone of the repository (called the worktree below, under the run directory), on branch `muster/NAME`. Muster fetches that branch back into the repository each time the worker goes idle and when the run ends, so `git log muster/NAME` works from the repository. NAME must not already be a branch in the repository; a taken name is refused. NAME is the run name you choose; it must match `^[a-z0-9][a-z0-9-]{0,39}$`.
+Each worker is a Claude session in its own clone of the repository (called the worktree below, under the run directory), on branch `muster/NAME`. Muster fetches that branch back into the repository each time the worker goes idle and when the run ends, so `git log muster/NAME` works from the repository. The clone keeps the repository's local `core.hooksPath`, so the repository's hooks run on the worker's commits. NAME must not already be a branch in the repository; a taken name is refused. NAME is the run name you choose; it must match `^[a-z0-9][a-z0-9-]{0,39}$`.
 
 Requires Bun, Node 22 or later, and git. `run` starts each worker through the ACP adapter `@agentclientprotocol/claude-agent-acp`, which `bunx` fetches from registry.npmjs.org at the version pinned in `src/launch.ts`; the adapter declares Node 22 or later, and `bunx` runs it under `node`. Check with `bun --version` and `node --version` before the first dispatch.
 

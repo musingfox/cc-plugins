@@ -76,6 +76,31 @@ describe("WorkerWorktree", () => {
     expect(git(result.worktree, ["rev-parse", "HEAD"])).toBe(first);
     expect(result.baseSha).not.toBe(second);
   });
+
+  function localHooksPath(dir: string): string | undefined {
+    const proc = Bun.spawnSync(["git", "-C", dir, "config", "--local", "--get", "core.hooksPath"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    return proc.exitCode === 0 ? proc.stdout.toString().trim() : undefined;
+  }
+
+  test("H1: the clone keeps the source's local core.hooksPath", () => {
+    const repo = makeRepo();
+    git(repo, ["config", "core.hooksPath", ".githooks"]);
+    const result = createWorkerWorktree({ repoRoot: repo, baseRef: "HEAD", name: "h1", worktreePath: freshPath() });
+
+    expect(localHooksPath(result.worktree)).toBe(".githooks");
+  });
+
+  test("H2: the clone has no local core.hooksPath when the source has none", () => {
+    const repo = makeRepo();
+    git(repo, ["config", "--unset", "core.hooksPath"]);
+    expect(localHooksPath(repo)).toBeUndefined();
+    const result = createWorkerWorktree({ repoRoot: repo, baseRef: "HEAD", name: "h2", worktreePath: freshPath() });
+
+    expect(localHooksPath(result.worktree)).toBeUndefined();
+  });
 });
 
 describe("fetchBranchBack", () => {
