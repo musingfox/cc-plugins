@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import * as sandbox from "../src/sandbox";
 import { resolveAllowedHosts, sandboxOption } from "../src/sandbox";
@@ -19,9 +20,9 @@ describe("sandbox settings", () => {
 });
 
 describe("sandbox option filesystem rules", () => {
-  test("R2: filesystem denies the credential stores under HOME and allows writes to the cache only; no temp roots, no denyWrite", () => {
+  test("R2: filesystem denies the credential stores under HOME and allows writes to the cache and the user temp dir only; no denyWrite", () => {
     expect("defaultTempRoots" in sandbox).toBe(false);
-    const option = sandboxOption({ env: { HOME: "/home/u" }, cache: "/r/cache" });
+    const option = sandboxOption({ env: { HOME: "/home/u" }, cache: "/r/cache", userTemp: "/var/folders/u/T/" });
     expect(option.filesystem).toStrictEqual({
       denyRead: [
         "/home/u/.npmrc",
@@ -39,9 +40,19 @@ describe("sandbox option filesystem rules", () => {
         "/home/u/.cargo/credentials.toml",
         "/home/u/.pypirc",
       ],
-      allowWrite: ["/r/cache"],
+      allowWrite: ["/r/cache", "/var/folders/u/T/"],
     });
     expect(JSON.stringify(option)).not.toMatch(/denyWrite|tempRoots|runTmp/);
+  });
+
+  test("R4: Apple mktemp ignores TMPDIR and writes to the per-user temp dir, so on macOS that dir is writable by default", () => {
+    const option = sandboxOption({ env: { HOME: "/home/u" }, cache: "/r/cache" });
+    if (process.platform !== "darwin") {
+      expect(option.filesystem.allowWrite).toStrictEqual(["/r/cache"]);
+      return;
+    }
+    const userTemp = execFileSync("getconf", ["DARWIN_USER_TEMP_DIR"], { encoding: "utf8" }).trim();
+    expect(option.filesystem.allowWrite).toStrictEqual(["/r/cache", userTemp]);
   });
 
   test("R3: without HOME in the env the denied paths come from the user's home directory", () => {

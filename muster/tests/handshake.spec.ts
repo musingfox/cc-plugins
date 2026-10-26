@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { openChannel, type Channel } from "../src/channel";
 import { HandshakeError, handshake, handshakeTimeoutMs } from "../src/handshake";
 import { resolveAllowedHosts } from "../src/sandbox";
+import { USER_TEMP_WRITES } from "./support/user-temp";
 
 const FAKE = join(import.meta.dir, "support", "fake-agent.ts");
 const RUNS = join(import.meta.dir, "..", ".test-runs");
@@ -43,7 +44,7 @@ const T1_PARAMS = {
           autoAllowBashIfSandboxed: true,
           allowUnsandboxedCommands: false,
           network: { allowedDomains: DEFAULT_HOSTS, strictAllowlist: true },
-          filesystem: { denyRead: CREDENTIAL_STORES, allowWrite: ["/tmp/muster-cache"] },
+          filesystem: { denyRead: CREDENTIAL_STORES, allowWrite: ["/tmp/muster-cache", ...USER_TEMP_WRITES] },
         },
       },
     },
@@ -167,11 +168,11 @@ describe("SessionHandshake", () => {
     }
   });
 
-  test("R2: session/new sandbox filesystem denies the credential stores and allows writes only to the run cache, with no denyWrite", async () => {
+  test("R2: session/new sandbox filesystem denies the credential stores and allows writes only to the run cache and the user temp dir, with no denyWrite", async () => {
     const { ch, eventsPath } = await open();
     await handshake(ch, { cache: "/t/a/runs/w/cache", worktree: "/t/a/runs/w/worktree", fenced: true, env: { HOME: "/home/u" } });
     const sandbox = sessionNew(eventsPath)._meta.claudeCode.options.sandbox;
-    expect(sandbox.filesystem).toStrictEqual({ denyRead: CREDENTIAL_STORES, allowWrite: ["/t/a/runs/w/cache"] });
+    expect(sandbox.filesystem).toStrictEqual({ denyRead: CREDENTIAL_STORES, allowWrite: ["/t/a/runs/w/cache", ...USER_TEMP_WRITES] });
   });
 
   test("T10: only the fenced option turns the sandbox on; no environment variable turns it on or off", async () => {

@@ -5,6 +5,7 @@ import { WorktreeError } from "../src/worktree";
 import { recordFetch, runWorker, type DispatchRequest } from "../src/session";
 import { readPhase, runPaths, writePhase, type RunPaths } from "../src/layout";
 import { commitFile, git, makeRepo, removeFixtures } from "./support/repo";
+import { USER_TEMP_WRITES } from "./support/user-temp";
 
 afterAll(removeFixtures);
 
@@ -363,7 +364,7 @@ describe("WorkerSessionLoop", () => {
     expect(echoed.npm_config_cache).toBe(join(layout.cache, "npm"));
     expect(echoed.BUN_INSTALL_CACHE_DIR).toBe(join(layout.cache, "bun"));
     const sessionNew = events(layout.events).find((e) => e.dir === "out" && e.msg.method === "session/new");
-    expect(sessionNew?.msg.params._meta.claudeCode.options.sandbox.filesystem.allowWrite).toEqual([layout.cache]);
+    expect(sessionNew?.msg.params._meta.claudeCode.options.sandbox.filesystem.allowWrite).toEqual([layout.cache, ...USER_TEMP_WRITES]);
   });
 
   test("F1: an unfenced run sends session/new without a sandbox key", async () => {

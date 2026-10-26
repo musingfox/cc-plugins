@@ -187,7 +187,7 @@ export function checkWebSearch(o: { events: Event[]; questions: Question[] }): R
 const DEFAULT_DOMAINS = ["registry.npmjs.org"];
 export const WORKER_TOOLS = ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "ToolSearch", "TodoWrite", "TaskCreate", "TaskUpdate", "TaskList"];
 
-export function checkSessionSandbox(events: Event[], where: { home: string; cache: string; fenced: boolean }): Result {
+export function checkSessionSandbox(events: Event[], where: { home: string; cache: string; fenced: boolean; userTemp?: string }): Result {
   const sn = events.find((e) => e.dir === "out" && e.msg?.method === "session/new");
   const sb = sn?.msg.params?._meta?.claudeCode?.options?.sandbox;
   if (!where.fenced && sb !== undefined) return fail("sandbox-present-unfenced", JSON.stringify(sb));
@@ -198,7 +198,7 @@ export function checkSessionSandbox(events: Event[], where: { home: string; cach
     const domainsOk = JSON.stringify(sb?.network?.allowedDomains) === JSON.stringify(DEFAULT_DOMAINS);
     if (!flagsOk || !domainsOk) return fail("sandbox-option-mismatch", JSON.stringify(sb ?? null));
     const fs = sb?.filesystem;
-    if (JSON.stringify(fs?.denyRead) !== JSON.stringify(denyRead) || JSON.stringify(fs?.allowWrite) !== JSON.stringify([where.cache])) {
+    if (JSON.stringify(fs?.denyRead) !== JSON.stringify(denyRead) || JSON.stringify(fs?.allowWrite) !== JSON.stringify(where.userTemp ? [where.cache, where.userTemp] : [where.cache])) {
       return fail("sandbox-filesystem-mismatch", JSON.stringify(fs ?? null));
     }
   }

@@ -29,6 +29,7 @@ import {
   treeSnapshot,
   type Result,
 } from "./receipts";
+import { USER_TEMP_WRITES } from "../tests/support/user-temp";
 
 const MUSTER = join(import.meta.dir, "..", "src", "muster.ts");
 const ADAPTER_VERSION = "0.93.0";
@@ -238,7 +239,7 @@ async function run(base: string): Promise<void> {
       FENCED
         ? "(5) session/new carries the sandbox object, allowlist, denyRead and allowWrite, tool allowlist and connectors-off setting"
         : "(5) session/new carries no sandbox key, and the tool allowlist and connectors-off setting",
-      checkSessionSandbox(events, { home: process.env.HOME ?? homedir(), cache: join(runDir, "cache"), fenced: FENCED }),
+      checkSessionSandbox(events, { home: process.env.HOME ?? homedir(), cache: join(runDir, "cache"), fenced: FENCED, userTemp: USER_TEMP_WRITES[0] }),
     );
     check("(7) at least one execute permission request, every one allowed once by policy, no QUESTION", checkExecuteAllowedOnce({ events, questions }));
 

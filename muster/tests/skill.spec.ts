@@ -89,10 +89,11 @@ describe("CoordinatorSkill", () => {
     expect(text).not.toMatch(/MUSTER_HOME[^.\n]*temp/i);
   });
 
-  test("R1: the confinement section says the system temp directories stay writable and never asks to keep MUSTER_HOME out of temp", () => {
+  test("R1: the confinement section says the sandbox TMPDIR and the per-user temp dir stay writable and never asks to keep MUSTER_HOME out of temp", () => {
     const text = body(SKILL);
     expect(text).toMatch(/temp[^\n]{0,80}writable|writable[^\n]{0,80}temp/i);
-    expect(text).toMatch(/worktree and the system temp directories/i);
+    expect(text).toMatch(/worktree, the temp directory the sandbox sets as `TMPDIR`, the per-user temp directory/i);
+    expect(text).toMatch(/DARWIN_USER_TEMP_DIR/);
     expect(text).not.toMatch(/MUSTER_HOME[^.\n]*temp/i);
   });
 

@@ -387,6 +387,13 @@ describe("session/new receipt", () => {
     expect(checkSessionSandbox([sessionNew({ ...good, sandbox })], WHERE)).toMatchObject({ ok: false, failure: "sandbox-filesystem-mismatch" });
   });
 
+  test("a fenced sandbox that also allows the user temp dir passes only when the receipt expects that dir", () => {
+    const where = { ...WHERE, userTemp: "/var/folders/u/T/" };
+    const sandbox = { ...good.sandbox, filesystem: { ...good.sandbox.filesystem, allowWrite: [WHERE.cache, where.userTemp] } };
+    expect(checkSessionSandbox([sessionNew({ ...good, sandbox })], where)).toMatchObject({ ok: true });
+    expect(checkSessionSandbox([sessionNew({ ...good, sandbox })], WHERE)).toMatchObject({ ok: false, failure: "sandbox-filesystem-mismatch" });
+  });
+
   test("connectors left on fail as settings-option-mismatch", () => {
     const r = checkSessionSandbox([sessionNew({ ...good, settings: { permissions: { ask: ["WebFetch"] } } })], WHERE);
     expect(r).toMatchObject({ ok: false, failure: "settings-option-mismatch" });
