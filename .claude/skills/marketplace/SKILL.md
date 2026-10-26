@@ -92,8 +92,8 @@ Read back what you touched and confirm each holds:
 
 - Every `*/.claude-plugin/plugin.json` has a `plugins[]` entry, and vice versa. The
   manifest `name` is the invocation namespace and may deliberately differ from the
-  directory and the entry name (`context-flow` → `cf:`, `obsidian-workspace` → `obw:`)
-  — do not "fix" those to match.
+  directory and the entry name (`obsidian-workspace` → `obw:`) — do not "fix" that to
+  match.
 - Every `plugins[]` entry has a README section and a structure-tree row.
 - Skill `name` in frontmatter is lowercase-hyphen and matches its directory — for a
   plugin skill, that `name` becomes the last segment of `/<plugin>:<name>`, so spaces
