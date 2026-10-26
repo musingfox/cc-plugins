@@ -37,7 +37,7 @@
 #
 # Log:     <out>/revert-gate.log, one `### <run>` section per run, each ending in
 #          an exit=<n> line the gate writes.
-# Env:     CF_TEST_DEADLINE_S  seconds before a run is group-killed (default 1800)
+# Env:     METHOD_TEST_DEADLINE_S  seconds before a run is group-killed (default 1800)
 #
 # Every run gets /dev/null on stdin. TEST_CMD runs exactly as given, in a
 # detached worktree the gate creates at --head under a fresh temporary directory
@@ -56,7 +56,7 @@ export LC_ALL=C
 # add a missing dev dependency to run its tests (e.g. `uv add --dev pytest`).
 # The scope gate reports them instead of failing; this gate never reverts them,
 # because a run needs them to install or build. scope-gate.sh carries the same line.
-CF_BUILD_LOCK_ALLOWLIST='^(pyproject\.toml|uv\.lock|requirements[^/]*\.txt|package\.json|package-lock\.json|bun\.lock(b)?|yarn\.lock|pnpm-lock\.yaml|Cargo\.(toml|lock)|go\.(mod|sum)|Gemfile(\.lock)?)$'
+METHOD_BUILD_LOCK_ALLOWLIST='^(pyproject\.toml|uv\.lock|requirements[^/]*\.txt|package\.json|package-lock\.json|bun\.lock(b)?|yarn\.lock|pnpm-lock\.yaml|Cargo\.(toml|lock)|go\.(mod|sum)|Gemfile(\.lock)?)$'
 
 tmp="" wt="" wt_admin="" sup=""
 
@@ -249,7 +249,7 @@ done
 [ -n "$out" ] || fail "usage: --out is required"
 [ ${#CMD[@]} -gt 0 ] || fail "usage: -- TEST_CMD [ARGS...] is required"
 
-DEADLINE="${CF_TEST_DEADLINE_S:-1800}"
+DEADLINE="${METHOD_TEST_DEADLINE_S:-1800}"
 case "$DEADLINE" in
   ''|*[!0-9]*|0) fail "bad-deadline" ;;
 esac
@@ -344,7 +344,7 @@ while [ "$i" -lt "$n" ]; do
   has_tests=$(jq -r --argjson i "$i" '.contracts[$i] | has("test_files")' "$contracts")
   revert=()
   for p in ${own[@]+"${own[@]}"}; do
-    if printf '%s\n' "$p" | grep -Eq "$CF_BUILD_LOCK_ALLOWLIST"; then continue; fi
+    if printf '%s\n' "$p" | grep -Eq "$METHOD_BUILD_LOCK_ALLOWLIST"; then continue; fi
     if [ "$has_tests" = true ]; then
       if printf '%s\n' "$tests" | grep -Fxq -- "$p"; then continue; fi
     elif is_test_path "$p" && printf '%s\n' "$touches" | grep -Fxq -- "$p"; then continue; fi

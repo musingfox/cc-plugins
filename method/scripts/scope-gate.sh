@@ -40,7 +40,7 @@ export LC_ALL=C
 # The scope gate reports them instead of failing; the revert gate never reverts
 # them, because a run needs them to install or build. revert-gate.sh carries
 # the same line.
-CF_BUILD_LOCK_ALLOWLIST='^(pyproject\.toml|uv\.lock|requirements[^/]*\.txt|package\.json|package-lock\.json|bun\.lock(b)?|yarn\.lock|pnpm-lock\.yaml|Cargo\.(toml|lock)|go\.(mod|sum)|Gemfile(\.lock)?)$'
+METHOD_BUILD_LOCK_ALLOWLIST='^(pyproject\.toml|uv\.lock|requirements[^/]*\.txt|package\.json|package-lock\.json|bun\.lock(b)?|yarn\.lock|pnpm-lock\.yaml|Cargo\.(toml|lock)|go\.(mod|sum)|Gemfile(\.lock)?)$'
 
 fail() { printf 'ERROR %s\n' "$1"; exit 1; }
 
@@ -101,8 +101,8 @@ fi
 
 allowlisted=""
 if [ -n "$undeclared" ]; then
-  allowlisted=$(printf '%s\n' "$undeclared" | grep -E "$CF_BUILD_LOCK_ALLOWLIST" || true)
-  undeclared=$(printf '%s\n' "$undeclared" | grep -vE "$CF_BUILD_LOCK_ALLOWLIST" || true)
+  allowlisted=$(printf '%s\n' "$undeclared" | grep -E "$METHOD_BUILD_LOCK_ALLOWLIST" || true)
+  undeclared=$(printf '%s\n' "$undeclared" | grep -vE "$METHOD_BUILD_LOCK_ALLOWLIST" || true)
 fi
 
 # .githooks/pre-commit bumps <plugin>/.claude-plugin/plugin.json inside the

@@ -57,7 +57,7 @@ echo '{"schema_version":1,"contracts":[{"name":"C1","touches_files":[],"test_fil
 err_case "E20 test_files is a string" --repo "$REPO" --base "$BASE" --head HEAD --contracts "$REPO_TOP/strtest.json" --out "$OUT" "${cmd[@]}"
 : >"$REPO_TOP/afile"
 err_case "E21 --out cannot be created" --repo "$REPO" --base "$BASE" --head HEAD --contracts "$CONTRACTS" --out "$REPO_TOP/afile/sub" "${cmd[@]}"
-CF_TEST_DEADLINE_S=-5 err_case "E22 negative deadline" "${good[@]}" "${cmd[@]}"
+METHOD_TEST_DEADLINE_S=-5 err_case "E22 negative deadline" "${good[@]}" "${cmd[@]}"
 
 # E23: jq absent -> ERROR jq-missing and nothing else, suite never run
 rm -f "$REPO_TOP/ran"
@@ -122,7 +122,7 @@ for verdict in clean stays_green tests_red stalled error; do
     error)     cmd_args=(bash run-tests.sh); printf 'nope' >"$CONTRACTS" ;;
     *)         cmd_args=(bash run-tests.sh) ;;
   esac
-  TMPDIR="$REPO_TOP/tmp" CF_TEST_DEADLINE_S=$deadline gate_run "${cmd_args[@]}"
+  TMPDIR="$REPO_TOP/tmp" METHOD_TEST_DEADLINE_S=$deadline gate_run "${cmd_args[@]}"
   after="$(snapshot)"
   assert_eq "$before" "$after" "S1 $verdict: checkout, index, refs, stash and worktrees unchanged (last: $GATE_LAST)"
   assert_eq "" "$(ls -A "$REPO_TOP/tmp")" "S1 $verdict: the temporary directory is removed"
@@ -208,7 +208,7 @@ sig_case() {
   # A job started with & in a non-interactive shell has SIGINT ignored, and an
   # ignored signal cannot be trapped; a gate run from a terminal does not. perl
   # puts the default back and execs the gate, so the gate is $!.
-  TMPDIR="$REPO_TOP/tmp" CF_TEST_DEADLINE_S=60 perl -e '$SIG{INT} = "DEFAULT"; exec @ARGV' bash "$GATE" --repo "$REPO" --base "$BASE" --head HEAD --contracts "$CONTRACTS" --out "$OUT" \
+  TMPDIR="$REPO_TOP/tmp" METHOD_TEST_DEADLINE_S=60 perl -e '$SIG{INT} = "DEFAULT"; exec @ARGV' bash "$GATE" --repo "$REPO" --base "$BASE" --head HEAD --contracts "$CONTRACTS" --out "$OUT" \
     -- bash "$REPO_TOP/sig.sh" >"$REPO_TOP/gate.out" 2>"$REPO_TOP/gate.err" &
   local pid=$!
   n=0
@@ -252,5 +252,5 @@ env_case() {
   drop_repo
 }
 env_case "A1 LC_ALL unset in the caller stays unset" '${LC_ALL-unset}' "seen=unset" -u LC_ALL LANG=en_US.UTF-8
-env_case "A1 the supervisor's stall mark is not exported" '${CF_BOUNDED_STALL_MARK-unset}' "seen=unset" -u LC_ALL LANG=en_US.UTF-8
+env_case "A1 the supervisor's stall mark is not exported" '${METHOD_BOUNDED_STALL_MARK-unset}' "seen=unset" -u LC_ALL LANG=en_US.UTF-8
 env_case "A1 LC_ALL set in the caller keeps its value" '${LC_ALL-unset}' "seen=en_US.UTF-8" LC_ALL=en_US.UTF-8

@@ -12,7 +12,7 @@ At the top the decision-maker is the human, and a round is easier to weigh on a 
 
 ## The brief
 
-Write the round to `.spiral/L<N>-a<M>-directions.md` yourself: Divergence returns data, never prose a human reads.
+Write the round to `.narrow/L<N>-a<M>-directions.md` yourself: Divergence returns data, never prose a human reads.
 
 One round asks every one-way door that is askable now, and only those. A two-way door gets a default and one line saying you took it; putting it on the page spends the attention the real doors need. If one decision survives, the round is one question.
 

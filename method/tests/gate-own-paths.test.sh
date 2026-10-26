@@ -76,7 +76,7 @@ drop_repo
 # --- T5: one allowlist, the same in both gates ---------------------------------
 # The revert gate never reverts what the scope gate allows; each script carries
 # its own copy of the regex, so the copies must not drift.
-allowlist_of() { sed -n "s/^CF_BUILD_LOCK_ALLOWLIST=//p" "$1"; }
+allowlist_of() { sed -n "s/^METHOD_BUILD_LOCK_ALLOWLIST=//p" "$1"; }
 assert_eq "1" "$(allowlist_of "$SCRIPTS/scope-gate.sh" | grep -c .)" "T5 the scope gate defines the allowlist once"
 assert_eq "1" "$(allowlist_of "$SCRIPTS/revert-gate.sh" | grep -c .)" "T5 the revert gate defines the allowlist once"
 assert_eq "$(allowlist_of "$SCRIPTS/scope-gate.sh")" "$(allowlist_of "$SCRIPTS/revert-gate.sh")" \

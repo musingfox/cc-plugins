@@ -6,7 +6,7 @@
 . "$METHOD_TESTS_DIR/lib/assert.sh"
 
 ROOT="$(cd "$METHOD_TESTS_DIR/.." && pwd)"
-pat='context''-flow|cf''(:|-(scope|revert-gate|add-repros))|spiral'':|spiral''/(agents|scripts|commands|docs)'
+pat='context''-flow|cf''(:|-(scope|revert-gate|add-repros))|spiral'':|spiral''/(agents|scripts|commands|docs)|\.spiral''/|spiral''/prototype|CF''_[A-Z_]+'
 
 hits="$(grep -rEn "$pat" "$ROOT" || true)"
 assert_eq "" "$hits" "no method file names a retired plugin seat, script or path"

@@ -26,7 +26,7 @@ undeclared=$(comm -23 <(sort "$actual_list") <(sort "$declared_list"))
 assert_eq "" "$undeclared" "T3: common file is not reported undeclared"
 
 # T4-T6: build/lock allowlist splits benign manifest touches from real violations.
-# Pins the CF_BUILD_LOCK_ALLOWLIST regex semantics of scope-gate.sh and revert-gate.sh.
+# Pins the METHOD_BUILD_LOCK_ALLOWLIST regex semantics of scope-gate.sh and revert-gate.sh.
 AL='^(pyproject\.toml|uv\.lock|requirements[^/]*\.txt|package\.json|package-lock\.json|bun\.lock(b)?|yarn\.lock|pnpm-lock\.yaml|Cargo\.(toml|lock)|go\.(mod|sum)|Gemfile(\.lock)?)$'
 undeclared=$'pyproject.toml\nuv.lock\nsrc/evil.py'
 allowlisted=$(printf '%s\n' "$undeclared" | grep -E "$AL" || true)
@@ -36,7 +36,7 @@ assert_eq "src/evil.py" "$remaining" "T5: non-manifest file still flagged undecl
 assert_eq "" "$(printf 'docs/uv.lock.md\n' | grep -E "$AL" || true)" "T6: nested/lookalike paths are NOT allowlisted"
 
 # T7: the pinned regex is the one the gate carries.
-live="$(sed -n 's/^CF_BUILD_LOCK_ALLOWLIST=//p' "$METHOD_TESTS_DIR/../scripts/scope-gate.sh")"
+live="$(sed -n 's/^METHOD_BUILD_LOCK_ALLOWLIST=//p' "$METHOD_TESTS_DIR/../scripts/scope-gate.sh")"
 assert_eq "'$AL'" "$live" "T7: scope-gate.sh carries the pinned build/lock allowlist"
 
 rm -f "$declared_list" "$actual_list"

@@ -93,7 +93,7 @@ drop_repo
 # T7: hangs past the deadline
 new_repo; write_runner; base_commit; add_effective
 write_contracts "[$C1]"
-CF_TEST_DEADLINE_S=1 gate_run sleep 30
+METHOD_TEST_DEADLINE_S=1 gate_run sleep 30
 assert_eq "124" "$GATE_RC" "T7 control stalled: exit"
 assert_eq "TESTS_STALLED 1" "$GATE_LAST" "T7 control stalled: verdict"
 assert_eq "1" "$(verdict_lines)" "T7 control stalled: exactly one verdict line"
@@ -171,7 +171,7 @@ drop_repo
 
 # B1-2: a stalled suite that printed a partial line
 a_fixture
-CF_TEST_DEADLINE_S=1 gate_run bash -c 'printf waiting; sleep 30'
+METHOD_TEST_DEADLINE_S=1 gate_run bash -c 'printf waiting; sleep 30'
 assert_eq "TESTS_STALLED 1" "$GATE_LAST" "B1-2 stalled with a partial line: last line is the verdict"
 assert_eq "124" "$GATE_RC" "B1-2 stalled with a partial line: exit"
 drop_repo

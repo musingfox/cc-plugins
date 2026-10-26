@@ -1,6 +1,6 @@
 {
   "name": "method",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "[Experimental] One node of a contract tree — do a contract yourself or split it into sub-contracts you write, dispatch them, route what comes back, report up in a fixed shape; narrows a question that is not yet a contract first",
   "author": {
     "name": "Nick Huang",

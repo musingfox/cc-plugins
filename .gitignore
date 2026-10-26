@@ -21,7 +21,7 @@ yarn-error.log*
 # Claude Code writes one into each mod it loads from --plugin-dir (its .claude-plugin/types/ ignores itself)
 /*/tsconfig.json
 .obsidian.yaml
-.spiral/
+.narrow/
 .serena/
 
 # cf build output

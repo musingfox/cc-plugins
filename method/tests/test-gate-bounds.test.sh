@@ -4,7 +4,7 @@
 # forever -- nothing downstream bounds it.
 #
 #   - a command that reads stdin gets EOF instead of blocking
-#   - a control run that outruns CF_TEST_DEADLINE_S is group-killed; the verdict
+#   - a control run that outruns METHOD_TEST_DEADLINE_S is group-killed; the verdict
 #     is TESTS_STALLED <seconds>, exit 124, and no contract run happens
 #   - a command that exits 124 BY ITSELF (a suite wrapping itself in timeout(1))
 #     is a red suite, TESTS_RED 124, not a stall
@@ -25,7 +25,7 @@ fixture() { new_repo; write_runner; base_commit; add_effective; write_contracts 
 
 fixture
 printf '%s\n' 'read -r line; echo "read rc=$?"' 'bash run-tests.sh' >"$REPO_TOP/stdin.sh"
-GATE_OUT="$(CF_TEST_DEADLINE_S=30 bash "$GATE" --repo "$REPO" --base "$BASE" --head HEAD --contracts "$CONTRACTS" --out "$OUT" -- bash "$REPO_TOP/stdin.sh" 2>/dev/null < <(sleep 10))"
+GATE_OUT="$(METHOD_TEST_DEADLINE_S=30 bash "$GATE" --repo "$REPO" --base "$BASE" --head HEAD --contracts "$CONTRACTS" --out "$OUT" -- bash "$REPO_TOP/stdin.sh" 2>/dev/null < <(sleep 10))"
 GATE_RC=$?
 assert_eq "0" "$GATE_RC" "stdin: a command that reads stdin still exits"
 assert_contains "$GATE_OUT" "test_exit=0" "stdin: the exit marker is still printed"
@@ -36,7 +36,7 @@ drop_repo
 
 fixture
 start=$(date +%s)
-CF_TEST_DEADLINE_S=1 gate_run sleep 30
+METHOD_TEST_DEADLINE_S=1 gate_run sleep 30
 elapsed=$(( $(date +%s) - start ))
 assert_eq "124" "$GATE_RC" "deadline: a control run past its deadline exits 124"
 assert_eq "TESTS_STALLED 1" "$GATE_LAST" "deadline: the verdict names the deadline in seconds"
@@ -53,7 +53,7 @@ drop_repo
 # the suite stopped.
 
 fixture
-CF_TEST_DEADLINE_S=1 gate_run bash -c 'echo "suite stopped here"; sleep 30'
+METHOD_TEST_DEADLINE_S=1 gate_run bash -c 'echo "suite stopped here"; sleep 30'
 assert_eq "TESTS_STALLED 1" "$GATE_LAST" "stall tail: stalled"
 assert_eq "suite stopped here" "$(printf '%s\n' "$GATE_OUT" | tail -2 | head -1)" "stall tail: the line before the verdict is the suite's last output"
 assert_eq "### control
@@ -78,7 +78,7 @@ drop_repo
 
 fixture
 MARK="$REPO_TOP/grandchild-alive"
-CF_TEST_DEADLINE_S=1 gate_run bash -c "bash -c 'sleep 30; : > \"$MARK\"' & wait"
+METHOD_TEST_DEADLINE_S=1 gate_run bash -c "bash -c 'sleep 30; : > \"$MARK\"' & wait"
 sleep 4
 grandchild=dead; [ -f "$MARK" ] && grandchild=alive
 assert_eq "dead" "$grandchild" "tree kill: the whole process group went down with the deadline"
@@ -90,7 +90,7 @@ fixture
 printf '%s\n' '[ -f src/add.sh ] || sleep 30' 'exit 0' >"$REPO/tests/add.test.sh"
 commit_all slow-when-reverted
 start=$(date +%s)
-CF_TEST_DEADLINE_S=2 gate_run bash run-tests.sh
+METHOD_TEST_DEADLINE_S=2 gate_run bash run-tests.sh
 elapsed=$(( $(date +%s) - start ))
 assert_eq "CLEAN 1" "$GATE_LAST" "contract deadline: the killed run counts as red"
 assert_contains "$(cat "$OUT/revert-gate.log")" "exit=124" "contract deadline: the log records the kill"
@@ -101,10 +101,10 @@ drop_repo
 # ---- the default deadline is 1800 seconds; a bad value is an input error ----
 
 fixture
-CF_TEST_DEADLINE_S=soon gate_run bash run-tests.sh
+METHOD_TEST_DEADLINE_S=soon gate_run bash run-tests.sh
 assert_eq "ERROR bad-deadline" "$GATE_OUT" "bad deadline: one ERROR line"
 assert_eq "1" "$GATE_RC" "bad deadline: exit"
-CF_TEST_DEADLINE_S=0 gate_run bash run-tests.sh
+METHOD_TEST_DEADLINE_S=0 gate_run bash run-tests.sh
 assert_eq "ERROR bad-deadline" "$GATE_OUT" "zero deadline: one ERROR line"
-assert_eq "1800" "$(sed -n 's/^DEADLINE="\${CF_TEST_DEADLINE_S:-\([0-9]*\)}"$/\1/p' "$GATE")" "default deadline is 1800"
+assert_eq "1800" "$(sed -n 's/^DEADLINE="\${METHOD_TEST_DEADLINE_S:-\([0-9]*\)}"$/\1/p' "$GATE")" "default deadline is 1800"
 drop_repo

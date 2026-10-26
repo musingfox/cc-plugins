@@ -28,9 +28,9 @@ Resolve everything to absolute paths first, so nothing depends on where you were
 
 ```bash
 REPO="$(git rev-parse --show-toplevel)"
-grep -qxF '.spiral/' "$REPO/.gitignore" 2>/dev/null || echo '.spiral/' >> "$REPO/.gitignore"
-BRANCH="spiral/prototype-<slug>"        # the name your task gave you
-WORK="$REPO/.spiral/${BRANCH##*/}"      # the branch name has a slash in it; the path must not
+grep -qxF '.narrow/' "$REPO/.gitignore" 2>/dev/null || echo '.narrow/' >> "$REPO/.gitignore"
+BRANCH="prototype/<slug>"       # the name your task gave you
+WORK="$REPO/.narrow/${BRANCH##*/}"      # the branch name has a slash in it; the path must not
 git -C "$REPO" worktree add -b "$BRANCH" "$WORK" HEAD
 ```
 

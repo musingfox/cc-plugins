@@ -138,7 +138,7 @@ printf '%s\n' '[ -f src/add.sh ] || sleep 30' '[ "$(bash src/add.sh 2 3)" = 5 ]'
 commit_all c1
 write_contracts "[$C1]"
 start=$(date +%s)
-CF_TEST_DEADLINE_S=2 gate_run bash run-tests.sh
+METHOD_TEST_DEADLINE_S=2 gate_run bash run-tests.sh
 elapsed=$(( $(date +%s) - start ))
 assert_eq "CLEAN 1" "$GATE_LAST" "T10 deadline kill is red: verdict"
 assert_eq "0" "$GATE_RC" "T10 deadline kill is red: exit"
@@ -244,7 +244,7 @@ new_repo; write_runner; base_commit; add_effective
 write_contracts "[$C1]"
 printf '%s\n' 'read -r line; echo "stdin-read-rc=$?"' 'bash run-tests.sh' >"$REPO_TOP/stdin.sh"
 BASE_SAVE="$BASE"
-GATE_OUT="$(CF_TEST_DEADLINE_S=20 bash "$GATE" --repo "$REPO" --base "$BASE" --head HEAD --contracts "$CONTRACTS" --out "$OUT" -- bash "$REPO_TOP/stdin.sh" 2>/dev/null < <(sleep 12))"
+GATE_OUT="$(METHOD_TEST_DEADLINE_S=20 bash "$GATE" --repo "$REPO" --base "$BASE" --head HEAD --contracts "$CONTRACTS" --out "$OUT" -- bash "$REPO_TOP/stdin.sh" 2>/dev/null < <(sleep 12))"
 GATE_RC=$?
 assert_eq "CLEAN 1" "$(printf '%s\n' "$GATE_OUT" | tail -1)" "T19 a suite that reads stdin gets EOF, not the caller's pipe"
 assert_contains "$(cat "$OUT/revert-gate.log")" "stdin-read-rc=1" "T19 the read saw end of file"
@@ -260,7 +260,7 @@ assert_not_verdict "M1 keeping every own test file breaks T3" "STAYS_GREEN C2" 2
 drop_repo
 
 pkg_fixture
-mutant 's/^ *if printf .*CF_BUILD_LOCK_ALLOWLIST.*continue; fi\n//m'
+mutant 's/^ *if printf .*METHOD_BUILD_LOCK_ALLOWLIST.*continue; fi\n//m'
 mutant_gate_run bash run-tests.sh
 assert_not_verdict "M2 reverting package.json breaks T7" "STAYS_GREEN C2" 2
 drop_repo

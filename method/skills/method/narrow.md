@@ -34,7 +34,7 @@ Each **layer** lands one result, concrete at its own grain and no finer: vague q
 
 A layer takes as many **rounds** as it needs. A round is one demand on the decision-maker: every decision askable now, asked at once, answered, folded back in. A decision that presupposes another still open belongs to the next round; settling the first is what makes it askable.
 
-Keep two counters, `L` (layer) and `a` (round), starting at `L1-a1`. Write each round's question and answer to a scratch file (`.spiral/L<N>-a<M>-*.md`, gitignored) and overwrite nothing: what was asked and what came back is the **carry-over** that stops the next round repeating the last.
+Keep two counters, `L` (layer) and `a` (round), starting at `L1-a1`. Write each round's question and answer to a scratch file (`.narrow/L<N>-a<M>-*.md`, gitignored) and overwrite nothing: what was asked and what came back is the **carry-over** that stops the next round repeating the last.
 
 ## 1. Diverge
 
@@ -47,7 +47,7 @@ It returns the decisions this layer can settle now, each tagged one-way or two-w
 
 ## 2. The round
 
-Put every one-way door from that list in front of the decision-maker at once. At the top that is the browser page: write the round as a brief in the `viz: feedback` shape in `.spiral/L<N>-a<M>-directions.md`, render it with `render-decision.sh`, hand the human the `URL:` line, wait with `wait-decision.sh` in the background, and read the answers back from the file. The brief format, the body layout and the read-back rules are in `decision-page.md`. When the render ends `save-mode=inline`, ask with `AskUserQuestion` instead. Below the top it is a `BLOCKED` report, as above. Give each two-way door a default instead. One surviving decision is a one-question round; a padded round is worse than a short one.
+Put every one-way door from that list in front of the decision-maker at once. At the top that is the browser page: write the round as a brief in the `viz: feedback` shape in `.narrow/L<N>-a<M>-directions.md`, render it with `render-decision.sh`, hand the human the `URL:` line, wait with `wait-decision.sh` in the background, and read the answers back from the file. The brief format, the body layout and the read-back rules are in `decision-page.md`. When the render ends `save-mode=inline`, ask with `AskUserQuestion` instead. Below the top it is a `BLOCKED` report, as above. Give each two-way door a default instead. One surviving decision is a one-question round; a padded round is worse than a short one.
 
 For each decision: the question in plain language, each candidate's substance inline (what it is, what taking it commits to, how costly it is to undo), and your recommendation with its reason. The recommendation is yours, never Divergence's. Facts Divergence resolved go in as facts. Where the candidates cannot be told apart from their descriptions, invite the decision-maker to keep several alive, and say that keeping several means "go walk them".
 
@@ -66,7 +66,7 @@ Sort what the probes bring back:
 - **Collided with something hard** → dead by right/wrong. Drop it and record the collision.
 - **Still standing** → it survived the walk.
 - **Falsified a premise, not the candidate** → the whole menu is re-priced, the unwalked candidates included. Re-price before sorting anything.
-- **Reading cannot answer it** → dispatch `method:prototype` with the question the build must answer, what counts as red and what as green, the candidate, what this layer widens from, and the branch `spiral/prototype-<question-slug>`. **You draw the red/green line**, concretely enough that the run meets it or does not; a prototype that draws its own can move it. Record the branch it reports back; that branch is the durable evidence.
+- **Reading cannot answer it** → dispatch `method:prototype` with the question the build must answer, what counts as red and what as green, the candidate, what this layer widens from, and the branch `prototype/<question-slug>`. **You draw the red/green line**, concretely enough that the run meets it or does not; a prototype that draws its own can move it. Record the branch it reports back; that branch is the durable evidence.
 
 Then take one exit:
 

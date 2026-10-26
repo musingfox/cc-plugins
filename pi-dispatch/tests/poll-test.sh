@@ -275,7 +275,7 @@ kill "$ALIVE" 2>/dev/null || true
 # ===========================================================================
 # Resume coverage — exercises pi-dispatch.sh PRIOR_RUNDIR session-id extraction.
 # Self-contained: embeds an argv-capture PATH-shim `pi` that records args and
-# emits a canned stop stream. Does NOT source anything from .spiral/.
+# emits a canned stop stream. Does NOT source anything from .narrow/.
 # Timing pins: tiny grace, huge wall/stall so nothing is flaky.
 # ===========================================================================
 
