@@ -23,8 +23,8 @@ n="$(grep -c 'glossary' spec/README.md || true)"
 
 moved="$(awk '
   /^├── spec\// { spec = $0; next }
-  /^├── spiral\// { print; if (spec != "") print spec; spec = ""; next }
+  /^├── viz\// { print; if (spec != "") print spec; spec = ""; next }
   { print }
 ' README.md)"
 moved_order="$(printf '%s\n' "$moved" | grep -oE '^├── (pi-dispatch|spec|viz)/' | paste -sd, -)"
-[ "$moved_order" != "$order" ] || fail "moving spec after spiral must change tree order"
+[ "$moved_order" != "$order" ] || fail "moving spec after viz must change tree order"

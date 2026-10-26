@@ -30,8 +30,8 @@ n=$(grep -c 'Which of these would you like to explore?' "$f" || true)
 n=$(grep -c 'No candidates' "$f" || true)
 [ "$n" -ge 1 ] || fail "T7: No candidates, got $n"
 
-n=$(grep -c '/spiral' "$f" || true)
-[ "$n" -ge 1 ] || fail "T8: /spiral, got $n"
+n=$(grep -c 'method. skill' "$f" || true)
+[ "$n" -ge 1 ] || fail "T8: method skill hand-off, got $n"
 
 n=$(grep -c 'Do NOT propose interfaces' "$f" || true)
 [ "$n" -ge 1 ] || fail "T9: Do NOT propose interfaces, got $n"

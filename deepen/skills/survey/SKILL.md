@@ -73,4 +73,4 @@ Print the report path.
 
 Which of these would you like to explore?
 
-Narrowing a chosen candidate is `/spiral`'s job. This skill ends at the report.
+Narrowing a chosen candidate is the `method` skill's job. This skill ends at the report.

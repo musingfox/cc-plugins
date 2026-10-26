@@ -50,37 +50,6 @@ Fetch Apple Podcasts episode audio download URLs:
 /plugin install apple-podcasts
 ```
 
-### Context Flow (Experimental)
-
-The contract-drafting and checking pieces of the contract-driven workflow, without an orchestrator:
-- **`cf:plan`**: drafts behavioral contracts with test cases and tiers each decision High/Medium/Low
-- **`cf:review`**: a read-only Spec reviewer that checks an implementation against its contracts
-- **Gate scripts**: `cf-scope.sh`, `cf-revert-gate.sh` and `cf-add-repros.sh` check a builder's file scope, test run and revert, and file review repros
-- **Requirements**: bash, git, jq and shasum
-
-**Installation:**
-```bash
-/plugin install context-flow
-```
-
-### Spiral (Experimental)
-
-Narrows a vague question into an implementation-sized goal, one layer at a time — **diverge → you answer → probe → converge** — for the layers where there is no compiler: strategy, approach, milestones.
-- **Divergence names the options**: an isolated subagent lists the decisions this layer can settle now and the genuinely *distinct* candidates for each, sorted by cost to reverse (one-way vs two-way door). It describes; it never decides, and it never re-lists last round.
-- **A round, not a question**: every decision that is independent right now is asked at once, and only the one-way doors — the reversible ones get a default and a line in the plan. Answering some and leaving others blank is a legitimate answer; what you settle is what makes the rest askable.
-- **Probes walk what you cannot settle from the page**: where candidates only differ once you take them, cheap throwaway descents run one per candidate and report the first hard thing each hits. A candidate that collides is dropped on evidence, never put to a vote. Where reading cannot settle it, a probe escalates to a **prototype** that builds and runs the smallest thing giving a red/green signal. A prototype can also go out without a probe, one per candidate on its own branch, when you ask to see the candidates built or when only a built thing can tell them apart.
-- **Convergence lands a layer**: what you settled becomes a plan or milestone — what this layer settles, what is concrete enough to build on, what it deliberately leaves to the next layer, and what would overturn it. Load-bearing facts cite their source.
-- **You own both directions**: the decision page renders in the browser; the depth gate afterwards is a one-line ask in the terminal, on a plan you already have. Dig another layer, stop, or — when a layer falsifies what the one above it rested on — go back up and retake that decision. It only widens again when you ask.
-- **Output is a goal, not code**: the run is promoted to `docs/milestones/<slug>.md`, composed from every layer that still stands — `.narrow/` is scratch, the milestone outlives it — then handed to the main session as a seed, not a contract set. No gate, nothing merged. A prototype may build a throwaway thing to settle a decision, but its code is evidence, abandoned on its own branch.
-- **Single command**: `/spiral "the question"`.
-
-See `spiral/docs/concept.md` for the full concept.
-
-**Installation:**
-```bash
-/plugin install spiral
-```
-
 ### Method (Experimental)
 
 One skill that teaches a session to act as one **node** of a contract tree: take a contract from the layer above, deliver it, report back. It fires on its own for a goal whose scope is settled, and for a question not yet sure what to build:
@@ -263,7 +232,7 @@ Survey a codebase for deepening opportunities — shallow modules, leaking seams
 - **Scope rule**: follow the user's direction, else git-log hotspots, else widen; explorers scan for shallow modules, leaking seams, and interfaces that are hard to test through
 - **Explorers**: fan out over the scoped modules; each reports deepening candidates, not a rewrite
 - **Viz report**: candidates land as markdown plus Mermaid and are handed to viz to render
-- **Spiral hand-off**: a candidate worth narrowing further goes to `/spiral`; this skill ends at the report
+- **Method hand-off**: a candidate worth narrowing further goes to the `method` skill; this skill ends at the report
 
 **Installation:**
 ```bash
@@ -371,7 +340,6 @@ cc-plugins/
 ├── apple-podcasts/     skills: apple-podcasts-fetch
 ├── audit/              skills: docs, tests · agents: docs-classifier, tests-tracer · scripts, tests
 ├── calendar/          hooks: register (Claude Mod) · tests
-├── context-flow/       agents: plan, review · scripts, tests
 ├── deepen/             skills: survey · agents: explorer · scripts, docs, tests
 ├── diagnose/           skills: diagnose, diagnose-now · docs, scripts, tests
 ├── fizzy/              skills: fizzy
@@ -385,7 +353,6 @@ cc-plugins/
 ├── omp-quota/          hooks: register (Claude Mod) · tests
 ├── pi-dispatch/        skills: pi-dispatch · agents: builder, reviewer · scripts, shims, extensions, tests
 ├── spec/               skills: spec, glossary · scripts: spec.sh · tests
-├── spiral/             commands: spiral · agents: divergence, probe, prototype · scripts · tests
 ├── viz/                skills: viz-inline, viz-render · lib, tests
 ├── wizard/             skills: wizard
 ├── zen-agent/          skills: zen-agent · bin: zen-agent, open · lib · .mcp.json
