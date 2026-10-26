@@ -10,7 +10,7 @@
 #          empty                        (exit 0)
 # Exit:    0 = no violation, 1 = violation, 2 = unusable input
 #
-# Per contract: observes is a non-empty array of stdout|stderr|exit|files;
+# Per contract: observes is a non-empty array of stdout|stderr|exit|files|return;
 # touches_files is a non-empty array; test_files is an array whose entries are
 # in touches_files; test_cases is a non-empty array whose every `expect` names
 # each observed channel as "<channel>:". A contract without a string `name` is
@@ -37,7 +37,7 @@ problems="$(jq -r '
     arr(k; $c),
     (if ($c | has(k)) and ($c[k] | type) == "array" and ($c[k] | length) == 0
      then "\(k) is empty" else empty end);
-  def channels: ["stdout", "stderr", "exit", "files"];
+  def channels: ["stdout", "stderr", "exit", "files", "return"];
 
   .contracts | to_entries[] | .key as $i | .value as $c
   | (if ($c | type) == "object" and ($c.name | type) == "string" then $c.name else "#\($i)" end) as $n

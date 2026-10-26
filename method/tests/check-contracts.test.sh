@@ -61,12 +61,14 @@ else run_err "unreadable file" "$TMP/unr.json"; fi
 run_doc "valid contract: exit 0, silent" "$GOOD" 0 ""
 run_doc "empty contracts array: exit 0, silent" "" 0 ""
 run_doc "test_files [] allowed" "$(mut '.test_files=[]')" 0 ""
-run_doc "all four channels accepted" "$(mut '.observes=["stdout","stderr","exit","files"]|.test_cases[0].expect="stdout: a, stderr: empty, exit: 0, files: none"')" 0 ""
+run_doc "all five channels accepted" "$(mut '.observes=["stdout","stderr","exit","files","return"]|.test_cases[0].expect="stdout: a, stderr: empty, exit: 0, files: none, return: 3"')" 0 ""
+run_doc "return alone accepted" "$(mut '.observes=["return"]|.test_cases[0].expect="return: throws RangeError"')" 0 ""
 
 # --- observes ---
 run_doc "observes missing" "$(mut 'del(.observes)')" 1 "C: observes is missing"
 run_doc "observes not an array" "$(mut '.observes="stdout"')" 1 "C: observes is not an array"
 run_doc "observes empty" "$(mut '.observes=[]')" 1 "C: observes is empty"
+run_doc "return observed but not named" "$(mut '.observes=["return"]|.test_cases[0].expect="stdout: a"')" 1 "C: test case T1 expect does not name channel return"
 run_doc "observes bad value" "$(mut '.observes=["stdout","network"]')" 1 "C: observes holds invalid value network"
 
 # --- touches_files ---

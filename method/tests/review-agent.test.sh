@@ -102,7 +102,7 @@ cc=$(section '#### 1. Contract Compliance (binding)')
 obs=$(printf '%s\n' "$cc" | grep -F -- '- **Observed channels**')
 assert_eq "1" "$(printf '%s\n' "$cc" | grep -cF -- '- **Observed channels**' | tr -d ' ')" "review: Contract Compliance has one Observed channels clause"
 assert_contains "$obs" '`observes`' "review: clause reads the contract's observes"
-for ch in stdout stderr exit files; do
+for ch in stdout stderr exit files return; do
   assert_contains "$obs" "\`$ch\`" "review: clause names channel $ch"
 done
 
