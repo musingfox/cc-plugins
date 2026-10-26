@@ -74,7 +74,7 @@ bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts followup NAME "NEXT INSTRUCTION"
 
 Use `followup NAME --file PATH` for longer text. Then wait again.
 
-A run that exited on the idle timeout without a report still shows `state=idle`, with `exit-reason=idle-timeout` at the end of its status line; that field is how you tell it apart from a live idle run. Its background `run` task has also finished, and `<RUNDIR>/phase.json` holds `"phase":"exited"` and `"reason":"idle-timeout"`; `followup` refuses it with `client exited; cannot follow up`. Its branch was fetched back as it exited, unless `phase.json` has a `fetchError`. Review `git log <baseSha>..muster/NAME`, then either dispatch a new run under a new NAME, adding `--base muster/NAME` to continue from its commits, or go to Cleanup.
+A run that exited on the idle timeout without a report still shows `state=idle`, with `exit-reason=idle-timeout` at the end of its status line; that field is how you tell it apart from a live idle run. Its background `run` task has also finished, and `<RUNDIR>/phase.json` holds `"phase":"exited"` and `"reason":"idle-timeout"`; `followup` refuses it with `client exited; cannot follow up`. Its branch was fetched back as it exited, unless the fetch failed; `clean` checks the branch itself. Review `git log <baseSha>..muster/NAME`, then either dispatch a new run under a new NAME, adding `--base muster/NAME` to continue from its commits, or go to Cleanup.
 
 ## Collect
 
@@ -105,11 +105,13 @@ bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts stop NAME
 
 ## Cleanup
 
-After the run has exited, remove its run directory; this deletes the worktree, the event log and the report. Branch `muster/NAME` stays in the repository, so `git log <baseSha>..<head sha>` still works; note `baseSha` and the head sha before removing, since `meta.json` goes with the directory. Read the report first. If `phase.json` in the run directory has a `fetchError`, the branch could not be fetched back and the commits exist only in the worktree at `<RUNDIR>/worktree`; fetch them by hand before removing it.
+After the run has exited, remove its run directory with `clean`; this deletes the worktree, the event log and the report. Branch `muster/NAME` stays in the repository, so `git log <baseSha>..<head sha>` still works. Read the report first. `clean` prints `removed <RUNDIR> base=<baseSha> head=<head>` (`head=unknown` when the run recorded none), so keep that line for the review.
 
 ```
-rm -rf "<RUNDIR>"
+bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts clean NAME
 ```
+
+`clean` removes the run directory only when the worker is not running (`phase.json` says `exited`, or the recorded pid is gone, which `status` shows as `dead`) and the repository already holds everything in the clone: the commit `muster/NAME` points at in `<RUNDIR>/worktree` must be the commit, or an ancestor of the commit, that `muster/NAME` points at in the repository. `fetched` and `fetchError` in `phase.json` play no part. Otherwise it refuses, removes nothing and exits non-zero: no run directory for NAME, the worker still running (stop it and wait), `meta.json` unreadable, or the branch not fetched back. For the last, fetch the branch by hand with the command in Collect, then run `clean` again.
 
 ## Confinement
 

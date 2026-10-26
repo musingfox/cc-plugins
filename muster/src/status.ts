@@ -53,7 +53,7 @@ function depCounts(value: unknown): { copied: number; total: number } | undefine
   return { copied: entries.filter((e) => e.outcome === "copied").length, total: entries.length };
 }
 
-function pidAlive(pid: number): boolean {
+export function pidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;

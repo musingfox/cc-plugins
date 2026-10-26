@@ -1,13 +1,14 @@
 #!/usr/bin/env bun
 import { type Env, UsageError } from "./layout";
 import { answerVerb } from "./verbs/answer";
+import { cleanVerb } from "./verbs/clean";
 import { followupVerb } from "./verbs/followup";
 import { runVerb } from "./verbs/run";
 import { statusVerb, type VerbResult } from "./verbs/status";
 import { stopVerb } from "./verbs/stop";
 import { watchMain } from "./verbs/watch";
 
-const VERBS = ["run", "status", "watch", "answer", "followup", "stop"];
+const VERBS = ["run", "status", "watch", "answer", "followup", "stop", "clean"];
 const USAGE = `usage: muster <${VERBS.join("|")}> [args]`;
 
 function usage(): number {
@@ -52,6 +53,8 @@ async function main(argv: string[]): Promise<number> {
     }
     case "stop":
       return emit(stopVerb(name, env));
+    case "clean":
+      return emit(cleanVerb(name, env));
   }
   return usage();
 }

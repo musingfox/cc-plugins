@@ -102,12 +102,13 @@ describe("CoordinatorSkill", () => {
     expect(bashFenceClaims(OLD_FENCE_FIXTURE).length).toBe(2);
   });
 
-  test("K1: the skill describes a per-run clone and cleanup by removing the run directory, with no git worktree commands", () => {
+  test("K1: the skill describes a per-run clone and cleanup by the clean verb, with no git worktree commands", () => {
     const text = body(SKILL);
     expect(text).not.toMatch(/git worktree/i);
     expect(text).toMatch(/\bclone\b/i);
     const cleanup = /## Cleanup\n([\s\S]*?)(?=\n## |$)/.exec(text)?.[1] ?? "";
-    expect(cleanup).toMatch(/rm -r/);
+    expect(cleanup).toMatch(/muster.ts clean NAME/);
+    expect(cleanup).not.toMatch(/rm -r/);
     expect(cleanup).toContain("RUNDIR");
   });
 

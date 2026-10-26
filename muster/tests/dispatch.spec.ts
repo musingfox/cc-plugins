@@ -8,7 +8,7 @@ const CLI = join(import.meta.dir, "..", "src", "muster.ts");
 const FAKE_AGENT = join(import.meta.dir, "support", "fake-agent.ts");
 const PERMISSION_TURN = join(import.meta.dir, "support", "scenarios", "permission-turn.ts");
 
-const VERBS = ["run", "status", "watch", "answer", "followup", "stop"];
+const VERBS = ["run", "status", "watch", "answer", "followup", "stop", "clean"];
 
 let home: string;
 let repo: string;
@@ -132,7 +132,7 @@ function startRun(name: string, model = "haiku", scen = scenario({})) {
 }
 
 describe("VerbDispatch", () => {
-  test("T1: --help lists exactly the six verbs, one per line", () => {
+  test("T1: --help lists exactly the seven verbs, one per line", () => {
     const r = muster(["--help"]);
     expect(r.out.split("\n").filter((l) => l !== "")).toEqual(VERBS);
   });
