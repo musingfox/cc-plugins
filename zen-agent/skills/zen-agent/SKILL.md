@@ -30,12 +30,23 @@ the user approves copying one domain's cookies.
 ## Operate
 
 Use the zen MCP tools: `list_pages`, `navigate_page`, `take_snapshot`, then
-`click_by_uid` / `fill_by_uid`, and `screenshot_page` to check the result. Re-run
-`take_snapshot` after the user has acted in the window: the page may have changed.
+`click_by_uid` / `fill_by_uid`, and a fresh `take_snapshot` or `get_page_text` to
+check the result. Re-run `take_snapshot` after the user has acted in the window: the
+page may have changed. For the whole tree or the whole text, pass `saveTo: true` and
+grep the file it names.
 
-For a multi-step flow or an extraction on a page whose structure you already know,
-write a puppeteer script and run it with `zen-agent run SCRIPT.ts` instead: one
-call, and only what the script returns enters the context. The script
+Take a screenshot only when the look itself is the question: layout, color, rendering.
+Each one stays in context as an image for the rest of the session. Use
+`screenshot_by_uid` when one element is the question.
+
+Every MCP call is a round trip. Switch to a script the moment you would call
+`evaluate_script` a second time on the same page, re-check the same thing after an
+edit, or repeat one action across viewports, tabs or URLs: write it once, rerun it
+after each change. The same goes for a multi-step flow or an extraction on a page
+whose structure you already know. Run it with `zen-agent run SCRIPT.ts`: one call,
+and only what the script returns enters the context. A script that needs to see the
+page saves `page.screenshot({ path })` into the scratchpad and returns the path; Read
+it only when the returned fields do not settle the question. The script
 default-exports `async ({ browser }) => result`; `browser` is a connected
 puppeteer-core `Browser`, and the result prints as JSON. Return the fields you
 need, never a whole page. Keep scripts in the scratchpad, not the user's repo.
