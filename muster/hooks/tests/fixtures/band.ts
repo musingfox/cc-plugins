@@ -12,7 +12,8 @@ export const BAND = {
 export function stringsIn(node: any): string[] {
   if (typeof node === 'string') return node === '' ? [] : [node]
   if (!node || typeof node !== 'object') return []
-  return [...(node.children ?? []), ...(node.props?.children ?? [])].flatMap(stringsIn)
+  const label = node.props?.label ?? node.label
+  return [...(typeof label === 'string' ? [label] : []), ...[...(node.children ?? []), ...(node.props?.children ?? [])].flatMap(stringsIn)]
 }
 
 export function nodesOf(node: any, type: string): any[] {

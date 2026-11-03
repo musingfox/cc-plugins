@@ -17,6 +17,7 @@ export const file = (name: string): Entry => ({ name, kind: 'file', size: 1, mti
 export function fakeEngine(options: { env?: Record<string, string | 'deny'>; root?: string; files?: Files; dirs?: Dirs } = {}) {
   const reads: string[] = []
   const lists: string[] = []
+  const tails: string[] = []
   const answer = <T>(table: Record<string, T | { deny: string } | 'defer'>, path: string, record: string[]): Promise<T> => {
     record.push(path)
     const value = table[path]
@@ -38,8 +39,17 @@ export function fakeEngine(options: { env?: Record<string, string | 'deny'>; roo
       read: (path: string) => answer(options.files ?? {}, path, reads),
       list: (path: string) => answer(options.dirs ?? {}, path, lists),
     },
+    process: { run: (argv: readonly string[]) => tailOf(options.files ?? {}, argv, tails) },
   }
-  return { $, reads, lists }
+  return { $, reads, lists, tails }
+}
+
+// `tail -c N path` answered from the same files: the whole text, as every fixture is under N; a missing or denied file exits 1.
+function tailOf(files: Files, argv: readonly string[], record: string[]) {
+  const path = argv[argv.length - 1] ?? ''
+  record.push(path)
+  const value = files[path]
+  return Promise.resolve(typeof value === 'string' ? { exitCode: 0, stdout: value, stderr: '' } : { exitCode: 1, stdout: '', stderr: 'tail: no such file' })
 }
 
 export const BENEATH = { type: 'Text', children: ['beneath'], part: { plugin: 'test' } }
@@ -63,6 +73,7 @@ export function kitWorld(on: any, options: { env?: Record<string, string>; root?
     if (answer === 'defer') return new Promise(() => {})
     return typeof answer === 'string' ? { value: answer } : answer
   })
+  on('process.run', (_: any, e: any) => tailOf(files, e.argv, []).then((value) => ({ value })))
   on('fs.list', (_: any, e: any) => {
     lists.push(e.path)
     const answer = dirs[e.path]

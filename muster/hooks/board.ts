@@ -1,5 +1,6 @@
-import type { BandRow, Board, RunRow, RunState } from '../types/index.d.ts'
+import type { BandRow, Board, RunDetail, RunRow, RunState } from '../types/index.d.ts'
 import { classifyRun, elapsedSeconds, figuresOf } from './band-model.ts'
+import { activityOf, openQuestions, reportOf } from './tree-model.ts'
 
 const LIVE: ReadonlySet<RunState> = new Set(['starting', 'running', 'question', 'idle'])
 const COLLECT: ReadonlySet<RunState> = new Set(['done', 'blocked', 'malformed'])
@@ -94,4 +95,54 @@ export function boardOf(runs: RunRow[] | null): Board | null {
 // The runs of this repository in flight and how many wait to be collected; null when none is in flight. Never throws.
 export async function readBoard($: any): Promise<Board | null> {
   return boardOf(await readRuns($))
+}
+
+// $.fs.read rejects a file over 4 MiB and events.jsonl is the raw ACP stream, so only its tail is read, and only again
+// once the file's size or time changed. The first line of the tail is usually cut and fails to parse, which drops it.
+const EVENTS_TAIL_BYTES = 1048576
+const CACHE_LIMIT = 50
+const activityCache = new Map<string, { size: number; mtimeMs: number; activity: string[] }>()
+
+async function recentActivity($: any, path: string, entry: { size: number; mtimeMs: number } | undefined, worktree: string): Promise<string[] | null> {
+  if (entry === undefined) return []
+  const cached = activityCache.get(path)
+  if (cached && cached.size === entry.size && cached.mtimeMs === entry.mtimeMs) return cached.activity
+  try {
+    const { exitCode, stdout } = await $.process.run(['tail', '-c', String(EVENTS_TAIL_BYTES), path], { timeoutMs: 5000 })
+    if (exitCode !== 0 || typeof stdout !== 'string') return null
+    const activity = activityOf(stdout, worktree)
+    if (activityCache.size >= CACHE_LIMIT) activityCache.clear()
+    activityCache.set(path, { size: entry.size, mtimeMs: entry.mtimeMs, activity })
+    return activity
+  } catch {
+    return null
+  }
+}
+
+// One run's report, open questions and recent activity, read when the pane shows its detail; null when the run is gone. Never throws.
+export async function readDetail($: any, name: string): Promise<RunDetail | null> {
+  try {
+    if (name === '' || name.includes('/') || name === '.' || name === '..') return null
+    const runsRoot = await runsRootOf($)
+    if (runsRoot === null) return null
+    const dir = `${runsRoot}/${name}`
+    const entries: { name: string; size: number; mtimeMs: number }[] = await $.fs.list(dir)
+    const files = entries.map((entry) => entry.name)
+    const meta = objectOf(await readText($, `${dir}/meta.json`))
+    const questions = await Promise.all(
+      openQuestions(files).map(async (n) => {
+        const paths = objectOf(await readText($, `${dir}/QUESTION-${n}.json`))?.paths
+        return { n, paths: Array.isArray(paths) ? paths.filter((path): path is string => typeof path === 'string') : [] }
+      }),
+    )
+    const worktree = typeof meta?.worktree === 'string' ? meta.worktree : `${dir}/worktree`
+    return {
+      name,
+      ...reportOf(await readText($, `${dir}/REPORT.md`)),
+      questions,
+      activity: await recentActivity($, `${dir}/events.jsonl`, entries.find((entry) => entry.name === 'events.jsonl'), worktree),
+    }
+  } catch {
+    return null
+  }
 }

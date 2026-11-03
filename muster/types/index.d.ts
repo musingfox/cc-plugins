@@ -28,8 +28,18 @@ export type RunRow = {
 
 export type TreeGroup = { issue: string | null; runs: RunRow[] }
 
+export type RunDetail = {
+  name: string
+  report: string | null
+  reason: string | null
+  questions: { n: number; paths: string[] }[]
+  activity: string[] | null
+}
+
+export type TreeView = { folded: string[]; selected: string | null; at: string | null; detail: RunDetail | null }
+
 declare module 'claude-code' {
   interface PluginState {
-    muster: { board: Board | null; tree: TreeGroup[] | null }
+    muster: { board: Board | null; tree: TreeGroup[] | null; view: TreeView }
   }
 }
