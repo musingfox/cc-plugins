@@ -31,12 +31,12 @@
     {
       "name": "adr",
       "source": "./adr",
-      "description": "Architecture Decision Records lifecycle management with MADR 4.0, a three-condition warrant test, and cross-reference consistency enforcement"
+      "description": "Architecture Decision Records lifecycle management with MADR 4.0 format, a three-condition warrant test, and cross-reference consistency enforcement"
     },
     {
       "name": "agent-browser",
       "source": "./agent-browser",
-      "description": "Browser automation with agent-browser CLI, Playwright test generation, and debug-to-test workflows"
+      "description": "Skills for browser automation with agent-browser CLI, Playwright test generation, and web debugging workflows"
     },
     {
       "name": "zen-agent",
@@ -46,7 +46,7 @@
     {
       "name": "hook-guard",
       "source": "./hook-guard",
-      "description": "One-stop hook setup — detect project environment, generate git pre-commit and commit-msg scripts with security checks and code quality gates"
+      "description": "One-stop hook setup assistant — detect project environment, generate git pre-commit and commit-msg scripts with security checks and code quality gates"
     },
     {
       "name": "fizzy",
@@ -56,12 +56,12 @@
     {
       "name": "obsidian-workspace",
       "source": "./obsidian-workspace",
-      "description": "Obsidian Workspace — personal vault productivity: quick capture to journal, long-form notes, and project management via Obsidian CLI; /obw:pm splits a spec into blocking tickets; /issue opens a Claude Mod pane that lists a view of the project's dashboard, draws Mermaid as text diagrams, and offers an optional open-in-browser card view through viz"
+      "description": "Obsidian Workspace — project-scoped vault productivity (capture / notes / PM). Skills own folder layout and templates; /obw:pm splits a spec into blocking tickets; /issue is a Claude Mod pane that lists a view of the project's dashboard, draws Mermaid as text diagrams, and can open a card in the browser through viz. Vault I/O uses the Obsidian CLI via the official obsidian-cli skill."
     },
     {
       "name": "pi-dispatch",
       "source": "./pi-dispatch",
-      "description": "[Experimental] Offload heavy work to Pi's cheap/fast models — builder + reviewer subagents over pi-agent.sh/pi-dispatch.sh background workers, so Claude only writes briefs and reads summaries, saving tokens"
+      "description": "[Experimental] Offload heavy work to cheap/fast models via pi — background dispatch + idempotent poll + worktree isolation, so Claude only issues briefs, reviews results, and scales to parallel tasks while saving tokens"
     },
     {
       "name": "wizard",
