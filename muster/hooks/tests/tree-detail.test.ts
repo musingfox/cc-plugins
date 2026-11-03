@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 import { readDetail } from '../board.ts'
-import { activityOf, arrowTarget, drawnKeys, issueKey, openQuestions, reportOf, runKey } from '../tree-model.ts'
+import { activityOf, arrowTarget, askKey, drawnKeys, isOpenable, issueKey, openKey, openQuestions, reportOf, runKey } from '../tree-model.ts'
 import { stringsIn } from './fixtures/band.ts'
 import { NOW, RUNS, SESSION, dir, fakeEngine, file, kitWorld } from './fixtures/world.ts'
 import type { RunRow, TreeGroup } from '../../types/index.d.ts'
@@ -51,8 +51,8 @@ test('TreeDetail D4 the drawn keys skip a folded issue\'s runs, and a single arr
     { issue: 'I', runs: [row('a', 'I'), row('b', 'I')] },
     { issue: null, runs: [row('c', null)] },
   ]
-  expect(drawnKeys(groups, [])).toEqual([issueKey('I'), runKey('a'), runKey('b'), issueKey(null), runKey('c')])
-  const keys = drawnKeys(groups, [issueKey('I')])
+  expect(drawnKeys(groups, [], null, false)).toEqual([issueKey('I'), runKey('a'), runKey('b'), issueKey(null), runKey('c')])
+  const keys = drawnKeys(groups, [issueKey('I')], null, false)
   expect(keys).toEqual([issueKey('I'), issueKey(null), runKey('c')])
   const arrow = (by: number) => ({ origin: { kind: 'person' }, by })
   expect(arrowTarget(arrow(1), keys, issueKey('I'))).toBe(issueKey(null))
@@ -106,8 +106,8 @@ const PANE_WORLD = {
   },
 }
 
-async function openPane($: any, on: any) {
-  const w = kitWorld(on, PANE_WORLD)
+async function openPane($: any, on: any, failing: string[] = []) {
+  const w = kitWorld(on, { ...PANE_WORLD, failing })
   on('command.register', () => ({ value: { command: 'muster-runs' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   await $.session.start(SESSION)
@@ -151,4 +151,70 @@ test('TreeDetail D7 pressing a run shows its detail beneath it, and pressing it 
   expect(shown).toContain('bun test hooks')
   await $.ui.press({ plugin: 'muster', key: runKey('a') })
   expect(stringsIn(await $.ui.render(PANE)).join(' ')).not.toContain('the fixture is missing')
+})
+
+test('TreeDetail D8 the open and hand-off Buttons join the arrow walk where they are drawn', () => {
+  const groups: TreeGroup[] = [
+    { issue: 'https://example.com/I', runs: [row('a', 'https://example.com/I'), row('b', 'https://example.com/I')] },
+    { issue: 'not a link', runs: [row('n', 'not a link')] },
+    { issue: null, runs: [row('c', null)] },
+  ]
+  expect(drawnKeys(groups, [], 'a', true)).toEqual([
+    issueKey('https://example.com/I'),
+    openKey('https://example.com/I'),
+    runKey('a'),
+    askKey('a'),
+    runKey('b'),
+    issueKey('not a link'),
+    runKey('n'),
+    issueKey(null),
+    runKey('c'),
+  ])
+  expect(drawnKeys(groups, [issueKey('https://example.com/I')], 'a', false)).toEqual([issueKey('https://example.com/I'), issueKey('not a link'), runKey('n'), issueKey(null), runKey('c')])
+})
+
+test('TreeDetail D9 only a web or obsidian link is opened', () => {
+  expect(isOpenable('https://example.com/I')).toBe(true)
+  expect(isOpenable('obsidian://open?vault=v&file=x')).toBe(true)
+  expect(isOpenable('file:///etc/passwd')).toBe(false)
+  expect(isOpenable('/Applications/Calculator.app')).toBe(false)
+  expect(isOpenable('-a Terminal')).toBe(false)
+})
+
+test('TreeDetail D10 the Open issue Button runs the system open on the issue URL', async ($, on) => {
+  const w = await openPane($, on)
+  await $.ui.render(PANE)
+  await $.ui.press({ plugin: 'muster', key: openKey('https://example.com/I') })
+  expect(w.commands).toContainEqual(['open', 'https://example.com/I'])
+})
+
+test('TreeDetail D11 the hand-off Button closes the pane and appends a line about the run to the prompt', async ($, on) => {
+  const closed: unknown[] = []
+  const filled: any[] = []
+  on('ui.close', (_: any, e: any) => {
+    closed.push(e.id)
+    return { value: undefined }
+  })
+  on('prompt.fill', (_: any, e: any) => {
+    filled.push(e)
+    return { isFilled: true }
+  })
+  await openPane($, on)
+  await $.ui.render(PANE)
+  await $.ui.press({ plugin: 'muster', key: runKey('a') })
+  await $.ui.render(PANE)
+  await $.ui.press({ plugin: 'muster', key: askKey('a') })
+  expect(closed).toContain('muster-tree')
+  expect(filled).toHaveLength(1)
+  expect(filled[0].text).toContain('muster run a')
+  expect(filled[0].text).toContain('blocked')
+  expect(filled[0].text).toContain('https://example.com/I')
+  expect(filled[0].mode).toBe('append')
+})
+
+test('TreeDetail D12 an open that exits non-zero falls back to xdg-open', async ($, on) => {
+  const w = await openPane($, on, ['open'])
+  await $.ui.render(PANE)
+  await $.ui.press({ plugin: 'muster', key: openKey('https://example.com/I') })
+  expect(w.commands).toContainEqual(['xdg-open', 'https://example.com/I'])
 })

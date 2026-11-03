@@ -3,7 +3,7 @@ import type { On } from 'claude-code'
 import type { BandRow, Board, RunDetail, RunRow, TreeGroup, TreeView } from '../types/index.d.ts'
 import { boardOf, readDetail, readRuns } from './board.ts'
 import { STATE_COLOR, costText, elapsedText, progressCell, stateLabel, summaryParts } from './band-model.ts'
-import { arrowTarget, drawnKeys, groupByIssue, issueKey, runKey, treeStateLabel } from './tree-model.ts'
+import { arrowTarget, askKey, drawnKeys, groupByIssue, handOffText, isOpenable, issueKey, openKey, runKey, treeStateLabel } from './tree-model.ts'
 
 export const board = atom({ plugin: 'muster', key: 'board' } as const, null as Board | null)
 export const tree = atom({ plugin: 'muster', key: 'tree' } as const, null as TreeGroup[] | null)
@@ -48,7 +48,28 @@ async function toggleRun($: any, name: string) {
   if (selected === name) await loadDetail($, name)
 }
 
+const clipped = (text: string, width: number): string => (text.length > width ? `${text.slice(0, width - 1)}…` : text)
+
 const quiet = (work: Promise<unknown>) => void work.catch(() => {})
+
+// On Debian-like hosts `open` is openvt, which starts and then fails, so a failed exit falls back too.
+async function openIssue($: any, url: string) {
+  const ran = (cmd: string) => $.process.run([cmd, url]).then((result: { exitCode: number }) => result.exitCode === 0, () => false)
+  if (!(await ran('open')) && !(await ran('xdg-open'))) void $.ui.toast(`muster: could not open ${drawable(url).slice(0, 200)}`)
+}
+
+// The pane holds the keys, and a box under a dialog takes no text, so the pane closes first. The line is left unsent:
+// the person finishes it and the coordinator acts, never the pane.
+async function handOff($: any, run: RunRow) {
+  try {
+    await $.ui.close({ id: TREE_PANE })
+    const { isFilled } = await $.prompt.fill({ text: handOffText({ ...run, name: drawable(run.name), issue: run.issue === null ? null : drawable(run.issue).slice(0, 500) }), mode: 'append' })
+    if (isFilled) return
+  } catch {
+    // A refused close or fill reads the same to the person as a box that would not take the line.
+  }
+  void $.ui.toast(`muster: the prompt could not take the line about ${drawable(run.name)}`)
+}
 
 // A run's name and title come from files, so they are drawn without control characters and capped in length.
 const drawable = (text: string): string => text.replace(/[\u0000-\u001f\u007f-\u009f]/g, '').slice(0, 10000)
@@ -95,9 +116,10 @@ function treeRowOf($: any, Box: any, Text: any, Button: any, run: RunRow) {
   })
 }
 
-function detailOf(Box: any, Text: any, found: RunDetail | null) {
+function detailOf($: any, Box: any, Text: any, Button: any, run: RunRow, found: RunDetail | null) {
   const line = (label: string, text: string) => Text({ wrap: 'truncate-end', children: [Text({ dimColor: true, children: [`${label}  `] }), drawable(text)] })
-  if (found === null) return Box({ paddingLeft: 6, children: [Text({ dimColor: true, children: ['Reading the run…'] })] })
+  const ask = Box({ children: [Button({ plain: true, key: askKey(run.name), label: '› ask the coordinator about this run', onPress: () => quiet(handOff($, run)) })] })
+  if (found === null) return Box({ flexDirection: 'column', paddingLeft: 6, children: [Text({ dimColor: true, children: ['Reading the run…'] }), ask] })
   const report = found.report === null ? 'none yet' : found.report === '' ? '(empty first line)' : found.report
   return Box({
     flexDirection: 'column',
@@ -109,16 +131,26 @@ function detailOf(Box: any, Text: any, found: RunDetail | null) {
       ...(found.activity === null
         ? [line('recent', 'the events log could not be read')]
         : found.activity.length ? [Text({ dimColor: true, children: ['recent'] }), ...found.activity.map((entry) => Text({ wrap: 'truncate-end', children: [`  ${drawable(entry)}`] }))] : [line('recent', 'no activity recorded')]),
+      ask,
     ],
   })
 }
 
+// Only the CLI runs host commands. Elsewhere a Link stands in, and a remote surface draws any link but https: as plain text.
+function openOf($: any, Button: any, Link: any, issue: string, onTerminal: boolean) {
+  if (onTerminal) return [Button({ plain: true, key: openKey(issue), label: '↗ open', dimColor: true, onPress: () => quiet(openIssue($, issue)) })]
+  return /^https:\/\//i.test(issue) && issue.length <= 2048 ? [Link({ href: issue, label: '↗ open' })] : []
+}
+
 async function drawTree($: any, e: any) {
-  const { Box, Text, Button } = await $.ui.resolve(e)
+  const { Box, Text, Button, Link } = await $.ui.resolve(e)
+  const onTerminal = e.surface === 'terminal'
   const groups = await read($, tree)
   if (groups === null) return Text({ dimColor: true, children: ['No muster runs could be read yet: the runs directory is missing, unreadable, or still loading.'] })
   if (groups.length === 0) return Text({ dimColor: true, children: ['No muster runs in this repository.'] })
   const { folded, selected, detail: found } = await read($, view)
+  // A Button label wraps instead of truncating, and a wrapped header pushes its count and open Button off the row.
+  const labelWidth = Math.max(12, (typeof e.props?.bodyColumns === 'number' ? e.props.bodyColumns : 80) - 16)
   return Box({
     flexDirection: 'column',
     children: [
@@ -130,17 +162,18 @@ async function drawTree($: any, e: any) {
           columnGap: 1,
           children: [
             Text({ dimColor: true, children: [isOpen ? '▾' : '▸'] }),
-            Button({ plain: true, key, label: group.issue === null ? '(no issue)' : drawable(group.issue), ...(i === 0 ? { autoFocus: true } : {}), onPress: () => quiet(toggleFold($, key)) }),
+            Button({ plain: true, key, label: group.issue === null ? '(no issue)' : clipped(drawable(group.issue), labelWidth), ...(i === 0 ? { autoFocus: true } : {}), onPress: () => quiet(toggleFold($, key)) }),
             Text({ dimColor: true, children: [` ${group.runs.length}`] }),
+            ...(group.issue !== null && isOpenable(group.issue) ? openOf($, Button, Link, group.issue, onTerminal) : []),
           ],
         })
         if (!isOpen) return [header]
         return [
           header,
-          ...group.runs.flatMap((run) => [treeRowOf($, Box, Text, Button, run), ...(run.name === selected ? [detailOf(Box, Text, found?.name === run.name ? found : null)] : [])]),
+          ...group.runs.flatMap((run) => [treeRowOf($, Box, Text, Button, run), ...(run.name === selected ? [detailOf($, Box, Text, Button, run, found?.name === run.name ? found : null)] : [])]),
         ]
       }),
-      Box({ marginTop: 1, children: [Text({ dimColor: true, wrap: 'truncate-end', children: ['↑↓ move · enter fold or show detail · esc close'] })] }),
+      Box({ marginTop: 1, children: [Text({ dimColor: true, wrap: 'truncate-end', children: ['↑↓ move · enter fold, show detail, open or ask · esc close'] })] }),
     ],
   })
 }
@@ -175,10 +208,11 @@ export function register(on: On) {
   })
 
   // A pane taller than its window turns the arrows into scrolling; an arrow walks the Buttons instead and the window follows.
+  // Arrows are the terminal's, so the walk counts the terminal's open Buttons.
   on('ui.scroll', { requestId: TREE_PANE }, async ($, e, next) => {
     const groups = await read($, tree)
-    const { folded, at } = await read($, view)
-    const target = groups === null ? null : arrowTarget(e, drawnKeys(groups, folded), at)
+    const { folded, selected, at } = await read($, view)
+    const target = groups === null ? null : arrowTarget(e, drawnKeys(groups, folded, selected, true), at)
     if (target === null) return next(e)
     try {
       const moved = await $.ui.focus({ requestId: TREE_PANE, key: target })

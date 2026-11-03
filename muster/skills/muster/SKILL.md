@@ -40,7 +40,7 @@ Start `watch` through `Bash(run_in_background: true)`; it prints one line per st
 
 With Claude Code 2.1.304 or later, a band above the prompt lists the in-flight runs of this repository, each with its state, its title and its task-list progress as `done/total`; its header counts running, question, idle and finished runs, and shows `N to collect` beside them while finished runs wait for collection.
 
-`/muster-runs` opens a pane that lists every run of this repository until it is cleaned, finished ones included, grouped by `--issue`; a run that exited without a report shows its exit reason there. In the pane the arrows and Enter fold an issue or show a run's report line, BLOCKED reason, open questions with their paths, and its last ten tool commands and permission decisions other than routine policy allows. The pane only shows; answering and following up stay with the coordinator.
+`/muster-runs` opens a pane that lists every run of this repository until it is cleaned, finished ones included, grouped by `--issue`; a run that exited without a report shows its exit reason there. In the pane the arrows and Enter fold an issue or show a run's report line, BLOCKED reason, open questions with their paths, and its last ten tool commands and permission decisions other than routine policy allows. On the terminal an issue that is an `http(s)://` or `obsidian://` link has an open Button. The pane only shows; answering and following up stay with the coordinator. Its hand-off Button puts `muster run NAME (STATE, issue URL): ` in the prompt for the person to finish, so a prompt that opens that way is about run NAME: read its status before acting on what follows.
 
 ```
 bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts watch NAME

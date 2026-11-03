@@ -17,13 +17,27 @@ export const treeStateLabel = (run: Pick<RunRow, 'state' | 'exitReason'>): strin
 export const issueKey = (issue: string | null): string => `issue:${issue ?? ''}`
 export const runKey = (name: string): string => `run:${name}`
 
-// The Buttons the pane draws, top to bottom: a folded issue keeps its header and hides its runs.
-export function drawnKeys(groups: TreeGroup[], folded: string[]): string[] {
+export const openKey = (issue: string): string => `open:${issue}`
+export const askKey = (name: string): string => `ask:${name}`
+
+// The issue reaches the system `open` as given, so only a link that names a web page or an Obsidian note is offered:
+// a path or a file: URL would launch whatever it names.
+export const isOpenable = (issue: string): boolean => /^(https?|obsidian):\/\/\S+$/i.test(issue)
+
+// The Buttons the pane draws, top to bottom: a folded issue keeps its header and hides its runs; the selected run's
+// hand-off Button sits under it; the Open issue Button follows its header where the surface can run `open`.
+export function drawnKeys(groups: TreeGroup[], folded: string[], selected: string | null, canOpen: boolean): string[] {
   return groups.flatMap((group) => {
     const key = issueKey(group.issue)
-    return folded.includes(key) ? [key] : [key, ...group.runs.map((run) => runKey(run.name))]
+    const head = [key, ...(canOpen && group.issue !== null && isOpenable(group.issue) ? [openKey(group.issue)] : [])]
+    if (folded.includes(key)) return head
+    return [...head, ...group.runs.flatMap((run) => [runKey(run.name), ...(run.name === selected ? [askKey(run.name)] : [])])]
   })
 }
+
+// The line the hand-off puts in the coordinator's prompt; the person finishes it and sends it, or not.
+export const handOffText = (run: Pick<RunRow, 'name' | 'state' | 'issue'>): string =>
+  `muster run ${run.name} (${run.state}${run.issue ? `, issue ${run.issue}` : ''}): `
 
 type Arrow = { origin: { kind: string }; by: number; pointer?: unknown }
 

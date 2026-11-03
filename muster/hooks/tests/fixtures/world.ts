@@ -55,7 +55,7 @@ function tailOf(files: Files, argv: readonly string[], record: string[]) {
 export const BENEATH = { type: 'Text', children: ['beneath'], part: { plugin: 'test' } }
 
 // A stub world beneath the band for the engine's own test body: env, clock, session root and the file reads are answered from the options, every read recorded.
-export function kitWorld(on: any, options: { env?: Record<string, string>; root?: string; files?: Files; dirs?: Dirs; beneath?: unknown } = {}) {
+export function kitWorld(on: any, options: { env?: Record<string, string>; root?: string; files?: Files; dirs?: Dirs; beneath?: unknown; failing?: string[] } = {}) {
   mock.env(on, options.env ?? { HOME })
   const clock = mock.clock(on, { now: NOW })
   on('ui.render', { component: 'AbovePrompt' }, () => options.beneath ?? BENEATH)
@@ -73,7 +73,12 @@ export function kitWorld(on: any, options: { env?: Record<string, string>; root?
     if (answer === 'defer') return new Promise(() => {})
     return typeof answer === 'string' ? { value: answer } : answer
   })
-  on('process.run', (_: any, e: any) => tailOf(files, e.argv, []).then((value) => ({ value })))
+  // `tail` reads the files above; any other command (the system `open`) is recorded and succeeds unless `failing` names it.
+  const commands: string[][] = []
+  on('process.run', (_: any, e: any) => {
+    commands.push([...e.argv])
+    return (e.argv[0] === 'tail' ? tailOf(files, e.argv, []) : Promise.resolve({ exitCode: options.failing?.includes(e.argv[0]) ? 1 : 0, stdout: '', stderr: '' })).then((value) => ({ value }))
+  })
   on('fs.list', (_: any, e: any) => {
     lists.push(e.path)
     const answer = dirs[e.path]
@@ -81,5 +86,5 @@ export function kitWorld(on: any, options: { env?: Record<string, string>; root?
     if (answer === 'defer') return new Promise(() => {})
     return 'deny' in (answer as object) ? answer : { value: answer }
   })
-  return { clock, files, dirs, reads, lists, state }
+  return { clock, files, dirs, reads, lists, commands, state }
 }
