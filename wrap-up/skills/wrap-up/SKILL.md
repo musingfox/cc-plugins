@@ -53,13 +53,21 @@ description: Close out the current task by reading the conversation, listing onl
 | 2 | 只做到一部分，或方向要使用者親自拉回來 |
 | 1 | 沒達成，或產出要整個丟掉 |
 
-問題文字寫出建議分數與一句理由，理由指名這個 session 的具體事件（走錯方向、重問幾次、一次到位）。選項只能有 2 到 4 個：建議分數標 (Recommended) 放第一個，再放上下相鄰的分數，其餘分數由使用者選 Other 填。使用者在 Other 或 notes 寫的理由取代建議理由。一次呼叫最多 4 個問題，加上評分超過 4 個就分兩次呼叫。
+問題文字寫出建議分數與理由。理由是 `/dream` 找出重複摩擦的證據，所以寫成能單獨讀懂的一小段，依序包含：
+
+1. 每個扣分事件：Claude 做了什麼、使用者怎麼糾正（引用原話）、多花了幾輪。沒有扣分事件就寫「無糾正」。
+2. 目標與結果：使用者要什麼，最後拿到什麼、還缺什麼。
+3. 做對的地方：只寫值得保留的具體做法，沒有就省略。
+
+扣分事件放最前面，因為 `/dream` 的聚合會把理由截在 200 到 300 字。整段控制在 300 字內。
+
+選項只能有 2 到 4 個：建議分數標 (Recommended) 放第一個，再放上下相鄰的分數，其餘分數由使用者選 Other 填。使用者在 Other 或 notes 寫了理由，就把原文放在最前面，後面接建議理由中沒有被它否定的部分。一次呼叫最多 4 個問題，加上評分超過 4 個就分兩次呼叫。
 
 使用者回答後立刻寫入，不等後面的操作。session id 是 scratchpad 路徑 `/private/tmp/claude-501/<project-slug>/<session-id>/scratchpad` 的中段；取不到時用 `ls -t ~/.claude/projects/<project-slug>/*.jsonl | head -1` 的檔名（不含副檔名）。
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/skills/wrap-up/scripts/rate.mjs" \
-  --session <session-id> --score <1-5> --reason "<一句話>" --project "$(pwd)"
+  --session <session-id> --score <1-5> --reason "<理由>" --project "$(pwd)"
 ```
 
 同一個 session 再跑一次 wrap-up 就會追加一行，聚合時以最後一行為準。腳本只寫 `~/.claude/usage-data/ratings.jsonl`，不碰 `/insights` 擁有的 `facets/` 與 `session-meta/`。
