@@ -326,8 +326,7 @@ Repository audits that put each piece of knowledge where it cannot drift. Each a
 
 Close out a task and score the session in one pass:
 - **`/wrap-up:wrap-up`**: reads the conversation and the working tree, lists only the close-out operations that have evidence (stale docs, commit, push/release, task card, memory, config), runs the ones you tick, and reports each with its receipt
-- **Score on every run**: the same tick dialog asks for a 1-5 score with a proposed reason, written to `~/.claude/usage-data/ratings.jsonl` before anything else runs
-- **`/wrap-up:rate`**: scores a session on its own; a later score for the same session wins
+- **Score on every run**: the same tick dialog asks for a 1-5 score with a proposed reason, written to `~/.claude/usage-data/ratings.jsonl` before anything else runs; running wrap-up again re-scores, and the last score for a session wins
 - Ratings are input for a separate review of past sessions; nothing in this plugin acts on them
 
 **Installation:**
@@ -395,7 +394,7 @@ cc-plugins/
 ├── spec/               skills: spec, glossary · scripts: spec.sh · tests
 ├── viz/                skills: viz-inline, viz-render · lib, tests
 ├── wizard/             skills: wizard
-├── wrap-up/            skills: wrap-up, rate · scripts: rate.mjs
+├── wrap-up/            skills: wrap-up · scripts: rate.mjs
 ├── zen-agent/          skills: zen-agent · bin: zen-agent, open · lib · .mcp.json · package.json
 └── README.md
 ```

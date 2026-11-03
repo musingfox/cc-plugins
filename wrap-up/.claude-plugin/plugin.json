@@ -1,7 +1,7 @@
 {
   "name": "wrap-up",
   "description": "Close out a task from what the conversation actually needs — docs, commit/push/release, task card, memory — and score the session 1-5 on every run, feeding ratings.jsonl for later review",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": {
     "name": "Nick Huang",
     "email": "nick12703990@gmail.com"
