@@ -322,6 +322,19 @@ Repository audits that put each piece of knowledge where it cannot drift. Each a
 /plugin install audit
 ```
 
+### wrap-up
+
+Close out a task and score the session in one pass:
+- **`/wrap-up:wrap-up`**: reads the conversation and the working tree, lists only the close-out operations that have evidence (stale docs, commit, push/release, task card, memory, config), runs the ones you tick, and reports each with its receipt
+- **Score on every run**: the same tick dialog asks for a 1-5 score with a proposed reason, written to `~/.claude/usage-data/ratings.jsonl` before anything else runs
+- **`/wrap-up:rate`**: scores a session on its own; a later score for the same session wins
+- Ratings are input for a separate review of past sessions; nothing in this plugin acts on them
+
+**Installation:**
+```bash
+/plugin install wrap-up
+```
+
 ## Standalone Skills
 
 These live under `skills/` and are not plugins: the marketplace does not list them and the version hooks ignore them.
@@ -382,6 +395,7 @@ cc-plugins/
 ├── spec/               skills: spec, glossary · scripts: spec.sh · tests
 ├── viz/                skills: viz-inline, viz-render · lib, tests
 ├── wizard/             skills: wizard
+├── wrap-up/            skills: wrap-up, rate · scripts: rate.mjs
 ├── zen-agent/          skills: zen-agent · bin: zen-agent, open · lib · .mcp.json · package.json
 └── README.md
 ```
