@@ -115,6 +115,14 @@ describe("RunRefusal", () => {
     expect(refusal(valid(["--effort", ""])).message).toContain("--effort");
   });
 
+  test("I1: --issue is optional, passes through verbatim, and refuses an empty or multi-line value", () => {
+    expect(parseRunArgs(valid(), env).issue).toBeUndefined();
+    expect(parseRunArgs(valid(["--issue", "obsidian://open?vault=v&file=a b"]), env).issue).toBe("obsidian://open?vault=v&file=a b");
+    expect(refusal(valid(["--issue", ""])).message).toContain("--issue");
+    expect(refusal(valid(["--issue", "a\nb"])).message).toContain("--issue");
+    expect(refusal(valid(["--issue", "a\u0007b"])).message).toContain("--issue");
+  });
+
   test("R1: a name whose muster/<name> branch exists in the repo is refused and no run dir is created", () => {
     execFileSync("git", ["-C", repo, "branch", "muster/a1"]);
     const err = refusal(valid());

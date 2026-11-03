@@ -7,13 +7,14 @@ export interface DispatchRequest {
   name: string;
   model: string;
   effort?: string;
+  issue?: string;
   repoRoot: string;
   baseRef: string;
   ticket: string;
   fenced: boolean;
 }
 
-const VALUE_FLAGS = new Set(["--name", "--model", "--effort", "--repo", "--base", "--ticket", "--ticket-file"]);
+const VALUE_FLAGS = new Set(["--name", "--model", "--effort", "--repo", "--base", "--ticket", "--ticket-file", "--issue"]);
 
 function parseFlags(args: string[]): { flags: Map<string, string>; fenced: boolean } {
   const flags = new Map<string, string>();
@@ -130,6 +131,11 @@ export function parseRunArgs(argv: string[], env: Env = { MUSTER_HOME: process.e
     throw new UsageError(`branch muster/${name} already exists in ${repoRoot}; pick another name`);
   }
 
+  const issue = flags.get("--issue");
+  if (issue !== undefined && (issue.trim() === "" || /[\u0000-\u001f\u007f-\u009f]/.test(issue))) {
+    throw new UsageError("--issue needs a single-line value without control characters");
+  }
+
   const request = { name, model, repoRoot, baseRef, ticket: ticketText(flags), fenced };
-  return effort === undefined ? request : { ...request, effort };
+  return { ...request, ...(effort === undefined ? {} : { effort }), ...(issue === undefined ? {} : { issue }) };
 }

@@ -17,6 +17,7 @@ export type DispatchRequest = {
   ticket: string;
   model: string;
   effort?: string;
+  issue?: string;
   repoRoot: string;
   baseRef: string;
 };
@@ -63,6 +64,7 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
         name: layout.name,
         model: request.model,
         ...(request.effort ? { effort: request.effort } : {}),
+        ...(request.issue ? { issue: request.issue } : {}),
         repoRoot: request.repoRoot,
         worktree: wt.worktree,
         branch: wt.branch,

@@ -212,6 +212,15 @@ describe("WorkerSessionLoop", () => {
     expect(meta.worktree).toBe(realpathSync(layout.worktree));
   });
 
+  test("T7b: meta.json records --issue when the request has one, and no issue field otherwise", async () => {
+    const withIssue = layoutFor("run-7b");
+    await runWorker({ ...request(), issue: "https://example.com/i/1" }, withIssue, { env: envFor(scenario()), exit: () => {} });
+    expect(JSON.parse(readFileSync(withIssue.meta, "utf8")).issue).toBe("https://example.com/i/1");
+    const without = layoutFor("run-7c");
+    await runWorker(request(), without, { env: envFor(scenario()), exit: () => {} });
+    expect(JSON.parse(readFileSync(without.meta, "utf8"))).not.toHaveProperty("issue");
+  });
+
   test("T8: phase is running while a turn is in flight and question while a question is pending", async () => {
     const layout = layoutFor();
     const outside = join(home, "outside.txt");

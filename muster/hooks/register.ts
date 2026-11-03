@@ -1,10 +1,15 @@
 import { atom, read, update } from 'claude-code'
 import type { On } from 'claude-code'
-import type { BandRow, Board } from '../types/index.d.ts'
-import { readBoard } from './board.ts'
+import type { BandRow, Board, RunRow, TreeGroup } from '../types/index.d.ts'
+import { boardOf, readRuns } from './board.ts'
 import { STATE_COLOR, costText, elapsedText, progressCell, stateLabel, summaryParts } from './band-model.ts'
+import { groupByIssue, treeStateLabel } from './tree-model.ts'
 
 export const board = atom({ plugin: 'muster', key: 'board' } as const, null as Board | null)
+export const tree = atom({ plugin: 'muster', key: 'tree' } as const, null as TreeGroup[] | null)
+
+export const TREE_PANE = 'muster-tree'
+const TREE_TITLE = 'muster'
 
 const POLL_MS = 5000
 
@@ -16,8 +21,9 @@ async function poll($: any) {
   if (polling) return
   polling = true
   try {
-    const next = await readBoard($)
-    await update($, board, () => next)
+    const runs = await readRuns($)
+    await update($, board, () => boardOf(runs))
+    await update($, tree, () => (runs === null ? null : groupByIssue(runs)))
   } finally {
     polling = false
   }
@@ -53,6 +59,42 @@ async function drawBand($: any, e: any, beneath: unknown) {
   })
 }
 
+function treeRowOf(Box: any, Text: any, run: RunRow) {
+  const progress = progressCell(run)
+  return Box({
+    columnGap: 2,
+    paddingLeft: 2,
+    children: [
+      Box({ width: 14, flexShrink: 0, children: [Text({ wrap: 'truncate-end', children: [drawable(run.name)] })] }),
+      Box({ width: 20, flexShrink: 0, children: [Text({ wrap: 'truncate-end', color: STATE_COLOR[run.state], children: [drawable(treeStateLabel(run))] })] }),
+      Box({ width: 36, flexShrink: 1, children: [Text({ wrap: 'truncate-end', children: [drawable(run.title)] })] }),
+      Box({ width: 10, flexShrink: 0, children: [Text({ ...(progress.dim ? { dimColor: true } : {}), children: [progress.text] })] }),
+      Box({ flexShrink: 0, children: [Text({ dimColor: true, wrap: 'truncate-end', children: [elapsedText(run.seconds)] })] }),
+    ],
+  })
+}
+
+async function drawTree($: any, e: any) {
+  const { Box, Text } = await $.ui.resolve(e)
+  const groups = await read($, tree)
+  if (groups === null) return Text({ dimColor: true, children: ['No muster runs could be read yet: the runs directory is missing, unreadable, or still loading.'] })
+  if (groups.length === 0) return Text({ dimColor: true, children: ['No muster runs in this repository.'] })
+  return Box({
+    flexDirection: 'column',
+    children: groups.flatMap((group, i) => [
+      Box({
+        ...(i > 0 ? { marginTop: 1 } : {}),
+        columnGap: 2,
+        children: [
+          Text({ weight: 'bold', wrap: 'truncate-end', children: [group.issue === null ? '(no issue)' : drawable(group.issue)] }),
+          Text({ dimColor: true, children: [String(group.runs.length)] }),
+        ],
+      }),
+      ...group.runs.map((run) => treeRowOf(Box, Text, run)),
+    ]),
+  })
+}
+
 export function register(on: On) {
   on('session.start', async ($, e, next) => {
     // A reload re-fires session.start on this instance; a second timer would double the cadence.
@@ -62,7 +104,27 @@ export function register(on: On) {
     })
     // Not awaited: a read that never settles must not hold the session's start.
     void poll($).catch(() => {})
+    try {
+      await $.command.register({ name: 'muster-runs', description: "Show this repository's muster runs grouped by issue" })
+    } catch {
+      // A refused /muster-runs leaves the band working. /muster itself is refused: the engine reserves it for the plugin's /muster:muster skill.
+    }
     return next(e)
+  })
+
+  on('command.run', { command: 'muster-runs' }, async ($) => {
+    void poll($).catch(() => {})
+    await $.ui.open({ id: TREE_PANE, title: TREE_TITLE })
+    return { text: 'muster runs pane opened.' }
+  })
+
+  on('ui.render', { component: 'Pane', requestId: TREE_PANE }, async ($, e) => {
+    try {
+      return await drawTree($, e)
+    } catch {
+      const { Text } = await $.ui.resolve(e)
+      return Text({ dimColor: true, children: ['The muster runs pane could not be drawn.'] })
+    }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {

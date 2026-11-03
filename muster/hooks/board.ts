@@ -1,4 +1,4 @@
-import type { BandRow, Board, RunState } from '../types/index.d.ts'
+import type { BandRow, Board, RunRow, RunState } from '../types/index.d.ts'
 import { classifyRun, elapsedSeconds, figuresOf } from './band-model.ts'
 
 const LIVE: ReadonlySet<RunState> = new Set(['starting', 'running', 'question', 'idle'])
@@ -33,7 +33,7 @@ export async function runsRootOf($: any): Promise<string | null> {
 }
 
 // Reads meta.json first and drops another repo's run before touching anything else. Null skips the run.
-async function runOf($: any, dir: string, name: string, root: string, now: number): Promise<{ state: RunState; row: BandRow } | null> {
+async function runOf($: any, dir: string, name: string, root: string, now: number): Promise<RunRow | null> {
   try {
     const meta = objectOf(await readText($, `${dir}/meta.json`))
     if (!meta || typeof meta.repoRoot !== 'string' || trimSlashes(meta.repoRoot) !== root) return null
@@ -48,14 +48,24 @@ async function runOf($: any, dir: string, name: string, root: string, now: numbe
       report: report === null ? undefined : report.split('\n')[0].trim(),
     })
     const figures = figuresOf(phase)
-    return { state, row: { name, state: state as BandRow['state'], title: figures.title, plan: figures.plan, tools: figures.tools, cost: figures.cost, seconds } }
+    return {
+      name,
+      state,
+      title: figures.title,
+      plan: figures.plan,
+      tools: figures.tools,
+      cost: figures.cost,
+      seconds,
+      issue: typeof meta.issue === 'string' && meta.issue.trim() !== '' ? meta.issue : null,
+      exitReason: phase.phase === 'exited' && typeof phase.reason === 'string' ? phase.reason : null,
+    }
   } catch {
     return null
   }
 }
 
-// The runs of this repository in flight and how many wait to be collected; null when none is in flight. Never throws.
-export async function readBoard($: any): Promise<Board | null> {
+// Every readable run of this repository, whatever its state; null when the runs directory cannot be listed. Never throws.
+export async function readRuns($: any): Promise<RunRow[] | null> {
   try {
     const runsRoot = await runsRootOf($)
     if (runsRoot === null) return null
@@ -63,10 +73,25 @@ export async function readBoard($: any): Promise<Board | null> {
     const now = await $.clock.now()
     const entries: { name: string; kind: string }[] = await $.fs.list(runsRoot)
     const runs = await Promise.all(entries.filter((entry) => entry.kind === 'dir').map((entry) => runOf($, `${runsRoot}/${entry.name}`, entry.name, root, now)))
-    const rows = runs.flatMap((run) => (run && LIVE.has(run.state) ? [run.row] : []))
-    if (rows.length === 0) return null
-    return { rows, collect: runs.filter((run) => run !== null && COLLECT.has(run.state)).length }
+    return runs.filter((run): run is RunRow => run !== null)
   } catch {
     return null
   }
+}
+
+// The runs in flight and how many wait to be collected; null when none is in flight.
+export function boardOf(runs: RunRow[] | null): Board | null {
+  if (runs === null) return null
+  const rows: BandRow[] = runs.flatMap((run) =>
+    LIVE.has(run.state)
+      ? [{ name: run.name, state: run.state as BandRow['state'], title: run.title, plan: run.plan, tools: run.tools, cost: run.cost, seconds: run.seconds }]
+      : [],
+  )
+  if (rows.length === 0) return null
+  return { rows, collect: runs.filter((run) => COLLECT.has(run.state)).length }
+}
+
+// The runs of this repository in flight and how many wait to be collected; null when none is in flight. Never throws.
+export async function readBoard($: any): Promise<Board | null> {
+  return boardOf(await readRuns($))
 }

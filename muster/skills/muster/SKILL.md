@@ -29,16 +29,18 @@ The model sets the ceiling of what the worker can judge correctly; effort sets h
 Use these aliases, not full IDs: the adapter offers the newest models only under them, a full ID such as `claude-opus-5` is an older generation, and the session's own ID such as `claude-opus-5-5` is refused. `default` is refused too. `--effort` is optional; without it the worker runs at the adapter's default for that model (`high` for `haiku` in a real run). An effort the chosen model does not offer is refused. A refused model or effort's report lists every offered value with its display name.
 
 ```
-bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts run --name NAME --model MODEL [--effort EFFORT] [--unfenced] --repo /abs/path/to/repo --ticket "TICKET TEXT"
+bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts run --name NAME --model MODEL [--effort EFFORT] [--unfenced] [--issue URL] --repo /abs/path/to/repo --ticket "TICKET TEXT"
 ```
 
-Use `--ticket-file PATH` instead of `--ticket` for a long ticket. Use `--base REF` to start from a ref other than HEAD. The worker's Bash runs inside the OS sandbox; add `--unfenced` to run it outside, for a ticket whose checks the sandbox cannot run, such as a suite that starts its own `sandbox-exec`; see Confinement. The first stdout line is `RUNDIR=<path>`; keep that path for collect.
+Use `--ticket-file PATH` instead of `--ticket` for a long ticket. Add `--issue URL` to tie the run to the work item it serves, such as an `obsidian://` link to its pm card; muster stores the value in `meta.json` without reading it, and `/muster-runs` groups runs by it. Use `--base REF` to start from a ref other than HEAD. The worker's Bash runs inside the OS sandbox; add `--unfenced` to run it outside, for a ticket whose checks the sandbox cannot run, such as a suite that starts its own `sandbox-exec`; see Confinement. The first stdout line is `RUNDIR=<path>`; keep that path for collect.
 
 ## Wait
 
 Start `watch` through `Bash(run_in_background: true)`; it prints one line per state change and exits when the run needs you or ends. Monitor can stream the same output when it is available.
 
 With Claude Code 2.1.304 or later, a band above the prompt lists the in-flight runs of this repository, each with its state, its title and its task-list progress as `done/total`; its header counts running, question, idle and finished runs, and shows `N to collect` beside them while finished runs wait for collection.
+
+`/muster-runs` opens a pane that lists every run of this repository until it is cleaned, finished ones included, grouped by `--issue`; a run that exited without a report shows its exit reason there.
 
 ```
 bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts watch NAME

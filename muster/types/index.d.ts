@@ -14,8 +14,22 @@ export type BandRow = {
 
 export type Board = { rows: BandRow[]; collect: number }
 
+export type RunRow = {
+  name: string
+  state: RunState
+  title: string
+  plan: { done: number; total: number } | null
+  tools: number
+  cost: number | null
+  seconds: number
+  issue: string | null
+  exitReason: string | null
+}
+
+export type TreeGroup = { issue: string | null; runs: RunRow[] }
+
 declare module 'claude-code' {
   interface PluginState {
-    muster: { board: Board | null }
+    muster: { board: Board | null; tree: TreeGroup[] | null }
   }
 }
