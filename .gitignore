@@ -12,6 +12,8 @@ yarn-debug.log*
 yarn-error.log*
 
 # Testing
+# claude plugin eval writes here when --output-dir is forgotten
+*/evals/results/
 .agents/tasks/
 .agents/retro/
 

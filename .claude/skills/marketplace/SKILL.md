@@ -7,7 +7,7 @@ description: >-
   carries the judgment for that. Enforces the repo's four-file invariant — plugin.json,
   marketplace.json, README.md, and the version bump that makes Claude Code refresh its
   cache.
-allowed-tools: Read Edit Write Glob Grep Bash(git status *) Bash(git diff *) Bash(ls *)
+allowed-tools: Read Edit Write Glob Grep Bash(git status *) Bash(git diff *) Bash(ls *) Bash(claude plugin eval *)
 ---
 
 # cc-plugins marketplace maintenance
@@ -35,8 +35,9 @@ wording decides whether the skill fires, when a skill should be user-invoked ins
 (`disable-model-invocation: true`) and pay no context load at all, what belongs in a
 sibling file rather than in `SKILL.md`, and which sentences are no-ops to delete.
 
-For the mechanics — frontmatter fields, directory layout, eval tooling — use
-`plugin-dev:skill-development` and `skill-creator` instead.
+For the mechanics — frontmatter fields, directory layout — use
+`plugin-dev:skill-development` and `skill-creator` instead. How to run a plugin's
+`evals/` suite is in [Measuring](WRITING.md#measuring).
 
 ## Adding a plugin
 
@@ -101,3 +102,12 @@ Read back what you touched and confirm each holds:
 - Any `description` you touched holds one trigger per branch, with synonyms collapsed,
   and the invocation choice was made rather than defaulted — see
   [WRITING.md](WRITING.md).
+- Every skill you touched whose plugin has `evals/` ran its suite before
+  and after the change, and the change holds the firing and output cases — see
+  [Measuring](WRITING.md#measuring). A touched skill with no suite is named in the
+  handoff as unmeasured.
+- Any `description` you touched, plus `when_to_use`, stays under 1,536 characters:
+  [Claude Code](https://code.claude.com/docs/en/skills) cuts the skill listing there,
+  so trigger words past it are lost.
+- The touched skill's `SKILL.md` stays under 500 lines, and a file it points at does
+  not point on to further files — the agent may read a nested file only partially.

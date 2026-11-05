@@ -8,15 +8,17 @@
 - [Steps and completion criteria](#steps-and-completion-criteria)
 - [Words](#words)
 - [Pruning](#pruning)
+- [Measuring](#measuring)
 
 The judgment layer for any document an agent consumes: a skill, `CLAUDE.md`, a file
 reached by a pointer. It answers three questions the mechanics cannot: does this
 material earn its place, where on the hierarchy does it sit, and which words make it
 fire.
 
-The mechanics live elsewhere — frontmatter fields, directory layout, and eval tooling
-are covered by `plugin-dev:skill-development` and `skill-creator`. Read those for how
-to fill a field; read this for what to put in it.
+The mechanics live elsewhere — frontmatter fields and directory layout are covered by
+`plugin-dev:skill-development` and `skill-creator`. Read those for how to fill a field;
+read this for what to put in it. How this repo runs evals is under
+[Measuring](#measuring).
 
 Adapted from [mattpocock/skills](https://github.com/mattpocock/skills)
 (`writing-for-agents`), MIT, Copyright (c) 2026 Matt Pocock.
@@ -74,17 +76,14 @@ This is the two loads applied to a skill:
   agent's reach: only the human typing the name can invoke it, and no other skill can.
   Zero context load, paid for in cognitive load — you are the index that must remember
   it exists. The `description` becomes human-facing: one line, triggers stripped.
+- **Model-only** (`user-invocable: false`) keeps the description but hides the skill
+  from the `/` menu: background knowledge the agent or another skill reaches, which no
+  human would type.
 
 Pick model-invocation when the agent must reach the skill on its own, or another skill
 must. A skill that only ever fires by hand should be user-invoked and pay nothing.
-
-A model-invoked description is a trigger, and a trigger is measured, not argued. When
-the plugin has an `evals/` suite, run
-`claude plugin eval <plugin> --runs 1 --ablation none --trust-plugin` before and after
-changing the description, and keep the change only if the should-fire and should-not
-cases hold. The eval sandbox loads only the plugin under test, so a plugin with a
-`dependencies` list does not load at all and its numbers mean nothing: run it on a copy
-outside the repo with `dependencies` removed.
+A model-invoked description is a trigger, and a trigger is measured, not argued — see
+[Measuring](#measuring).
 
 Reference two user-invoked skills both need can live in neither — with no descriptions,
 neither can fire the other. Put it in a plain file both can point at, the way this file
@@ -125,7 +124,7 @@ by branch or sequence so each path carries only what it needs.
 ## Steps and completion criteria
 
 Every step ends on a **completion criterion**: the condition telling the agent the work
-is done. Two properties make it a lever.
+is done. Three properties make it a lever.
 
 - **Clarity** — can the agent tell done from not-done? A vague bound ("understanding
   reached") invites **premature completion**: ending the step early, attention slipping
@@ -135,6 +134,9 @@ is done. Two properties make it a lever.
   the sequence to hide the later steps. Hiding works only across a real context
   boundary — a hand-off or a subagent dispatch. An inline call leaves the later steps
   in context and clears nothing.
+- **Exercised** — a criterion that names a check is met only when the check ran and
+  exercised the change. A syntax-only check, or a command that failed to start, is not
+  a pass, and a text-only end of turn is a report, not proof.
 - **Demand** — how much the criterion requires. "Every modified model accounted for"
   forces thorough work where "produce a change list" does not. Demand drives the
   legwork the agent does inside the step, and it is not step-bound: "every rule
@@ -170,7 +172,24 @@ all there is; the negation is a weak modifier that the strongly-activated concep
 overruns, so the ban half-reads as an instruction to do the thing. State the target
 behaviour instead, so the banned one is never spoken. A prohibition earns its place
 only as a hard guardrail you cannot phrase positively — and even then, pair it with the
-positive target so attention lands on what to do.
+positive target so attention lands on what to do. One measured exception: when the
+model has a strong default that positive wording does not displace, a short named list
+of the patterns to avoid can work — Anthropic's Opus 5.5 prompting guide reports it.
+Keep it only if the eval shows it.
+
+**Give the reason.** The model generalises from a rule's reason to the cases the rule
+does not name. "Never use ellipses" becomes "the output is read by a text-to-speech
+engine, which cannot pronounce ellipses".
+
+**Calm the volume.** Current models follow instructions closely, so emphasis written
+for older models now overshoots: Anthropic's prompting guide says `CRITICAL: you MUST
+use X` and `if in doubt, use X` make a tool overtrigger. Write `use X when <condition>`
+and let the condition carry the weight. The older skill best-practices page still
+suggests `MUST` as a fix; the prompting guide is the newer word, and the eval settles
+it per skill.
+
+**The verb decides the act.** "Suggest changes" yields suggestions; "change it" yields
+edits. When a step should end in a changed file, its verb is an action verb.
 
 ## Pruning
 
@@ -197,3 +216,30 @@ positive target so attention lands on what to do.
   word too weak to beat the default (*be thorough*, when the agent is already
   thorough-ish) is a no-op, and the fix is a stronger word (*relentless*), not a
   different technique.
+
+## Measuring
+
+Every rule above is a hypothesis about the model. When a plugin has an `evals/` suite, a change to a skill is kept only when the
+suite holds before and after. Two questions get two kinds of case:
+
+- **Firing** — did the skill load? A `tool_used` grader on `Skill` with should-fire
+  and should-not-fire prompts. It answers a `description` change.
+- **Output** — did the skill do what it says once loaded? An `llm` or `regex` grader on
+  the result. Firing tells you Claude found the skill, not that it worked, so a change
+  to the body needs an output case; a suite of firing cases alone cannot answer it.
+
+Run the suite under each model the skill is meant for, with `--model`: an unpinned run
+uses the user's default model and proves nothing about the others.
+
+The command is
+`claude plugin eval <plugin> --runs 1 --ablation none --no-publish --trust-plugin --output-dir <outside the repo>`.
+Each item below is a trap already hit here:
+
+- `--ablation none` — the default with-without arm leaves `tool_used: Skill` graders
+  unscored, so firing cases always look neutral.
+- `--output-dir` outside the repo — otherwise results land in `<plugin>/evals/results/`.
+- A plugin with a `dependencies` list does not load in the sandbox, which loads only
+  the plugin under test, and its numbers mean nothing: run a copy outside the repo with
+  `dependencies` removed.
+- A before/after comparison runs both versions side by side: extract the old one with
+  `git archive HEAD <plugin>` into a scratch directory and copy the new cases in.
