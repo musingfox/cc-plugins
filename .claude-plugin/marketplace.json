@@ -111,7 +111,7 @@
     {
       "name": "muster",
       "source": "./muster",
-      "description": "[Experimental] Unattended Claude workers over ACP — a coordinator dispatches headless workers with an optional permission fence, an event log, file-based escalation and report-file completion; a Claude Mod band shows in-flight workers (needs Claude Code 2.1.304+)"
+      "description": "[Experimental] Unattended Claude workers over ACP — a coordinator dispatches headless workers with an optional permission fence, an event log, file-based escalation and report-file completion; a Claude Mod band shows in-flight workers and a runs pane opens when one is dispatched (needs Claude Code 2.1.304+)"
     },
     {
       "name": "wrap-up",

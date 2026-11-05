@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { On } from 'claude-code'
 import type { BandRow, Board, RunDetail, RunRow, TreeGroup, TreeView } from '../types/index.d.ts'
-import { boardOf, readDetail, readRuns } from './board.ts'
+import { LIVE, boardOf, readDetail, readRuns } from './board.ts'
 import { STATE_COLOR, costText, elapsedText, progressCell, stateLabel, summaryParts } from './band-model.ts'
 import { arrowTarget, askKey, drawnKeys, groupByIssue, handOffText, isOpenable, issueKey, openKey, runKey, treeStateLabel } from './tree-model.ts'
 
@@ -17,6 +17,8 @@ const POLL_MS = 5000
 
 let timer: { cancel(): void } | null = null
 let polling = false
+// Run names this module has listed; null until the first read, which only seeds it so a start or reload opens nothing.
+let seen: Set<string> | null = null
 
 // One read at a time: a tick that fires while a read is pending is skipped, and a read that never settles blocks only its own ticks.
 async function poll($: any) {
@@ -26,11 +28,20 @@ async function poll($: any) {
     const runs = await readRuns($)
     await update($, board, () => boardOf(runs))
     await update($, tree, () => (runs === null ? null : groupByIssue(runs)))
+    if (runs !== null) await openOnDispatch($, runs)
     const { selected } = await read($, view)
     if (selected !== null) await loadDetail($, selected)
   } finally {
     polling = false
   }
+}
+
+// A run first listed in flight opens the pane unasked and leaves the keyboard at the prompt; the engine seats it only on a wide enough terminal.
+async function openOnDispatch($: any, runs: RunRow[]) {
+  const fresh = seen === null ? [] : runs.filter((run) => !seen!.has(run.name) && LIVE.has(run.state))
+  seen = new Set([...(seen ?? []), ...runs.map((run) => run.name)])
+  // A refused open must not cost the tick its tree update.
+  if (fresh.length > 0) await $.ui.open({ id: TREE_PANE, title: TREE_TITLE, closeOnEscape: true }).catch(() => {})
 }
 
 // A detail read that settles after the person picked another run is dropped inside the compare-and-set.
@@ -182,6 +193,7 @@ export function register(on: On) {
   on('session.start', async ($, e, next) => {
     // A reload re-fires session.start on this instance; a second timer would double the cadence.
     timer?.cancel()
+    seen = null
     timer = $.clock.every(POLL_MS, () => {
       void poll($).catch(() => {})
     })
