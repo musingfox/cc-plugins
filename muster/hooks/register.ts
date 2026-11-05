@@ -1,6 +1,6 @@
 import { atom, read, update } from 'claude-code'
 import type { On } from 'claude-code'
-import type { BandRow, Board, RunDetail, RunRow, TreeGroup, TreeView } from '../types/index.d.ts'
+import type { Activity, BandRow, Board, RunDetail, RunRow, TreeGroup, TreeView } from '../types/index.d.ts'
 import { LIVE, boardOf, readDetail, readRuns } from './board.ts'
 import { STATE_COLOR, costText, elapsedText, progressCell, stateLabel, summaryParts } from './band-model.ts'
 import { arrowTarget, askKey, drawnKeys, groupByIssue, handOffText, isOpenable, issueKey, openKey, runKey, treeStateLabel } from './tree-model.ts'
@@ -139,12 +139,24 @@ function detailOf($: any, Box: any, Text: any, Button: any, run: RunRow, found: 
       line('report', report),
       ...(found.reason === null ? [] : [line('reason', found.reason)]),
       ...found.questions.map((question) => line(`question ${question.n}`, question.paths.length ? question.paths.join(', ') : '(no paths)')),
-      ...(found.activity === null
-        ? [line('recent', 'the events log could not be read')]
-        : found.activity.length ? [Text({ dimColor: true, children: ['recent'] }), ...found.activity.map((entry) => Text({ wrap: 'truncate-end', children: [`  ${drawable(entry)}`] }))] : [line('recent', 'no activity recorded')]),
+      ...activityLines(Text, line, found.activity),
       ask,
     ],
   })
+}
+
+const PLAN_MARK = { completed: '✓', in_progress: '▸', pending: '·' } as const
+
+function activityLines(Text: any, line: (label: string, text: string) => unknown, activity: Activity | null) {
+  if (activity === null) return [line('activity', 'the events log could not be read')]
+  const { plan, said, denied } = activity
+  if (plan === null && said.length === 0 && denied.length === 0) return [line('activity', 'nothing recorded yet')]
+  const item = (text: string, dim = false) => Text({ wrap: 'truncate-end', ...(dim ? { dimColor: true } : {}), children: [`  ${drawable(text)}`] })
+  return [
+    ...(plan === null ? [] : [line('plan', `${plan.done}/${plan.total}`), ...plan.shown.map((entry) => item(`${PLAN_MARK[entry.status]} ${entry.content}`, entry.status !== 'in_progress'))]),
+    ...(said.length ? [Text({ dimColor: true, children: ['said'] }), ...said.map((entry) => item(entry))] : []),
+    ...denied.map((entry) => line('refused', entry)),
+  ]
 }
 
 // Only the CLI runs host commands. Elsewhere a Link stands in, and a remote surface draws any link but https: as plain text.

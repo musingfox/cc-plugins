@@ -33,17 +33,33 @@ test('TreeDetail D2 a question is open until an ANSWER of its number exists', ()
   expect(openQuestions([])).toEqual([])
 })
 
-test('TreeDetail D3 activity keeps the last ten tool titles and permission decisions, skipping noise and repeats', () => {
+const said = (text: string) => line({ t: 't', dir: 'in', msg: { method: 'session/update', params: { update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } } } } })
+const planOf = (...entries: [string, string][]) =>
+  line({ t: 't', dir: 'in', msg: { method: 'session/update', params: { update: { sessionUpdate: 'plan', entries: entries.map(([status, content]) => ({ status, content, priority: 'medium' })) } } } })
+const quietActivity = { plan: null, said: [], denied: [] }
+
+test('TreeDetail D3 activity is the worker\'s latest plan and words and the permissions refused it, never its commands', () => {
   const noise = line({ t: 't', dir: 'in', msg: { method: 'session/update', params: { update: { sessionUpdate: 'usage_update', used: 1 } } } })
-  const decision = line({ t: 't', dir: 'client-decision', msg: { decision: 'deny', by: 'policy' } })
-  const routine = line({ t: 't', dir: 'client-decision', msg: { decision: 'allow', by: 'policy' } })
-  const text = [toolTitle('first'), noise, 'not json', toolTitle(null), toolTitle('same'), routine, toolTitle('same'), decision, ''].join('\n')
-  expect(activityOf(text)).toEqual(['first', 'same', 'permission deny by policy'])
-  const many = Array.from({ length: 15 }, (_, i) => toolTitle(`cmd ${i}`)).join('\n')
-  expect(activityOf(many)).toEqual(Array.from({ length: 10 }, (_, i) => `cmd ${i + 5}`))
-  expect(activityOf(toolTitle('x'.repeat(300)))[0]?.length).toBeLessThanOrEqual(120)
-  const placeholder = line({ t: 't', dir: 'in', msg: { method: 'session/update', params: { update: { sessionUpdate: 'tool_call', title: 'Terminal' } } } })
-  expect(activityOf([placeholder, toolTitle('cd /w/t && bun test /w/t/a.ts')].join('\n'), '/w/t')).toEqual(['bun test ./a.ts'])
+  const deny = line({ t: 't', dir: 'client-decision', msg: { decision: 'deny', by: 'policy' } })
+  const allow = line({ t: 't', dir: 'client-decision', msg: { decision: 'allow', by: 'coordinator' } })
+  const text = [
+    planOf(['pending', 'old']),
+    said('Reading '), noise, said('the code.'), toolTitle('sed -n 1,9p a.ts'),
+    'not json',
+    said('Now the tests.'), allow, deny,
+    planOf(['completed', 'a'], ['completed', 'b'], ['in_progress', 'c'], ['in_progress', 'd'], ['pending', 'e'], ['pending', 'f']),
+    '',
+  ].join('\n')
+  expect(activityOf(text)).toEqual({
+    plan: { done: 2, total: 6, shown: [{ status: 'completed', content: 'b' }, { status: 'in_progress', content: 'c' }, { status: 'in_progress', content: 'd' }, { status: 'pending', content: 'e' }] },
+    said: ['Reading the code.', 'Now the tests.'],
+    denied: ['permission deny by policy'],
+  })
+  const many = Array.from({ length: 5 }, (_, i) => [said(`step ${i}`), toolTitle('x')].join('\n')).join('\n')
+  expect(activityOf(many).said).toEqual(['step 2', 'step 3', 'step 4'])
+  expect(activityOf(said('x'.repeat(500))).said[0]?.length).toBeLessThanOrEqual(240)
+  expect(activityOf(said('ran /w/t/a.ts'), '/w/t').said).toEqual(['ran ./a.ts'])
+  expect(activityOf(toolTitle('bun test'))).toEqual(quietActivity)
 })
 
 test('TreeDetail D4 the drawn keys skip a folded issue\'s runs, and a single arrow walks them', () => {
@@ -72,7 +88,7 @@ const DETAIL_WORLD = {
     [`${RUN}/QUESTION-1.json`]: line({ paths: ['/etc/hosts'] }),
     [`${RUN}/ANSWER-1.json`]: '{}',
     [`${RUN}/QUESTION-2.json`]: line({ paths: ['/a', '/b'] }),
-    [`${RUN}/events.jsonl`]: [toolTitle('bun test'), toolTitle('git commit')].join('\n'),
+    [`${RUN}/events.jsonl`]: [said('Testing.'), toolTitle('git commit')].join('\n'),
   },
 }
 
@@ -84,7 +100,7 @@ test('TreeDetail D5 a run\'s detail reads its report, open questions with their 
     report: 'BLOCKED',
     reason: 'no key',
     questions: [{ n: 2, paths: ['/a', '/b'] }],
-    activity: ['bun test', 'git commit'],
+    activity: { ...quietActivity, said: ['Testing.'] },
   })
   expect(await readDetail(fakeEngine({ dirs: { [RUNS]: [] } }).$, 'gone')).toBeNull()
   // A later time than the read above, so the cached tail does not answer.
@@ -100,7 +116,7 @@ const PANE_WORLD = {
     [`${RUNS}/a/meta.json`]: meta({ issue: 'https://example.com/I' }),
     [`${RUNS}/a/phase.json`]: line({ phase: 'idle', title: 'Build A' }),
     [`${RUNS}/a/REPORT.md`]: 'BLOCKED\nthe fixture is missing',
-    [`${RUNS}/a/events.jsonl`]: toolTitle('bun test hooks'),
+    [`${RUNS}/a/events.jsonl`]: [planOf(['in_progress', 'Wire the fixture']), said('Looking for the fixture.')].join('\n'),
     [`${RUNS}/c/meta.json`]: meta(),
     [`${RUNS}/c/phase.json`]: line({ phase: 'running', title: 'Probe C' }),
   },
@@ -121,13 +137,13 @@ test('TreeDetail D5b an unchanged events log is not read again; a changed one is
   const name = 'cache-probe'
   const runDir = `${RUNS}/${name}`
   const events = { ...file('events.jsonl'), size: 10, mtimeMs: 1 }
-  const files = { [`${runDir}/events.jsonl`]: toolTitle('one') }
+  const files = { [`${runDir}/events.jsonl`]: said('one') }
   const engine = fakeEngine({ dirs: { [runDir]: [events] }, files })
-  expect((await readDetail(engine.$, name))?.activity).toEqual(['one'])
-  expect((await readDetail(engine.$, name))?.activity).toEqual(['one'])
+  expect((await readDetail(engine.$, name))?.activity?.said).toEqual(['one'])
+  expect((await readDetail(engine.$, name))?.activity?.said).toEqual(['one'])
   expect(engine.tails).toHaveLength(1)
-  const grown = fakeEngine({ dirs: { [runDir]: [{ ...events, size: 20 }] }, files: { [`${runDir}/events.jsonl`]: [toolTitle('one'), toolTitle('two')].join('\n') } })
-  expect((await readDetail(grown.$, name))?.activity).toEqual(['one', 'two'])
+  const grown = fakeEngine({ dirs: { [runDir]: [{ ...events, size: 20 }] }, files: { [`${runDir}/events.jsonl`]: [said('one'), toolTitle('x'), said('two')].join('\n') } })
+  expect((await readDetail(grown.$, name))?.activity?.said).toEqual(['one', 'two'])
 })
 
 test('TreeDetail D6 pressing an issue folds its runs away and pressing it again brings them back', async ($, on) => {
@@ -148,7 +164,8 @@ test('TreeDetail D7 pressing a run shows its detail beneath it, and pressing it 
   await $.ui.press({ plugin: 'muster', key: runKey('a') })
   const shown = stringsIn(await $.ui.render(PANE)).join(' ')
   expect(shown).toContain('the fixture is missing')
-  expect(shown).toContain('bun test hooks')
+  expect(shown).toContain('Wire the fixture')
+  expect(shown).toContain('Looking for the fixture.')
   await $.ui.press({ plugin: 'muster', key: runKey('a') })
   expect(stringsIn(await $.ui.render(PANE)).join(' ')).not.toContain('the fixture is missing')
 })

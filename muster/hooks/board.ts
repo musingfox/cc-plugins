@@ -1,4 +1,4 @@
-import type { BandRow, Board, RunDetail, RunRow, RunState } from '../types/index.d.ts'
+import type { Activity, BandRow, Board, RunDetail, RunRow, RunState } from '../types/index.d.ts'
 import { classifyRun, elapsedSeconds, figuresOf } from './band-model.ts'
 import { activityOf, openQuestions, reportOf } from './tree-model.ts'
 
@@ -101,10 +101,10 @@ export async function readBoard($: any): Promise<Board | null> {
 // once the file's size or time changed. The first line of the tail is usually cut and fails to parse, which drops it.
 const EVENTS_TAIL_BYTES = 1048576
 const CACHE_LIMIT = 50
-const activityCache = new Map<string, { size: number; mtimeMs: number; activity: string[] }>()
+const activityCache = new Map<string, { size: number; mtimeMs: number; activity: Activity }>()
 
-async function recentActivity($: any, path: string, entry: { size: number; mtimeMs: number } | undefined, worktree: string): Promise<string[] | null> {
-  if (entry === undefined) return []
+async function recentActivity($: any, path: string, entry: { size: number; mtimeMs: number } | undefined, worktree: string): Promise<Activity | null> {
+  if (entry === undefined) return { plan: null, said: [], denied: [] }
   const cached = activityCache.get(path)
   if (cached && cached.size === entry.size && cached.mtimeMs === entry.mtimeMs) return cached.activity
   try {

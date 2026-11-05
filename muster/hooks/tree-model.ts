@@ -1,4 +1,4 @@
-import type { RunRow, TreeGroup } from '../types/index.d.ts'
+import type { Activity, PlanEntry, RunRow, TreeGroup } from '../types/index.d.ts'
 
 // Issues sort by their text with runs dispatched without one last; within an issue the oldest run comes first.
 export function groupByIssue(runs: RunRow[]): TreeGroup[] {
@@ -67,14 +67,20 @@ export function openQuestions(files: string[]): number[] {
   return numbers(/^QUESTION-(\d+)\.json$/).filter((n) => !answered.has(n)).sort((a, b) => a - b)
 }
 
-const ACTIVITY_LIMIT = 10
-const ACTIVITY_WIDTH = 120
+const SAID_LIMIT = 3
+const DENIED_LIMIT = 3
+const SAID_WIDTH = 240
 
-// events.jsonl is the raw ACP stream; a tool's title and a permission decision are the lines a person can read, so the
-// rest is dropped. Only tool_call_update carries the real title: tool_call opens with a placeholder such as "Terminal".
-// Commands open with the worktree's absolute path, so it reads as "." and a leading "cd . &&" goes.
-export function activityOf(text: string, worktree?: string): string[] {
-  const picked: string[] = []
+// events.jsonl is the raw ACP stream. A person reads a run by its plan and the worker's own words; its commands are
+// noise, so they are dropped. A message streams as chunks, and anything but a usage tick between two chunks ends it.
+// A policy allow is muster's routine approval and a coordinator's allow is already known to it, so only refusals stay.
+// Paths open with the worktree's absolute path, so it reads as ".".
+export function activityOf(text: string, worktree?: string): Activity {
+  let plan: PlanEntry[] | null = null
+  const said: string[] = []
+  const denied: string[] = []
+  let speaking = false
+  const local = (entry: string) => (worktree ? entry.split(worktree).join('.') : entry).replace(/\s+/g, ' ').trim()
   for (const raw of text.split('\n')) {
     let event: any
     try {
@@ -83,18 +89,34 @@ export function activityOf(text: string, worktree?: string): string[] {
       continue
     }
     const update = event?.msg?.params?.update
-    // A policy allow is muster's routine auto-approval; denials and the coordinator's answers are what a person looks for.
-    const isRoutine = event?.msg?.decision === 'allow' && event?.msg?.by === 'policy'
-    const entry =
-      event?.dir === 'client-decision' && typeof event.msg?.decision === 'string' && !isRoutine
-        ? `permission ${event.msg.decision}${typeof event.msg.by === 'string' ? ` by ${event.msg.by}` : ''}`
-        : update?.sessionUpdate === 'tool_call_update' && typeof update.title === 'string' && update.title.trim() !== ''
-          ? update.title.trim()
-          : null
-    if (entry === null) continue
-    const local = worktree ? entry.split(worktree).join('.').replace(/^cd \. && /, '') : entry
-    const clipped = local.replace(/\s+/g, ' ').slice(0, ACTIVITY_WIDTH)
-    if (picked[picked.length - 1] !== clipped) picked.push(clipped)
+    const kind = update?.sessionUpdate
+    if (kind === 'usage_update') continue
+    if (kind === 'agent_message_chunk' && typeof update.content?.text === 'string') {
+      if (speaking) said[said.length - 1] += update.content.text
+      else said.push(update.content.text)
+      speaking = true
+      continue
+    }
+    speaking = false
+    if (kind === 'plan' && Array.isArray(update.entries)) {
+      plan = update.entries.flatMap((entry: any) =>
+        typeof entry?.content === 'string' && ['completed', 'in_progress', 'pending'].includes(entry.status) ? [{ status: entry.status, content: local(entry.content) }] : [],
+      )
+    } else if (event?.dir === 'client-decision' && typeof event.msg?.decision === 'string' && event.msg.decision !== 'allow') {
+      denied.push(`permission ${event.msg.decision}${typeof event.msg.by === 'string' ? ` by ${event.msg.by}` : ''}`)
+    }
   }
-  return picked.slice(-ACTIVITY_LIMIT)
+  return {
+    plan: plan === null || plan.length === 0 ? null : planFocus(plan),
+    said: said.map(local).filter((entry) => entry !== '').slice(-SAID_LIMIT).map((entry) => entry.slice(0, SAID_WIDTH)),
+    denied: denied.slice(-DENIED_LIMIT),
+  }
+}
+
+// Where the worker stands: the step it last finished, the steps under way, and the one it takes up next.
+function planFocus(entries: PlanEntry[]): NonNullable<Activity['plan']> {
+  const lastDone = entries.map((entry) => entry.status).lastIndexOf('completed')
+  const nextPending = entries.findIndex((entry) => entry.status === 'pending')
+  const shown = entries.filter((entry, i) => entry.status === 'in_progress' || i === lastDone || i === nextPending)
+  return { done: entries.filter((entry) => entry.status === 'completed').length, total: entries.length, shown }
 }

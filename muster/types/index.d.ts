@@ -33,8 +33,12 @@ export type RunDetail = {
   report: string | null
   reason: string | null
   questions: { n: number; paths: string[] }[]
-  activity: string[] | null
+  activity: Activity | null
 }
+
+export type PlanEntry = { status: 'completed' | 'in_progress' | 'pending'; content: string }
+
+export type Activity = { plan: { done: number; total: number; shown: PlanEntry[] } | null; said: string[]; denied: string[] }
 
 export type TreeView = { folded: string[]; selected: string | null; at: string | null; detail: RunDetail | null }
 
