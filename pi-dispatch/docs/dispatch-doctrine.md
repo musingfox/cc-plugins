@@ -2,7 +2,7 @@
 
 pi-dispatch is a tool, not a methodology: it moves workload from Claude Code
 (expensive tokens, native tooling) to external pi workers (cheap, fast,
-disposable). Methodologies (cf, spiral, ad-hoc main-thread work) choose when
+disposable). Methodologies (the method skill, ad-hoc main-thread work) choose when
 to use it. This doctrine is the choosing.
 
 ## The mental model
@@ -18,7 +18,7 @@ by the `pi-agent.sh` primitives (start/send/poll/peek/ls/stop/watch).
 |------------------|-------------------------------|----------|
 | background task  | main + Monitor on `watch`     | single small task; main reads the result anyway |
 | dynamic workflow | Workflow script (deterministic) | multi-stage pipelines needing schema gates, journal/resume, concurrency caps |
-| (no analog)      | dedicated shell script (cf)   | fixed-domain repeated pipelines; maximum determinism |
+| (no analog)      | dedicated shell script        | fixed-domain repeated pipelines; maximum determinism |
 | peer session     | `ListAgents` + `SendMessage`  | a Claude session that already exists elsewhere — in practice, another repo |
 
 Row 1 is model-driven (flexible, can drift); rows 2–3 are deterministic
