@@ -3,20 +3,19 @@ name: pi-dispatch
 description: >-
   This skill should be used when the user asks to "offload this", "dispatch to pi",
   "run this on a cheap model", "fan these tasks out to pi workers", "save tokens on this
-  grunt work", or when the main thread is about to write a builder brief that hands
-  work to a background worker. Offload dispatch to cheap/fast pi models via
+  grunt work", or when the main thread is about to hand work to a background pi
+  worker. Offload dispatch to cheap/fast pi models via
   the pi-agent script — name-addressed sub-agent verbs (start/send/poll/peek/ls/stop/watch)
   over background pi workers with idempotent poll, worktree isolation, and distilled
-  reports. Main loads this to write the offload usage it embeds in a builder brief.
+  reports.
 ---
 
 # pi-dispatch — offload usage
 
 `${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh` is the name-addressed unified entry point over the pi
 worker primitives. The registry is the filesystem: `$PI_RUNS_DIR/agents/<NAME>`
-symlinks to the run's RUNDIR. Main (the orchestrator) reads this whole file; the
-`## Operator usage` section at the end is what it embeds into a builder brief,
-and the builder operates those verbs as a pure operator.
+symlinks to the run's RUNDIR. Main reads this whole file and runs the verbs
+itself.
 
 ## How main uses this
 
@@ -44,10 +43,8 @@ and the builder operates those verbs as a pure operator.
    file skips the kill. When the work is merged or dropped, run
    `${CLAUDE_PLUGIN_ROOT}/scripts/pi-worktree.sh clean <cleanup script>`: it saves the diff to
    `<diff file>` and removes the worktree.
-2. Embed the `## Operator usage` section — from its heading to the end of
-   this file — verbatim, plus the per-task brief, into a builder dispatch.
-   The builder runs `${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh start` per task and `${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh watch` as
-   its main loop, and runs each worker's acceptance check when it settles.
+2. Run `${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh start` per task, arm one background `watch`
+   (below), and run each worker's acceptance check when it settles.
 3. Terminal status lines persist in the RUNDIR and replay on re-poll; raw stream
    is kept as `pi.stream.jsonl`, distilled final text as `result.md`.
 4. `stop NAME` once a worker's result is consumed. The registry never
@@ -57,9 +54,9 @@ and the builder operates those verbs as a pure operator.
    unscoped watch would report on — and quota-abort — another dispatch's
    workers. `ls` is the global view.
 6. When a batch ends on `QUOTA` or `QUOTA-WINDOW` (see the provider wall
-   below), re-dispatch the SAME brief, minus the operator usage, to a Claude
-   builder in self-do mode (`${CLAUDE_PLUGIN_ROOT}/docs/main-orchestration.md` §6) on the same
-   worktree. One shot: if that fails too, the task is failed.
+   below), hand the SAME brief to a Claude seat on the same worktree: do it
+   yourself, or dispatch it as a muster run. One shot: if that fails too, the
+   task is failed.
 
 ## Waiting without burning tokens
 
@@ -126,7 +123,7 @@ naming a retired variable, do not dispatch and do not fall back silently:
 The command is recorded per run and replayed on resume, so `send` keeps the
 worker on the binary it started with, and the session keeps its model.
 
-Pick the reviewer's model to be at least as capable as the builder's — there
+Pick the reviewer's model to be at least as capable as the worker's — there
 is no ranked list to defer to, so that judgement is main's.
 
 ## Prerequisites
@@ -137,8 +134,7 @@ detached launch and watchdogs), `git` (for worktrees). Probe with
 
 ## Operator usage
 
-The dispatcher is whoever runs `start`: the builder, or main when it
-dispatches directly.
+Main runs these verbs.
 
 ### Output contract — required in every brief
 
@@ -218,4 +214,4 @@ reported with — they share the wall. On either tag:
    ```
 
    A worker's partial state is not reviewable; the fallback starts clean.
-3. Report the tag to main; main re-dispatches the task to a Claude builder.
+3. Hand the task to a Claude seat (step 6 of "How main uses this").

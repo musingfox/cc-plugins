@@ -172,8 +172,7 @@ Personal Obsidian vault productivity — capture, notes, and project management 
 ### pi-dispatch (Experimental)
 
 Offload heavy work to [pi](https://github.com/earendil-works/pi) cheap/fast models so Claude only writes briefs and reviews summaries — saving tokens:
-- **`agents/builder.md`**: brief-driven executor — when the brief embeds `pi-agent.sh` offload usage, builder operates it as a pure operator (`pi-agent.sh start` per task, `pi-agent.sh watch` as the main loop, run acceptance check, distill report); when the brief carries no offload usage, builder does the work itself. Builder does NOT choose the mode — the brief does.
-- **`agents/reviewer.md`**: independent contract judge — given ONLY the contract, the deliverable paths, and the check output, returns an evidence-backed PASS/FAIL per clause; never sees the builder transcript, never runs offload verbs. Main dispatches builder and reviewer directly (no intermediary coordinator).
+- **`agents/reviewer.md`**: independent contract judge — given ONLY the contract, the deliverable paths, and the check output, returns an evidence-backed PASS/FAIL per clause; never sees the worker transcript, never runs offload verbs. Main runs the `pi-agent.sh` verbs and dispatches the reviewer itself.
 - **`pi-agent.sh`**: name-addressed unified verbs (`start/send/poll/peek/ls/stop/watch`) mirroring native sub-agent UX; `send` resumes a finished worker's session, `watch` feeds the Monitor tool for push notifications
 - **`pi-dispatch.sh`**: launches one brief on a cheap/fast pi model in the background (routed by one `PI_DISPATCH_CMD`), returns a run handle instantly — dispatch N briefs for parallel fan-out
 - **`pi-poll.sh` / `pi-stop.sh`**: idempotent one-line status polls and group-kill cancel; `pi-worktree.sh` isolates parallel code-writing tasks in git worktrees
@@ -389,7 +388,7 @@ cc-plugins/
 ├── muster/             skills: muster · hooks: register (Claude Mod) · src, e2e, tests
 ├── obsidian-workspace/ skills: init, jot, pm · templates, tests · hooks: register (Claude Mod)
 ├── omp-quota/          hooks: register (Claude Mod) · tests
-├── pi-dispatch/        skills: pi-dispatch · agents: builder, reviewer · scripts, shims, extensions, tests
+├── pi-dispatch/        skills: pi-dispatch · agents: reviewer · scripts, shims, extensions, tests
 ├── skills/rex/         standalone skill, not a plugin · scripts: agent-wait.lua
 ├── spec/               skills: spec, glossary · scripts: spec.sh · tests
 ├── viz/                skills: viz-inline, viz-render · lib, tests

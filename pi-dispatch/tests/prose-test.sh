@@ -58,7 +58,7 @@ for f in "$README" "$SKILL" "$DOCTRINE"; do
 done
 [ "$(grep -c run_in_background "$AGENT")" -ge 1 ] && ok "pi-agent.sh header names run_in_background" || bad "pi-agent.sh never names run_in_background"
 # Since Claude Code 2.1.311 a background sub-agent is woken by its own background task (measured 2026-11-05).
-hits="$(grep -il 'cannot be woken\|in the foreground' "$README" "$SKILL" "$DOCTRINE" "$AGENT" "$PLUGIN/agents/builder.md")"
+hits="$(grep -il 'cannot be woken\|in the foreground' "$README" "$SKILL" "$DOCTRINE" "$AGENT")"
 [ -z "$hits" ] && ok "no doc says a sub-agent must watch in the foreground" || bad "foreground watch still in: $hits"
 hits="$(grep -l 'Monitor tool' "$README" "$SKILL" "$DOCTRINE" "$AGENT")"
 [ -z "$hits" ] && ok "no doc or script says 'Monitor tool'" || bad "'Monitor tool' still in: $hits"
@@ -69,19 +69,6 @@ case "$section" in
   *PI_WRITABLE_FILES*) ok "SKILL's output contract says to declare the verdict file in PI_WRITABLE_FILES" ;;
   *) bad "SKILL's output contract never names PI_WRITABLE_FILES" ;;
 esac
-
-# --- the operator usage main embeds has a boundary and holds only operator steps ---
-operator="$(sed -n '/^## Operator usage/,$p' "$SKILL")"
-case "$operator" in
-  *"pi-agent.sh start"*) ok "SKILL has an Operator usage section that runs to the end of the file" ;;
-  *) bad "SKILL has no Operator usage section carrying the verbs" ;;
-esac
-case "$operator" in
-  *AskUserQuestion*) bad "the Operator usage section asks the human (builder has no AskUserQuestion)" ;;
-  *) ok "the Operator usage section never asks the human" ;;
-esac
-[ "$(grep -c '^## ' <<<"$operator")" = 1 ] && ok "the Operator usage section is the last top-level section" || bad "a top-level section follows Operator usage"
-grep -q 'Embed the `## Operator usage` section' "$SKILL" && ok "SKILL tells main which section to embed" || bad "SKILL never names the section to embed"
 
 # --- every env var read has a README row ---
 for v in PI_PROMPT PI_WALL_CLOCK_S PI_STALL_THRESHOLD_S PI_NO_MARKER_GRACE_S PI_RUN_DEADLINE_S PI_POLL_INTERVAL_S PI_WRITABLE_FILES; do

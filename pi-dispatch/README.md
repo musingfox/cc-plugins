@@ -5,21 +5,20 @@ Offload heavy work to cheap/fast models via [pi](https://github.com/earendil-wor
 ## Architecture
 
 ```
-Claude (main, or a builder)                           pi worker (cheap model)
+Claude (main)                                         pi worker (cheap model)
   write brief   ──►    pi-agent.sh start (instant)  ──►   background run in RUNDIR
   ...                  pi-agent.sh watch (1 line/change)  result.md + stream + rc
   review result ◄──    terminal line + file path    ◄──   distilled final text
 ```
 
 - **`scripts/pi-dispatch.sh BRIEF [OUTDIR [PRIOR_RUNDIR]]`** — launches pi in the background (setsid process group), returns `OUTPUT=/PID=/RUNDIR=` instantly. `PRIOR_RUNDIR` resumes the prior run's session (`--session <id>`), preserving worker context across rounds without re-briefing.
-- **`scripts/pi-poll.sh RUNDIR`** — stateless, idempotent one-line status: `RUNNING` or a terminal `STATUS=OK|FAIL …`. On OK it distills the final assistant text into `result.md` (raw stream kept as `pi.stream.jsonl`). Terminal status lines persist in `RUNDIR/status` and replay on re-poll. Liveness guards (wall-clock, stall) group-kill orphans automatically. Terminal lines carry `model=<provider/model> cost=$<sum over all turns> turns=<n>`; a provider spend wall is killed on sight and tagged `QUOTA` (balance exhausted) or `QUOTA-WINDOW` (a rolling usage window that resets on its own); transient rate limits are neither, and `pi-agent.sh watch` then aborts the siblings it was given so the caller can fall back to a Claude builder.
+- **`scripts/pi-poll.sh RUNDIR`** — stateless, idempotent one-line status: `RUNNING` or a terminal `STATUS=OK|FAIL …`. On OK it distills the final assistant text into `result.md` (raw stream kept as `pi.stream.jsonl`). Terminal status lines persist in `RUNDIR/status` and replay on re-poll. Liveness guards (wall-clock, stall) group-kill orphans automatically. Terminal lines carry `model=<provider/model> cost=$<sum over all turns> turns=<n>`; a provider spend wall is killed on sight and tagged `QUOTA` (balance exhausted) or `QUOTA-WINDOW` (a rolling usage window that resets on its own); transient rate limits are neither, and `pi-agent.sh watch` then aborts the siblings it was given so the caller can fall back to a Claude seat.
 - **`scripts/pi-stop.sh RUNDIR`** — idempotent group-kill cancel.
 - **`scripts/pi-run.sh [--deadline S] BRIEF [OUTDIR [PRIOR_RUNDIR]]`** — run-to-terminal: dispatch + block until terminal in ONE call, one `OUTCOME=OK|FAIL …` line. A detached setsid watchdog reaps the worker at the deadline even if the CALLER dies mid-wait (harness timeout, killed sub-agent) — orphan safety no longer depends on the caller passing the right timeout. Use from contexts that must block in a single Bash call (sub-agents can't be woken by Monitor).
 - **`scripts/pi-probe.sh [--bin-only] [PROBE_DIR]`** — pre-flight gate: `--bin-only` checks the command's binary is on PATH (exit 0/1); the full probe runs `say ok` on the same `PI_DISPATCH_CMD` a dispatch would run, bounded by `PI_PROBE_DEADLINE_S` (default 60) and reporting `STALLED` rather than hanging its caller. Callers never touch the agent binary themselves.
 - **`scripts/pi-watch.sh RUNDIR`** — one-shot monitoring snapshot of a live run (fixed 4 lines regardless of stream size): event/byte counts, tool progress + current tool, token usage, latest assistant text. `pi-poll.sh` answers "is it done?"; `pi-watch.sh` answers "what is it doing?". Safe on a mid-write stream (partial trailing line skipped).
 - **`scripts/pi-worktree.sh create|clean …`** — git-worktree isolation for code-writing tasks; cleanup captures the diff before removal.
-- **`agents/builder.md`** — a brief-driven executor. When the brief embeds the `pi-agent.sh` offload usage, builder operates it as a pure operator: `pi-agent.sh start` per task, `pi-agent.sh watch` as the main loop, runs each worker's acceptance check, and distills a report to main. When the brief carries no offload usage, builder does the work itself. Builder does NOT choose the mode — the brief does.
-- **`agents/reviewer.md`** — an independent contract judge. Given ONLY the contract, the deliverable paths, and the check output, it returns an evidence-backed PASS/FAIL per clause. It never sees the builder transcript and never runs offload verbs.
+- **`agents/reviewer.md`** — an independent contract judge. Given ONLY the contract, the deliverable paths, and the check output, it returns an evidence-backed PASS/FAIL per clause. It never sees the worker transcript and never runs offload verbs.
 
 ## Named agents — `pi-agent.sh`
 
@@ -39,7 +38,7 @@ Claude (main, or a builder)                           pi worker (cheap model)
 
 Run `pi-agent.sh watch` as a background task (`Bash(run_in_background: true)`) and wait for its completion notification, which wakes main and a sub-agent alike; main can also follow it with Monitor.
 
-When/how to choose between direct dispatch, dispatcher, builder/reviewer, Workflow
+When/how to choose between direct dispatch, reviewer, Workflow
 thin-shells — and when not to outsource at all: see
 [docs/dispatch-doctrine.md](docs/dispatch-doctrine.md).
 
@@ -82,7 +81,7 @@ Dispatch is non-blocking, so fan-out is just N launches:
 
 1. Claude decomposes work into self-contained briefs (one observable outcome each).
 2. For code-writing tasks, `pi-worktree.sh create` one worktree per task; put the worktree path in the brief (worker uses absolute paths, never cd out).
-3. Launch each brief with `pi-dispatch.sh` (each returns instantly) — directly, or hand the whole fan-out to one `builder` agent.
+3. Launch each brief with `pi-dispatch.sh` (each returns instantly)
 4. Poll each RUNDIR until terminal; failures carry diagnostics in `RUNDIR/pi.stderr.log`.
 5. `pi-worktree.sh clean` captures each task's diff; Claude reviews diffs/results against the brief's contract and merges or re-dispatches (resume via `PRIOR_RUNDIR` keeps the worker's session context).
 
@@ -96,4 +95,4 @@ Context hygiene: main never reads worker streams or source material — only bri
 
 From the repository root, `bash tests/run-all.sh` runs every suite below, the bun suite, and the `method` suite, printing one `ok`/`not ok` line per suite and `suites: N, failed: M` last.
 
-Each suite also runs alone from this directory as `bash tests/<name>`: `cmd-test.sh`, `wrapper-test.sh`, `cwd-test.sh`, `shim-test.sh`, `poll-test.sh`, `worktree-cleanup-test.sh`, `probe-watch-test.sh`, `agent-test.sh`, `run-test.sh`, `writable-test.sh`, `builder-seat-test.sh`, `quota-guard-test.sh` and `prose-test.sh`. All are pure-local, no network (agent-test, cwd-test and writable-test use a bash shim in place of `pi`; shim-test runs real git against scratch repos; prose-test reads the docs). `bun test extensions/` covers the write/edit fence.
+Each suite also runs alone from this directory as `bash tests/<name>`: `cmd-test.sh`, `wrapper-test.sh`, `cwd-test.sh`, `shim-test.sh`, `poll-test.sh`, `worktree-cleanup-test.sh`, `probe-watch-test.sh`, `agent-test.sh`, `run-test.sh`, `writable-test.sh`, `reviewer-seat-test.sh`, `quota-guard-test.sh` and `prose-test.sh`. All are pure-local, no network (agent-test, cwd-test and writable-test use a bash shim in place of `pi`; shim-test runs real git against scratch repos; prose-test reads the docs). `bun test extensions/` covers the write/edit fence.

@@ -1,15 +1,10 @@
 #!/usr/bin/env bash
-# builder-seat-test.sh — committed behavior test for the builder and reviewer
-# seats (agents/builder.md, agents/reviewer.md).
+# reviewer-seat-test.sh — committed behavior test for the reviewer seat
+# (agents/reviewer.md) and the verdict file a dispatch declares.
 #
-#   builder tools   self-do mode holds the Edit and Write its instructions use
-#   done check      the builder polls only the workers it started; no
-#                   machine-wide `ls` decides when it is done
-#   verdict file    the offload protocol declares a mktemp verdict file and
-#                   routes on its STATUS= line; a live pi-agent.sh start with
-#                   PI_WRITABLE_FILES records it, and send replays it unset
-#   reviewer        no model pin (it inherits the caller's, so no pin can make
-#                   it weaker than the builder) and no Edit (a judge seat)
+#   verdict file    a live pi-agent.sh start with PI_WRITABLE_FILES records
+#                   the verdict path, and send replays it unset
+#   reviewer        pinned on opus and no Edit (a judge seat)
 #
 # Returns 0 iff every assertion holds.
 
@@ -22,26 +17,9 @@ bad() { FAIL=$((FAIL+1)); echo "FAIL - $1"; }
 
 AGENTS="$(cd "$(dirname "${BASH_SOURCE[0]}")/../agents" && pwd)"
 SCRIPTS="$(cd "$AGENTS/../scripts" && pwd)"
-BUILDER="$AGENTS/builder.md"
 REVIEWER="$AGENTS/reviewer.md"
 
 tools() { sed -n 's/^tools: //p' "$1"; }
-step() { # the numbered protocol step whose first line contains $2
-  awk -v m="$2" '/^[0-9]+\. /{on = index($0, m) > 0} /^$|^#/{on = 0} on' "$1"
-}
-
-B_TOOLS="$(tools "$BUILDER")"
-if printf '%s\n' "$B_TOOLS" | grep -qw Edit && printf '%s\n' "$B_TOOLS" | grep -qw Write; then ok "builder tools hold Edit and Write"; else bad "builder tools -> '$B_TOOLS'"; fi
-
-n="$(grep -c 'run `pi-agent.sh ls`' "$BUILDER")"
-if [ "$n" = 0 ]; then ok "builder never runs pi-agent.sh ls as its done check"; else bad "builder 'run \`pi-agent.sh ls\`' lines -> $n"; fi
-S6="$(step "$BUILDER" 'Before ending ANY turn')"
-if [ -n "$S6" ] && printf '%s\n' "$S6" | grep -qF 'pi-agent.sh poll'; then ok "the before-ending step polls the builder's own workers"; else bad "before-ending step -> '$S6'"; fi
-
-for want in mktemp PI_WRITABLE_FILES STATUS=DONE STATUS=BLOCKED; do
-  if grep -qF "$want" "$BUILDER"; then ok "builder protocol names $want"; else bad "builder protocol lacks $want"; fi
-done
-if ! grep -qF 'produce the deliverable as your final answer text' "$BUILDER"; then ok "builder no longer takes the final answer as the verdict"; else bad "builder still asks for the deliverable as the final answer"; fi
 
 # --- live start/send: the declared verdict file is recorded and replayed ---
 TMP="$(mktemp -d)"
@@ -85,7 +63,7 @@ if [ -n "$R2" ] && [ "$R2" != "$R1" ] && [ "$(rec "$R2")" = "$VERDICT_C" ]; then
 if [ "$(env_seen "$R2")" = "$VERDICT_C" ]; then ok "send -> the resumed worker's env holds the verdict path"; else bad "send -> worker env '$(env_seen "$R2")'"; fi
 rm -f "$VERDICT"
 
-# 7c5d7e0 pins the reviewer on opus so it is never weaker than the builder.
+# 7c5d7e0 pins the reviewer on opus so it is never weaker than the seat that built the deliverable.
 n="$(grep -c '^model:' "$REVIEWER")"
 if [ "$n" = 1 ] && grep -qx 'model: opus' "$REVIEWER"; then ok "reviewer pins model: opus"; else bad "reviewer model: lines -> $n, opus pin -> $(grep -c '^model: opus$' "$REVIEWER")"; fi
 R_TOOLS="$(tools "$REVIEWER")"

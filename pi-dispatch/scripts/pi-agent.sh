@@ -160,7 +160,7 @@ watch)
     # in the batch is about to pay for the same wall. Kill them now and stamp a
     # replayable terminal verdict carrying the SAME class the wall was reported
     # with; the caller sees one QUOTA line per worker and falls back to a Claude
-    # self-do builder for the lot.
+    # seat for the lot.
     # ponytail: assumes the batch shares the provider/quota (true for one
     # PI_DISPATCH_CMD); compare RUNDIR/routing CMD= if mixed routing appears.
     if [ "${QUOTA_SEEN:-0}" = 1 ]; then

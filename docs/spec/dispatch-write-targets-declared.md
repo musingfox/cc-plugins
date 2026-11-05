@@ -4,7 +4,6 @@ status: accepted
 scope:
   - "pi-dispatch/scripts/pi-dispatch.sh"
   - "pi-dispatch/extensions/worktree-fence.ts"
-  - "pi-dispatch/agents/builder.md"
 verify: check:bash pi-dispatch/tests/writable-test.sh
 related: [dispatch-verdict-from-file, quota-ends-the-batch]
 source: dispatch-write-set-and-failure-routing

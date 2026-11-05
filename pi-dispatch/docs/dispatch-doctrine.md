@@ -12,50 +12,27 @@ contractors. Every native operating mode keeps its organizational shape — the
 only question is which seats are filled by a contractor. The worker side is always the same: pi processes managed
 by the `pi-agent.sh` primitives (start/send/poll/peek/ls/stop/watch).
 
-## Two-node dispatch model (current shape)
-
-The live topology is two nodes off main:
-
-- **builder** — executes the brief. Main either embeds `pi-agent.sh` offload
-  usage (builder offloads to a pi worker) or omits it (builder does the work
-  itself). The mode is dictated by the brief, not by the builder.
-- **reviewer** — independent contract judge. Given only the contract +
-  deliverable paths + check output; never sees the builder transcript.
-
-Main dispatches both and owns the final verdict. The worker side (when offloaded)
-is always the same: pi processes managed by the `pi-agent.sh` primitives
-(start/send/poll/peek/ls/stop/watch). The reviewer is just another dispatch —
-same primitives, stronger profile (`reviewer ≥ builder`).
-
 ### Consumption shapes (one primitive set)
 
 | Native analog    | Control plane                 | Use when |
 |------------------|-------------------------------|----------|
 | background task  | main + Monitor on `watch`     | single small task; main reads the result anyway |
-| sub-agent        | main → builder (one-shot)     | single larger task; keep brief/result out of main's context |
-| agent team       | main → builder (resident)     | multiple workers, cross-turn follow-ups, conversational steering |
 | dynamic workflow | Workflow script (deterministic) | multi-stage pipelines needing schema gates, journal/resume, concurrency caps |
 | (no analog)      | dedicated shell script (cf)   | fixed-domain repeated pipelines; maximum determinism |
 | peer session     | `ListAgents` + `SendMessage`  | a Claude session that already exists elsewhere — in practice, another repo |
 
-Rows 1–3 are model-driven (flexible, can drift); rows 4–5 are deterministic
+Row 1 is model-driven (flexible, can drift); rows 2–3 are deterministic
 (reliable, written in advance).
 
 Run `pi-agent.sh watch` as a background task (`Bash(run_in_background: true)`) and wait for its completion notification, which wakes main and a sub-agent alike; main can also follow it with Monitor.
 
-Row 6 is discover-and-talk, not dispatch: no verb creates a peer, kills one,
+Row 4 is discover-and-talk, not dispatch: no verb creates a peer, kills one,
 isolates it in a worktree, or picks its model, and `SendMessage` has no CLI, so
 no shell caller can reach it. Verified 2026-08-10: a subagent can address a peer
 by bare name, but `ListAgents` is unavailable to subagents — they can address,
 not discover, so main must name the peer in the brief. Against a plain subagent
 it buys nothing except reaching a session that is already sitting in a different
 repository; that is the only case worth using it for.
-
-The builder, wherever it offloads, coordinates
-the pi worker: it establishes the environment, injects the brief, runs the
-deterministic checks, and assembles evidence — a context firewall and
-structured-output enforcement point. It never issues the verdict; that seat
-belongs to main, informed by the reviewer.
 
 ## Dispatch decision — fit first, cost second
 
@@ -92,42 +69,29 @@ hand it; anything not in the brief does not exist. A brief carries:
   a brief can tell the worker where to work, but only the launch decides
   where a bare command runs.
 
-**Return end — independent review (builder ↔ advisor).** Every dispatch
-names its reviewer, and the reviewer is never the builder (self-acceptance)
-nor the dispatcher (main) — main has a close-the-task incentive
-(self-certification). Three seats:
+**Return end — independent review.** Every dispatch names its reviewer, and
+the reviewer is never the worker (self-acceptance) nor the dispatcher (main) —
+main has a close-the-task incentive (self-certification). Three seats:
 
-- **builder** runs the deterministic checks (tests, acceptance commands,
-  schema) and assembles the evidence bundle;
+- **the dispatcher** re-runs the deterministic checks (tests, acceptance
+  commands, schema) and assembles the evidence bundle;
 - **independent reviewer** judges what checks can't decide — non-
   deterministic clauses ("minimal memory", "idiomatic") get evidence-backed
   adversarial judgement at the contract's own precision, in a FRESH session
-  given only the contract + deliverable + check results (never the builder's
+  given only the contract + deliverable + check results (never the worker's
   transcript);
 - **main** owns the final verdict.
 
-Capability rule: **reviewer ≥ builder**. Routings are named by provider and
+Capability rule: **reviewer ≥ worker**. Routings are named by provider and
 model, not ranked by tier, so nothing in the tooling enforces this — the
-dispatcher picks the reviewer's routing and owns the judgement. A builder
+dispatcher picks the reviewer's routing and owns the judgement. A worker
 already on the strongest routing available gets a fresh session on that same
 routing, or main itself, as reviewer. The reviewer is just another dispatch —
-same primitives, a routing at least as capable. Between the two Claude seats
-the rule holds on model and effort: the frontmatter pins the builder at `low`
-and the reviewer on `opus` at `xhigh`.
+same primitives, a routing at least as capable. The Claude reviewer seat's
+frontmatter pins it on `opus` at `xhigh`.
 
 Proportionality: deterministic checks always run; a separate reviewer is
 dispatched only when the deliverable is a code change or the contract has
 non-deterministic clauses; main may mark a dispatch `no-review` when it will
 read and judge the result itself. A dispatch with no reviewer on any seat is
 not a dispatch — it's abandonment.
-
-## Empirical footnotes (2026-07, verified live — named-agent harness behavior)
-
-- SendMessage to a completed named subagent resumes it from transcript with full context — a live, verified harness behavior. This is what makes the resident shape (consumption-shapes row 3) work: main → builder, cross-turn resume.
-- A background subagent can push `SendMessage(to: "main")` mid-invocation;
-  a named agent's idle notification carries no text, so mid-run reporting
-  has to go through that channel.
-- Agents drift after resumes (dispatch-and-sleep); pin discipline as an
-  end-of-turn check in the agent definition, not as one-time narrative.
-- Official docs lag the product on both resume and to:"main" — trust live
-  probes over doc verdicts for harness behavior.
