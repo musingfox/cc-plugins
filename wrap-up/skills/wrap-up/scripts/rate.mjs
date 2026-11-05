@@ -15,10 +15,13 @@ const getArg = (name) => {
 const sessionId = getArg("session");
 const score = Number(getArg("score"));
 const reason = getArg("reason") || "";
+const suggestedArg = getArg("suggested");
+const suggested = suggestedArg === undefined ? undefined : Number(suggestedArg);
 const projectPath = getArg("project") || process.cwd();
 
-if (!sessionId || !Number.isInteger(score) || score < 1 || score > 5) {
-  console.error("usage: rate.mjs --session <id> --score <1-5> [--reason <text>] [--project <path>]");
+const isScore = (n) => Number.isInteger(n) && n >= 1 && n <= 5;
+if (!sessionId || !isScore(score) || (suggested !== undefined && !isScore(suggested))) {
+  console.error("usage: rate.mjs --session <id> --score <1-5> [--suggested <1-5>] [--reason <text>] [--project <path>]");
   process.exit(1);
 }
 
@@ -28,6 +31,8 @@ const record = {
   session_id: sessionId,
   project_path: projectPath,
   score,
+  // The score Claude recommended: the model's own assessment, which /dream compares against.
+  suggested,
   reason,
   rated_at: new Date().toISOString(),
 };

@@ -67,8 +67,10 @@ description: Close out the current task by reading the conversation, listing onl
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/skills/wrap-up/scripts/rate.mjs" \
-  --session <session-id> --score <1-5> --reason "<理由>" --project "$(pwd)"
+  --session <session-id> --score <1-5> --suggested <建議分數> --reason "<理由>" --project "$(pwd)"
 ```
+
+`--suggested` 是你在問題裡標 (Recommended) 的分數，使用者選哪個都照填。它是模型對自己的評估，`/dream` 拿它和使用者分數比對，找出模型覺得沒問題、使用者卻不滿意的 session。
 
 同一個 session 再跑一次 wrap-up 就會追加一行，聚合時以最後一行為準。腳本只寫 `~/.claude/usage-data/ratings.jsonl`，不碰 `/insights` 擁有的 `facets/` 與 `session-meta/`。
 
