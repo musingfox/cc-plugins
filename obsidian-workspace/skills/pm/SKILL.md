@@ -35,7 +35,7 @@ pm/
 
 Every project has all three: `tasks/`, `docs/`, `dashboard.base`. `/obw:init` bootstraps them. If a pm operation finds `pm/{project}/dashboard.base` missing, regenerate it (see Dashboards) before reporting done.
 
-Beyond that, folders are created on demand — `create` / `move` auto-create missing parent folders. No `mkdir` needed.
+Beyond that, folders are created on demand: `create` auto-creates missing parent folders, but `move` fails with `ENOENT` when the destination folder is missing (e.g. the first archive). Create it first with `obsidian vault={vault} eval code="app.vault.createFolder('pm/{project}/tasks/archive')"`.
 
 ## Filenames
 
