@@ -214,8 +214,8 @@ edits. When a step should end in a changed file, its verb is an action verb.
   settle it by running the document, not by debate. When a sentence fails, delete the
   whole sentence rather than trim words from it. The test grades leading words too: a
   word too weak to beat the default (*be thorough*, when the agent is already
-  thorough-ish) is a no-op, and the fix is a stronger word (*relentless*), not a
-  different technique.
+  thorough) is a no-op: delete it, or replace it with the concrete bar the default
+  misses ("every modified model accounted for"), not a louder adjective.
 
 ## Measuring
 

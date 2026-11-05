@@ -34,7 +34,7 @@ Each **layer** lands one result, concrete at its own grain and no finer: vague q
 
 A layer takes as many **rounds** as it needs. A round is one demand on the decision-maker: every decision askable now, asked at once, answered, folded back in. A decision that presupposes another still open belongs to the next round; settling the first is what makes it askable.
 
-Keep two counters, `L` (layer) and `a` (round), starting at `L1-a1`. Write each round's question and answer to a scratch file (`.narrow/L<N>-a<M>-*.md`, gitignored) and overwrite nothing: what was asked and what came back is the **carry-over** that stops the next round repeating the last.
+Keep two counters, `L` (layer) and `a` (round), starting at `L1-a1`. Write each round's question and answer to a scratch file (`.narrow/L<N>-a<M>-*.md`, ignored through `.git/info/exclude`, so the user's tree stays clean) and overwrite nothing: what was asked and what came back is the **carry-over** that stops the next round repeating the last.
 
 ## 1. Diverge
 
