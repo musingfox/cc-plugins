@@ -22,10 +22,9 @@
 #
 # watch: loops over the agents NAMED ON ITS COMMAND LINE, polls each, and prints
 # ONE line per MEANINGFUL state change (volatile elapsed/stale counters normalized
-# away). Exits 0 when none of them is in flight. From main, run it as a
-# background task (Bash run_in_background: true) and follow it with Monitor, which
-# is the native "background agent completed" experience; a sub-agent cannot be
-# woken that way, so it runs watch in the foreground.
+# away). Exits 0 when none of them is in flight. Run it as a background task
+# (Bash run_in_background: true): its completion notification wakes main and a
+# sub-agent alike, and main can also follow it with Monitor.
 #
 # The names are required, and that is the point: the registry is machine-wide, so
 # a watch over all of it would report on — and, on a quota hit, KILL — workers

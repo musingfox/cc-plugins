@@ -66,7 +66,7 @@ and the builder operates those verbs as a pure operator.
 Never poll from a Bash loop in the main thread — every poll is a tool call.
 Start the workers, then arm ONE blocking watch:
 
-From main, run `${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh watch` as a background task (`Bash(run_in_background: true)`) and follow it with Monitor; a sub-agent cannot be woken that way, so it runs `watch` in the foreground.
+Run `${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh watch` as a background task (`Bash(run_in_background: true)`) and wait for its completion notification, which wakes main and a sub-agent alike; main can also follow it with Monitor.
 
 ```
 Bash(command: "${CLAUDE_PLUGIN_ROOT}/scripts/pi-agent.sh watch 15 NAME1 NAME2 …", run_in_background: true)

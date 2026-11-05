@@ -41,7 +41,7 @@ same primitives, stronger profile (`reviewer ≥ builder`).
 Rows 1–3 are model-driven (flexible, can drift); rows 4–5 are deterministic
 (reliable, written in advance).
 
-From main, run `pi-agent.sh watch` as a background task (`Bash(run_in_background: true)`) and follow it with Monitor; a sub-agent cannot be woken that way, so it runs `watch` in the foreground.
+Run `pi-agent.sh watch` as a background task (`Bash(run_in_background: true)`) and wait for its completion notification, which wakes main and a sub-agent alike; main can also follow it with Monitor.
 
 Row 6 is discover-and-talk, not dispatch: no verb creates a peer, kills one,
 isolates it in a worktree, or picks its model, and `SendMessage` has no CLI, so

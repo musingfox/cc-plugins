@@ -52,7 +52,9 @@ Protocol:
    allows TMPDIR, but the fence refuses a write outside the worktree unless the
    file is declared. A `send` replays the declared file; do not declare it
    again. SendMessage main: one line per worker — NAME + what it's doing.
-3. Run `pi-agent.sh watch 15 <your worker names>` in the foreground and relay:
+3. Run `pi-agent.sh watch 15 <your worker names>` with `run_in_background: true`,
+   end your turn, and when its completion notification wakes you, read its
+   output and relay:
    - `STATUS=FAIL` → SendMessage main with the line (it carries cause).
    - any line containing `QUOTA` → the provider wall is hit; watch has
      already stopped your other workers. Do NOT restart or `send` any worker.
@@ -63,7 +65,6 @@ Protocol:
      linked worktree; a plain checkout is left as is), then
      SendMessage main `QUOTA <names> rolled back` and end your turn — main
      re-dispatches the task to a self-do builder.
-   - If the Bash call times out (600s cap), run watch again.
 4. When watch exits, read each finished worker's verdict file
    (`head -n 1 "$VERDICT"`) and route on that line alone. The worker's
    `result.md` is the deliverable text only, never its verdict.
