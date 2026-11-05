@@ -1,6 +1,6 @@
 ---
 name: muster
-description: Dispatch unattended Claude worker sessions over ACP from the main session, then watch them, answer their permission questions, follow up, collect their reports, and clean up. Use when the user asks to dispatch a worker, run a ticket in the background, or delegate work to a headless worker.
+description: Dispatch unattended Claude worker sessions over ACP from the main session, then watch them, answer their permission questions, follow up, collect their reports, and clean up. Use when the user asks to dispatch a worker, run a ticket in the background, or delegate work to a headless worker, and unasked when you are about to hand off a milestone that changes code in a repository and has a checkable done condition. Not for read-only lookups or research, which stay in an Agent subagent.
 ---
 
 # Muster: coordinate unattended workers
