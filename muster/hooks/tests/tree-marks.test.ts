@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import { nodesOf, stringsIn } from './fixtures/band.ts'
 import { NOW, RUNS, SESSION, dir, file, kitWorld } from './fixtures/world.ts'
-import { issueKey, runKey } from '../tree-model.ts'
+import { drawnKeys, issueKey, runKey } from '../tree-model.ts'
 
 const ago = (seconds: number) => new Date(NOW - seconds * 1000).toISOString()
 const meta = (extra: object = {}, started = ago(100)) => JSON.stringify({ name: 'x', repoRoot: '/r', started, ...extra })
@@ -148,4 +148,15 @@ test('TreeMarks M5 under the last run of an issue the trunk is blank, and a repo
 
 test('TreeMarks M6 the footer reads the new keys', async ($, on) => {
   expect(stringsIn(await openPane($, on))).toContain('↑↓ move · enter fold, detail, open, ask · esc close')
+})
+
+test('TreeMarks M7 drawnKeys lists the Buttons the pane draws, in drawn order', async ($, on) => {
+  const tree = await openPane($, on, ['a'])
+  const keys = nodesOf(tree, 'Button').map((button) => button.props?.key ?? button.key)
+  expect(keys).toEqual([issueKey(ISSUE), `open:${ISSUE}`, 'run:a', 'ask:a', 'run:b', 'run:d', issueKey(null), 'run:c'])
+  const groups = [
+    { issue: ISSUE, runs: ['a', 'b', 'd'].map((name) => ({ name })) },
+    { issue: null, runs: [{ name: 'c' }] },
+  ] as any
+  expect(drawnKeys(groups, [], 'a', true)).toEqual(keys)
 })
