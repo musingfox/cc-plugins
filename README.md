@@ -333,26 +333,6 @@ Close out a task and score the session in one pass:
 /plugin install wrap-up
 ```
 
-## Standalone Skills
-
-These live under `skills/` and are not plugins: the marketplace does not list them and the version hooks ignore them.
-
-### rex
-
-The stub that `rex skill setup` installs, kept as-is. It runs `rex __internal skill`, so the guide follows the installed Rex version.
-
-**Installation** (from GitHub):
-```bash
-bunx skills add musingfox/cc-plugins --skill rex -g -a claude-code codex opencode -y
-```
-
-**Installation** (from a clone, edits apply at once):
-```bash
-ln -sfn "$PWD/skills/rex" ~/.agents/skills/rex
-```
-
-The file carries the `rex-stub` marker, so `rex skill setup` rewrites it after a Rex upgrade; with the symlink, that rewrite lands in this repo as a diff.
-
 ## Plugin Development
 
 This repository serves as both a marketplace and a development workspace for custom Claude Code plugins.
@@ -387,7 +367,6 @@ cc-plugins/
 ├── obsidian-workspace/ skills: init, jot, pm · templates, tests · hooks: register (Claude Mod)
 ├── omp-quota/          hooks: register (Claude Mod) · tests
 ├── pi-dispatch/        skills: pi-dispatch · agents: reviewer · scripts, shims, extensions, tests
-├── skills/rex/         standalone skill, not a plugin
 ├── spec/               skills: spec, glossary · scripts: spec.sh · tests
 ├── viz/                skills: viz-inline, viz-render · lib, tests
 ├── wizard/             skills: wizard
