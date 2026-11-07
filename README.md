@@ -339,9 +339,7 @@ These live under `skills/` and are not plugins: the marketplace does not list th
 
 ### rex
 
-Replaces the stub that `rex skill setup` installs. It still runs `rex __internal skill` first, so the guide follows the installed Rex version, then adds how to watch agent workers in Rex panes: wait on their OSC 7501 program status with `scripts/agent-wait.lua` instead of scraping `rex capture`.
-
-It must be named `rex` and sit in `~/.agents/skills/rex`, the directory Claude Code, Codex, OpenCode and Pi share, because the skill calls the script by that path. A plugin cannot do either, since plugin skills are namespaced and live in the plugin cache.
+The stub that `rex skill setup` installs, kept as-is. It runs `rex __internal skill`, so the guide follows the installed Rex version.
 
 **Installation** (from GitHub):
 ```bash
@@ -353,7 +351,7 @@ bunx skills add musingfox/cc-plugins --skill rex -g -a claude-code codex opencod
 ln -sfn "$PWD/skills/rex" ~/.agents/skills/rex
 ```
 
-Without the `rex-stub` marker, `rex skill setup` reports the skill as a conflict and leaves it alone; `rex skill status` then also shows the hook as `outdated`, which it is not. Do not run `rex skill setup --force`, which puts the stub back.
+The file carries the `rex-stub` marker, so `rex skill setup` rewrites it after a Rex upgrade; with the symlink, that rewrite lands in this repo as a diff.
 
 ## Plugin Development
 
@@ -389,7 +387,7 @@ cc-plugins/
 ├── obsidian-workspace/ skills: init, jot, pm · templates, tests · hooks: register (Claude Mod)
 ├── omp-quota/          hooks: register (Claude Mod) · tests
 ├── pi-dispatch/        skills: pi-dispatch · agents: reviewer · scripts, shims, extensions, tests
-├── skills/rex/         standalone skill, not a plugin · scripts: agent-wait.lua
+├── skills/rex/         standalone skill, not a plugin
 ├── spec/               skills: spec, glossary · scripts: spec.sh · tests
 ├── viz/                skills: viz-inline, viz-render · lib, tests
 ├── wizard/             skills: wizard
