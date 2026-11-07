@@ -2,8 +2,8 @@ import { atom, read, update } from 'claude-code'
 import type { On } from 'claude-code'
 import type { Activity, BandRow, Board, RunDetail, RunRow, TreeGroup, TreeView } from '../types/index.d.ts'
 import { LIVE, boardOf, readDetail, readRuns } from './board.ts'
-import { STATE_COLOR, costText, elapsedText, progressCell, stateLabel, summaryParts } from './band-model.ts'
-import { arrowTarget, askKey, drawnKeys, groupByIssue, handOffText, isOpenable, issueKey, openKey, runKey, treeStateLabel } from './tree-model.ts'
+import { GLYPH, STATE_COLOR, bar, costText, elapsedText, progressCell, summaryParts } from './band-model.ts'
+import { arrowTarget, askKey, drawnKeys, groupByIssue, handOffText, isOpenable, issueKey, openKey, runKey } from './tree-model.ts'
 
 export const board = atom({ plugin: 'muster', key: 'board' } as const, null as Board | null)
 export const tree = atom({ plugin: 'muster', key: 'tree' } as const, null as TreeGroup[] | null)
@@ -91,9 +91,9 @@ function rowOf(Box: any, Text: any, row: BandRow) {
     columnGap: 2,
     children: [
       Box({ width: 14, flexShrink: 0, children: [Text({ wrap: 'truncate-end', children: [drawable(row.name)] })] }),
-      Box({ width: 10, flexShrink: 0, children: [Text({ color: STATE_COLOR[row.state], children: [stateLabel(row.state)] })] }),
+      Box({ width: 2, flexShrink: 0, children: [Text({ color: STATE_COLOR[row.state], children: [GLYPH[row.state]] })] }),
       Box({ width: 36, flexShrink: 0, children: [Text({ wrap: 'truncate-end', children: [drawable(row.title)] })] }),
-      Box({ width: 10, flexShrink: 0, children: [Text({ ...(progress.dim ? { dimColor: true } : {}), children: [progress.text] })] }),
+      Box({ width: 11, flexShrink: 0, children: [Text({ ...(progress.dim ? { dimColor: true } : {}), children: [progress.text] })] }),
       Text({ wrap: 'truncate-end', children: [Text({ dimColor: true, children: [elapsedText(row.seconds)] }), costText(row.cost)] }),
     ],
   })
@@ -112,57 +112,60 @@ async function drawBand($: any, e: any, beneath: unknown) {
   })
 }
 
-function treeRowOf($: any, Box: any, Text: any, Button: any, run: RunRow) {
+// One run is one branch of its issue: the connector, a coloured state glyph, the name as a Button, then the facts.
+function treeRowOf($: any, Box: any, Text: any, Button: any, run: RunRow, last: boolean) {
   const progress = progressCell(run)
   return Box({
-    columnGap: 2,
-    paddingLeft: 2,
+    columnGap: 1,
     children: [
-      Box({ width: 14, flexShrink: 0, children: [Button({ plain: true, key: runKey(run.name), label: drawable(run.name).slice(0, 14), onPress: () => quiet(toggleRun($, run.name)) })] }),
-      Box({ width: 20, flexShrink: 0, children: [Text({ wrap: 'truncate-end', color: STATE_COLOR[run.state], children: [drawable(treeStateLabel(run))] })] }),
-      Box({ width: 36, flexShrink: 1, children: [Text({ wrap: 'truncate-end', children: [drawable(run.title)] })] }),
-      Box({ width: 10, flexShrink: 0, children: [Text({ ...(progress.dim ? { dimColor: true } : {}), children: [progress.text] })] }),
-      Box({ flexShrink: 0, children: [Text({ dimColor: true, wrap: 'truncate-end', children: [elapsedText(run.seconds)] })] }),
+      Text({ dimColor: true, children: [last ? '└─' : '├─'] }),
+      Text({ color: STATE_COLOR[run.state], children: [GLYPH[run.state]] }),
+      Box({ width: 16, flexShrink: 0, children: [Button({ plain: true, key: runKey(run.name), label: drawable(run.name).slice(0, 16), onPress: () => quiet(toggleRun($, run.name)) })] }),
+      Box({ flexGrow: 1, flexShrink: 1, children: [Text({ wrap: 'truncate-end', children: [drawable(run.title), ...(run.state === 'exited' && run.exitReason ? [Text({ dimColor: true, children: [` → ${drawable(run.exitReason)}`] })] : [])] })] }),
+      Box({ width: 11, flexShrink: 0, justifyContent: 'flex-end', children: [Text({ ...(progress.dim ? { dimColor: true } : {}), children: [progress.text] })] }),
+      Box({ width: 5, flexShrink: 0, justifyContent: 'flex-end', children: [Text({ dimColor: true, children: [elapsedText(run.seconds)] })] }),
     ],
   })
 }
 
-function detailOf($: any, Box: any, Text: any, Button: any, run: RunRow, found: RunDetail | null) {
-  const line = (label: string, text: string) => Text({ wrap: 'truncate-end', children: [Text({ dimColor: true, children: [`${label}  `] }), drawable(text)] })
-  const ask = Box({ children: [Button({ plain: true, key: askKey(run.name), label: '› ask the coordinator about this run', onPress: () => quiet(handOff($, run)) })] })
-  if (found === null) return Box({ flexDirection: 'column', paddingLeft: 6, children: [Text({ dimColor: true, children: ['Reading the run…'] }), ask] })
-  const report = found.report === null ? 'none yet' : found.report === '' ? '(empty first line)' : found.report
+// The detail hangs under its run as that run's children, so the trunk line keeps running past it unless the run is last.
+function detailOf($: any, Box: any, Text: any, Button: any, run: RunRow, found: RunDetail | null, last: boolean) {
+  const trunk = last ? '   ' : '│  '
+  const leaves: unknown[] = []
+  const leaf = (child: unknown) => leaves.push(child)
+  const kv = (label: string, text: string, color?: string) => Text({ wrap: 'truncate-end', children: [Text({ dimColor: true, children: [`${label} `] }), Text({ ...(color ? { color } : {}), children: [drawable(text)] })] })
+  if (found === null) leaf(Text({ dimColor: true, children: ['…'] }))
+  else {
+    leaf(kv('¶', found.report === null ? '—' : found.report === '' ? '(empty first line)' : found.report, found.report === 'DONE' ? 'success' : found.report === 'BLOCKED' ? 'error' : undefined))
+    if (found.reason !== null) leaf(kv('×', found.reason, 'error'))
+    for (const q of found.questions) leaf(kv(`?${q.n}`, q.paths.length ? q.paths.join(', ') : '(no paths)', 'warning'))
+    for (const line of activityLines(Text, kv, found.activity)) leaf(line)
+  }
+  leaf(Button({ plain: true, key: askKey(run.name), label: '› ask coordinator', onPress: () => quiet(handOff($, run)) }))
   return Box({
     flexDirection: 'column',
-    paddingLeft: 6,
-    children: [
-      line('report', report),
-      ...(found.reason === null ? [] : [line('reason', found.reason)]),
-      ...found.questions.map((question) => line(`question ${question.n}`, question.paths.length ? question.paths.join(', ') : '(no paths)')),
-      ...activityLines(Text, line, found.activity),
-      ask,
-    ],
+    children: leaves.map((child, i) => Box({ columnGap: 1, children: [Text({ dimColor: true, children: [`${trunk}${i === leaves.length - 1 ? '└─' : '├─'}`] }), Box({ flexGrow: 1, flexShrink: 1, children: [child] })] })),
   })
 }
 
-const PLAN_MARK = { completed: '✓', in_progress: '▸', pending: '·' } as const
+const PLAN_MARK = { completed: '√', in_progress: '►', pending: '·' } as const
 
 function activityLines(Text: any, line: (label: string, text: string) => unknown, activity: Activity | null) {
-  if (activity === null) return [line('activity', 'the events log could not be read')]
+  if (activity === null) return [line('ø', 'events log unreadable')]
   const { plan, said, denied } = activity
-  if (plan === null && said.length === 0 && denied.length === 0) return [line('activity', 'nothing recorded yet')]
-  const item = (text: string, dim = false) => Text({ wrap: 'truncate-end', ...(dim ? { dimColor: true } : {}), children: [`  ${drawable(text)}`] })
+  if (plan === null && said.length === 0 && denied.length === 0) return [line('·', 'nothing yet')]
+  const item = (text: string, dim = false) => Text({ wrap: 'truncate-end', ...(dim ? { dimColor: true } : {}), children: [drawable(text)] })
   return [
-    ...(plan === null ? [] : [line('plan', `${plan.done}/${plan.total}`), ...plan.shown.map((entry) => item(`${PLAN_MARK[entry.status]} ${entry.content}`, entry.status !== 'in_progress'))]),
-    ...(said.length ? [Text({ dimColor: true, children: ['said'] }), ...said.map((entry) => item(entry))] : []),
-    ...denied.map((entry) => line('refused', entry)),
+    ...(plan === null ? [] : [line('≡', bar(plan.done, plan.total)), ...plan.shown.map((entry) => item(`${PLAN_MARK[entry.status]} ${entry.content}`, entry.status !== 'in_progress'))]),
+    ...said.map((entry) => item(`» ${entry}`)),
+    ...denied.map((entry) => line('ø', entry)),
   ]
 }
 
 // Only the CLI runs host commands. Elsewhere a Link stands in, and a remote surface draws any link but https: as plain text.
 function openOf($: any, Button: any, Link: any, issue: string, onTerminal: boolean) {
-  if (onTerminal) return [Button({ plain: true, key: openKey(issue), label: '↗ open', dimColor: true, onPress: () => quiet(openIssue($, issue)) })]
-  return /^https:\/\//i.test(issue) && issue.length <= 2048 ? [Link({ href: issue, label: '↗ open' })] : []
+  if (onTerminal) return [Button({ plain: true, key: openKey(issue), label: '→', dimColor: true, onPress: () => quiet(openIssue($, issue)) })]
+  return /^https:\/\//i.test(issue) && issue.length <= 2048 ? [Link({ href: issue, label: '→' })] : []
 }
 
 async function drawTree($: any, e: any) {
@@ -174,9 +177,15 @@ async function drawTree($: any, e: any) {
   const { folded, selected, detail: found } = await read($, view)
   // A Button label wraps instead of truncating, and a wrapped header pushes its count and open Button off the row.
   const labelWidth = Math.max(12, (typeof e.props?.bodyColumns === 'number' ? e.props.bodyColumns : 80) - 16)
+  const runs = groups.flatMap((group) => group.runs)
+  const counts = (['running', 'question', 'idle', 'done', 'blocked'] as const).flatMap((state) => {
+    const n = runs.filter((run) => run.state === state).length
+    return n ? [Text({ color: STATE_COLOR[state], children: [`${GLYPH[state]} ${n}`] })] : []
+  })
   return Box({
     flexDirection: 'column',
     children: [
+      Box({ columnGap: 2, marginBottom: 1, children: [Text({ weight: 'bold', children: ['muster'] }), ...counts] }),
       ...groups.flatMap((group, i) => {
         const key = issueKey(group.issue)
         const isOpen = !folded.includes(key)
@@ -184,19 +193,22 @@ async function drawTree($: any, e: any) {
           ...(i > 0 ? { marginTop: 1 } : {}),
           columnGap: 1,
           children: [
-            Text({ dimColor: true, children: [isOpen ? '▾' : '▸'] }),
+            Text({ dimColor: true, children: [isOpen ? '▼' : '►'] }),
             Button({ plain: true, key, label: group.issue === null ? '(no issue)' : clipped(drawable(group.issue), labelWidth), ...(i === 0 ? { autoFocus: true } : {}), onPress: () => quiet(toggleFold($, key)) }),
-            Text({ dimColor: true, children: [` ${group.runs.length}`] }),
+            Text({ dimColor: true, children: [isOpen ? '' : group.runs.map((run) => GLYPH[run.state]).join('')] }),
             ...(group.issue !== null && isOpenable(group.issue) ? openOf($, Button, Link, group.issue, onTerminal) : []),
           ],
         })
         if (!isOpen) return [header]
         return [
           header,
-          ...group.runs.flatMap((run) => [treeRowOf($, Box, Text, Button, run), ...(run.name === selected ? [detailOf($, Box, Text, Button, run, found?.name === run.name ? found : null)] : [])]),
+          ...group.runs.flatMap((run, j) => {
+            const last = j === group.runs.length - 1
+            return [treeRowOf($, Box, Text, Button, run, last), ...(run.name === selected ? [detailOf($, Box, Text, Button, run, found?.name === run.name ? found : null, last)] : [])]
+          }),
         ]
       }),
-      Box({ marginTop: 1, children: [Text({ dimColor: true, wrap: 'truncate-end', children: ['↑↓ move · enter fold, show detail, open or ask · esc close'] })] }),
+      Box({ marginTop: 1, children: [Text({ dimColor: true, wrap: 'truncate-end', children: ['↑↓ move · enter fold, detail, open, ask · esc close'] })] }),
     ],
   })
 }

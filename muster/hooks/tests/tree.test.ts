@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 import { readRuns } from '../board.ts'
-import { groupByIssue, treeStateLabel } from '../tree-model.ts'
+import { groupByIssue } from '../tree-model.ts'
 import { stringsIn } from './fixtures/band.ts'
 import { NOW, RUNS, SESSION, dir, fakeEngine, kitWorld } from './fixtures/world.ts'
 import type { RunRow } from '../../types/index.d.ts'
@@ -71,13 +71,6 @@ test('DispatchTree T2 runs group by issue, issues sorted with the no-issue group
   expect(groupByIssue([])).toEqual([])
 })
 
-test('DispatchTree T3 an exited run is labelled with its exit reason; other states keep the band label', () => {
-  expect(treeStateLabel({ state: 'exited', exitReason: 'idle-timeout' })).toBe('exited · idle-timeout')
-  expect(treeStateLabel({ state: 'exited', exitReason: null })).toBe('exited')
-  expect(treeStateLabel({ state: 'question', exitReason: null })).toBe('? question')
-  expect(treeStateLabel({ state: 'done', exitReason: null })).toBe('done')
-})
-
 test('DispatchTree T4 /muster-runs opens the pane, which lists this repository\'s runs under their issues', async ($, on) => {
   const w = kitWorld(on, WORLD)
   const opened: unknown[] = []
@@ -98,8 +91,8 @@ test('DispatchTree T4 /muster-runs opens the pane, which lists this repository\'
   expect(text.indexOf('https://example.com/I')).toBeLessThan(text.indexOf('b'))
   expect(text.indexOf('b')).toBeLessThan(text.indexOf('a'))
   expect(text.indexOf('a')).toBeLessThan(text.indexOf('(no issue)'))
-  expect(joined).toContain('exited · idle-timeout')
-  expect(joined).toContain('done')
+  expect(joined).toContain('Probe C |  → idle-timeout')
+  expect(joined).toContain('√')
   expect(joined).not.toContain('/other')
 })
 

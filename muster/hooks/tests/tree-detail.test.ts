@@ -152,7 +152,7 @@ test('TreeDetail D6 pressing an issue folds its runs away and pressing it again 
   await $.ui.press({ plugin: 'muster', key: issueKey('https://example.com/I') })
   const folded = stringsIn(await $.ui.render(PANE)).join(' ')
   expect(folded).not.toContain('Build A')
-  expect(folded).toContain('▸')
+  expect(folded).toContain('►')
   expect(folded).toContain('Probe C')
   await $.ui.press({ plugin: 'muster', key: issueKey('https://example.com/I') })
   expect(stringsIn(await $.ui.render(PANE)).join(' ')).toContain('Build A')

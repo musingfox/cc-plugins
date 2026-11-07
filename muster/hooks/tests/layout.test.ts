@@ -23,27 +23,27 @@ test('BandLayout T1 the header and the live row read as approved, with the benea
   const strings = stringsIn(tree)
   expect(strings).toContain('muster')
   expect(strings).toContain(' · 1 running · 1 to collect')
-  expect(strings).toEqual(expect.arrayContaining(['inline-help', 'running', 'Add a login form', '2/5', '2m', '  $5.7']))
+  expect(strings).toEqual(expect.arrayContaining(['inline-help', '●', 'Add a login form', '██░░░ 2/5', '2m', '  $5.7']))
   expect((tree.props?.children ?? tree.children).at(-1)).toEqual(BENEATH)
 })
 
-test('BandLayout T2 a question, a running, a starting and an idle run each get their label and color', async () => {
+test('BandLayout T2 a question, a running, a starting and an idle run each get their glyph and color', async () => {
   const tree = await drawn({
     rows: [row({ name: 'a', state: 'question' }), row({ name: 'b', state: 'running' }), row({ name: 'c', state: 'starting' }), row({ name: 'd', state: 'idle' })],
     collect: 0,
   })
   const labels = nodesOf(tree, 'Text').filter((node) => node.props?.color !== undefined)
   expect(labels.map((node) => [stringsIn(node).join(''), node.props.color])).toEqual([
-    ['? question', 'warning'],
-    ['running', 'suggestion'],
-    ['starting', 'inactive'],
-    ['idle', 'permission'],
+    ['?', 'warning'],
+    ['●', 'suggestion'],
+    ['…', 'inactive'],
+    ['○', 'permission'],
   ])
 })
 
 test('BandLayout T3 progress without a plan is a dim tool count and a plan is not dimmed', async () => {
   const tree = await drawn({ rows: [row({ name: 'a', plan: null, tools: 12 }), row({ name: 'b' })], collect: 0 })
-  const progress = nodesOf(tree, 'Text').filter((node) => ['12 tools', '2/5'].includes(stringsIn(node).join('')))
+  const progress = nodesOf(tree, 'Text').filter((node) => ['# 12', '██░░░ 2/5'].includes(stringsIn(node).join('')))
   expect(progress[0].props.dimColor).toBe(true)
   expect(progress[1].props?.dimColor).toBeUndefined()
 })
@@ -52,7 +52,7 @@ test('BandLayout T4 the row is laid out in fixed columns with truncating texts a
   const tree = await drawn({ rows: [row({})], collect: 0 })
   const rowBox = nodesOf(tree, 'Box').find((node) => node.props?.columnGap === 2)
   expect(rowBox).toBeDefined()
-  expect(rowBox.props.children.slice(0, 4).map((cell: any) => cell.props.width)).toEqual([14, 10, 36, 10])
+  expect(rowBox.props.children.slice(0, 4).map((cell: any) => cell.props.width)).toEqual([14, 2, 36, 11])
   const texts = nodesOf(rowBox, 'Text')
   expect(texts.find((node) => stringsIn(node).join('') === 'inline-help').props.wrap).toBe('truncate-end')
   expect(texts.find((node) => stringsIn(node).join('') === 'Add a login form').props.wrap).toBe('truncate-end')
@@ -77,13 +77,13 @@ test('BandLayout R1 a title with control characters or 11000 characters still dr
   expect(strings).toContain('okbad[31m')
 })
 
-test('BandLayout R2 the four fixed-width cells do not shrink, so the columns line up across rows', async () => {
+test('BandLayout R2 the four fixed-width cells (name, glyph, title, progress) do not shrink, so the columns line up across rows', async () => {
   const tree = await drawn({ rows: [row({ name: 'a', seconds: 5484, cost: 12.3 }), row({ name: 'b', seconds: 120, cost: null })], collect: 0 })
   const rowBoxes = nodesOf(tree, 'Box').filter((node) => node.props?.columnGap === 2)
   expect(rowBoxes).toHaveLength(2)
   for (const rowBox of rowBoxes) {
     const cells = rowBox.props.children.slice(0, 4)
-    expect(cells.map((cell: any) => cell.props.width)).toEqual([14, 10, 36, 10])
+    expect(cells.map((cell: any) => cell.props.width)).toEqual([14, 2, 36, 11])
     expect(cells.map((cell: any) => cell.props.flexShrink)).toEqual([0, 0, 0, 0])
   }
 })

@@ -10,10 +10,6 @@ export function groupByIssue(runs: RunRow[]): TreeGroup[] {
     .map(([issue, members]) => ({ issue, runs: [...members].sort((a, b) => b.seconds - a.seconds || a.name.localeCompare(b.name)) }))
 }
 
-// An exited run left no report, so its exit reason is the only account of how it ended.
-export const treeStateLabel = (run: Pick<RunRow, 'state' | 'exitReason'>): string =>
-  run.state === 'question' ? '? question' : run.state === 'exited' && run.exitReason ? `exited · ${run.exitReason}` : run.state
-
 export const issueKey = (issue: string | null): string => `issue:${issue ?? ''}`
 export const runKey = (name: string): string => `run:${name}`
 

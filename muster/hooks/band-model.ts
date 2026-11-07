@@ -68,7 +68,14 @@ export function figuresOf(phase: unknown): Figures {
   }
 }
 
-export const stateLabel = (state: RunState): string => (state === 'question' ? '? question' : state)
+// One mark per state, shared by the band and the pane. Every character here is in the allowlist that tests/glyphs.test.ts holds.
+export const GLYPH: Record<RunState, string> = { starting: '…', running: '●', question: '?', idle: '○', done: '√', blocked: '×', malformed: '◊', exited: '■' }
+
+// Five cells of plan progress, filled by the share done, then the count.
+export function bar(done: number, total: number): string {
+  const filled = Math.round((done / total) * 5)
+  return `${'█'.repeat(filled)}${'░'.repeat(5 - filled)} ${done}/${total}`
+}
 
 // The theme keys the band paints each state with.
 export const STATE_COLOR: Record<RunState, string> = {
@@ -83,7 +90,7 @@ export const STATE_COLOR: Record<RunState, string> = {
 }
 
 export const progressCell = (row: Pick<BandRow, 'plan' | 'tools'>): { text: string; dim: boolean } =>
-  row.plan ? { text: `${row.plan.done}/${row.plan.total}`, dim: false } : { text: `${row.tools} tools`, dim: true }
+  row.plan ? { text: bar(row.plan.done, row.plan.total), dim: false } : { text: `# ${row.tools}`, dim: true }
 
 export const costText = (cost: number | null): string =>
   cost === null ? '' : `  $${cost.toLocaleString('en-US', { useGrouping: false, minimumFractionDigits: 1, maximumFractionDigits: 1 })}`
