@@ -179,6 +179,12 @@ describe("StatusReader", () => {
     const result = statusVerb("a1", { MUSTER_HOME: home, HOME: home });
     expect(result).toEqual({ exitCode: 0, stdout: "a1 state=running\n", stderr: "" });
   });
+
+  test("S1: a recorded session id renders session= before exit-reason", () => {
+    const p = makeRun();
+    writePhase(p, { phase: "exited", reason: "stopped", sessionId: "8e43-abc" });
+    expect(line(p)).toBe("a1 state=idle session=8e43-abc exit-reason=stopped");
+  });
 });
 
 describe("TerminationReasonInStatus status line", () => {

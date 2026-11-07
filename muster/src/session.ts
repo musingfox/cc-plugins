@@ -118,6 +118,7 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
     const hs = await handshake(channel, { worktree: wt.worktree, cache: layout.cache, fenced: request.fenced });
     sessionId = hs.sessionId;
     state.sessionId = sessionId;
+    writePhase(layout, { sessionId });
     const afterModel = await gateModel(channel, { sessionId, configOptions: hs.configOptions, requestedModel: request.model });
     if (request.effort) {
       await gateEffort(channel, { sessionId, configOptions: afterModel, requestedEffort: request.effort });

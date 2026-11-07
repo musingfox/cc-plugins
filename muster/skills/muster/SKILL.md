@@ -95,6 +95,18 @@ If the state is `dead`, the `muster run` process is gone without finishing the r
 git -C /abs/path/to/repo -c fetch.fsckObjects=true fetch -q --no-tags --no-recurse-submodules "<RUNDIR>/worktree" +refs/heads/muster/NAME:refs/heads/muster/NAME
 ```
 
+## Inspect
+
+Report to the person from status lines and `REPORT.md`, as a manager reports on their own team; never put a worker's transcript in front of them unasked. Open the worker's session only when the person asks to see it, or when the report and status cannot explain what went wrong (an unclear `BLOCKED` reason, `malformed`, `dead`, the same question coming back), and then say why you are pulling them one level down.
+
+The worker is an ordinary Claude Code session. Once `status` shows `session=<id>`, the person can open it from the worktree in a terminal of their own (with Rex, a new tab or pane) — `<RUNDIR>/worktree` is the worker's worktree:
+
+```
+cd "<RUNDIR>/worktree" && claude --resume <id> --fork-session
+```
+
+`--fork-session` gives them a copy, so the worker's own transcript is left alone; while the run is in flight that copy is a snapshot taken when it opened. Without `--fork-session` the person takes over that session, which is only safe after the run has exited. Either way the session they open runs with their own permissions, outside the fence.
+
 ## Stop
 
 Stop asks the worker to end; it does not end it at once. Run `watch` until it reports a terminal state.

@@ -169,6 +169,14 @@ describe("WorkerSessionLoop", () => {
     await done;
   });
 
+  test("T3b: the ACP session id is recorded in phase.json once the handshake succeeds", async () => {
+    const layout = layoutFor();
+    const done = runWorker(request(), layout, { env: envFor(scenario({})), exit: () => {} });
+    expect(await waitFor(() => readPhase(layout)?.sessionId !== undefined)).toBe(true);
+    expect(readPhase(layout)?.sessionId).toBe("sess-1");
+    await done;
+  });
+
   test("T4: a model the adapter does not offer blocks the run before any prompt", async () => {
     const layout = layoutFor();
     const exits: number[] = [];
