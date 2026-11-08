@@ -1,6 +1,6 @@
 ---
 name: pm
-description: Obsidian Workspace PM — tasks and documents in your Obsidian vault. Triggers on task/doc lifecycle requests ("add a task", "create a doc", "archive X", "list in-progress tasks", "refresh dashboard", "split this spec into tickets") and via `/obw:pm`. Requires `.obsidian.yaml` with a `pm.project` section. ADRs belong to the adr plugin.
+description: Obsidian Workspace PM — the one obw command, filing tasks and documents under the project's vault folder by their content. Triggers on task/doc lifecycle requests ("add a task", "create a note on X", "archive X", "list in-progress tasks", "refresh dashboard", "split this spec into tickets"), on workspace setup ("set up the Obsidian workspace", "migrate my obw vault"), and via `/obw:pm`. ADRs belong to the adr plugin.
 ---
 
 # pm — Obsidian Project Management
@@ -19,7 +19,7 @@ pm:
   project: <PROJECT_NAME>
 ```
 
-Missing config or `pm.project` → tell the user to run `/obw:init` and stop. Never guess the vault.
+Missing config or `pm.project`, or a request to set up or migrate the workspace → follow [references/setup.md](references/setup.md), then continue with the request. Never guess the vault.
 
 ## Vault Layout
 
@@ -33,30 +33,35 @@ pm/
 └── dashboard.base       # cross-project dashboard (optional)
 ```
 
-Every project has all three: `tasks/`, `docs/`, `dashboard.base`. `/obw:init` bootstraps them. If a pm operation finds `pm/{project}/dashboard.base` missing, regenerate it (see Dashboards) before reporting done.
+Every project has all three: `tasks/`, `docs/`, `dashboard.base`. Every task and doc lives under its `pm/{project}/`. Setup bootstraps them. If a pm operation finds `pm/{project}/dashboard.base` missing, regenerate it (see Dashboards) before reporting done.
 
 Beyond that, folders are created on demand: `create` auto-creates missing parent folders, but `move` fails with `ENOENT` when the destination folder is missing (e.g. the first archive). Create it first with `obsidian vault={vault} eval code="app.vault.createFolder('pm/{project}/tasks/archive')"`.
 
 ## Filenames
 
-Kebab-case, always: lowercase, whitespace and punctuation → `-`, collapse repeats, Unicode characters kept intact. Same rule as `/obw:jot` note mode.
+Every note is `{kebab}.md`, named from its title with only `a-z`, `0-9`, `-`, `_`, `.`, because the name is typed in wikilinks, CLI arguments and shell commands. Lowercase the title, turn whitespace and other punctuation into `-`, and collapse repeats. Translate a title in another language into English for the name, and keep the given text in `title`.
+
+Before `create`, `read` the path. If the note exists, ask with `AskUserQuestion` whether to overwrite, rename, or cancel, since `create` would otherwise write a `name 1.md` duplicate.
 
 The human-readable title is not derivable from the filename, so it lives in the `title` property. Obsidian's `{{title}}` resolves to the filename, so the H1 stays kebab — `title` is what dashboards display.
 
 - `Implement Auth` → `pm/{project}/tasks/implement-auth.md`, `title: Implement Auth`
+- `登入流程重構` → `pm/{project}/docs/login-flow-refactor.md`, `title: 登入流程重構`
 
 ## Template Names
 
-Fixed: `task`, `doc`. Installed into the vault's Obsidian Templates folder by `/obw:init`. Use via CLI `create template=<name>`.
+Fixed: `task`, `doc`. Installed into the vault's Obsidian Templates folder by setup. Use via CLI `create template=<name>`.
 
-If `obsidian vault=<v> templates` doesn't list one of these, `/obw:init` hasn't run (or the user removed them). Tell the user to re-run init rather than inlining template content here.
+If `obsidian vault=<v> templates` doesn't list one of these, setup hasn't run (or the user removed them). Run its step 4 rather than inlining template content here.
 
 ## Operations
 
 Use **one call** per known-name read — never chain `search → read`. The pm-specific bits:
 
+- **Choose the folder** → the content decides. Work to be done, with a checkable end, is a task in `tasks/`. Anything written to be read later, such as a note, spec, report or proposal, is a doc in `docs/`. An explicit "task" or "doc" in the request wins; when neither fits, ask with `AskUserQuestion`.
 - **Create task** → `create` at `pm/{project}/tasks/{kebab}.md` with `template=task`, then set properties `title` / `project` / `priority` / `due` / `tags`.
 - **Create doc** → `create` at `pm/{project}/docs/{kebab}.md` with `template=doc`, then set `title` / `project`.
+- **Fill the body** → put what the user gave into the template's matching section (`## Description`, `## Acceptance Criteria`, `## Overview`, `## Details`), since `append` lands at the end of the file. `read` the note, then `create` the same path with the edited text and `overwrite`.
 - **List tasks** → `search` with `query="[type:task] [project:{project}] [status:<s>]" format=json`.
 - **To tickets** → split a spec, task, or conversation into tickets with blocking edges; follow [references/to-tickets.md](references/to-tickets.md).
 - **Archive** → set `status=done` and `completed`, then `move` to `pm/{project}/tasks/archive`. Run the dependent check first (see Relations).
@@ -123,7 +128,7 @@ Conversation-mode status (user asks in chat, not Obsidian): run the equivalent `
 
 1. Read `.obsidian.yaml` before any operation.
 2. Never `search` to locate a note whose name is known — go straight to `read`.
-3. Never bypass the CLI with filesystem Read/Write against the vault. The only exceptions belong to `/obw:init`, which lists them under Filesystem Access. Dashboard creation uses the CLI via shell-piped content.
+3. Never bypass the CLI with filesystem Read/Write against the vault. The only exceptions belong to setup, which lists them under Filesystem Access. Dashboard creation uses the CLI via shell-piped content.
 4. Confirm destructive intents (delete, archive-move) before executing.
 5. A claim of "created" / "updated" needs a receipt — the CLI's own success output counts; an error output never does. Report failures as failures.
 6. Bulk scans (e.g. auditing all archived tasks) may be delegated to a read-only Explore agent to keep the listing out of context; single-entity operations never need one.

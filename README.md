@@ -156,11 +156,9 @@ Interact with [Fizzy](https://fizzy.do) via the Fizzy CLI for project management
 
 ### Obsidian Workspace
 
-Personal Obsidian vault productivity — capture, notes, and project management through the Obsidian CLI:
+Personal Obsidian vault project management through the Obsidian CLI:
 - **Issue Pane** (`/issue`): Claude Mod pane for listing a view of the project's dashboard and reading a card's details — coloured status and priority labels, an Acceptance Criteria count, Mermaid blocks drawn as text diagrams (`uvx termaid`), and an **Open in browser** Button that renders the card through viz, plus **Bind this session** / **Unbind this session** Buttons that tie the session to the card and show it in a band line above the prompt
-- **Jot** (`/obw:jot`): Quick capture (timestamped journal bullet) or long-form note — triages by input shape; filename strategies (title / slug / timestamp-title), `--folder` overrides per-call
-- **Project Management** (`/obw:pm`): Task/doc lifecycle, Bases dashboards, wikilink cross-references; split a spec into blocking tickets
-- **Interactive Init** (`/obw:init`): Guided setup of `.obsidian.yaml` — vault binding, note/pm sections
+- **Project Management** (`/obw:pm`): The one command; files tasks and docs under `pm/<project>/` by their content; guided setup of `.obsidian.yaml` and migration; task/doc lifecycle, Bases dashboards, wikilink cross-references; split a spec into blocking tickets
 - **Pm Tools** (`mcp__obw__pm_tick`, `pm_note`, `pm_status`): Claude ticks an acceptance criterion, appends a Notes line or sets a card's status in one tool call; each writes through one `obsidian eval` and reads the card back
 - **Prerequisites**: Obsidian app + CLI enabled, `.obsidian.yaml` config in project root; the Issue Pane also needs Claude Code 2.1.287 or later, with uv and viz optional
 
@@ -364,7 +362,7 @@ cc-plugins/
 ├── mermaid-inline/     hooks: register (Claude Mod) · tests
 ├── method/             skills: method · scripts · tests
 ├── muster/             skills: muster · hooks: register (Claude Mod) · src, e2e, tests
-├── obsidian-workspace/ skills: init, jot, pm · templates, tests · hooks: register (Claude Mod)
+├── obsidian-workspace/ skills: pm · templates, tests · hooks: register (Claude Mod)
 ├── omp-quota/          hooks: register (Claude Mod) · tests
 ├── pi-dispatch/        skills: pi-dispatch · agents: reviewer · scripts, shims, extensions, tests
 ├── spec/               skills: spec, glossary · scripts: spec.sh · tests

@@ -1,5 +1,5 @@
 ---
-description: "Near miss: a journal capture, which belongs to jot."
+description: "Near miss: a journal capture, which obw does not handle."
 tags: [trigger, negative]
 max_turns: 4
 timeout_seconds: 180

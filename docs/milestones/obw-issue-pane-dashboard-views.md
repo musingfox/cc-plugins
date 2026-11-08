@@ -46,7 +46,7 @@ a string `path` (the empty array being a view with no rows), and the dashboard f
 run that exited non-zero is reported from stderr rather than from whatever success-shaped text it
 left on stdout. A failed dashboard query carries one fixed line pointing at `/obw:pm`; a
 configuration error never does, because a missing `.obsidian.yaml` or `pm.project` belongs to
-`/obw:init`.
+`/obw:pm`, whose setup writes them.
 
 ## Concrete enough to build on
 

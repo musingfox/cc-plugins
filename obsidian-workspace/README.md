@@ -1,22 +1,19 @@
 # Obsidian Workspace
 
-Project-scoped Obsidian vault productivity for Claude Code — quick capture, long-form notes, and project management. Skills own folder layout + file templates + PM conventions, while the `/issue` Claude Mod lists a view of the project's dashboard in a pane; vault I/O runs through the Obsidian CLI, deferring to the official `obsidian:obsidian-cli` skill for syntax. Each skill file is kept small so it doesn't burn your context budget.
+Project-scoped Obsidian vault project management for Claude Code. The `/obw:pm` skill owns folder layout + file templates + PM conventions, while the `/issue` Claude Mod lists a view of the project's dashboard in a pane; vault I/O runs through the Obsidian CLI, deferring to the official `obsidian:obsidian-cli` skill for syntax. The skill file is kept small so it doesn't burn your context budget.
 
-Plugin identifier: `obw` (skills invoked as `/obw:<name>` or via natural language).
+Plugin identifier: `obw` (invoked as `/obw:pm` or via natural language).
 
 ## Skills
 
 | Skill | Purpose |
 |-------|---------|
-| `/obw:init` | Pick a vault, write `.obsidian.yaml`, install starter templates, bootstrap the project workspace, migrate an older layout |
-| `/obw:jot <text>` | Quick capture (timestamped bullet to today's daily note) or long-form note — triages by input shape |
-| `/obw:pm [intent]` | Task / document lifecycle, project-scoped; split a spec into blocking tickets |
+| `/obw:pm [intent]` | The one command. Files what you write under `pm/<project>/` by its content (`tasks/` for work to do, `docs/` for anything to read later); task / document lifecycle; split a spec into blocking tickets; workspace setup and migration when config is missing or you ask for it |
 
 ## How It Works
 
 - **Vault I/O** goes through the `obsidian` CLI, run directly in the main context (no sub-agent). This plugin does not duplicate CLI syntax; it defers to the official `obsidian:obsidian-cli` skill and `obsidian help`.
-- **Daily notes** use Obsidian's **Daily Notes** core plugin (folder / filename / template). Quick capture calls `daily:append`.
-- **Templates** (`task`, `doc`) live in your vault's Obsidian Templates folder. On `/obw:init` the plugin copies starter files from `templates/` only if the same name doesn't already exist — it never overwrites your edits.
+- **Templates** (`task`, `doc`) live in your vault's Obsidian Templates folder. During setup the plugin copies starter files from `templates/` only if the same name doesn't already exist — it never overwrites your edits.
 - **Dashboards** are **Obsidian Bases** (`.base` files — core in Obsidian 1.9+) generated from plugin-internal templates via shell substitution, so contents never enter Claude's context.
 
 ## Issue Pane
@@ -65,9 +62,8 @@ The obw Claude Mod registers three tools that Claude can call to change a task c
 - [Obsidian](https://obsidian.md) app running (headless CLI also works)
 - Obsidian community plugin **`obsidian-cli`** installed and enabled. The plugin's name is `obsidian-cli` but the executable it installs is `obsidian` (invoked as `obsidian vault=<name> ...`). This is **not** the unrelated standalone `obsidian-cli` binary by Yakitrak.
 - **Templates** core plugin enabled (required for `/obw:pm` — `task` / `doc` templates)
-- **Daily Notes** core plugin enabled (required for `/obw:jot` quick capture)
 - **Bases** core plugin enabled (required only for `/obw:pm` dashboards — bundled in Obsidian 1.9+)
-- [jq](https://jqlang.org) (required by `/obw:init`, which reads Obsidian's vault list and Templates settings with it)
+- [jq](https://jqlang.org) (required by `/obw:pm` setup, which reads Obsidian's vault list and Templates settings with it)
 - [uv](https://docs.astral.sh/uv/) (required by `/obw:pm refresh dashboard`, which compares dashboards through `uv run --with pyyaml`; optional for the `/issue` pane, where it draws Mermaid blocks as text diagrams through `uvx termaid@0.9.0` — without it they show as code blocks)
 - [viz](../viz) plugin (optional; enables the `/issue` pane's **Open in browser** Button — without it the Button is not drawn)
 - Claude Code 2.1.287 or later (required only for the `/issue` pane; the skills do not need it)
@@ -96,24 +92,18 @@ Vault operations shell out to the `obsidian` CLI plus a few Unix helpers. To avo
 }
 ```
 
-Or run `/fewer-permission-prompts` after a stuck `/obw:init` and it will scan transcripts and propose the same list.
+Or run `/fewer-permission-prompts` after a stuck `/obw:pm` setup and it will scan transcripts and propose the same list.
 
 ## Configuration
 
-Run `/obw:init` in a project root. The generated `.obsidian.yaml`:
+Run `/obw:pm` in a project root. With no config it walks through setup and generates `.obsidian.yaml`:
 
 ```yaml
 vault: MyVault
 
-note:
-  default_folder: Inbox
-  filename_strategy: title     # title | slug | timestamp-title
-
 pm:
-  project: my-project          # Omit this section to disable /obw:pm
+  project: my-project
 ```
-
-Daily note folder / filename / template are **not** in `.obsidian.yaml` — they come from Obsidian's Daily Notes settings.
 
 ## Vault Layout (`/obw:pm`)
 
@@ -127,15 +117,15 @@ pm/
     └── docs/             # Docs
 ```
 
-Every project gets `tasks/`, `docs/`, and `dashboard.base` — `/obw:init` creates all three up front, so a project is never a bare folder.
+Every project gets `tasks/`, `docs/`, and `dashboard.base` — setup creates all three up front, so a project is never a bare folder.
 
-Upgrading a vault from before 0.9: re-run `/obw:init`. It detects the old layout and offers, each separately, to move `archive/` into `tasks/archive/` (through the CLI, so links follow), backfill the `title` property on existing notes, and regenerate the dashboards with the new views. Existing filenames are never renamed.
+Upgrading a vault from before 0.9: run `/obw:pm migrate my obw vault`. It detects the old layout and offers, each separately, to move `archive/` into `tasks/archive/` (through the CLI, so links follow), backfill the `title` property on existing notes, and regenerate the dashboards with the new views. Existing filenames are never renamed.
 
 A plugin update can change dashboard views, formulas, columns, and filters. Run `/obw:pm refresh dashboard` to bring in All Tasks (and any other template change) on an existing vault. The refresh compares `dashboard.base` with every template version as parsed YAML. A dashboard identical to one of them is regenerated at once; one with hand edits lists them, warns that regenerating overwrites them, and asks first.
 
 ## Filenames
 
-All notes are kebab-cased (`Implement Auth` → `implement-auth.md`), for both `/obw:jot` notes and `/obw:pm` tasks / docs. Because Obsidian's `{{title}}` resolves to the filename, the human-readable title lives in the `title` property — that is what the dashboards display.
+All notes are named `<title>.md` in kebab-case, using only `a-z`, `0-9`, `-`, `_` and `.` (`Implement Auth` → `implement-auth.md`), for both tasks and docs. A title in another language gets an English filename and stays as written in `title`. Because Obsidian's `{{title}}` resolves to the filename, the human-readable title lives in the `title` property — that is what the dashboards display.
 
 ## Property Schema
 
@@ -153,8 +143,7 @@ Only one direction is stored. What a task *blocks*, and what its subtasks are, c
 ## Examples
 
 ```
-/obw:jot #worklog 完成 API 重構 PR，等 review
-/obw:jot API Redesign Proposal --folder Architecture --tag design
+/obw:pm new note: API Redesign Proposal
 /obw:pm add task implement-auth, high priority, due 2026-05-01
 /obw:pm implement-auth is blocked by db-migration
 /obw:pm implement-auth is done, archive it

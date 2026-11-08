@@ -4,7 +4,7 @@ cd "$(git rev-parse --show-toplevel)"
 
 fail() { echo "  ✗ $*"; exit 1; }
 
-n="$(grep -c 'skills: init, jot, pm · templates, tests' README.md || true)"
+n="$(grep -c 'skills: pm · templates, tests' README.md || true)"
 [ "$n" -eq 1 ] || fail "root README tree line count is $n, want 1"
 
 n="$(awk '/^### Obsidian Workspace/,/^### pi-dispatch/' README.md | grep -ci 'tickets' || true)"
@@ -51,7 +51,7 @@ n="$(grep -c '/issue' obsidian-workspace/README.md || true)"
 n="$(awk '/^### Obsidian Workspace/,/^### pi-dispatch/' README.md | grep -c '/issue' || true)"
 [ "$n" -ge 1 ] || fail "root README Obsidian Workspace section must mention /issue"
 
-n="$(grep -cF '├── obsidian-workspace/ skills: init, jot, pm · templates, tests · hooks: register (Claude Mod)' README.md || true)"
+n="$(grep -cF '├── obsidian-workspace/ skills: pm · templates, tests · hooks: register (Claude Mod)' README.md || true)"
 [ "$n" -eq 1 ] || fail "root README obw tree line count is $n, want 1"
 
 for f in obsidian-workspace/.claude-plugin/plugin.json .claude-plugin/marketplace.json obsidian-workspace/README.md README.md; do
@@ -112,3 +112,21 @@ if printf '%s\n' "$s" | grep -Eqi 'literal vault path|bare name[^.]*rejected'; t
   fail "README Pm Tools tells callers to pass the vault path as card; the tools take the file name without .md"
 fi
 printf '%s\n' "$s" | grep -q 'pm/<project>/tasks/' || fail "README Pm Tools must state the card path rule"
+
+[ "$(ls obsidian-workspace/skills)" = pm ] || fail "pm must be the only obw skill"
+for f in obsidian-workspace/skills/pm/SKILL.md obsidian-workspace/skills/pm/references/setup.md obsidian-workspace/README.md obsidian-workspace/templates/README.md wrap-up/skills/wrap-up/SKILL.md docs/milestones/obw-issue-pane-dashboard-views.md; do
+  n="$(grep -cE 'obw:(jot|init)|default_folder|filename_strategy|timestamp-title|--folder|--tag|Unicode|daily:append' "$f" || true)"
+  [ "$n" -eq 0 ] || fail "$f still names a removed command, note folder, filename strategy, tag flag, Unicode filenames or daily capture, got $n"
+done
+n="$(awk '/^### Obsidian Workspace/,/^### pi-dispatch/' README.md | grep -cE 'obw:(jot|init)|timestamp-title|--folder' || true)"
+[ "$n" -eq 0 ] || fail "root README Obsidian Workspace section still names a removed command, got $n"
+n="$(grep -rlE '\bjot\b|obw:init' obsidian-workspace/evals | wc -l | tr -d ' ' || true)"
+[ "$n" -eq 0 ] || fail "$n eval files still target a removed skill"
+n="$(awk '/^## Filenames/,/^## Template Names/' obsidian-workspace/skills/pm/SKILL.md | grep -cF '`a-z`, `0-9`, `-`, `_`, `.`' || true)"
+[ "$n" -eq 1 ] || fail "pm Filenames must state the filename character set once, got $n"
+n="$(grep -cF 'template=doc' obsidian-workspace/skills/pm/SKILL.md || true)"
+[ "$n" -eq 1 ] || fail "pm Create doc must apply the doc template, got $n"
+n="$(awk '/^## Operations/,/^## Relations/' obsidian-workspace/skills/pm/SKILL.md | grep -c '^- \*\*Choose the folder\*\*' || true)"
+[ "$n" -eq 1 ] || fail "pm Operations must route content to a folder, got $n"
+n="$(grep -cF '(references/setup.md)' obsidian-workspace/skills/pm/SKILL.md || true)"
+[ "$n" -ge 1 ] || fail "pm must point at its setup reference"

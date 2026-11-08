@@ -13,7 +13,7 @@ n=$(grep -c '^description:' "$skill" || true)
 [ "$n" -eq 1 ] || fail "T2: one description line, got $n"
 
 n=$(grep '^description:' "$skill" | grep -cF 'Requires `.obsidian.yaml`' || true)
-[ "$n" -eq 1 ] || fail "T3: description must keep Requires \`.obsidian.yaml\`"
+[ "$n" -eq 0 ] || fail "T3: pm runs setup itself, so its description must not require \`.obsidian.yaml\`"
 
 n=$(awk '/^## Operations/,/^## Relations/' "$skill" | grep -c '^- \*\*To tickets\*\*' || true)
 [ "$n" -eq 1 ] || fail "T4: Operations must have To tickets bullet, got $n"
