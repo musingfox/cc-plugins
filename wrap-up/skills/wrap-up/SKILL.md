@@ -33,7 +33,6 @@ description: Close out the current task by reading the conversation, listing onl
 | Memory、知識庫 | 只和這個專案有關、值得跨 session 保留、但 repo 沒有記錄的事實 | memory 檔案（依系統提示的 memory 規則）；Hindsight 用 `hindsight_ingest_document` |
 | 全域規則 | 適用所有專案的偏好，或在多個專案反覆出現的障礙 | 提出 `~/.claude/CLAUDE.md` 的修改，逐項核准後再改；memory 只在存入的專案載入，不適合放這類規則 |
 | 設定、變數 | 對話中決定要改設定，但還沒改 | `Edit`；Claude Code 設定用 `update-config` skill |
-| Journal | 使用者要把 recap 留存下來 | `/obw:jot` |
 
 每一項寫成一行，包含操作、依據與工具。依據要指名具體內容，例如檔名、commit hash、卡片名稱或對話中的哪個決定。
 
