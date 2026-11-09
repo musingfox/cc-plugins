@@ -68,10 +68,13 @@ async function put($: any, request: number, change: (state: ObwPane) => ObwPane)
 }
 
 // A refused focus (the pane does not hold the keys, a key not drawn) leaves the ring where it is.
+// The ring is recorded here: a focus the plugin raises outside a person's key does not reach its own ui.focus hook.
 async function focus($: any, key: string): Promise<boolean> {
   try {
     const moved = await $.ui.focus({ requestId: PANE_ID, key })
-    return !moved?.deny
+    if (moved?.deny) return false
+    await update($, ring, (previous) => nextRing(previous, key))
+    return true
   } catch {
     return false
   }
