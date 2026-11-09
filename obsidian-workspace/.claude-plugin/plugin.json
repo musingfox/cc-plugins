@@ -1,6 +1,6 @@
 {
   "name": "obw",
-  "version": "0.10.3",
+  "version": "0.10.4",
   "description": "Obsidian Workspace — project-scoped vault project management. /obw:pm is the one command: it owns setup, folder layout and templates, files tasks and docs under pm/<project>/ by their content, and splits a spec into blocking tickets; /issue is a Claude Mod pane that lists a view of the project's dashboard, draws Mermaid as text diagrams, and can open a card in the browser through viz. Vault I/O uses the Obsidian CLI via the official obsidian-cli skill.",
   "types": "./types/index.d.ts",
   "dependencies": [
@@ -10,5 +10,13 @@
     "name": "musingfox"
   },
   "repository": "https://github.com/musingfox/cc-plugins",
-  "keywords": ["obsidian", "journal", "capture", "notes", "project-management", "claude-mod"]
+  "keywords": ["obsidian", "journal", "capture", "notes", "project-management", "claude-mod"],
+  "userConfig": {
+    "work_prompt": {
+      "type": "string",
+      "title": "Work on this card prompt",
+      "description": "Text the Work on this card Button sends, with {card} for the card's vault path and {vault} for the vault. A work_prompt under pm: in .obsidian.yaml wins over this. Empty uses the built-in text",
+      "default": ""
+    }
+  }
 }
