@@ -61,6 +61,8 @@ export type ObwPane = {
   allTasks: { groups: ObwGroup[]; hidden: number } | null
   selected: string | null
   card: ObwCard | null
+  // The dim line a failed 5-second refresh leaves; null once a refresh succeeds.
+  refreshLine: ObwLine | null
 }
 
 export type ObwList = {

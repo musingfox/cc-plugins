@@ -52,6 +52,7 @@ export type WorldOptions = {
   reads?: Record<string, CliAnswer>
   register?: { deny: string }
   open?: { deny: string }
+  panes?: { deny: string }
   env?: Record<string, string>
   write?: { deny: string }
   render?: CliAnswer
@@ -93,14 +94,17 @@ function readAnswer(reads: Record<string, CliAnswer>, argv: string[]): CliAnswer
 // `$.env.get` is answered only when `env` is given; without it the call rejects; `$.session.id` likewise answers only with `sessionId`.
 // `rm` runs are answered by `rm` (exit 0 by default) and an exit-0 answer deletes argv[2] from `files`, which is live.
 // `beneath` is what the AbovePrompt hooks below the plugin draw.
+// `panes: { deny }` refuses `$.ui.panes()`. `panes` below holds the ids of the panes a successful `ui.open` left open, and `$.ui.panes()` answers from it; a test closes a pane by emptying it.
+// `answers` is live: a test changes what a later run of a verb is answered with.
 export function world(on: any, options: WorldOptions = {}) {
-  for (const key of Object.keys(options)) if (!['cwd', 'files', 'exists', 'views', 'query', 'read', 'reads', 'register', 'open', 'env', 'write', 'render', 'termaid', 'serve', 'sessionId', 'beneath', 'rm', 'toolRegister', 'cards', 'eval'].includes(key)) throw new Error(`stale world option: ${key}`)
+  for (const key of Object.keys(options)) if (!['cwd', 'files', 'exists', 'views', 'query', 'read', 'reads', 'register', 'open', 'panes', 'env', 'write', 'render', 'termaid', 'serve', 'sessionId', 'beneath', 'rm', 'toolRegister', 'cards', 'eval'].includes(key)) throw new Error(`stale world option: ${key}`)
   const runs: any[] = []
   const tools: any[] = []
   const cards: Record<string, string> = { ...(options.cards ?? {}) }
   const existsCalls: string[] = []
   const readCalls: string[] = []
   const opened: any[] = []
+  const panes: string[] = []
   const registered: any[] = []
   const writes: { path: string; text: string }[] = []
   const state = { invalidates: 0 }
@@ -152,8 +156,11 @@ export function world(on: any, options: WorldOptions = {}) {
   })
   on('ui.open', ($: any, e: any) => {
     opened.push(e)
-    return options.open ?? { value: undefined }
+    if (options.open) return options.open
+    if (!panes.includes(e.id)) panes.push(e.id)
+    return { value: undefined }
   })
+  on('ui.panes', () => options.panes ?? { value: panes.map((id) => ({ id })) })
   on('ui.invalidate', () => {
     state.invalidates += 1
     return { value: undefined }
@@ -192,6 +199,8 @@ export function world(on: any, options: WorldOptions = {}) {
     existsCalls,
     readCalls,
     opened,
+    panes,
+    answers,
     registered,
     tools,
     cards,

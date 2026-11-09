@@ -39,6 +39,12 @@ export function reorderTarget(item: string | null, items: string[]): string | nu
   return item !== null && items.includes(item) ? item : null
 }
 
+// After a refresh changed the list: the list item the ring is on when it is still drawn, else the first drawn item. A ring on the filter or a button stays.
+export function refreshTarget(at: string | null, items: string[]): string | null {
+  if (at === null || !isListKey(at) || items.length === 0) return null
+  return items.includes(at) ? at : items[0]
+}
+
 // Where the ring goes when a card is left: `back` while another card remains, else the row the person opened.
 export function backTarget(trail: string[], items: string[]): string | null {
   if (trail.length > 1) return BACK_KEY

@@ -16,7 +16,7 @@ import { acLabel, headerOf, relationsOf } from './card.ts'
 import { vizManifestPath, vizInstallPath, renderTarget, renderArgv, renderOutcome, RENDER_TIMEOUT_MS, isLoopbackUrl, tailnetUrl, SERVE_STATUS_ARGV, SERVE_TIMEOUT_MS } from './viz.ts'
 import { splitFences, termaidHeaderAllowed, diagramOutcome, TERMAID_ARGV, TERMAID_TIMEOUT_MS } from './mermaid.ts'
 import type { Segment } from './mermaid.ts'
-import { BACK_KEY, QUERY_KEY, arrowMove, backTarget, closeGoesBack, nextRing, reorderTarget, submitTarget } from './ring.ts'
+import { BACK_KEY, QUERY_KEY, arrowMove, backTarget, closeGoesBack, nextRing, refreshTarget, reorderTarget, submitTarget } from './ring.ts'
 import { LIST_START, LOADING, RING_START } from './state.ts'
 import { ACCENT, ERROR, INACTIVE, SUBTLE, priorityColor, statusColor } from './style.ts'
 import { fitWidth } from './width.ts'
@@ -27,7 +27,7 @@ import { PM_TOOLS, cardText, evalArgv, pmEdit } from './pm-tools.ts'
 
 // The scan that checks `update` and `read` follows an atom only when it is made in the file that uses it.
 // Bump the shape tag when ObwPane changes meaning: a reload then declines what the old code wrote.
-export const pane = atom({ plugin: 'obw', key: 'pane' } as const, LOADING, { shape: 'pane-2' })
+export const pane = atom({ plugin: 'obw', key: 'pane' } as const, LOADING, { shape: 'pane-3' })
 export const list = atom({ plugin: 'obw', key: 'list' } as const, LIST_START)
 export const ring = atom({ plugin: 'obw', key: 'ring' } as const, RING_START)
 
@@ -125,11 +125,12 @@ async function show($: any, step: (before: string[]) => Step, ringAfter: RingAft
   if (output.kind === 'error') return settle({ kind: 'error', message: output.message })
   const vizRoot = await findViz($)
   const segments = splitFences(bounded(output.body).text)
+  const body = output.body.slice(0, MAX_STORED_BODY)
   await settle({
     kind: 'shown',
     path,
     header: headerOf(output.frontmatter),
-    body: output.body.slice(0, MAX_STORED_BODY),
+    body,
     segments,
     relations: relationsOf(output.frontmatter),
     vizRoot,
@@ -138,17 +139,22 @@ async function show($: any, step: (before: string[]) => Step, ringAfter: RingAft
     bindLine: null,
   })
   // termaid never holds /issue: an offline uvx can take seconds, and the card is already drawn.
-  void drawDiagrams($, request, segments).catch(() => {})
+  void drawDiagrams($, request, segments, body).catch(() => {})
 }
 
 // One run at a time: a rejected run means uvx fails for every block, and a superseded read never draws.
-async function drawDiagrams($: any, request: number, segments: Segment[]) {
+// A refresh changes the body under the same request, so a diagram also lands only on the body it was started for.
+async function drawDiagrams($: any, request: number, segments: Segment[], body: string) {
+  const current = async () => {
+    const state = await read($, pane)
+    return state.request === request && state.card?.kind === 'shown' && state.card.body === body
+  }
   for (const [index, segment] of segments.entries()) {
-    if (segment.kind !== 'mermaid' || !termaidHeaderAllowed(segment.source) || (await read($, pane)).request !== request) continue
+    if (segment.kind !== 'mermaid' || !termaidHeaderAllowed(segment.source) || !(await current())) continue
     const run = await runProcess($, TERMAID_ARGV, TERMAID_TIMEOUT_MS, segment.source)
     if (run.kind === 'rejected') return
     const diagram = diagramOutcome(run)
-    if (diagram !== null) await patchShown($, request, (card) => ({ ...card, diagrams: card.diagrams.map((drawn, at) => (at === index ? diagram : drawn)) }))
+    if (diagram !== null) await patchShown($, request, (card) => (card.body === body ? { ...card, diagrams: card.diagrams.map((drawn, at) => (at === index ? diagram : drawn)) } : card))
   }
 }
 
@@ -377,6 +383,20 @@ function reasonOf(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
 
+// What a view's rows become in the pane: the cards, the outside or empty notice, and the All Tasks groups.
+function listOf(scope: Scope, chosen: string, result: Exclude<ReturnType<typeof baseQueryOutput>, { kind: 'error' }>) {
+  const listed = result.kind === 'rows' ? listRows(scope.project, result.rows) : []
+  const cards = listed.map((card) => ({ path: card.path, label: bounded(card.label, MAX_LABEL).text, status: card.status === null ? null : bounded(card.status, MAX_LABEL).text }))
+  const outside = result.kind === 'rows' ? rowsOutside(scope.project, result.rows) : 0
+  const message: Line | null = outside
+    ? { kind: 'notice', text: outsideNotice(outside, chosen, scope.project) }
+    : !cards.length
+      ? { kind: 'notice', text: `No cards in the ${chosen} view of pm/${scope.project}.` }
+      : null
+  const allTasks = chosen === COUNT_VIEW && result.kind === 'rows' ? listGroups(scope.project, result.rows) : null
+  return { cards, message, allTasks }
+}
+
 async function openView($: any, scope: Scope, views: string[], chosen: string, named: string | null, request: number | null, listing: Line | null = null) {
   const loading = (state: ObwPane): ObwPane => ({ ...LOADING, request: state.request, scope, views, chosen, listing })
   let current = request
@@ -394,20 +414,96 @@ async function openView($: any, scope: Scope, views: string[], chosen: string, n
     await put($, current, (state) => ({ ...state, loading: false, message, hint }))
     return
   }
-  const listed = result.kind === 'rows' ? listRows(scope.project, result.rows) : []
-  const cards = listed.map((card) => ({ path: card.path, label: bounded(card.label, MAX_LABEL).text, status: card.status === null ? null : bounded(card.status, MAX_LABEL).text }))
-  const outside = result.kind === 'rows' ? rowsOutside(scope.project, result.rows) : 0
-  const message: Line | null = outside
-    ? { kind: 'notice', text: outsideNotice(outside, chosen, scope.project) }
-    : !cards.length
-      ? { kind: 'notice', text: `No cards in the ${chosen} view of pm/${scope.project}.` }
-      : null
-  const allTasks = chosen === COUNT_VIEW && result.kind === 'rows' ? listGroups(scope.project, result.rows) : null
+  const { cards, message, allTasks } = listOf(scope, chosen, result)
   const drawn = await put($, current, (state) => ({ ...LOADING, request: state.request, loading: false, message, listing, scope, views, chosen, cards, allTasks }))
   if (!drawn || !named) return
   // All Tasks draws a card in its card view, so back leads to the list; any other view keeps its list above the card.
   const path = cardPathIn(cards, scope.project, named)
   await show($, (before) => ({ trail: chosen === COUNT_VIEW ? [path] : before, path }))
+}
+
+const REFRESH_MS = 5000
+
+let refresher: { cancel(): void } | null = null
+let refreshing = false
+
+function stopRefresh() {
+  refresher?.cancel()
+  refresher = null
+}
+
+function startRefresh($: any) {
+  stopRefresh()
+  refresher = $.clock.every(REFRESH_MS, () => {
+    void refreshTick($).catch(() => {})
+  })
+}
+
+// One refresh at a time: a tick that fires while a read is pending is skipped.
+async function refreshTick($: any) {
+  if (refreshing) return
+  refreshing = true
+  try {
+    let open: { id: string }[]
+    try {
+      open = await $.ui.panes()
+    } catch {
+      return
+    }
+    if (!open.some((entry) => entry.id === PANE_ID)) return stopRefresh()
+    await refreshPane($)
+  } finally {
+    refreshing = false
+  }
+}
+
+function refreshFailed($: any, request: number, reason: string) {
+  const refreshLine: Line = { kind: 'notice', text: `Could not refresh: ${bounded(reason, MAX_LABEL).text}` }
+  return put($, request, (state) => ({ ...state, refreshLine }))
+}
+
+// Every write is compared with the request read first, and the tick never numbers one: whatever the person did meanwhile drops it.
+async function refreshPane($: any) {
+  const first = await read($, pane)
+  const { request, scope, chosen } = first
+  if (first.loading || !scope || !chosen) return
+  const query = baseQueryArgv(scope, chosen)
+  const cardRead = first.card?.kind === 'shown' ? cardPathArgv(scope, first.card.path) : null
+  if (!('argv' in query) || (cardRead && !('argv' in cardRead))) return
+  let result: ReturnType<typeof baseQueryOutput>
+  let fresh: ReturnType<typeof readOutput> | null = null
+  try {
+    result = baseQueryOutput(await runProcess($, query.argv))
+    if (cardRead && 'argv' in cardRead) fresh = readOutput(await runProcess($, cardRead.argv))
+  } catch (error) {
+    await refreshFailed($, request, reasonOf(error))
+    return
+  }
+  if (result.kind === 'error' || fresh?.kind === 'error') {
+    await refreshFailed($, request, result.kind === 'error' ? result.message : (fresh as { message: string }).message)
+    return
+  }
+  const listed = listOf(scope, chosen, result)
+  const body = fresh?.kind === 'card' ? fresh.body.slice(0, MAX_STORED_BODY) : null
+  const segments = fresh?.kind === 'card' ? splitFences(bounded(fresh.body).text) : null
+  const merge = (state: ObwPane): ObwPane => {
+    const held = state.card
+    const card =
+      held?.kind === 'shown' && fresh?.kind === 'card' && body !== null && segments
+        ? { ...held, header: headerOf(fresh.frontmatter), body, segments, relations: relationsOf(fresh.frontmatter), diagrams: body === held.body ? held.diagrams : segments.map(() => null) }
+        : held
+    return { ...state, ...listed, hint: state.message?.kind === 'error' ? null : state.hint, refreshLine: null, card }
+  }
+  const before = await read($, pane)
+  if (before.request !== request || JSON.stringify(merge(before)) === JSON.stringify(before)) return
+  if (!(await put($, request, merge))) return
+  if (before.card?.kind === 'shown' && body !== null && segments && before.card.body !== body) void drawDiagrams($, request, segments, body).catch(() => {})
+  if (JSON.stringify([before.cards, before.allTasks]) !== JSON.stringify([listed.cards, listed.allTasks])) await keepRing($)
+}
+
+async function keepRing($: any) {
+  const target = refreshTarget((await read($, ring)).at, (await drawnItems($)).keys)
+  if (target) await focus($, target)
 }
 
 // A pick is taken from a drawing the pane has already replaced: a later /issue whose config resolution
@@ -596,6 +692,7 @@ async function drawPane($: any, e: any) {
   }
   if (state.message) children.push(line(state.message))
   if (state.hint) children.push(dim(state.hint))
+  if (state.refreshLine) children.push(line(state.refreshLine))
   if (drawnList) children.push(listHints(ui, e.surface))
   const card = state.card
   if (!card) return Box({ flexDirection: 'column', children })
@@ -704,7 +801,7 @@ function cardRegion($: any, draw: DrawContext, card: ObwCard) {
 
 // The card view: the path taken from the list, a back Button, the card, and what the keys do here.
 function cardView($: any, draw: DrawContext, { columns, ruleWidth }: { columns: number; ruleWidth: number }) {
-  const { ui, state, dim } = draw
+  const { ui, state, dim, line } = draw
   const { Box, Text, Button } = ui
   const { card } = state
   const crumbs = ['list', ...state.trail.slice(0, -1).map((path) => bounded(cardName(path)).text)]
@@ -723,6 +820,7 @@ function cardView($: any, draw: DrawContext, { columns, ruleWidth }: { columns: 
         ],
       }),
       Box({ flexDirection: 'column', marginTop: 1, children: [dim('─'.repeat(ruleWidth)), ...(card ? cardRegion($, draw, card) : [])] }),
+      ...(state.refreshLine ? [line(state.refreshLine)] : []),
       Box({ marginTop: 1, children: [Text({ color: SUBTLE, wrap: 'truncate-end', children: [hints.join(' · ')] })] }),
     ],
   })
@@ -797,6 +895,8 @@ async function pmHook($: any, tool: string, event: Record<string, unknown>) {
 
 export function register(on: On) {
   on('session.start', async ($, e, next) => {
+    // A reload re-fires session.start on this instance; the next /issue starts the timer again.
+    stopRefresh()
     try {
       await $.command.register({
         name: 'issue',
@@ -829,6 +929,7 @@ export function register(on: On) {
     } catch {
       return { text: 'obw: the /issue pane could not open.' }
     }
+    startRefresh($)
     await openIssue($, request, argument, chosen)
     // Card text never goes into the result: the model would read it.
     return {}

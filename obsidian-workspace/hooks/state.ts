@@ -15,6 +15,7 @@ export const LOADING: ObwPane = {
   allTasks: null,
   selected: null,
   card: null,
+  refreshLine: null,
 }
 
 export const LIST_START: ObwList = { query: '', priority: null, sort: 'priority', folded: [groupKey(0, 'done')] }
