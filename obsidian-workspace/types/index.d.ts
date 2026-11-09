@@ -29,8 +29,8 @@ export type ObwCard =
       browser: ObwBrowser | null
       // Indexed by a mermaid block's position in `segments`; `null` for a block with no drawn diagram.
       diagrams: (string | null)[]
-      // A failed Unbind or Work on this card press; null once a press succeeds or the card is read again.
-      bindLine: ObwLine | null
+      // A failed Work on this card press; null once a press succeeds or the card is read again.
+      workLine: ObwLine | null
     }
 
 export type ObwRow = {
@@ -76,11 +76,9 @@ export type ObwList = {
 
 export type ObwRing = { at: string | null; item: string | null }
 
-// A binding file may carry no project, which a card path can still name. `card` is what the band draws, null until it is read.
-export type ObwBound = { cardPath: string; vault: string; project: string | null; card: { title: string | null; ac: string | null } | null }
 
 declare module 'claude-code' {
   interface PluginState {
-    obw: { pane: Shaped<ObwPane>; list: ObwList; ring: ObwRing; binding: ObwBound | null }
+    obw: { pane: Shaped<ObwPane>; list: ObwList; ring: ObwRing }
   }
 }

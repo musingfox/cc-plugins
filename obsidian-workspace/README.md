@@ -38,7 +38,7 @@ The pane needs Claude Code 2.1.287 or later, where Claude Mods are on by default
 
 ## Session Writeback
 
-A session is bound to a task card by a file at `~/.claude-mobile/launches/<session_id>.json` (`cardPath`, `vault`, `project`, `createdAt`, plus `paneId` from cc-mobile), or under `$OBW_LAUNCHES_DIR` when that is set. Two things write it: cc-mobile when it starts a session for a card, and Claude setting a `pm/<project>/tasks/` card's status to `in-progress` once the CLI confirms it. The **Unbind this session** Button, or a confirmed `done` of the bound card, removes it. While bound, the band above the prompt shows the card's name, title and AC x/y, reread after each turn. Three hooks in `hooks/hooks.json` run `hooks/writeback.sh` on every prompt, stop and permission prompt of every session; a session without that file leaves in a few milliseconds and touches nothing. For a bound session they write to the card:
+A session is bound to a task card by a file at `~/.claude-mobile/launches/<session_id>.json` (`cardPath`, `vault`, `project`, `createdAt`, plus `paneId`), or under `$OBW_LAUNCHES_DIR` when that is set. Only cc-mobile writes it, when it starts a session for a card. Three hooks in `hooks/hooks.json` run `hooks/writeback.sh` on every prompt, stop and permission prompt of every session; a session without that file leaves in a few milliseconds and touches nothing. For a bound session they write to the card:
 
 - the first prompt sets `session` and appends `工作中` to `## Agent`;
 - each stop appends the reply's first line, and a longer reply's full text goes to `pm/<project>/runs/<card>.md`, linked from that line;
@@ -52,7 +52,7 @@ The obw Claude Mod registers three tools that Claude can call to change a task c
 
 - `pm_tick {card, index, checked}` sets one checkbox of the card to `checked`.
 - `pm_note {card, line}` adds `line` to the card.
-- `pm_status {card, status}` sets the card's status. It does not bind or unbind the session.
+- `pm_status {card, status}` sets the card's status.
 
 `card` is the card's file name without `.md`, such as `a` for `pm/<project>/tasks/a.md`; the project comes from `.obsidian.yaml`. An empty name, a name with `/`, or one with a control character is rejected with `isError` set, and nothing is written. Every result is one JSON line in the tool's text: `{"ok":true,"path":"pm/<project>/tasks/a.md"}` on success, `{"ok":false,"reason":"..."}` otherwise; the platform accepts only text or content blocks as a tool result, so the object is never returned bare.
 

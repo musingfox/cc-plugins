@@ -20,14 +20,12 @@ import { BACK_KEY, QUERY_KEY, arrowMove, backTarget, closeGoesBack, nextRing, re
 import { LIST_START, LOADING, RING_START } from './state.ts'
 import { ACCENT, ERROR, INACTIVE, SUBTLE, priorityColor, statusColor } from './style.ts'
 import { fitWidth } from './width.ts'
-import type { ObwBound, ObwBrowser, ObwCard, ObwLine, ObwList, ObwPane } from '../types/index.d.ts'
-import { bindingAction, bindingOf, bindingPath, sameBinding, statusChanges } from './bind.ts'
-import type { Binding } from './bind.ts'
+import type { ObwBrowser, ObwCard, ObwLine, ObwList, ObwPane } from '../types/index.d.ts'
 import { PM_TOOLS, cardText, evalArgv, pmEdit } from './pm-tools.ts'
 
 // The scan that checks `update` and `read` follows an atom only when it is made in the file that uses it.
 // Bump the shape tag when ObwPane changes meaning: a reload then declines what the old code wrote.
-export const pane = atom({ plugin: 'obw', key: 'pane' } as const, LOADING, { shape: 'pane-4' })
+export const pane = atom({ plugin: 'obw', key: 'pane' } as const, LOADING, { shape: 'pane-5' })
 export const list = atom({ plugin: 'obw', key: 'list' } as const, LIST_START)
 export const ring = atom({ plugin: 'obw', key: 'ring' } as const, RING_START)
 
@@ -40,11 +38,6 @@ const PANE = { id: PANE_ID, title: 'obw issue', focus: true, closeOnEscape: true
 
 type Line = ObwLine
 type Shown = Extract<ObwCard, { kind: 'shown' }>
-
-type Stored = Omit<ObwBound, 'card'>
-
-// The session's binding as loaded from its file; null while the session has none.
-export const binding = atom({ plugin: 'obw', key: 'binding' } as const, null as ObwBound | null)
 
 async function runProcess($: any, argv: string[], timeoutMs = OBSIDIAN_TIMEOUT_MS, stdin?: string): Promise<Run> {
   try {
@@ -139,7 +132,7 @@ async function show($: any, step: (before: string[]) => Step, ringAfter: RingAft
     vizRoot,
     browser: null,
     diagrams: segments.map(() => null),
-    bindLine: null,
+    workLine: null,
   })
   // termaid never holds /issue: an offline uvx can take seconds, and the card is already drawn.
   void drawDiagrams($, request, segments, body).catch(() => {})
@@ -202,21 +195,15 @@ async function workShown($: any) {
   await update($, pane, (state) => {
     first = !state.sent.includes(path)
     if (!first) return state
-    return { ...state, sent: [...state.sent, path], card: state.card?.kind === 'shown' ? { ...state.card, bindLine: null } : state.card }
+    return { ...state, sent: [...state.sent, path], card: state.card?.kind === 'shown' ? { ...state.card, workLine: null } : state.card }
   })
   if (!first) return
   try {
     await $.prompt.submit({ text: workPrompt(path, scope.vault), asUser: true })
   } catch (error) {
     await update($, pane, (state) => ({ ...state, sent: state.sent.filter((sent) => sent !== path) }))
-    await patchShown($, request, (card) => ({ ...card, bindLine: { kind: 'error', text: `Could not send: ${bounded(reasonOf(error), MAX_LABEL).text}` } }))
+    await patchShown($, request, (card) => ({ ...card, workLine: { kind: 'error', text: `Could not send: ${bounded(reasonOf(error), MAX_LABEL).text}` } }))
   }
-}
-
-async function unbindShown($: any) {
-  const { request } = await read($, pane)
-  const outcome = await removeBinding($)
-  await patchShown($, request, (card) => ({ ...card, bindLine: outcome.ok ? null : { kind: 'error', text: `Could not unbind: ${outcome.reason}` } }))
 }
 
 // A block without a drawn diagram stays inside the markdown around it, so a pending or failed block reads as code.
@@ -281,93 +268,6 @@ async function resolveConfig($: any): Promise<Config> {
     if (await $.fs.exists(path)) return readConfig($, path)
     if (dir === '/') return { error: `No .obsidian.yaml in ${cwd} or any directory above it.` }
   }
-}
-
-const NO_BINDING_DIR = 'neither OBW_LAUNCHES_DIR nor HOME is set.'
-const RELATIVE_BINDING_DIR = 'OBW_LAUNCHES_DIR or HOME is not an absolute path.'
-
-async function bindingFile($: any): Promise<{ path: string | null; reason: string }> {
-  const launchesDir = await $.env.get('OBW_LAUNCHES_DIR')
-  const home = await $.env.get('HOME')
-  const path = bindingPath(launchesDir || undefined, home || undefined, await $.session.id())
-  return { path, reason: launchesDir || home ? RELATIVE_BINDING_DIR : NO_BINDING_DIR }
-}
-
-function clearBinding($: any) {
-  return update($, binding, () => null)
-}
-
-// The card read patches only the binding it was started for: a later binding, or none, drops it.
-async function showBinding($: any, record: Stored) {
-  await update($, binding, (bound) => ({ ...record, card: bound && sameBinding(bound, record) ? bound.card : null }))
-  if (!record.project) return
-  const built = cardPathArgv({ vault: record.vault, project: record.project }, record.cardPath)
-  if (!('argv' in built)) return
-  const output = readOutput(await runProcess($, built.argv))
-  const title = output.kind === 'card' ? headerOf(output.frontmatter).title : undefined
-  const card = output.kind === 'card' ? { title: title ? bounded(title).text || null : null, ac: acLabel(output.body) } : null
-  await update($, binding, (bound) => (bound && sameBinding(bound, record) ? { ...bound, card } : bound))
-}
-
-async function loadBinding($: any) {
-  const { path } = await bindingFile($)
-  if (!path) return
-  if (!(await $.fs.exists(path))) return clearBinding($)
-  const record = bindingOf(await $.fs.read(path))
-  if (!record) return clearBinding($)
-  await showBinding($, record)
-}
-
-type Outcome = { ok: true } | { ok: false; reason: string }
-
-async function writeBinding($: any, card: Binding): Promise<Outcome> {
-  try {
-    const { path, reason } = await bindingFile($)
-    if (!path) return { ok: false, reason }
-    const createdAt = new Date(await $.clock.now()).toISOString()
-    await $.fs.write(path, `${JSON.stringify({ cardPath: card.cardPath, vault: card.vault, project: card.project, createdAt })}\n`)
-  } catch (error) {
-    return { ok: false, reason: reasonOf(error) }
-  }
-  await showBinding($, card).catch(() => {})
-  return { ok: true }
-}
-
-// What Claude's Bash result says: the tool's stdout, or the text the model reads when stdout is not a string.
-function outputOf(result: any): string {
-  const stdout = result?.result?.stdout
-  if (typeof stdout === 'string') return stdout
-  return typeof result?.text === 'string' ? result.text : ''
-}
-
-async function removeBinding($: any): Promise<Outcome> {
-  let file: { path: string | null; reason: string }
-  try {
-    file = await bindingFile($)
-  } catch (error) {
-    return { ok: false, reason: reasonOf(error) }
-  }
-  const { path } = file
-  if (!path) return { ok: false, reason: file.reason }
-  const run = await runProcess($, ['rm', '-f', path])
-  if (run.kind === 'rejected') return { ok: false, reason: 'rm did not run.' }
-  if (run.exitCode !== 0) return { ok: false, reason: run.stderr.trim() || `rm exited ${run.exitCode}` }
-  clearBinding($)
-  return { ok: true }
-}
-
-async function followStatus($: any, command: unknown, output: string) {
-  if (typeof command !== 'string') return
-  const changes = statusChanges(command, output)
-  if (!changes.length) return
-  let config: Scope | null = null
-  if (changes.some(change => change.vault === null || 'file' in change.target)) {
-    const found = await resolveConfig($)
-    if (!('error' in found)) config = { vault: found.vault, project: found.project }
-  }
-  const action = bindingAction(changes, config, await read($, binding))
-  if (action?.kind === 'bind') await writeBinding($, action.card)
-  else if (action?.kind === 'unbind') await removeBinding($)
 }
 
 // The only writer of this hint: a dashboard the CLI could not read may simply not exist yet, while a
@@ -681,7 +581,7 @@ async function drawPane($: any, e: any) {
   const bodyColumns = Number.isInteger(e.props?.bodyColumns) && e.props.bodyColumns > 0 ? e.props.bodyColumns : null
   const columns = bodyColumns ?? 80
   const ruleWidth = Math.min(bodyColumns ?? 40, MAX_CHARS)
-  const draw: DrawContext = { ui, state, bound: await read($, binding), e, dim, error, line, span }
+  const draw: DrawContext = { ui, state, e, dim, error, line, span }
 
   if (state.trail.length) return cardView($, draw, { columns, ruleWidth })
 
@@ -725,7 +625,6 @@ async function drawPane($: any, e: any) {
 type DrawContext = {
   ui: any
   state: ObwPane
-  bound: ObwBound | null
   e: any
   dim: (text: string) => any
   error: (text: string) => any
@@ -760,7 +659,7 @@ function relationLines($: any, { ui, state }: DrawContext, card: Shown) {
 }
 
 function cardRegion($: any, draw: DrawContext, card: ObwCard) {
-  const { ui, state, bound, e, dim, error, line, span } = draw
+  const { ui, state, e, dim, error, line, span } = draw
   const { Text, Markdown, Button, Code, Box } = ui
   const region: any[] = []
   if (card.kind === 'loading') region.push(dim(`Reading ${cardName(card.path)}…`))
@@ -789,10 +688,7 @@ function cardRegion($: any, draw: DrawContext, card: ObwCard) {
       region.push(state.sent.includes(card.path)
           ? Button({ key: 'work', label: 'Sent to Claude.', dimColor: true, onPress: () => {} })
           : Button({ key: 'work', label: 'Work on this card', onPress: () => { void workShown($).catch(() => {}) } }))
-      if (bound && state.scope && sameBinding(bound, { cardPath: card.path, vault: state.scope.vault })) {
-        region.push(Button({ key: 'unbind', label: 'Unbind this session', onPress: () => { void unbindShown($).catch(() => {}) } }))
-      }
-      if (card.bindLine) region.push(line(card.bindLine))
+      if (card.workLine) region.push(line(card.workLine))
     }
     // Only the terminal can run render.sh: `process` is CLI only.
     if (card.vizRoot && e.surface === 'terminal') {
@@ -937,7 +833,6 @@ export function register(on: On) {
         // A refused tool must not stop the others, /issue or the session.
       }
     }
-    void loadBinding($).catch(() => {})
     return next(e)
   })
 
@@ -999,42 +894,7 @@ export function register(on: On) {
       }
     }
   })
-  on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
-    const result = await next(e)
-    void followStatus($, e.command, outputOf(result)).catch(() => {})
-    return result
-  })
-
   on('tool.call', { tool: 'mcp__obw__pm_tick' }, ($, e) => queued(() => pmHook($, 'pm_tick', e)))
   on('tool.call', { tool: 'mcp__obw__pm_note' }, ($, e) => queued(() => pmHook($, 'pm_note', e)))
   on('tool.call', { tool: 'mcp__obw__pm_status' }, ($, e) => queued(() => pmHook($, 'pm_status', e)))
-
-  on('turn.complete', async ($, e, next) => {
-    const result = await next(e)
-    if (e.agentId === undefined) void loadBinding($).catch(() => {})
-    return result
-  })
-
-  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    const bound = await read($, binding)
-    if (!bound || e.props?.hasSurvey) return next(e)
-    const beneath = await next(e)
-    try {
-      const { Box, Text } = await $.ui.resolve(e)
-      const { cardPath, card } = bound
-      const title = card?.title
-      const line = Text({
-        wrap: 'truncate-end',
-        children: [
-          Text({ color: 'success', children: ['●'] }),
-          ` ${bounded(cardName(cardPath)).text}`,
-          ...(title ? [`  ${title}`] : []),
-          ...(card?.ac ? [`  ${card.ac}`] : []),
-        ],
-      })
-      return Box({ flexDirection: 'column', children: [line, beneath] })
-    } catch {
-      return beneath
-    }
-  })
 }
