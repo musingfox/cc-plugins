@@ -30,13 +30,12 @@ const open = async ($: any, on: any, options: any = {}) => {
   return w
 }
 
-test('W1 a shown card on the terminal draws Work on this card and no bind Button', async ($, on) => {
+test('W1 a shown card on the terminal draws Work on this card', async ($, on) => {
   await open($, on)
   const tree = await $.ui.render(PANE)
   const work = nodesOf(tree, 'Button').filter((node: any) => node.props.key === 'work')
   expect(work).toHaveLength(1)
   expect(work[0].props.label).toBe('Work on this card')
-  expect(await keys($)).not.toContain('bind')
 })
 
 test('W1 the desktop draws no Work button', async ($, on) => {

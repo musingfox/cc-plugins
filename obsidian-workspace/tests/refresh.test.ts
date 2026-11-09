@@ -160,15 +160,15 @@ describe('what a tick reads (clauses 5-7)', () => {
     const state = watchState(on)
     await openFirstRow($, w)
     await pressKey($, w, 'work')
-    expect(state.latest('pane').card.bindLine).not.toBeNull()
-    const kept = state.latest('pane').card.bindLine
+    expect(state.latest('pane').card.workLine).not.toBeNull()
+    const kept = state.latest('pane').card.workLine
     const changed = CARD.replace('status: todo', 'status: done').replace('priority: medium', 'priority: high').replace('tags:\n', 'parent: "[[p]]"\ntags:\n')
     w.answers.read = changed
     await tick(w)
     const shown = state.latest('pane').card
     expect(shown.header).toMatchObject({ status: 'done', priority: 'high' })
     expect(shown.relations.parent).toEqual(['p'])
-    expect(shown.bindLine).toEqual(kept)
+    expect(shown.workLine).toEqual(kept)
     const header = headerIn(await $.ui.render(PANE))
     expect(stringsIn(header).join('')).toContain('status: done · priority: high')
   })
