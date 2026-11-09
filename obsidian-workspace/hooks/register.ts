@@ -785,7 +785,10 @@ function cardRegion($: any, draw: DrawContext, card: ObwCard) {
     const relations = state.trail.length ? relationLines($, draw, card) : []
     if (relations.length) region.push(Box({ flexDirection: 'column', children: relations }))
     if (e.surface === 'terminal') {
-      region.push(state.sent.includes(card.path) ? dim('Sent to Claude.') : Button({ key: 'work', label: 'Work on this card', onPress: () => { void workShown($).catch(() => {}) } }))
+      // The sent state keeps the key: the Button leaving the tree would move the focus on to Open in browser.
+      region.push(state.sent.includes(card.path)
+          ? Button({ key: 'work', label: 'Sent to Claude.', dimColor: true, onPress: () => {} })
+          : Button({ key: 'work', label: 'Work on this card', onPress: () => { void workShown($).catch(() => {}) } }))
       if (bound && state.scope && sameBinding(bound, { cardPath: card.path, vault: state.scope.vault })) {
         region.push(Button({ key: 'unbind', label: 'Unbind this session', onPress: () => { void unbindShown($).catch(() => {}) } }))
       }

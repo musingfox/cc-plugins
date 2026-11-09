@@ -8,7 +8,9 @@ const A = 'pm/cc-plugins/tasks/a.md'
 const B = 'pm/cc-plugins/tasks/b.md'
 const TICK_MS = 5000
 const keys = async ($: any) => nodesOf(await $.ui.render(PANE), 'Button').map((node: any) => node.props.key)
-const SENT = (tree: any) => stringsIn(tree).filter((text) => text === 'Sent to Claude.')
+const workButtons = (tree: any) => nodesOf(tree, 'Button').filter((node: any) => node.props.key === 'work')
+const SENT = (tree: any) => workButtons(tree).filter((node: any) => node.props.label === 'Sent to Claude.' && node.props.dimColor === true)
+const OFFERED = (tree: any) => workButtons(tree).filter((node: any) => node.props.label === 'Work on this card')
 const COULD_NOT_SEND = (tree: any) => stringsIn(tree).filter((text) => text.startsWith('Could not send: '))
 
 // The kit raises prompt.submit to a test hook with the plugin's call as its event: { text } lets the submit succeed,
@@ -60,16 +62,17 @@ test('W2 W3 W4 pressing submits that text once as the user, writes no binding an
   expect(w.panes).toContain('obw-issue')
 })
 
-test('W5 the pressed card shows Sent to Claude. in place of the Button, and a second press sends nothing', async ($, on) => {
+test('W5 the pressed card keeps a dim work Button labelled Sent to Claude., and pressing it sends nothing', async ($, on) => {
   const calls = submits(on)
   const w = await open($, on)
   await pressKey($, w, 'work')
   const tree = await $.ui.render(PANE)
   expect(SENT(tree)).toHaveLength(1)
-  expect(await keys($)).not.toContain('work')
-  await $.ui.press({ plugin: 'obw', key: 'work' }).catch(() => {})
-  await w.clock.settle()
+  expect(workButtons(tree)).toHaveLength(1)
+  expect(OFFERED(tree)).toEqual([])
+  await pressKey($, w, 'work')
   expect(calls).toHaveLength(1)
+  expect(SENT(await $.ui.render(PANE))).toHaveLength(1)
 })
 
 test('W5 two presses before the submit settles send once', async ($, on) => {
@@ -86,7 +89,7 @@ test('W5 another card still shows the Button', async ($, on) => {
   const w = await open($, on)
   await pressKey($, w, 'work')
   await shown($, w, 'b')
-  expect(await keys($)).toContain('work')
+  expect(OFFERED(await $.ui.render(PANE))).toHaveLength(1)
   expect(SENT(await $.ui.render(PANE))).toEqual([])
   await pressKey($, w, 'work')
   expect(calls.map((call: any) => call.text)).toEqual([workPrompt(A, 'obsidian'), workPrompt(B, 'obsidian')])
@@ -99,7 +102,7 @@ test('W5 /issue resets what was sent', async ($, on) => {
   expect(SENT(await $.ui.render(PANE))).toHaveLength(1)
   await shown($, w, 'a')
   expect(SENT(await $.ui.render(PANE))).toEqual([])
-  expect(await keys($)).toContain('work')
+  expect(OFFERED(await $.ui.render(PANE))).toHaveLength(1)
 })
 
 test('W5 a refresh tick keeps what was sent', async ($, on) => {
@@ -109,7 +112,7 @@ test('W5 a refresh tick keeps what was sent', async ($, on) => {
   await w.clock.advance(TICK_MS)
   await w.clock.settle()
   expect(SENT(await $.ui.render(PANE))).toHaveLength(1)
-  expect(await keys($)).not.toContain('work')
+  expect(OFFERED(await $.ui.render(PANE))).toEqual([])
   expect(calls).toHaveLength(1)
 })
 
