@@ -182,8 +182,25 @@ async function openInBrowser($: any) {
   if (tailnet) await showBrowser($, request, { ...outcome, tailnet })
 }
 
-export function workPrompt(cardPath: string, vault: string) {
-  return `Work on the pm task card ${cardPath} in vault ${vault}. Read it with the Obsidian CLI, then meet its acceptance criteria. Set its status with pm_status when you start and when you finish, and tick each criterion with pm_tick once you have verified it.`
+const BUILT_IN_WORK_PROMPT = (cardPath: string, vault: string) =>
+  `Work on the pm task card ${cardPath} in vault ${vault}. Read it with the Obsidian CLI, then meet its acceptance criteria. Set its status with pm_status when you start and when you finish, and tick each criterion with pm_tick once you have verified it.`
+
+let userWorkPrompt = ''
+
+export function workPrompt(cardPath: string, vault: string, ...overrides: (string | undefined)[]) {
+  const chosen = overrides.find((text) => text?.trim())
+  if (!chosen) return BUILT_IN_WORK_PROMPT(cardPath, vault)
+  return chosen.replace(/\{(card|vault)\}/g, (_, name) => (name === 'card' ? cardPath : vault))
+}
+
+// A config that cannot be read leaves the user value and the built-in text to send.
+async function projectWorkPrompt($: any) {
+  try {
+    const config = await resolveConfig($)
+    return 'error' in config ? undefined : config.workPrompt
+  } catch {
+    return undefined
+  }
 }
 
 async function workShown($: any) {
@@ -199,7 +216,7 @@ async function workShown($: any) {
   })
   if (!first) return
   try {
-    await $.prompt.submit({ text: workPrompt(path, scope.vault), asUser: true })
+    await $.prompt.submit({ text: workPrompt(path, scope.vault, await projectWorkPrompt($), userWorkPrompt), asUser: true })
   } catch (error) {
     await update($, pane, (state) => ({ ...state, sent: state.sent.filter((sent) => sent !== path) }))
     await patchShown($, request, (card) => ({ ...card, workLine: { kind: 'error', text: `Could not send: ${bounded(reasonOf(error), MAX_LABEL).text}` } }))
@@ -235,7 +252,7 @@ function browserLines(browser: ObwBrowser | null): Line[] {
   return [`Opened in the browser: ${browser.path}`, ...tailnet].map(notice)
 }
 
-type Config = (Scope & { path: string }) | { error: string }
+type Config = (Scope & { path: string; workPrompt?: string }) | { error: string }
 
 function configPathIn(dir: string) {
   return dir === '/' ? '/.obsidian.yaml' : `${dir}/.obsidian.yaml`
@@ -253,11 +270,11 @@ async function readConfig($: any, path: string): Promise<Config> {
   } catch {
     return { error: `Could not read ${path}.` }
   }
-  const { vault, project } = configOf(text)
+  const { vault, project, workPrompt } = configOf(text)
   if (!vault && !project) return { error: `${path} has no vault or pm.project.` }
   if (!vault) return { error: `${path} has no vault.` }
   if (!project) return { error: `${path} has no pm.project.` }
-  return { vault, project, path }
+  return { vault, project, path, workPrompt }
 }
 
 // `fs.exists` never rejects on the host, so a rejection here is a fault to show, not an absent file.
@@ -812,7 +829,9 @@ async function pmHook($: any, tool: string, event: Record<string, unknown>) {
   }
 }
 
-export function register(on: On) {
+export function register(on: On, options: { work_prompt?: string } = {}) {
+  userWorkPrompt = typeof options.work_prompt === 'string' ? options.work_prompt : ''
+
   on('session.start', async ($, e, next) => {
     // A reload re-fires session.start on this instance; the next /issue starts the timer again.
     stopRefresh()
