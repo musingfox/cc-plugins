@@ -16,3 +16,10 @@ test('unwraps a double quoted value before its comment', () => expect(configOf('
 test('unwraps a single quoted value before its comment', () => expect(configOf("vault: 'my vault' # c\n")).toEqual({ vault: 'my vault', project: undefined }))
 test('opens the pm block at a pm line with a comment after it', () => expect(configOf('vault: v\npm:  # PM settings\n  project: p\n')).toEqual({ vault: 'v', project: 'p' }))
 test('keeps the pm block closed at a pm line with an inline value and a comment', () => expect(configOf('vault: v\npm: x # c\n  project: p\n')).toEqual({ vault: 'v', project: undefined }))
+test('C2 reads a plain pm.work_prompt', () => expect(configOf('vault: v\npm:\n  project: p\n  work_prompt: Do {card} now\n').workPrompt).toBe('Do {card} now'))
+test('C2 a quoted pm.work_prompt keeps # and drops a comment after the quotes', () => expect(configOf('vault: v\npm:\n  project: p\n  work_prompt: "Do #1 {card}"  # why\n').workPrompt).toBe('Do #1 {card}'))
+test('C2 an unquoted pm.work_prompt drops a trailing comment', () => expect(configOf('vault: v\npm:\n  project: p\n  work_prompt: Do {card} now   # why\n').workPrompt).toBe('Do {card} now'))
+test('C2 a commented-out or empty pm.work_prompt is unset', () => {
+  expect(configOf('vault: v\npm:\n  project: p\n  # work_prompt: x\n').workPrompt).toBeUndefined()
+  expect(configOf('vault: v\npm:\n  project: p\n  work_prompt:\n').workPrompt).toBeUndefined()
+})

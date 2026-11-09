@@ -8,9 +8,10 @@ export function valueOf(raw: string) {
   return value || undefined
 }
 
-export function configOf(text: string): { vault?: string; project?: string } {
+export function configOf(text: string): { vault?: string; project?: string; workPrompt?: string } {
   let vault: string | undefined
   let project: string | undefined
+  let workPrompt: string | undefined
   let inPm = false
   for (const raw of text.split('\n')) {
     const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw
@@ -20,7 +21,9 @@ export function configOf(text: string): { vault?: string; project?: string } {
       if (/^vault:/.test(line)) vault = valueOf(line.slice('vault:'.length))
     } else if (inPm && /^\s+project:/.test(line)) {
       project = valueOf(line.replace(/^\s+project:/, ''))
+    } else if (inPm && /^\s+work_prompt:/.test(line)) {
+      workPrompt = valueOf(line.replace(/^\s+work_prompt:/, ''))
     }
   }
-  return { vault, project }
+  return { vault, project, workPrompt }
 }
