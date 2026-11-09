@@ -29,7 +29,7 @@ export type ObwCard =
       browser: ObwBrowser | null
       // Indexed by a mermaid block's position in `segments`; `null` for a block with no drawn diagram.
       diagrams: (string | null)[]
-      // A failed Bind or Unbind press; null once a press succeeds or the card is read again.
+      // A failed Unbind or Work on this card press; null once a press succeeds or the card is read again.
       bindLine: ObwLine | null
     }
 
@@ -63,6 +63,8 @@ export type ObwPane = {
   card: ObwCard | null
   // The dim line a failed 5-second refresh leaves; null once a refresh succeeds.
   refreshLine: ObwLine | null
+  // Card paths a Work on this card press has sent to Claude since the last /issue.
+  sent: string[]
 }
 
 export type ObwList = {

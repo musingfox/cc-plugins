@@ -155,11 +155,11 @@ describe('what a tick reads (clauses 5-7)', () => {
     expect(stringsIn(await $.ui.render(PANE))).not.toContain('1 row of the All Tasks view is not a card under pm/cc-plugins and was left out.')
   })
 
-  test('7: a tick rereads an open card and keeps its browser line and bind line', async ($, on) => {
+  test('7: a tick rereads an open card and keeps its browser line and send failure line', async ($, on) => {
     const w = mix(on)
     const state = watchState(on)
     await openFirstRow($, w)
-    await pressKey($, w, 'bind')
+    await pressKey($, w, 'work')
     expect(state.latest('pane').card.bindLine).not.toBeNull()
     const kept = state.latest('pane').card.bindLine
     const changed = CARD.replace('status: todo', 'status: done').replace('priority: medium', 'priority: high').replace('tags:\n', 'parent: "[[p]]"\ntags:\n')

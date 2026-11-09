@@ -27,7 +27,7 @@ import { PM_TOOLS, cardText, evalArgv, pmEdit } from './pm-tools.ts'
 
 // The scan that checks `update` and `read` follows an atom only when it is made in the file that uses it.
 // Bump the shape tag when ObwPane changes meaning: a reload then declines what the old code wrote.
-export const pane = atom({ plugin: 'obw', key: 'pane' } as const, LOADING, { shape: 'pane-3' })
+export const pane = atom({ plugin: 'obw', key: 'pane' } as const, LOADING, { shape: 'pane-4' })
 export const list = atom({ plugin: 'obw', key: 'list' } as const, LIST_START)
 export const ring = atom({ plugin: 'obw', key: 'ring' } as const, RING_START)
 
@@ -189,11 +189,28 @@ async function openInBrowser($: any) {
   if (tailnet) await showBrowser($, request, { ...outcome, tailnet })
 }
 
-async function bindShown($: any) {
+export function workPrompt(cardPath: string, vault: string) {
+  return `Work on the pm task card ${cardPath} in vault ${vault}. Read it with the Obsidian CLI, then meet its acceptance criteria. Set its status with pm_status when you start and when you finish, and tick each criterion with pm_tick once you have verified it.`
+}
+
+async function workShown($: any) {
   const { card, scope, request } = await read($, pane)
   if (card?.kind !== 'shown' || !scope) return
-  const outcome = await writeBinding($, { cardPath: card.path, vault: scope.vault, project: scope.project })
-  await patchShown($, request, (card) => ({ ...card, bindLine: outcome.ok ? null : { kind: 'error', text: `Could not bind: ${outcome.reason}` } }))
+  const path = card.path
+  // The path is recorded before the await: a second press while the submit is pending finds it and sends nothing.
+  let first = false
+  await update($, pane, (state) => {
+    first = !state.sent.includes(path)
+    if (!first) return state
+    return { ...state, sent: [...state.sent, path], card: state.card?.kind === 'shown' ? { ...state.card, bindLine: null } : state.card }
+  })
+  if (!first) return
+  try {
+    await $.prompt.submit({ text: workPrompt(path, scope.vault), asUser: true })
+  } catch (error) {
+    await update($, pane, (state) => ({ ...state, sent: state.sent.filter((sent) => sent !== path) }))
+    await patchShown($, request, (card) => ({ ...card, bindLine: { kind: 'error', text: `Could not send: ${bounded(reasonOf(error), MAX_LABEL).text}` } }))
+  }
 }
 
 async function unbindShown($: any) {
@@ -768,7 +785,7 @@ function cardRegion($: any, draw: DrawContext, card: ObwCard) {
     const relations = state.trail.length ? relationLines($, draw, card) : []
     if (relations.length) region.push(Box({ flexDirection: 'column', children: relations }))
     if (e.surface === 'terminal') {
-      region.push(Button({ key: 'bind', label: 'Bind this session', onPress: () => { void bindShown($).catch(() => {}) } }))
+      region.push(state.sent.includes(card.path) ? dim('Sent to Claude.') : Button({ key: 'work', label: 'Work on this card', onPress: () => { void workShown($).catch(() => {}) } }))
       if (bound && state.scope && sameBinding(bound, { cardPath: card.path, vault: state.scope.vault })) {
         region.push(Button({ key: 'unbind', label: 'Unbind this session', onPress: () => { void unbindShown($).catch(() => {}) } }))
       }
