@@ -17,6 +17,7 @@ Run the `obsidian` CLI directly — no sub-agent. Before any CLI call, invoke th
 vault: <VAULT_NAME>
 pm:
   project: <PROJECT_NAME>
+  # work_prompt: <optional text for the /issue Work on this card Button>
 ```
 
 Missing config or `pm.project`, or a request to set up or migrate the workspace → follow [references/setup.md](references/setup.md), then continue with the request. Never guess the vault.

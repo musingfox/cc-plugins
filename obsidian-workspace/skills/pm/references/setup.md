@@ -58,6 +58,7 @@ vault: <VAULT_NAME>
 
 pm:
   project: <PROJECT_NAME>
+  # work_prompt: <optional text for the /issue Work on this card Button>
 ```
 
 ## Confirmation Output
