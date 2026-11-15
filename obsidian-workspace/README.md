@@ -59,8 +59,8 @@ The obw Claude Mod registers three tools that Claude can call to change a task c
 ## Prerequisites
 
 - Official `obsidian` plugin (from the `obsidian-skills` marketplace) — declared as a plugin dependency, so it auto-installs with this plugin as long as that marketplace is added (`claude plugin marketplace add`)
-- [Obsidian](https://obsidian.md) app running (headless CLI also works)
-- Obsidian community plugin **`obsidian-cli`** installed and enabled. The plugin's name is `obsidian-cli` but the executable it installs is `obsidian` (invoked as `obsidian vault=<name> ...`). This is **not** the unrelated standalone `obsidian-cli` binary by Yakitrak.
+- [Obsidian](https://obsidian.md) desktop app running — the `obsidian` CLI talks to the open app. Obsidian Headless (`ob`) only syncs and publishes, so it cannot stand in.
+- Obsidian CLI turned on ([help.obsidian.md/cli](https://help.obsidian.md/cli)). The `obsidian` command ships with the Obsidian installer (invoked as `obsidian vault=<name> ...`); do not install the unrelated npm package `obsidian-cli`.
 - **Templates** core plugin enabled (required for `/obw:pm` — `task` / `doc` templates)
 - **Bases** core plugin enabled (required only for `/obw:pm` dashboards — bundled in Obsidian 1.9+)
 - [jq](https://jqlang.org) (required by `/obw:pm` setup, which reads Obsidian's vault list and Templates settings with it)
