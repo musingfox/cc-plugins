@@ -125,6 +125,21 @@ A visible browser agents drive and you can take over, beside your everyday Zen (
 /plugin install zen-agent
 ```
 
+### search-agent
+
+Agents browse in your own [Search](https://github.com/driceroland/Search) browser, in tabs of their own beside yours (macOS 14+, Search, `python3`):
+- **MCP**: `bin/search-mcp`, vendored verbatim from Search's repo at commit `859c951` (MIT, `bin/search-mcp.LICENSE`) — open, read, click, type, press, scroll, wait, screenshot. Re-vendor it when a Search update changes its agent socket
+- **You stay in charge**: each connection asks in Search's window first; the agent's tab wears a dot and Stop ends it. Search itself withholds password, card and one-time-code values and refuses downloads
+- **Secrets stay with you**: the agent stops before logins, 2FA, payments and any step that reveals an API key or token, and hands them to you
+- **Logins stick**: a login you make in the agent's tab carries over to later connections
+
+Turn on Settings › About › Developer › "Let coding agents use Search" first. Not on Linux; use zen-agent there.
+
+**Installation:**
+```bash
+/plugin install search-agent
+```
+
 ### Hook Guard
 
 One-stop hook setup assistant for Claude Code projects:
@@ -365,6 +380,7 @@ cc-plugins/
 ├── obsidian-workspace/ skills: pm · templates, tests · hooks: register (Claude Mod)
 ├── omp-quota/          hooks: register (Claude Mod) · tests
 ├── pi-dispatch/        skills: pi-dispatch · agents: reviewer · scripts, shims, extensions, tests
+├── search-agent/       skills: search-agent · bin: search-mcp · .mcp.json
 ├── spec/               skills: spec, glossary · scripts: spec.sh · tests
 ├── viz/                skills: viz-inline, viz-render · lib, tests
 ├── wizard/             skills: wizard

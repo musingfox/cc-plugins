@@ -44,6 +44,11 @@
       "description": "A second Zen on its own profile for agents to drive over WebDriver BiDi, beside your everyday Zen: URL redirect in Rex, firefox-devtools MCP or puppeteer scripts, per-domain cookie copy, headless or headed, human handoff for logins and secrets"
     },
     {
+      "name": "search-agent",
+      "source": "./search-agent",
+      "description": "Agents browse in tabs of their own in your Search browser (macOS, WebKit) while you watch and take over: the search MCP server, plus handoff rules for logins, 2FA, payments and secrets"
+    },
+    {
       "name": "hook-guard",
       "source": "./hook-guard",
       "description": "One-stop hook setup assistant — detect project environment, generate git pre-commit and commit-msg scripts with security checks and code quality gates"
