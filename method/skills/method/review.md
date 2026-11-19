@@ -30,7 +30,7 @@ Attach its sub-contracts as context: a `## Sub-contracts file` line naming the `
 ## Reading the verdict
 
 - **`APPROVE`**: merge that head sha into your branch.
-- **`APPROVE-with-advisories`**: merge, then turn each advisory into a test case or drop it; never apply a reviewer's suggested fix by hand (`<plugin root>/agents/review.md:79`).
+- **`APPROVE-with-advisories`**: merge, then turn each `important` or `nit` advisory into a test case or drop it; never apply a reviewer's suggested fix by hand (`<plugin root>/agents/review.md:79`). Never fix a `pre_existing` advisory inside the current milestone and never drop it silently: record it, with its Repro, in a task card or in your report up, so it gets its own milestone and commit.
 - **`REQUEST_CHANGES`**: the next line is the `Layer:`. Route it with `route.md`.
 
 ## Repros

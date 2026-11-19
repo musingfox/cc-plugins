@@ -72,11 +72,11 @@ Categories:
 - **correctness**: race conditions, edge cases outside the contract's declared domain, resource leaks
 
 Severities:
-- **critical**: likely to cause production incidents or security breaches
-- **warning**: should be addressed but not urgent
-- **info**: suggestions for improvement
+- **important**: a defect this diff introduces or makes worse
+- **nit**: minor, author's choice
+- **pre_existing**: the defect was already present at the base commit, so the builder is not held responsible for it; the advisory must say how you know it predates the diff (e.g. the line is unchanged in the diff)
 
-Every advisory carries a `Repro`: a self-contained command, run from the reviewed tree's root, that shows what you observed, or `none` when no command can reproduce it. The rule for the main session: the main session turns each advisory into a test case or drops it, and never applies a reviewer's suggested fix by hand.
+Every advisory carries a `Repro`: a self-contained command, run from the reviewed tree's root, that shows what you observed, or `none` when no command can reproduce it. The rule for the main session: the main session turns each `important` or `nit` advisory into a test case or drops it, and never applies a reviewer's suggested fix by hand. A `pre_existing` advisory is never fixed inside the current milestone and never silently dropped: the main session records it, with its Repro, in a task card or in its report up, so it gets its own milestone and commit.
 
 ### Layers
 
@@ -136,7 +136,7 @@ The "What Changed" section is the human's primary review surface. It must read l
 
 ### [Advisory Title]
 - **Category**: security | performance | maintainability | correctness
-- **Severity**: critical | warning | info
+- **Severity**: important | nit | pre_existing
 - **Detail**: [what was observed, why it matters, suggested fix]
 - **Repro**: <self-contained command, run from the reviewed tree's root>
 - **Repro**: none
@@ -201,7 +201,7 @@ Layer: <code|contract|milestone>   (only after REQUEST_CHANGES)
 ## Contract status
 - {one-line "ContractName: PASS|FAIL" per contract — no evidence here, that lives in the file}
 
-## Critical/warning advisories (titles only)
+## Important/pre_existing advisories (titles only)
 - {advisory title — severity} per item, omit if none
 
 ## Blockers (if any)
@@ -215,6 +215,6 @@ Do NOT paste the What Changed body, contract evidence, advisory details, or the 
 - PASS/FAIL is based on the **contract specification**, not your opinion of how it should have been designed.
 - Run tests to verify — do not just read code and assume it works.
 - Verify contracts as-written, `fuzzy_criteria` included. A constraint the plan captured nowhere — neither as a test case nor as a fuzzy criterion — is not yours to enforce.
-- Critical advisories should be prominently flagged but still do not change the verdict. The human decides whether to address them.
+- `important` advisories should be prominently flagged but still do not change the verdict. The human decides whether to address them.
 - If the diff deviated from the plan's implementation steps (different files, different internal structure) but all contracts pass, that is NOT a failure. The plan is guidance; contracts are binding.
 - **Verdict enum is exact**: emit one of `APPROVE`, `APPROVE-with-advisories`, `REQUEST_CHANGES` on the line immediately after the `## Verdict` heading — no other tokens, no prose, no whitespace beyond the trailing newline. When the verdict is `REQUEST_CHANGES`, the next line is the Layer line, nothing else between. The main session extracts both lines literally.
