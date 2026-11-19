@@ -107,6 +107,11 @@ Prefer `check:` over prose. `test:` is not executable yet and is reported as deb
 like prose, so it does not outrank `check:`. A `check:` runs from the repo root;
 write it, and test it, from there.
 
+When an entry states an invariant over inputs — a round-trip (`decode(encode(x)) == x`),
+idempotency, an always-true bound, or equivalence to a naive implementation — the
+strongest `check:` is a property-based test (fast-check, Hypothesis, proptest) run by a
+shell command, because generated inputs are not biased by the agent that wrote the code.
+
 Downgrade to `verify: null` when a check would produce false positives — an
 untrustworthy check is worse than none, because the whole drift defence dies
 with it.
