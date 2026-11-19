@@ -135,6 +135,8 @@ Agents browse in your own [Search](https://github.com/driceroland/Search) browse
 
 Turn on Settings › About › Developer › "Let coding agents use Search" first. Not on Linux; use zen-agent there.
 
+pi and omp can use the same server; point them at this checkout's `search-agent/bin/search-mcp`, not the plugin cache, whose path carries the version. pi: `pi mcp add search -- <checkout>/search-agent/bin/search-mcp`. omp: a `search` entry under `mcpServers` in `~/.omp/agent/mcp.json`. Search's "Always allow" covers only Claude Code's `claude`, so they are asked on every connection.
+
 **Installation:**
 ```bash
 /plugin install search-agent
