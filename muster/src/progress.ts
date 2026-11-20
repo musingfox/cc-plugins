@@ -54,28 +54,50 @@ function persist(layout: RunPaths, patch: Phase): void {
   }
 }
 
-// The figures a phase.json carries; cost and plan appear once they have a value.
-const projectionOf = (figures: Figures, plan: Plan | null): Projection => ({
-  title: figures.title,
-  tools: figures.tools,
-  ...(figures.cost === null ? {} : { cost: figures.cost }),
-  ...(plan === null ? {} : { plan }),
-});
+// The figures earlier turns left in phase.json; a new client's turn adds its own on top of them.
+type Carried = { title?: string; tools: number; cost: number | null; plan: Plan | null };
+
+function carriedFrom(prior: Phase | undefined): Carried {
+  const plan = isRecord(prior?.plan) && typeof prior.plan.done === "number" && typeof prior.plan.total === "number"
+    ? { done: prior.plan.done, total: prior.plan.total }
+    : null;
+  return {
+    title: typeof prior?.title === "string" && prior.title !== "" ? prior.title : undefined,
+    tools: typeof prior?.tools === "number" ? prior.tools : 0,
+    cost: typeof prior?.cost === "number" ? prior.cost : null,
+    plan,
+  };
+}
+
+// The figures a phase.json carries; cost and plan appear once they have a value. The adapter's cost is its own
+// process's total, so a resumed client's cost adds to what the earlier clients spent.
+const projectionOf = (figures: Figures, plan: Plan | null, carried: Carried): Projection => {
+  const cost = figures.cost === null ? carried.cost : (carried.cost ?? 0) + figures.cost;
+  const shownPlan = plan ?? carried.plan;
+  return {
+    title: figures.title,
+    tools: carried.tools + figures.tools,
+    ...(cost === null ? {} : { cost }),
+    ...(shownPlan === null ? {} : { plan: shownPlan }),
+  };
+};
 
 const changedKeys = (prev: Projection, next: Projection): Phase =>
   Object.fromEntries(Object.entries(next).filter(([key, value]) => JSON.stringify(prev[key]) !== JSON.stringify(value)));
 
-// Writes the worker's figures into the run's phase.json as its session/update notifications arrive.
-export function createProgressWriter(layout: RunPaths, ticket: string): (params: unknown) => void {
-  let figures: Figures = { title: ticketTitle(ticket), tools: 0, cost: null };
+// Writes the worker's figures into the run's phase.json as its session/update notifications arrive. prior is the
+// phase.json a follow-up starts from: its title, tools, cost and plan carry over.
+export function createProgressWriter(layout: RunPaths, ticket: string, prior?: Phase): (params: unknown) => void {
+  const carried = carriedFrom(prior);
+  let figures: Figures = { title: carried.title ?? ticketTitle(ticket), tools: 0, cost: null };
   let plan: Plan | null = null;
-  let shown = projectionOf(figures, plan);
+  let shown = projectionOf(figures, plan, carried);
   persist(layout, shown);
   return (params) => {
     const update = isRecord(params) ? params.update : undefined;
     figures = foldFigures(figures, update);
     plan = foldPlan(plan, update);
-    const next = projectionOf(figures, plan);
+    const next = projectionOf(figures, plan, carried);
     const patch = changedKeys(shown, next);
     shown = next;
     if (Object.keys(patch).length > 0) persist(layout, patch);

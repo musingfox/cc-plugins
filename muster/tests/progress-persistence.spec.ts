@@ -49,6 +49,18 @@ test("a real session title replaces the ticket title and a usage cost is recorde
   expect(phaseOf()).toMatchObject({ title: "Real title", cost: 0.5 });
 });
 
+test("a follow-up's writer adds its tools and cost to the earlier turns' and keeps their title and plan until its own", () => {
+  const prior = { phase: "starting", pid: 7, title: "Real title", tools: 4, cost: 1.5, plan: { done: 2, total: 3 } };
+  writeFileSync(layout.phase, JSON.stringify(prior));
+  const observe = createProgressWriter(layout, "", prior);
+  expect(phaseOf()).toEqual(prior);
+  observe(update({ sessionUpdate: "tool_call", toolCallId: "t1" }));
+  observe(update({ sessionUpdate: "usage_update", size: 1, used: 1, cost: { amount: 0.25, currency: "USD" } }));
+  expect(phaseOf()).toMatchObject({ title: "Real title", tools: 5, cost: 1.75, plan: { done: 2, total: 3 } });
+  observe(update(plan("completed")));
+  expect(phaseOf().plan).toEqual({ done: 1, total: 1 });
+});
+
 test("params that are not a session update leave the phase unchanged", () => {
   const observe = createProgressWriter(layout, "T");
   const before = readFileSync(layout.phase, "utf8");
