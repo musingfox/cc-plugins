@@ -97,9 +97,31 @@ describe("WatchCommand", () => {
   });
 
   test("T6: watching an unknown run exits 1 with 'no such run: nope'", async () => {
-    const result = await watchVerb("nope", env(), { intervalMs: 50, write: () => {} });
+    const result = await watchVerb("nope", env(), { intervalMs: 50, metaWaitMs: 0, write: () => {} });
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toBe("no such run: nope\n");
+  });
+});
+
+describe("WatchWaitsForTheRun", () => {
+  test("W1: a run created 150 ms after watch starts, already done, exits 0 with the done line", async () => {
+    const lines: string[] = [];
+    const watching = watchVerb("late", env(), { intervalMs: 50, metaWaitMs: 2000, write: (l) => lines.push(l) });
+    await sleep(150);
+    const p = makeRun("late");
+    writePhase(p, { phase: "exited", pid: process.pid, stopReason: "end_turn", fetched: true });
+    writeFileSync(p.report, "DONE\nok");
+    const result = await watching;
+    expect(result.exitCode).toBe(0);
+    expect(lines).toEqual([`late state=done report=${p.report}`]);
+  });
+
+  test("W2: a run that never appears still fails 'no such run' after the wait", async () => {
+    const started = Date.now();
+    const result = await watchVerb("never", env(), { intervalMs: 50, metaWaitMs: 200, write: () => {} });
+    expect(Date.now() - started).toBeGreaterThanOrEqual(150);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toBe("no such run: never\n");
   });
 });
 
