@@ -62,7 +62,7 @@ When the state is `question`, decide and answer it. The only decisions are `allo
 bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts answer NAME allow
 ```
 
-Add `--n N` when more than one question is pending. Then wait again. A question left unanswered for 30 minutes ends the run. If `REPORT.md` is missing or malformed, muster writes a `BLOCKED` one with `question-timeout` as the reason and the run ends `blocked`; a report the worker already wrote stands, so a `DONE` report ends the run `done`. Set `MUSTER_QUESTION_TIMEOUT_MS` in the environment of `muster run` to change the limit.
+Add `--n N` when more than one question is pending. Then wait again. A question left unanswered for 30 minutes ends the run. Muster writes `REPORT.md` only when a turn ends, and the turn the timeout cuts short never ends on its own, so muster writes a `BLOCKED` report with `question-timeout` as the reason and the run ends `blocked`. Set `MUSTER_QUESTION_TIMEOUT_MS` in the environment of `muster run` to change the limit.
 
 ## Follow up
 
@@ -77,6 +77,8 @@ Use `followup NAME --file PATH` for longer text. Then wait again.
 A run that exited on the idle timeout without a report still shows `state=idle`, with `exit-reason=idle-timeout` at the end of its status line; that field is how you tell it apart from a live idle run. Its background `run` task has also finished, and `<RUNDIR>/phase.json` holds `"phase":"exited"` and `"reason":"idle-timeout"`; `followup` refuses it with `client exited; cannot follow up`. Its branch was fetched back as it exited, unless the fetch failed; `clean` checks the branch itself. Review `git log <baseSha>..muster/NAME`, then either dispatch a new run under a new NAME, adding `--base muster/NAME` to continue from its commits, or go to Cleanup.
 
 ## Collect
+
+Muster writes `<RUNDIR>/REPORT.md` itself from the worker's final message of each turn; the worker writes no file outside its worktree. The first line of that message, `DONE` or `BLOCKED`, decides the state, and a first line that is anything else makes the run `malformed`; the lines after it hold what the commits do not show. Each follow-up turn replaces the report.
 
 When the state is `done`, read the report and the worker's commits from the repository. A report state appears only after the branch fetch-back has finished; a `fetch-error=` field on the status line means it failed and the branch may be missing:
 

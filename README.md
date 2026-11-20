@@ -201,12 +201,12 @@ Offload heavy work to [pi](https://github.com/earendil-works/pi) cheap/fast mode
 
 ### muster (Experimental)
 
-Unattended Claude workers over [ACP](https://agentclientprotocol.com) (claude-agent-acp, pinned by version): a coordinator dispatches headless workers, each optionally under a permission fence, and collects their result from a report file:
+Unattended Claude workers over [ACP](https://agentclientprotocol.com) (claude-agent-acp, pinned by version): a coordinator dispatches headless workers, each optionally under a permission fence, and collects their result from a report file muster writes from each worker's final message:
 - **Permission fence**: workers run in default mode with no setting sources; only one-time allow and reject decisions are answered
 - **Model and effort per dispatch**: `--model` takes an alias (`haiku`, `sonnet`, `opus`, `fable`), since the adapter offers the newest models only under them, and the optional `--effort` sets how hard that model works; a value the adapter does not offer is refused with the offered values and their display names
 - **Event log**: every worker run records its events for replay after the fact
 - **File-based escalation**: when a worker needs a human, the client writes `QUESTION-<n>.json` and the request blocks until `ANSWER-<n>.json` exists
-- **Report-file completion**: a run is done when the worker writes its report file
+- **Report-file completion**: a run is done when the report muster writes from the worker's final message of a turn says DONE on its first line
 - **Progress band**: a Claude Mod band above the prompt lists each in-flight run's title, task-list progress and state, and needs Claude Code 2.1.304+
 - **Runs pane**: `/muster-runs` opens a pane; the pane lists this repository's runs until they are cleaned, grouped by the `--issue` URL each was dispatched with; arrows and Enter fold an issue, show a run's report, BLOCKED reason, open questions, where its plan stands and what the worker last said, open the issue link, or put a line about the run in your prompt for the coordinator
 - **Own clone per run**: each worker runs in a `git clone --no-hardlinks` of your repo under the run directory, so nothing it runs can move your refs, as long as your repo is outside `/tmp`, `/private/tmp` and `$TMPDIR` (`muster run` refuses one under them); muster fetches its `muster/<name>` branch back when the worker goes idle and when the run ends, and cleanup is `muster clean NAME`, which removes the run directory of an exited run and refuses one whose branch could not be fetched back; `muster status` shows `deps=<copied>/<total>`, how many of the directories holding a lockfile had their dependencies copied into the clone, when the run records them
