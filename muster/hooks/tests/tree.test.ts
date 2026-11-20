@@ -102,3 +102,25 @@ test('DispatchTree T5 with no runs the pane says so instead of drawing an empty 
   await w.clock.settle()
   expect(stringsIn(await $.ui.render(PANE)).join(' ')).toContain('No muster runs in this repository.')
 })
+
+test('a run first listed in flight opens no pane', async ($, on) => {
+  const opens: string[] = []
+  on('ui.open', (_: any, e: any) => {
+    opens.push(e.id)
+    return { value: { isPlaced: true } }
+  })
+  const dirs: Record<string, any> = { [RUNS]: [] }
+  const files: Record<string, string> = {}
+  const w = kitWorld(on, { dirs, files })
+  await $.session.start(SESSION)
+  await w.clock.settle()
+  dirs[`${RUNS}/fresh`] = []
+  files[`${RUNS}/fresh/meta.json`] = meta({ name: 'fresh' })
+  files[`${RUNS}/fresh/phase.json`] = phase({ phase: 'running', title: 'Build it' })
+  ;(dirs[RUNS] as any[]).push(dir('fresh'))
+  for (let i = 0; i < 2; i++) {
+    await w.clock.advance(5000)
+    await w.clock.settle()
+  }
+  expect(opens).toEqual([])
+})

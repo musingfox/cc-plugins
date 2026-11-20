@@ -2,7 +2,7 @@ import type { Activity, BandRow, Board, RunDetail, RunRow, RunState } from '../t
 import { classifyRun, elapsedSeconds, figuresOf } from './band-model.ts'
 import { activityOf, openQuestions, reportOf } from './tree-model.ts'
 
-export const LIVE: ReadonlySet<RunState> = new Set(['starting', 'running', 'question', 'idle'])
+const LIVE: ReadonlySet<RunState> = new Set(['starting', 'running', 'question', 'idle'])
 const COLLECT: ReadonlySet<RunState> = new Set(['done', 'blocked', 'malformed'])
 
 const trimSlashes = (path: string): string => path.replace(/\/+$/, '')
