@@ -54,7 +54,7 @@ function writeTool(path: string) {
   return { toolCallId: "t-w", kind: "edit", title: "Write", locations: [{ path }], rawInput: { file_path: path, content: "x" } };
 }
 
-async function setup(scenario: object = {}, name = "run-1") {
+async function setup(scenario: object = {}, name = "run-1", pathContext?: { home?: string; tempRoots?: string[]; runsDir?: string }) {
   const layout: RunPaths = runPaths(name, { MUSTER_HOME: home, HOME: home });
   createRunDir(layout);
   mkdirSync(layout.worktree, { recursive: true });
@@ -73,6 +73,7 @@ async function setup(scenario: object = {}, name = "run-1") {
     createPermissionHandler({
       layout,
       worktreeReal,
+      pathContext,
       trackPending: (cancel) => {
         pending.push(cancel);
         return () => {
@@ -99,6 +100,22 @@ describe("EscalationRoundTrip", () => {
     expect(existsSync(layout.question(1))).toBe(false);
     expect(outReplyFor(layout.events, "perm-1").result.outcome).toEqual({ outcome: "selected", optionId: "allow-once" });
     expect(decisions(layout.events)).toEqual([{ decision: "allow", by: "policy" }]);
+  });
+
+  test("T1b: with the worker's home in its path context, a Read outside the worktree is allowed and a Read of ~/.ssh asks", async () => {
+    const homeReal = realpathSync(home);
+    const readTool = (path: string) => ({ toolCallId: "t-r", kind: "read", title: "Read", locations: [{ path }], rawInput: { file_path: path } });
+    const open = await setup({ permission: { toolCall: readTool(join(homeReal, "notes.txt")) } }, "run-1", { home: homeReal });
+    expect(await open.ch.request("session/prompt", { sessionId: "sess-1" })).toEqual({ stopReason: "end_turn" });
+    expect(existsSync(open.layout.question(1))).toBe(false);
+    expect(decisions(open.layout.events)).toEqual([{ decision: "allow", by: "policy" }]);
+
+    const ssh = await setup({ permission: { toolCall: readTool(join(homeReal, ".ssh/id_x")) } }, "run-2", { home: homeReal });
+    const turn = ssh.ch.request("session/prompt", { sessionId: "sess-1" });
+    expect(await waitFor(() => existsSync(ssh.layout.question(1)))).toBe(true);
+    expect(JSON.parse(readFileSync(ssh.layout.question(1), "utf8")).reason).toContain("credential store");
+    writeFileSync(ssh.layout.answer(1), JSON.stringify({ decision: "deny" }));
+    expect(await turn).toEqual({ stopReason: "end_turn" });
   });
 
   test("T2: an outside Write pauses until ANSWER-1 allows it, then replies allow-once", async () => {

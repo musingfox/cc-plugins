@@ -39,6 +39,14 @@ export function darwinUserTempDir(): string | undefined {
   return dir === "" ? undefined : dir;
 }
 
+// The temp dir a fenced worker's Bash may write, which its file tools may then write without a question.
+// Claude Code's own /tmp/claude-<uid> is left out although Bash may write most of it: it holds every session's
+// scratch and task files, and Claude Code's sandbox guards paths inside it (claude-settings-*.json, bash-edit-diff,
+// the session's tasks directory) by a list muster cannot see, so a file-tool edit there could exceed what Bash can do.
+export function workerTempDirs(): string[] {
+  return [darwinUserTempDir()].filter((d): d is string => d !== undefined);
+}
+
 // allowedHosts is the list resolved when the run was dispatched; every turn passes the same one.
 export function sandboxOption(opts: { env: Env; cache: string; allowedHosts: readonly string[]; userTemp?: string }) {
   const home = opts.env.HOME ?? homedir();

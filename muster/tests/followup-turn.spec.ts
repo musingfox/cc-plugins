@@ -177,7 +177,8 @@ describe("FollowUpResumesTheSession", () => {
     const layout = await firstTurn();
     writeFileSync(layout.question(1), JSON.stringify({ n: 1, paths: [] }));
     writeFileSync(layout.answer(1), JSON.stringify({ decision: "allow" }));
-    const outside = join(home, "outside.txt");
+    // home is under the temp dir, where an edit now passes by policy; the run's own directory still asks.
+    const outside = join(layout.runDir, "outside.txt");
     const sc = scenario({
       permission: { toolCall: { toolCallId: "t-w", kind: "edit", title: "Write", locations: [{ path: outside }], rawInput: { file_path: outside, content: "x" } } },
       writeOnAllow: { path: outside, content: "x" },

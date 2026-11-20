@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import * as sandbox from "../src/sandbox";
-import { resolveAllowedHosts, sandboxOption } from "../src/sandbox";
+import { resolveAllowedHosts, sandboxOption, workerTempDirs } from "../src/sandbox";
+import { USER_TEMP_WRITES } from "./support/user-temp";
 
 const DEFAULT_HOSTS = ["registry.npmjs.org"];
 
@@ -63,5 +64,12 @@ describe("sandbox option filesystem rules", () => {
   test("R3: without HOME in the env the denied paths come from the user's home directory", () => {
     const option = sandboxOption({ env: {}, cache: "/r/cache", allowedHosts: DEFAULT_HOSTS });
     expect(option.filesystem.denyRead.every((p) => p.startsWith(homedir() + "/"))).toBe(true);
+  });
+});
+
+describe("worker temp dirs", () => {
+  test("R5: the file-tool temp roots are the per-user temp dir only, not Claude Code's shared /tmp/claude-<uid>", () => {
+    if (process.platform === "win32") return;
+    expect(workerTempDirs()).toStrictEqual([...USER_TEMP_WRITES]);
   });
 });

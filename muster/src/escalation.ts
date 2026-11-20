@@ -4,7 +4,7 @@ import { decideBash } from "./bash-policy";
 import { writeAtomic, writePhase, type RunPaths } from "./layout";
 import { chooseOutcome, type PermissionOption, type PermissionOutcome } from "./outcome";
 import { decideNetwork } from "./network-policy";
-import { danglingLinkTargetOutside, decidePath, resolveRequestPath, type Decision, type ToolCall } from "./path-policy";
+import { danglingLinkTargetOutside, decidePath, resolveRequestPath, type Decision, type PathContext, type ToolCall } from "./path-policy";
 import { awaitAnswerWithin, questionTimeoutMs } from "./question-timeout";
 import { DEFAULT_ALLOWED_HOSTS } from "./sandbox";
 import { pollMs, type Reason } from "./termination";
@@ -21,6 +21,8 @@ type Settled = { kind: "answer"; text: string } | { kind: "terminated" };
 export type PermissionHandlerOptions = {
   layout: RunPaths;
   worktreeReal: string;
+  // What the worker's Bash may already reach outside the worktree; absent, every file request outside it asks.
+  pathContext?: Omit<PathContext, "worktreeReal">;
   fenced?: boolean;
   trackPending: (cancel: () => void) => () => void;
   terminate: (reason: Reason, detail?: string) => Promise<number>;
@@ -29,8 +31,9 @@ export type PermissionHandlerOptions = {
   allowedHosts?: readonly string[];
 };
 
-function policyDecision(toolCall: ToolCallRequest, worktreeReal: string, fenced?: boolean): Decision {
-  if (PATH_KINDS.has(toolCall.kind)) return decidePath(toolCall, { worktreeReal });
+function policyDecision(toolCall: ToolCallRequest, ctx: PathContext, fenced?: boolean): Decision {
+  const { worktreeReal } = ctx;
+  if (PATH_KINDS.has(toolCall.kind)) return decidePath(toolCall, ctx);
   if (toolCall.kind === "execute") return decideBash(toolCall.rawInput?.command, { worktreeReal, fenced });
   return { allow: false, reason: `kind ${toolCall.kind} needs an answer` };
 }
@@ -94,6 +97,7 @@ function lastQuestion(runDir: string): number {
 
 export function createPermissionHandler(opts: PermissionHandlerOptions) {
   const { layout, worktreeReal, fenced, trackPending, terminate, logDecision } = opts;
+  const pathContext: PathContext = { ...opts.pathContext, worktreeReal };
   const env = opts.env ?? process.env;
   const poll = pollMs(env);
   let questions = lastQuestion(layout.runDir);
@@ -128,7 +132,7 @@ export function createPermissionHandler(opts: PermissionHandlerOptions) {
       return { outcome: chooseOutcome(options, network.decision) };
     }
 
-    const policy = policyDecision(toolCall, worktreeReal, fenced);
+    const policy = policyDecision(toolCall, pathContext, fenced);
     if (policy.allow) {
       await logDecision({ decision: "allow", by: "policy" });
       return { outcome: chooseOutcome(options, "allow") };

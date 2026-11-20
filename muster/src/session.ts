@@ -1,4 +1,6 @@
 import { mkdirSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname } from "node:path";
 import { LaunchError, openChannel, type Channel } from "./channel";
 import { createPermissionHandler } from "./escalation";
 import { handshake } from "./handshake";
@@ -11,7 +13,7 @@ import { createRunDir, readPhase, writeAtomic, writePhase, type Phase, type RunP
 import { copyDeps } from "./deps";
 import { writeTurnReport } from "./report";
 import { createTerminator, killGraceMs, type TerminatorState } from "./termination";
-import { DEFAULT_ALLOWED_HOSTS, resolveAllowedHosts } from "./sandbox";
+import { DEFAULT_ALLOWED_HOSTS, resolveAllowedHosts, workerTempDirs } from "./sandbox";
 import { createWorkerWorktree, fetchBranchBack } from "./worktree";
 
 export type DispatchRequest = {
@@ -217,6 +219,7 @@ async function runTurn(
     createPermissionHandler({
       layout,
       worktreeReal: spec.worktree,
+      pathContext: { home: env.HOME ?? homedir(), tempRoots: workerTempDirs(), runsDir: dirname(layout.runDir) },
       fenced: spec.fenced,
       allowedHosts: spec.allowedHosts,
       trackPending: term.trackPending,
