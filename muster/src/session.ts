@@ -7,9 +7,10 @@ import { buildAgentLaunch } from "./launch";
 import { gateEffort, gateModel } from "./model-gate";
 import { enforceDefaultMode } from "./mode-gate";
 import { buildPrompt } from "./prompt";
-import { createProgressWriter } from "./progress";
+import { createProgressWriter, createReplyReader } from "./progress";
 import { createRunDir, readPhase, writeAtomic, writePhase, type Phase, type RunPaths } from "./layout";
 import { copyDeps } from "./deps";
+import { writeTurnReport } from "./report";
 import { createTerminator, killGraceMs, type TerminatorState } from "./termination";
 import { createWorkerWorktree, fetchBranchBack } from "./worktree";
 
@@ -78,6 +79,7 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
   const prompt = buildPrompt({ worktree: wt.worktree, reportPath: layout.report, ticket: request.ticket });
   setPhase(layout, "starting");
   const observe = createProgressWriter(layout, request.ticket);
+  const reply = createReplyReader();
   try {
     const deps = (opts.copyDeps ?? copyDeps)({ repoRoot: request.repoRoot, baseSha: wt.baseSha, clone: wt.worktree });
     writePhase(layout, { deps });
@@ -145,7 +147,10 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
       env,
     }),
   );
-  channel.onNotification("session/update", observe);
+  channel.onNotification("session/update", (params) => {
+    observe(params);
+    reply.observe(params);
+  });
 
   const failTurn = async (e: unknown) => {
     const grace = new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), killGraceMs(env)));
@@ -153,7 +158,16 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
     if (exitCode !== undefined) await term.terminate("agent-exited", `exit code ${exitCode}`);
     else await term.terminate("prompt-error", (e as Error).message);
   };
+  // The report is the turn's final message; a turn a termination cancelled keeps the report termination writes.
   const recordTurn = (result: TurnResult | null) => {
+    const message = reply.take();
+    if (!state.terminating) {
+      try {
+        writeTurnReport(layout.report, message);
+      } catch (e) {
+        process.stderr.write(`muster: report write failed: ${(e as Error).message}\n`);
+      }
+    }
     fetchBack();
     setPhase(layout, "idle", {
       stopReason: result?.stopReason,

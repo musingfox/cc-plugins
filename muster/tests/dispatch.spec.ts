@@ -22,21 +22,17 @@ beforeEach(() => {
   repo = makeRepo();
   outside = join(home, "outside.txt");
   hook = join(home, "turn-hook.ts");
-  // Writes DONE to the report file once the permission is answered with an option (allow or deny),
-  // so the fake agent "writes DONE" whether or not the client allowed the outside write. A
+  // Ends the turn with a DONE message once the permission is answered with an option (allow or deny),
+  // so the fake agent reports DONE whether or not the client allowed the outside write. A
   // cancelled permission (stop) does not finish the turn.
   writeFileSync(
     hook,
     `import * as base from ${JSON.stringify(PERMISSION_TURN)};
-import { writeFileSync } from "node:fs";
 export const setup = base.setup;
-let reportPath;
 export function handle(msg, io) {
-  if (msg.method === "session/prompt") {
-    reportPath = /^Report file: (.+)$/m.exec(msg.params?.prompt?.[0]?.text ?? "")?.[1];
-  }
-  if (msg.id === "perm-1" && msg.method === undefined && reportPath && msg.result?.outcome?.outcome === "selected") {
-    writeFileSync(reportPath, "DONE\\n");
+  if (msg.id === "perm-1" && msg.method === undefined && msg.result?.outcome?.outcome === "selected") {
+    const update = { sessionUpdate: "agent_message_chunk", messageId: "m1", content: { type: "text", text: "DONE\\n" } };
+    io.out({ jsonrpc: "2.0", method: "session/update", params: { sessionId: "s1", update } });
   }
   return base.handle(msg, io);
 }

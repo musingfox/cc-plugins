@@ -81,3 +81,33 @@ export function createProgressWriter(layout: RunPaths, ticket: string): (params:
     if (Object.keys(patch).length > 0) persist(layout, patch);
   };
 }
+
+export type Reply = { id: string | undefined; text: string; open: boolean };
+
+// The last agent message so far. Chunks join while their messageId holds; a chunk without one joins the
+// message before it only until another update comes between.
+export function foldReply(prev: Reply | null, update: unknown): Reply | null {
+  if (!isRecord(update)) return prev;
+  if (update.sessionUpdate !== "agent_message_chunk") return prev?.open ? { ...prev, open: false } : prev;
+  const content = update.content;
+  if (!isRecord(content) || content.type !== "text" || typeof content.text !== "string") return prev;
+  const id = typeof update.messageId === "string" ? update.messageId : undefined;
+  const same = prev !== null && (id !== undefined ? prev.id === id : prev.id === undefined && prev.open);
+  return { id, text: same ? prev.text + content.text : content.text, open: true };
+}
+
+// Collects the turn's final agent message from its session/update notifications; take() hands it over
+// and starts the next turn empty.
+export function createReplyReader(): { observe: (params: unknown) => void; take: () => string } {
+  let reply: Reply | null = null;
+  return {
+    observe: (params) => {
+      reply = foldReply(reply, isRecord(params) ? params.update : undefined);
+    },
+    take: () => {
+      const text = reply?.text ?? "";
+      reply = null;
+      return text;
+    },
+  };
+}

@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
+import { writeAtomic } from "./layout";
 
 export type ReportResult =
   | { kind: "none" }
@@ -22,4 +23,15 @@ export function readReport(reportPath: string): ReportResult {
   if (firstLine === "DONE") return { kind: "done", body };
   if (firstLine === "BLOCKED") return { kind: "blocked", body };
   return { kind: "malformed", firstLine };
+}
+
+// C0 controls except newline and tab, DEL, and C1 controls (ESC among them): status and the pane print the report.
+const CONTROL = /[\x00-\x08\x0b-\x1f\x7f-\x9f]/g;
+
+// Each turn replaces the report with the worker's final message, untrusted text stripped of its controls;
+// a turn that ended with no agent text leaves no report.
+export function writeTurnReport(reportPath: string, message: string): void {
+  const text = message.replace(CONTROL, "");
+  if (text === "") rmSync(reportPath, { force: true });
+  else writeAtomic(reportPath, text);
 }

@@ -11,7 +11,8 @@ export type Reason =
   | "handshake-failed"
   | "prompt-error";
 
-export type TerminatorState = { channel?: Channel; sessionId?: string; turn?: Promise<unknown> };
+// terminating is set once a termination starts, so a turn it cancels no longer writes the report.
+export type TerminatorState = { channel?: Channel; sessionId?: string; turn?: Promise<unknown>; terminating?: boolean };
 
 type Env = { MUSTER_KILL_GRACE_MS?: string; MUSTER_POLL_MS?: string };
 
@@ -75,6 +76,7 @@ export function createTerminator(opts: TerminatorOptions) {
   };
 
   async function run(reason: Reason, detail?: string): Promise<number> {
+    state.terminating = true;
     clearInterval(timer);
     for (const entry of [...cancels]) {
       try {

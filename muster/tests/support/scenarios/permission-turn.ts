@@ -2,7 +2,8 @@
 //   permission = {toolCall, options?}  sent as session/request_permission after session/prompt
 //   writeOnAllow = {path, content}     written only when the client selects an allow_once option
 //   stopReason                         answers the prompt (default end_turn)
-//   writeReport                        content written to the "Report file:" path named in the prompt
+//   replies                            the final agent message of each prompt turn: turn n sends replies[n-1],
+//                                      the last entry repeating, as two agent_message_chunk updates of one messageId
 //   modelUsage                         [{model}] answered as _meta.quota.model_usage
 //   echoEnv                            writes its own environment to stderr at startup
 //   promptDelayMs                      delays the prompt answer
@@ -17,7 +18,7 @@ type Io = {
     permission?: { toolCall: unknown; options?: Option[] };
     writeOnAllow?: { path: string; content: string };
     stopReason?: string;
-    writeReport?: string;
+    replies?: string[];
     modelUsage?: { model: string }[];
     echoEnv?: boolean;
     promptDelayMs?: number;
@@ -37,14 +38,24 @@ const DEFAULT_OPTIONS: Option[] = [
 ];
 
 let promptId: unknown;
+let turns = 0;
 const configValues = new Map<string, unknown>();
 
 export function setup(io: Io): void {
   if (io.scenario.echoEnv) process.stderr.write(JSON.stringify(process.env));
 }
 
+function replyUpdates(io: Io): unknown[] {
+  const replies = io.scenario.replies ?? [];
+  if (replies.length === 0) return [];
+  const text = replies[Math.min(turns, replies.length) - 1];
+  const half = Math.ceil(text.length / 2);
+  const chunk = (part: string) => ({ sessionUpdate: "agent_message_chunk", messageId: `reply-${turns}`, content: { type: "text", text: part } });
+  return [chunk(text.slice(0, half)), chunk(text.slice(half))];
+}
+
 function answerPrompt(io: Io, id: unknown): void {
-  for (const update of io.scenario.updates ?? []) {
+  for (const update of [...(io.scenario.updates ?? []), ...replyUpdates(io)]) {
     io.out({ jsonrpc: "2.0", method: "session/update", params: { sessionId: "sess-1", update } });
   }
   setTimeout(
@@ -81,6 +92,7 @@ export function handle(msg: { id?: unknown; method?: string; params?: any; resul
 
   if (msg.method === "session/prompt" && msg.id !== undefined) {
     promptId = msg.id;
+    turns++;
     if (io.scenario.permission) {
       io.out({
         jsonrpc: "2.0",
@@ -91,13 +103,7 @@ export function handle(msg: { id?: unknown; method?: string; params?: any; resul
       return true;
     }
     if (io.scenario.errors?.["session/prompt"] !== undefined) return undefined;
-    const text: string = msg.params?.prompt?.[0]?.text ?? "";
-    const reportPath = /^Report file: (.+)$/m.exec(text)?.[1];
-    if (io.scenario.writeReport !== undefined && reportPath !== undefined) {
-      void Bun.write(reportPath, io.scenario.writeReport).then(() => answerPrompt(io, msg.id));
-    } else {
-      answerPrompt(io, msg.id);
-    }
+    answerPrompt(io, msg.id);
     return true;
   }
 

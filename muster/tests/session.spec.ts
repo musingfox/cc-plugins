@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { WorktreeError } from "../src/worktree";
 import { recordFetch, runWorker, type DispatchRequest } from "../src/session";
 import { readPhase, runPaths, writePhase, type RunPaths } from "../src/layout";
+import { readStatus } from "../src/status";
 import { commitFile, git, makeRepo, removeFixtures } from "./support/repo";
 import { USER_TEMP_WRITES } from "./support/user-temp";
 
@@ -148,10 +149,10 @@ describe("WorkerSessionLoop", () => {
     expect(String(readPhase(layout)?.depsError)).toContain("listing the tree at abc failed");
   });
 
-  test("T2: a cancelled turn leaves a REPORT.md that the client did not touch", async () => {
+  test("T2: a turn the agent itself ends as cancelled still reports its final message, stopReason unread", async () => {
     const layout = layoutFor();
     const exits: number[] = [];
-    const sc = scenario({ stopReason: "cancelled", writeReport: "DONE\nx" });
+    const sc = scenario({ stopReason: "cancelled", replies: ["DONE\nx"] });
     const done = runWorker(request(), layout, { env: envFor(sc), exit: (c) => exits.push(c) });
     expect(await waitFor(() => readPhase(layout)?.stopReason === "cancelled")).toBe(true);
     expect(readReportFile(layout)).toBe("DONE\nx");
@@ -286,13 +287,49 @@ describe("WorkerSessionLoop", () => {
     process.env.MUSTER_IDLE_TIMEOUT_MS = "300";
     const layout = layoutFor();
     const exits: number[] = [];
-    const sc = scenario({ writeReport: "DONE\nall good" });
+    const sc = scenario({ replies: ["DONE\nall good"] });
     await runWorker(request(), layout, { env: envFor(sc, { MUSTER_IDLE_TIMEOUT_MS: "300" }), exit: (c) => exits.push(c) });
     expect(exits).toEqual([0]);
     expect(readReportFile(layout)).toBe("DONE\nall good");
     expect(readPhase(layout)?.reason).toContain("idle-timeout");
     const everything = [JSON.stringify(readPhase(layout)), readFileSync(layout.events, "utf8"), readFileSync(layout.stderrLog, "utf8")];
     for (const text of everything) expect(text).not.toContain("agent-exited");
+  });
+
+  test("M1: a turn that writes no file but ends with DONE\\nchecks passed leaves that text in REPORT.md and state=done", async () => {
+    const layout = layoutFor();
+    const updates = [
+      { sessionUpdate: "agent_message_chunk", messageId: "m-0", content: { type: "text", text: "Running the checks now." } },
+      { sessionUpdate: "tool_call", toolCallId: "t1" },
+    ];
+    await runWorker(request(), layout, { env: envFor(scenario({ updates, replies: ["DONE\nchecks passed"] })), exit: () => {} });
+    expect(readReportFile(layout)).toBe("DONE\nchecks passed");
+    expect(readStatus(layout.runDir).state).toBe("done");
+  });
+
+  test("M2: a final message whose first line is not DONE or BLOCKED leaves the run malformed", async () => {
+    const layout = layoutFor();
+    await runWorker(request(), layout, { env: envFor(scenario({ replies: ["HTTP 404 Not Found\nDONE"] })), exit: () => {} });
+    expect(readReportFile(layout)).toBe("HTTP 404 Not Found\nDONE");
+    expect(readStatus(layout.runDir).state).toBe("malformed");
+  });
+
+  test("M3: ESC, C0 and C1 control characters in the final message never reach REPORT.md; newline and tab do", async () => {
+    const layout = layoutFor();
+    const reply = "DONE\n\u001b[31mred\u001b[0m\tok\u0007\u009b2J\u0085end\r";
+    await runWorker(request(), layout, { env: envFor(scenario({ replies: [reply] })), exit: () => {} });
+    expect(readReportFile(layout)).toBe("DONE\n[31mred[0m\tok2Jend");
+  });
+
+  test("M5: a stop that lands during a turn keeps muster's BLOCKED report over the turn's final message", async () => {
+    const layout = layoutFor();
+    const exits: number[] = [];
+    const sc = scenario({ replies: ["DONE\npartial"], promptDelayMs: 400 });
+    void runWorker(request(), layout, { env: envFor(sc, { MUSTER_KILL_GRACE_MS: "1500" }), exit: (c) => exits.push(c) });
+    expect(await waitFor(() => existsSync(layout.events) && readFileSync(layout.events, "utf8").includes("agent_message_chunk"))).toBe(true);
+    writeFileSync(layout.stop, "");
+    expect(await waitFor(() => exits.length > 0, 5000)).toBe(true);
+    expect(readReportFile(layout)).toBe("BLOCKED\nreason: stopped\n");
   });
 
   test("M6: phase.json carries no updated timestamp", async () => {
@@ -324,7 +361,7 @@ describe("WorkerSessionLoop", () => {
     );
     const layout = layoutFor();
     const exits: number[] = [];
-    const sc = scenario({ writeReport: "DONE\nfirst" });
+    const sc = scenario({ replies: ["DONE\nfirst"] });
     const run = runWorker(request(), layout, { env: { ...envFor(sc), MUSTER_AGENT_CMD: fakeCmd(sc, script) }, exit: (c) => exits.push(c) });
     expect(await waitFor(() => readPhase(layout)?.phase === "idle")).toBe(true);
     writeFileSync(join(layout.runDir, "FOLLOWUP-1.md"), "second");
@@ -414,7 +451,7 @@ describe("RecordDepsOutcome", () => {
     depsRepo();
     const layout = layoutFor();
     const exits: number[] = [];
-    await runWorker(request(), layout, { env: envFor(scenario({ writeReport: "DONE\nok" })), exit: (c) => exits.push(c) });
+    await runWorker(request(), layout, { env: envFor(scenario({ replies: ["DONE\nok"] })), exit: (c) => exits.push(c) });
     expect(exits).toEqual([0]);
     expect(readPhase(layout)?.deps).toEqual([{ dir: ".", outcome: "copied" }]);
   });
@@ -423,7 +460,7 @@ describe("RecordDepsOutcome", () => {
     depsRepo();
     const layout = layoutFor();
     const listing = join(home, "listing.txt");
-    const sc = scenario({ writeReport: "DONE\nok" });
+    const sc = scenario({ replies: ["DONE\nok"] });
     const [sh, ...fake] = JSON.parse(fakeCmd(sc, SCRIPT)) as string[];
     const wrapped = ["/bin/sh", "-c", `ls node_modules > '${listing}'; exec "$@"`, sh, ...fake];
     const env = { ...envFor(sc), MUSTER_AGENT_CMD: JSON.stringify(wrapped) };
@@ -442,7 +479,7 @@ describe("RecordDepsOutcome", () => {
     writeFileSync(join(repo, "bun.lock"), "edited\n");
     const layout = layoutFor();
     const exits: number[] = [];
-    await runWorker(request(), layout, { env: envFor(scenario({ writeReport: "DONE\nok" })), exit: (c) => exits.push(c) });
+    await runWorker(request(), layout, { env: envFor(scenario({ replies: ["DONE\nok"] })), exit: (c) => exits.push(c) });
     expect(exits).toEqual([0]);
     expect(readPhase(layout)?.deps).toEqual([{ dir: ".", outcome: "lockfile-differs", detail: "bun.lock" }]);
     expect(readPhase(layout)?.phase).toBe("exited");
