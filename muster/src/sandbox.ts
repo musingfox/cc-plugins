@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { CREDENTIAL_STORES } from "./credential-stores";
 
 export class InvalidAllowHost extends Error {
   override name = "InvalidAllowHost";
@@ -28,22 +29,7 @@ export function resolveAllowedHosts(env: Env): string[] {
   return [...new Set([...DEFAULT_ALLOWED_HOSTS, ...extra])];
 }
 
-export const CREDENTIAL_STORES = [
-  ".npmrc",
-  ".config/gh",
-  ".git-credentials",
-  ".config/git/credentials",
-  ".netrc",
-  ".aws",
-  ".docker/config.json",
-  "Library/Keychains",
-  ".ssh",
-  ".pi",
-  ".config/gcloud",
-  ".kube",
-  ".cargo/credentials.toml",
-  ".pypirc",
-];
+export { CREDENTIAL_STORES };
 
 // Apple mktemp without a template ignores TMPDIR and writes here; without it every test fixture fails to start.
 export function darwinUserTempDir(): string | undefined {
