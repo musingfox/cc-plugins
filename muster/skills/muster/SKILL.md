@@ -30,11 +30,11 @@ Use these aliases, not full IDs: the adapter offers the newest models only under
 bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts run --name NAME --model MODEL [--effort EFFORT] [--unfenced] [--issue URL] --repo /abs/path/to/repo --ticket "TICKET TEXT"
 ```
 
-Use `--ticket-file PATH` instead of `--ticket` for a long ticket. Add `--issue URL` to tie the run to the work item it serves, such as an `obsidian://` link to its pm card; muster stores the value in `meta.json` without reading it, and `/muster-runs` groups runs by it. Use `--base REF` to start from a ref other than HEAD. The worker's Bash runs inside the OS sandbox; add `--unfenced` to run it outside, for a ticket whose checks the sandbox cannot run, such as a suite that starts its own `sandbox-exec`; see Confinement. The first stdout line is `RUNDIR=<path>`; keep that path for collect.
+Use `--ticket-file PATH` instead of `--ticket` for a long ticket. Add `--issue URL` to tie the run to the work item it serves, such as an `obsidian://` link to its pm card; muster stores the value in `meta.json` without reading it, and `/muster-runs` groups runs by it. Use `--base REF` to start from a ref other than HEAD. The worker's Bash runs inside the OS sandbox; add `--unfenced` to run it outside, for a ticket whose checks the sandbox cannot run, such as a suite that starts its own `sandbox-exec`; see Confinement. The first stdout line is `RUNDIR=<path>`; keep that path for collect. The last stdout line, printed as the turn ends, is the line `status NAME` prints at that moment, so the exit of the background `run` task tells you the outcome and you need no `status` call after it.
 
 ## Wait
 
-Start `watch` through `Bash(run_in_background: true)`; it prints one line per state change and exits when the run needs you or ends. Monitor can stream the same output when it is available.
+A finished turn is reported by the exit of the background `run` or `followup` task: its last line is the status line, whose `state=` tells you what to do next. You need `watch` only to be told about a question while the turn is still running, since the turn then waits on you. Start it through `Bash(run_in_background: true)`, in the same message as `run` if you like (it waits up to 30 seconds for the run to appear, as `run` creates it only after cloning the repository); it prints one line per state change and exits when the run needs you or ends. Monitor can stream the same output when it is available.
 
 With Claude Code 2.1.304 or later, a band above the prompt lists the in-flight runs of this repository, each with a glyph for its state, its title and its task-list progress as a five-cell bar then `done/total` (`# N` tool calls when it has no plan); its header counts running, question, idle and finished runs, and shows `N to collect` beside them while finished runs wait for collection.
 
@@ -66,7 +66,7 @@ Add `--n N` when more than one question is pending. Then wait again. A question 
 
 ## Follow up
 
-Once the turn has ended (`done`, `blocked`, `malformed`, `idle`, or `dead`), you can send the worker its next instruction. `followup` starts a new client that resumes the worker's session, so the worker remembers the earlier turns, and runs one turn with the same model, effort, fence and tools as the run. Like `run`, it blocks until that turn ends, so start it with `Bash(run_in_background: true)`, then wait again:
+Once the turn has ended (`done`, `blocked`, `malformed`, `idle`, or `dead`), you can send the worker its next instruction. `followup` starts a new client that resumes the worker's session, so the worker remembers the earlier turns, and runs one turn with the same model, effort, fence and tools as the run. Like `run`, it blocks until that turn ends and prints the status line as its last stdout line, so start it with `Bash(run_in_background: true)`; its exit reports the outcome, and `watch` is needed only for a question mid-turn:
 
 ```
 bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts followup NAME "NEXT INSTRUCTION"
