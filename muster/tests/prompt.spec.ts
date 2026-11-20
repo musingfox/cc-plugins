@@ -53,6 +53,13 @@ describe("WorkerPrompt", () => {
     expect(followup).not.toContain(reportPath);
   });
 
+  test("W1: the first prompt and the follow-up both say to wait in the foreground, since background work ends with the turn", () => {
+    for (const text of [buildPrompt({ worktree, ticket }), buildFollowup({ text: "do X" })]) {
+      expect(text).toContain("You are not woken when a background task finishes, and background processes end with the turn.");
+      expect(text).toContain("Wait for every command in the foreground before you end your turn.");
+    }
+  });
+
   test("T5: empty ticket or relative worktree throws UsageError", () => {
     expect(() => buildPrompt({ worktree, ticket: "" })).toThrow(UsageError);
     expect(() => buildPrompt({ worktree: "relative/wt", ticket })).toThrow(UsageError);

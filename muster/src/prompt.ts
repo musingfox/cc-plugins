@@ -2,7 +2,10 @@ import { isAbsolute } from "node:path";
 import { UsageError } from "./layout";
 
 // muster writes REPORT.md from this final message, so the worker writes no file outside its worktree.
+// The client exits when the turn ends, which ends the worker's background processes with it.
 const FINAL_MESSAGE = [
+  "You are not woken when a background task finishes, and background processes end with the turn.",
+  "Wait for every command in the foreground before you end your turn.",
   "End each turn with a final message whose first line is exactly DONE or BLOCKED, with nothing else on that line.",
   "After it, write only what your commits do not show: the checks you ran and their results, what is left open, and the reason when BLOCKED.",
   "Requests outside the worktree may be denied. If a request is refused, do not work around the refusal; end the turn with BLOCKED instead.",
