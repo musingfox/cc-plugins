@@ -38,6 +38,7 @@ const T1_PARAMS = {
         settingSources: [],
         settings: { permissions: { ask: ["WebFetch"] }, disableClaudeAiConnectors: true },
         tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "ToolSearch", "TodoWrite", "TaskCreate", "TaskUpdate", "TaskList"],
+        env: { npm_config_cache: "/tmp/muster-cache/npm", BUN_INSTALL_CACHE_DIR: "/tmp/muster-cache/bun" },
         sandbox: {
           enabled: true,
           failIfUnavailable: true,
@@ -100,7 +101,7 @@ function sessionNew(path: string) {
 }
 
 describe("SessionHandshake", () => {
-  test("T1: a fenced session/new is sent with cwd, empty mcpServers, settingSources [], the WebFetch ask rule, connectors off, the tool allowlist and the sandbox option", async () => {
+  test("T1: a fenced session/new is sent with cwd, empty mcpServers, settingSources [], the WebFetch ask rule, connectors off, the tool allowlist, the run cache env and the sandbox option", async () => {
     const { ch, eventsPath } = await open();
     await handshake(ch, { cache: "/tmp/muster-cache", worktree: "/w/x", fenced: true, env: { HOME: "/home/u" } });
     expect(sessionNew(eventsPath)).toStrictEqual(T1_PARAMS);
@@ -151,30 +152,17 @@ describe("SessionHandshake", () => {
     expect(handshakeTimeoutMs()).toBe(60000);
   });
 
-  test("T6: MUSTER_ALLOW_HOSTS is trimmed, lower-cased, deduplicated and appended after the defaults", async () => {
-    const { ch, eventsPath } = await open();
-    await handshake(ch, {
-      cache: "/tmp/muster-cache",
-      worktree: "/w/x",
-      fenced: true,
-      env: { MUSTER_ALLOW_HOSTS: " Example.org, *.corp.example ,registry.npmjs.org," },
-    });
-    expect(sessionNew(eventsPath)._meta.claudeCode.options.sandbox.network.allowedDomains).toStrictEqual([
+  test("T6: MUSTER_ALLOW_HOSTS is trimmed, lower-cased, deduplicated and appended after the defaults", () => {
+    expect(resolveAllowedHosts({ MUSTER_ALLOW_HOSTS: " Example.org, *.corp.example ,registry.npmjs.org," })).toStrictEqual([
       ...DEFAULT_HOSTS,
       "example.org",
       "*.corp.example",
     ]);
   });
 
-  test("T7: an invalid MUSTER_ALLOW_HOSTS entry rejects with invalid-allow-host before any request is sent", async () => {
+  test("T7: an invalid MUSTER_ALLOW_HOSTS entry is rejected with invalid-allow-host", () => {
     for (const entry of ["https://x.org", "a.com/path", "a.com:443", "*", "localhost", "a b"]) {
-      const { ch, eventsPath } = await open();
-      const err = await handshake(ch, { cache: "/tmp/muster-cache", worktree: "/w/x", env: { MUSTER_ALLOW_HOSTS: entry } }).catch((e) => e);
-      expect(err).toBeInstanceOf(HandshakeError);
-      expect(err.message).toContain("invalid-allow-host");
-      expect(err.message).toContain(entry);
-      expect(sentMethods(eventsPath)).not.toContain("initialize");
-      expect(sentMethods(eventsPath)).not.toContain("session/new");
+      expect(() => resolveAllowedHosts({ MUSTER_ALLOW_HOSTS: entry })).toThrow(`invalid-allow-host: ${entry}`);
     }
   });
 
@@ -209,14 +197,18 @@ describe("SessionHandshake", () => {
     expect(sessionNew(eventsPath)).toStrictEqual({ ...T1_PARAMS, _meta: { claudeCode: { options } } });
   });
 
-  test("T11: the sandbox allowedDomains equal resolveAllowedHosts for the same env", async () => {
-    const env = { MUSTER_ALLOW_HOSTS: "a.org" };
+  test("T11: the sandbox allowedDomains are the hosts passed in, not MUSTER_ALLOW_HOSTS from the env", async () => {
     const { ch, eventsPath } = await open();
-    await handshake(ch, { cache: "/tmp/muster-cache", worktree: "/w/x", fenced: true, env });
+    await handshake(ch, {
+      cache: "/tmp/muster-cache",
+      worktree: "/w/x",
+      fenced: true,
+      allowedHosts: [...DEFAULT_HOSTS, "a.org"],
+      env: { MUSTER_ALLOW_HOSTS: "b.org" },
+    });
     expect(sessionNew(eventsPath)._meta.claudeCode.options.sandbox.network.allowedDomains).toStrictEqual([
       ...DEFAULT_HOSTS,
       "a.org",
     ]);
-    expect(resolveAllowedHosts(env)).toStrictEqual([...DEFAULT_HOSTS, "a.org"]);
   });
 });

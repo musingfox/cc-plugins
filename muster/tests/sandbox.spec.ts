@@ -22,7 +22,7 @@ describe("sandbox settings", () => {
 describe("sandbox option filesystem rules", () => {
   test("R2: filesystem denies the credential stores under HOME and allows writes to the cache and the user temp dir only; no denyWrite", () => {
     expect("defaultTempRoots" in sandbox).toBe(false);
-    const option = sandboxOption({ env: { HOME: "/home/u" }, cache: "/r/cache", userTemp: "/var/folders/u/T/" });
+    const option = sandboxOption({ env: { HOME: "/home/u" }, cache: "/r/cache", allowedHosts: DEFAULT_HOSTS, userTemp: "/var/folders/u/T/" });
     expect(option.filesystem).toStrictEqual({
       denyRead: [
         "/home/u/.npmrc",
@@ -46,7 +46,7 @@ describe("sandbox option filesystem rules", () => {
   });
 
   test("R4: Apple mktemp ignores TMPDIR and writes to the per-user temp dir, so on macOS that dir is writable by default", () => {
-    const option = sandboxOption({ env: { HOME: "/home/u" }, cache: "/r/cache" });
+    const option = sandboxOption({ env: { HOME: "/home/u" }, cache: "/r/cache", allowedHosts: DEFAULT_HOSTS });
     if (process.platform !== "darwin") {
       expect(option.filesystem.allowWrite).toStrictEqual(["/r/cache"]);
       return;
@@ -55,8 +55,13 @@ describe("sandbox option filesystem rules", () => {
     expect(option.filesystem.allowWrite).toStrictEqual(["/r/cache", userTemp]);
   });
 
+  test("H3: allowedDomains are the hosts passed in, whatever MUSTER_ALLOW_HOSTS the env holds", () => {
+    const option = sandboxOption({ env: { MUSTER_ALLOW_HOSTS: "b.org" }, cache: "/r/cache", allowedHosts: [...DEFAULT_HOSTS, "a.org"] });
+    expect(option.network.allowedDomains).toStrictEqual([...DEFAULT_HOSTS, "a.org"]);
+  });
+
   test("R3: without HOME in the env the denied paths come from the user's home directory", () => {
-    const option = sandboxOption({ env: {}, cache: "/r/cache" });
+    const option = sandboxOption({ env: {}, cache: "/r/cache", allowedHosts: DEFAULT_HOSTS });
     expect(option.filesystem.denyRead.every((p) => p.startsWith(homedir() + "/"))).toBe(true);
   });
 });

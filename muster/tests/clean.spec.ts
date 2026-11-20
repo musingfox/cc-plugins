@@ -5,8 +5,12 @@ import { join } from "node:path";
 import { git } from "../src/worktree";
 import { createRunDir, runPaths, writeAtomic, writePhase } from "../src/layout";
 import { cleanVerb } from "../src/verbs/clean";
+import { runWorker } from "../src/session";
+import { readStatus } from "../src/status";
 
 const CLI = join(import.meta.dir, "..", "src", "muster.ts");
+const FAKE = join(import.meta.dir, "support", "fake-agent.ts");
+const SCRIPT = join(import.meta.dir, "support", "scenarios", "permission-turn.ts");
 
 let home: string;
 let repo: string;
@@ -84,6 +88,35 @@ describe("CleanCommand", () => {
     expect(existsSync(p.runDir)).toBe(false);
   });
 
+  test("K1: a run that has just reached done is removed with no stop", async () => {
+    const models = [{ value: "claude-haiku-5-5", name: "claude-haiku-5-5" }];
+    const sc = {
+      replies: ["DONE\nok"],
+      results: {
+        initialize: { agentInfo: { name: "claude-agent-acp", version: "0.93.0" } },
+        "session/new": {
+          sessionId: "sess-1",
+          configOptions: [
+            { id: "model", category: "model", currentValue: "claude-haiku-5-5", options: models },
+            { id: "mode", category: "mode", currentValue: "auto", options: [{ value: "default" }] },
+          ],
+        },
+      },
+    };
+    const agentCmd = JSON.stringify(["env", `FAKE_AGENT_SCENARIO=${JSON.stringify(sc)}`, `FAKE_AGENT_SCRIPT=${SCRIPT}`, process.execPath, FAKE]);
+    const p = runPaths("a1", env);
+    await runWorker(
+      { ticket: "t", model: "claude-haiku-5-5", repoRoot: repo, baseRef: "HEAD", fenced: true },
+      p,
+      { env: { ...env, MUSTER_AGENT_CMD: agentCmd, MUSTER_POLL_MS: "20", MUSTER_KILL_GRACE_MS: "200" }, exit: () => {} },
+    );
+    expect(readStatus(p.runDir).state).toBe("done");
+    const r = cleanVerb("a1", env);
+    expect(r.stderr).toBe("");
+    expect(r.exitCode).toBe(0);
+    expect(existsSync(p.runDir)).toBe(false);
+  });
+
   test("K2: a missing run is refused with one stderr line and a non-zero exit", () => {
     const r = cleanVerb("nope", env);
     expect(r.exitCode).not.toBe(0);
@@ -92,13 +125,16 @@ describe("CleanCommand", () => {
     expect(r.stderr.trimEnd().split("\n")).toHaveLength(1);
   });
 
-  for (const phase of ["starting", "running", "question", "idle"]) {
+  for (const phase of ["starting", "running", "question"]) {
     test(`K2: a run in phase ${phase} is refused and nothing is removed`, () => {
       const p = makeRun("a1", { phase, pid: process.pid });
       const r = cleanVerb("a1", env);
       expect(r.exitCode).not.toBe(0);
       expect(r.stdout).toBe("");
       expect(r.stderr).toContain("still running");
+      // The client ends with its turn: there is no process left to wait out once the turn is over.
+      expect(r.stderr).toContain("wait for the turn to end, or stop it");
+      expect(r.stderr).not.toContain("exit");
       expect(r.stderr.trimEnd().split("\n")).toHaveLength(1);
       expect(existsSync(p.worktree)).toBe(true);
     });

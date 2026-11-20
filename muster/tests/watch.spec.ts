@@ -66,7 +66,7 @@ describe("WatchCommand", () => {
 
   test("T3: a run already done prints one line and exits immediately", async () => {
     const p = makeRun();
-    writePhase(p, { phase: "idle", pid: process.pid, stopReason: "end_turn", fetched: true });
+    writePhase(p, { phase: "exited", pid: process.pid, stopReason: "end_turn", fetched: true });
     writeFileSync(p.report, "DONE\nok");
     const result = await watchVerb("w1", env(), { intervalMs: 2000, write: () => {} });
     const lines: string[] = [];
@@ -88,9 +88,9 @@ describe("WatchCommand", () => {
     expect(w.lines.at(-1)).toBe("w1 state=question question=1");
   });
 
-  test("T5: idle without a report exits", async () => {
+  test("T5: an exited client without a report reads idle and exits", async () => {
     const p = makeRun();
-    writePhase(p, { phase: "idle", pid: process.pid, stopReason: "end_turn" });
+    writePhase(p, { phase: "exited", pid: process.pid, stopReason: "end_turn" });
     const result = await watchVerb("w1", env(), { intervalMs: 50, write: () => {} });
     expect(result.exitCode).toBe(0);
     expect(readStatus(p.runDir).state).toBe("idle");

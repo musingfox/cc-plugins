@@ -14,7 +14,7 @@ beforeEach(() => {
   home = mkdtempSync(join(RUNS, "guards-"));
   layout = runPaths("r1", { MUSTER_HOME: home, HOME: home });
   createRunDir(layout);
-  writeFileSync(layout.phase, JSON.stringify({ phase: "idle", pid: 7 }));
+  writeFileSync(layout.phase, JSON.stringify({ phase: "running", pid: 7 }));
 });
 
 afterEach(() => {
@@ -51,7 +51,7 @@ test("a run directory removed under the writer does not throw", () => {
   expect(() => observe(update(plan("completed")))).not.toThrow();
 });
 
-test("a changed figure on an idle run is written", () => {
+test("a changed figure on a running run is written", () => {
   const observe = createProgressWriter(layout, "T");
   observe(update(plan("completed", "pending")));
   expect(JSON.parse(readFileSync(layout.phase, "utf8")).plan).toEqual({ done: 1, total: 2 });

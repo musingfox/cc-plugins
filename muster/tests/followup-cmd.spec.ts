@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRunDir, runPaths, writePhase, type RunPaths } from "../src/layout";
@@ -22,68 +22,42 @@ function env() {
   return { MUSTER_HOME: home, HOME: home };
 }
 
-function makeRun(phase: Record<string, unknown> = { phase: "running", pid: process.pid }): RunPaths {
+function makeRun(phase: Record<string, unknown> = { phase: "exited", pid: 999999, sessionId: "sess-1" }): RunPaths {
   const p = runPaths("a1", env());
   createRunDir(p);
-  writeFileSync(p.meta, JSON.stringify({ name: "a1" }));
+  writeFileSync(p.meta, JSON.stringify({ name: "a1", model: "m", repoRoot: home, worktree: home, branch: "muster/a1" }));
   writePhase(p, phase);
   return p;
 }
 
 describe("FollowUpCommand", () => {
-  test("T1: first follow-up writes FOLLOWUP-1.md and prints queued line", () => {
+  test("T4: empty text exits 2 and leaves the run directory as it was", async () => {
     const p = makeRun();
-    const r = followupVerb("a1", "do X", env());
-    expect(r.exitCode).toBe(0);
-    expect(r.stdout).toBe("queued a1 followup=1\n");
-    expect(readFileSync(join(p.runDir, "FOLLOWUP-1.md"), "utf8")).toBe("do X");
-  });
-
-  test("T2: next number is 1 + highest of FOLLOWUP-<n>.md and FOLLOWUP-<n>.sent.md", () => {
-    const p = makeRun();
-    writeFileSync(join(p.runDir, "FOLLOWUP-1.sent.md"), "old");
-    writeFileSync(join(p.runDir, "FOLLOWUP-2.md"), "pending");
-    const r = followupVerb("a1", "next", env());
-    expect(r.stdout).toBe("queued a1 followup=3\n");
-    expect(readFileSync(join(p.runDir, "FOLLOWUP-3.md"), "utf8")).toBe("next");
-  });
-
-  test("T3: --file copies the file bytes verbatim", () => {
-    const p = makeRun();
-    const src = join(scratch, "notes.md");
-    const bytes = "line one\n\n  indented 中文\n";
-    writeFileSync(src, bytes);
-    const r = followupVerb("a1", { file: src }, env());
-    expect(r.exitCode).toBe(0);
-    expect(readFileSync(join(p.runDir, "FOLLOWUP-1.md"), "utf8")).toBe(bytes);
-  });
-
-  test("T4: empty text exits 2 and writes no file", () => {
-    const p = makeRun();
-    const r = followupVerb("a1", "   ", env());
+    const r = await followupVerb("a1", "   ", env());
     expect(r.exitCode).toBe(2);
-    expect(existsSync(join(p.runDir, "FOLLOWUP-1.md"))).toBe(false);
+    expect(readdirSync(p.runDir).sort()).toEqual(["meta.json", "phase.json"]);
   });
 
-  test("R1: empty --file content exits 2 and writes no file", () => {
+  test("R1: empty --file content exits 2 and leaves the run directory as it was", async () => {
     const p = makeRun();
     const src = join(scratch, "empty.md");
     writeFileSync(src, "");
-    const r = followupVerb("a1", { file: src }, env());
+    const r = await followupVerb("a1", { file: src }, env());
     expect(r.exitCode).toBe(2);
-    expect(existsSync(join(p.runDir, "FOLLOWUP-1.md"))).toBe(false);
+    expect(readdirSync(p.runDir).sort()).toEqual(["meta.json", "phase.json"]);
   });
 
-  test("T5: exited phase exits 1 with 'client exited' and writes no file", () => {
-    const p = makeRun({ phase: "exited", pid: 999999 });
-    const r = followupVerb("a1", "do X", env());
+  test("T5: a run whose client is still running exits 1 with 'still running' and keeps its report", async () => {
+    const p = makeRun({ phase: "running", pid: process.pid, sessionId: "sess-1" });
+    writeFileSync(p.report, "DONE\nkept\n");
+    const r = await followupVerb("a1", "do X", env());
     expect(r.exitCode).toBe(1);
-    expect(r.stderr).toContain("client exited");
-    expect(existsSync(join(p.runDir, "FOLLOWUP-1.md"))).toBe(false);
+    expect(r.stderr).toContain("still running");
+    expect(existsSync(p.report)).toBe(true);
   });
 
-  test("T6: unknown run exits 1 with 'no such run'", () => {
-    const r = followupVerb("zz", "do X", env());
+  test("T6: unknown run exits 1 with 'no such run'", async () => {
+    const r = await followupVerb("zz", "do X", env());
     expect(r.exitCode).toBe(1);
     expect(r.stderr).toContain("no such run");
   });

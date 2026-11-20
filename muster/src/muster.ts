@@ -46,10 +46,10 @@ async function main(argv: string[]): Promise<number> {
     case "followup": {
       if (args[1] === "--file") {
         if (args[2] === undefined) return usage();
-        return emit(followupVerb(name, { file: args[2] }, env));
+        return emit(await followupVerb(name, { file: args[2] }, env));
       }
       if (args[1] === undefined) return usage();
-      return emit(followupVerb(name, args[1], env));
+      return emit(await followupVerb(name, args[1], env));
     }
     case "stop":
       return emit(stopVerb(name, env));

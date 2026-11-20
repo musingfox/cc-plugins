@@ -150,6 +150,33 @@ describe("CoordinatorSkill", () => {
   });
 });
 
+describe("DocsDescribeOneClientPerTurn", () => {
+  const section = (name: string) => new RegExp(`## ${name}\\n([\\s\\S]*?)(?=\\n## |$)`).exec(body(SKILL))?.[1] ?? "";
+  const README = readFileSync(join(MUSTER_ROOT, "..", "README.md"), "utf8");
+
+  test("L1: no idle timeout is documented, and the 30-minute question timeout still is", () => {
+    for (const text of [SKILL, README]) {
+      expect(text).not.toContain("MUSTER_IDLE_TIMEOUT_MS");
+      expect(text).not.toMatch(/idle[ -]timeout|goes idle/);
+    }
+    expect(section("Answer")).toContain("30 minutes");
+  });
+
+  test("L2: Follow up starts followup in the background, says it resumes the session and blocks, and names the refusal", () => {
+    const followUp = section("Follow up");
+    expect(followUp).toContain("run_in_background");
+    expect(followUp).toMatch(/resumes the worker's session/);
+    expect(followUp).toMatch(/blocks until that turn ends/);
+    expect(followUp).toContain("a client is still running");
+  });
+
+  test("L3: Cleanup works as soon as the run is done and Stop is only for a turn in progress", () => {
+    expect(section("Cleanup")).toMatch(/As soon as the run's turn has ended, a `done` run included/);
+    expect(section("Stop")).toMatch(/for a turn in progress/);
+    expect(section("Dispatch")).toMatch(/client exits with the turn/);
+  });
+});
+
 describe("DocsDescribeBand", () => {
   const README = readFileSync(join(MUSTER_ROOT, "..", "README.md"), "utf8");
   const PLUGIN = JSON.parse(readFileSync(join(MUSTER_ROOT, ".claude-plugin", "plugin.json"), "utf8")) as { description: string };
@@ -177,8 +204,8 @@ describe("DocsDescribeBand", () => {
     expect(market).toContain("2.1.304");
   });
 
-  test("T5: the skill documents exit-reason and exit-detail, and an idle-timeout run shows exit-reason", () => {
-    expect(SKILL).toContain("exit-reason=idle-timeout");
+  test("T5: the skill documents exit-reason and exit-detail, and a run whose turn ended shows exit-reason=turn-ended", () => {
+    expect(SKILL).toContain("exit-reason=turn-ended");
     expect(SKILL).toContain("exit-reason=<reason>");
     expect(SKILL).toContain("exit-detail=");
     expect(SKILL).not.toContain("same status line as before it exited");
@@ -188,8 +215,8 @@ describe("DocsDescribeBand", () => {
       const p = runPaths("a1", env);
       createRunDir(p);
       writeFileSync(p.meta, JSON.stringify({ name: "a1" }));
-      writePhase(p, { phase: "exited", reason: "idle-timeout" });
-      expect(statusVerb("a1", env)).toEqual({ exitCode: 0, stdout: "a1 state=idle exit-reason=idle-timeout\n", stderr: "" });
+      writePhase(p, { phase: "exited", reason: "turn-ended" });
+      expect(statusVerb("a1", env)).toEqual({ exitCode: 0, stdout: "a1 state=idle exit-reason=turn-ended\n", stderr: "" });
     } finally {
       rmSync(home, { recursive: true, force: true });
     }

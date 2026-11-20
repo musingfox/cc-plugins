@@ -69,10 +69,11 @@ function carriedFrom(prior: Phase | undefined): Carried {
   };
 }
 
-// The figures a phase.json carries; cost and plan appear once they have a value. The adapter's cost is its own
-// process's total, so a resumed client's cost adds to what the earlier clients spent.
+// The figures a phase.json carries; cost and plan appear once they have a value. A resumed session reports its
+// whole total so far, not the new process's share (a real resume reported 0.0061 after a 0.0040 first turn whose
+// tokens exceeded the second's), so the latest cost replaces the carried one instead of adding to it.
 const projectionOf = (figures: Figures, plan: Plan | null, carried: Carried): Projection => {
-  const cost = figures.cost === null ? carried.cost : (carried.cost ?? 0) + figures.cost;
+  const cost = figures.cost ?? carried.cost;
   const shownPlan = plan ?? carried.plan;
   return {
     title: figures.title,

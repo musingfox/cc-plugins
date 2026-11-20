@@ -8,6 +8,8 @@ import {
   buildAgentLaunch,
   isExactPin,
 } from "../src/launch";
+import { runPaths } from "../src/layout";
+import { sandboxOption } from "../src/sandbox";
 
 const CACHE = "/runs/a1/cache";
 const FAKE = join(import.meta.dir, "support", "fake-agent.ts");
@@ -99,6 +101,17 @@ describe("buildAgentLaunch", () => {
   test("T4: MUSTER_AGENT_CMD overrides the default argv", () => {
     const { argv } = buildAgentLaunch({ MUSTER_AGENT_CMD: '["bun","fake.ts"]' }, CACHE);
     expect(argv).toEqual(["bun", "fake.ts"]);
+  });
+
+  test("L2: the adapter's install cache lies in the run directory, outside every path the fenced sandbox may write", () => {
+    const within = (path: string, dir: string) => path === dir.replace(/\/+$/, "") || path.startsWith(dir.replace(/\/+$/, "") + "/");
+    const p = runPaths("a1", { HOME: "/home/u" });
+    const { argv, env } = buildAgentLaunch({ PATH: "/bin" }, p.launchCache);
+    const allowWrite = sandboxOption({ env: { HOME: "/home/u" }, cache: p.cache, allowedHosts: [], userTemp: "/var/folders/u/T/" }).filesystem.allowWrite;
+    for (const value of [env.npm_config_cache, env.BUN_INSTALL_CACHE_DIR]) expect(within(value, p.runDir)).toBe(true);
+    for (const value of [...argv, env.npm_config_cache, env.BUN_INSTALL_CACHE_DIR]) {
+      for (const w of allowWrite) expect(within(value, w)).toBe(false);
+    }
   });
 
   test("T5: malformed MUSTER_AGENT_CMD throws UsageError", () => {

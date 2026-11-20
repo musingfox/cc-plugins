@@ -18,6 +18,7 @@ export interface RunPaths {
   runDir: string;
   worktree: string;
   cache: string;
+  launchCache: string;
   meta: string;
   events: string;
   stderrLog: string;
@@ -26,7 +27,6 @@ export interface RunPaths {
   stop: string;
   question(n: number): string;
   answer(n: number): string;
-  followup(n: number): string;
 }
 
 export function runPaths(name: string, env: Env): RunPaths {
@@ -40,6 +40,8 @@ export function runPaths(name: string, env: Env): RunPaths {
     runDir,
     worktree: join(runDir, "worktree"),
     cache: join(runDir, "cache"),
+    // The adapter's install cache, outside cache: the fenced worker can write cache but not this.
+    launchCache: join(runDir, "launch"),
     meta: join(runDir, "meta.json"),
     events: join(runDir, "events.jsonl"),
     stderrLog: join(runDir, "stderr.log"),
@@ -48,7 +50,6 @@ export function runPaths(name: string, env: Env): RunPaths {
     stop: join(runDir, "STOP"),
     question: (n) => join(runDir, `QUESTION-${n}.json`),
     answer: (n) => join(runDir, `ANSWER-${n}.json`),
-    followup: (n) => join(runDir, `FOLLOWUP-${n}.md`),
   };
 }
 

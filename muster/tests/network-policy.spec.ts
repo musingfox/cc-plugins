@@ -178,14 +178,19 @@ describe("NetworkPolicy", () => {
         (url) => decideNetwork(fetchCall(url), hosts)?.decision,
       ),
     ).toEqual(["allow", "deny", "allow", "deny"]);
-    expect(sandboxOption({ worktree: "/t/w", env, tempRoots: [] }).network.allowedDomains).toEqual(hosts);
+    expect(sandboxOption({ env, cache: "/t/cache", allowedHosts: hosts }).network.allowedDomains).toEqual(hosts);
 
+    const r = await viaHandler(fetchCall("https://docs.example.org/"), { allowedHosts: hosts }, "run-t7");
+    expect(r.reply).toEqual({ outcome: "selected", optionId: "allow-once" });
+    expect(r.decisions).toEqual([{ decision: "allow", by: "policy", host: "docs.example.org" }]);
+  });
+
+  test("H4: the handler ignores MUSTER_ALLOW_HOSTS in process.env and allows only the hosts passed in, or the defaults", async () => {
     const previous = process.env.MUSTER_ALLOW_HOSTS;
-    process.env.MUSTER_ALLOW_HOSTS = env.MUSTER_ALLOW_HOSTS;
+    process.env.MUSTER_ALLOW_HOSTS = "docs.example.org";
     try {
-      const r = await viaHandler(fetchCall("https://docs.example.org/"), {}, "run-t7");
-      expect(r.reply).toEqual({ outcome: "selected", optionId: "allow-once" });
-      expect(r.decisions).toEqual([{ decision: "allow", by: "policy", host: "docs.example.org" }]);
+      const r = await viaHandler(fetchCall("https://docs.example.org/"), {}, "run-h4");
+      expect(r.decisions).toEqual([{ decision: "deny", by: "policy", host: "docs.example.org" }]);
     } finally {
       if (previous === undefined) delete process.env.MUSTER_ALLOW_HOSTS;
       else process.env.MUSTER_ALLOW_HOSTS = previous;

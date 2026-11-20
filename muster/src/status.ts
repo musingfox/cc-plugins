@@ -110,7 +110,8 @@ function classify(runDir: string, name: string): StatusLine {
   // "question" is the window between a worker asking and resuming after ANSWER-n.json.
   if (phaseName === "question") return { name, state: "running" };
   if (phaseName === "starting" || phaseName === "running") return { name, state: phaseName };
-  if (phaseName === "idle" || phaseName === "exited") {
+  // A client that exited with no report to show leaves the run waiting for a follow-up.
+  if (phaseName === "exited") {
     const stop = typeof phase.stopReason === "string" ? phase.stopReason : undefined;
     return { name, state: "idle", stop };
   }

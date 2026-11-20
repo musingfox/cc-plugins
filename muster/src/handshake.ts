@@ -1,5 +1,6 @@
 import type { Channel } from "./channel";
-import { InvalidAllowHost, resolveAllowedHosts, sandboxOption } from "./sandbox";
+import { installCacheEnv } from "./launch";
+import { DEFAULT_ALLOWED_HOSTS, sandboxOption } from "./sandbox";
 
 export class HandshakeError extends Error {
   override name = "HandshakeError";
@@ -50,18 +51,22 @@ async function call(channel: Channel, method: string, params: unknown, ms: numbe
 }
 
 // resume names the session a previous client opened: the new client resumes it with the options session/new had.
+// allowedHosts is the run's recorded list, so a resumed turn gets the hosts of the first, whatever its own env says.
 export async function handshake(
   channel: Channel,
-  opts: { worktree: string; cache: string; fenced?: boolean; resume?: string; env?: Record<string, string | undefined> },
+  opts: {
+    worktree: string;
+    cache: string;
+    fenced?: boolean;
+    resume?: string;
+    allowedHosts?: readonly string[];
+    env?: Record<string, string | undefined>;
+  },
 ): Promise<Handshake> {
   const env = opts.env ?? process.env;
-  try {
-    resolveAllowedHosts(env);
-  } catch (e) {
-    if (e instanceof InvalidAllowHost) throw new HandshakeError(e.message);
-    throw e;
-  }
-  const sandbox = opts.fenced ? sandboxOption({ env, cache: opts.cache }) : undefined;
+  const sandbox = opts.fenced
+    ? sandboxOption({ env, cache: opts.cache, allowedHosts: opts.allowedHosts ?? DEFAULT_ALLOWED_HOSTS })
+    : undefined;
   const ms = handshakeTimeoutMs();
   const init = (await call(
     channel,
@@ -86,6 +91,9 @@ export async function handshake(
           // Without an allowlist and with connectors on, the worker inherits the user's account-level tools
           // (RemoteTrigger acted on cloud routines with no permission request).
           tools: WORKER_TOOLS,
+          // The adapter starts from the launch cache and the Claude Code child inherits its env; this moves the
+          // worker's own installs back to the cache its sandbox may write. The adapter merges env over its own.
+          env: installCacheEnv(opts.cache),
           ...(sandbox ? { sandbox } : {}),
         },
       },

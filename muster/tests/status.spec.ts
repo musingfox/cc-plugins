@@ -43,16 +43,16 @@ describe("StatusReader", () => {
     expect(line(p)).toBe("a1 state=running");
   });
 
-  test("T3: idle phase without report renders state=idle stop=end_turn, not done", () => {
+  test("T3: an exited client without a report renders state=idle stop=end_turn, not done", () => {
     const p = makeRun();
-    writePhase(p, { phase: "idle", pid: process.pid, stopReason: "end_turn" });
+    writePhase(p, { phase: "exited", pid: process.pid, stopReason: "end_turn" });
     expect(line(p)).toBe("a1 state=idle stop=end_turn");
   });
 
   test("T4: a DONE report renders state=done with the absolute report path, whatever the stopReason", () => {
     for (const stopReason of ["end_turn", "refusal", "cancelled"]) {
       const p = makeRun();
-      writePhase(p, { fetched: true, phase: "idle", pid: process.pid, stopReason });
+      writePhase(p, { fetched: true, phase: "exited", pid: process.pid, stopReason });
       writeFileSync(p.report, "DONE\nok");
       expect(line(p)).toBe(`a1 state=done report=${p.report}`);
       rmSync(p.runDir, { recursive: true, force: true });
@@ -70,21 +70,21 @@ describe("StatusReader", () => {
 
   test("W3a: a done run prints the sha recorded at the fetch as head=", () => {
     const p = makeRun();
-    writePhase(p, { phase: "idle", pid: process.pid, fetched: true, head: "abc123" });
+    writePhase(p, { phase: "exited", pid: process.pid, fetched: true, head: "abc123" });
     writeFileSync(p.report, "DONE\nok");
     expect(line(p)).toBe(`a1 state=done report=${p.report} head=abc123`);
   });
 
   test("F2: a recorded fetch failure still reads done and shows the failure", () => {
     const p = makeRun();
-    writePhase(p, { phase: "idle", pid: process.pid, fetched: true, fetchError: "refused" });
+    writePhase(p, { phase: "exited", pid: process.pid, fetched: true, fetchError: "refused" });
     writeFileSync(p.report, "DONE\nok");
     expect(line(p)).toBe(`a1 state=done report=${p.report} fetch-error=refused`);
   });
 
   test("T5: BLOCKED report renders reason; a report with another first line is malformed", () => {
     const p = makeRun();
-    writePhase(p, { fetched: true, phase: "idle", pid: process.pid, stopReason: "end_turn" });
+    writePhase(p, { fetched: true, phase: "exited", pid: process.pid, stopReason: "end_turn" });
     writeFileSync(p.report, "BLOCKED\nneed key");
     expect(readStatus(p.runDir)).toMatchObject({ state: "blocked", reason: "need key" });
     expect(line(p)).toContain("state=blocked");
@@ -96,7 +96,7 @@ describe("StatusReader", () => {
 
   test("T6: a pending question takes precedence over a valid DONE report", () => {
     const p = makeRun();
-    writePhase(p, { phase: "idle", pid: process.pid, stopReason: "end_turn" });
+    writePhase(p, { phase: "running", pid: process.pid });
     writeFileSync(p.report, "DONE\nok");
     writeFileSync(p.question(1), JSON.stringify({ paths: [] }));
     expect(readStatus(p.runDir).state).toBe("question");
@@ -148,7 +148,7 @@ describe("StatusReader", () => {
 
   test("D2: deps follows models= and precedes reason=; a non-array deps value is ignored; non-object entries are not counted", () => {
     const p = makeRun();
-    writePhase(p, { phase: "idle", pid: process.pid, stopReason: "end_turn", models: ["haiku"], deps: [{ dir: ".", outcome: "copied" }] });
+    writePhase(p, { phase: "exited", pid: process.pid, stopReason: "end_turn", models: ["haiku"], deps: [{ dir: ".", outcome: "copied" }] });
     writeFileSync(p.report, "BLOCKED\nneed key");
     writePhase(p, { fetched: true });
     expect(line(p)).toBe("a1 state=blocked report=" + p.report + " models=haiku deps=1/1 reason=need key");

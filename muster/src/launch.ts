@@ -13,9 +13,15 @@ export function isExactPin(spec: string): boolean {
   return /^(?:@[^/]+\/)?[^@/]+@\d+\.\d+\.\d+$/.test(spec);
 }
 
+// Where npm and bun install packages; bunx also keeps the package it runs there and runs it unverified.
+export function installCacheEnv(cache: string): { npm_config_cache: string; BUN_INSTALL_CACHE_DIR: string } {
+  return { npm_config_cache: join(cache, "npm"), BUN_INSTALL_CACHE_DIR: join(cache, "bun") };
+}
+
+// launchCache must be a directory the worker cannot write: the next turn's adapter runs from it outside the sandbox.
 export function buildAgentLaunch(
   env: Record<string, string | undefined>,
-  cache: string,
+  launchCache: string,
 ): {
   argv: string[];
   env: Record<string, string>;
@@ -28,8 +34,7 @@ export function buildAgentLaunch(
   }
   out.CLAUDE_CODE_DISABLE_ADVISOR_TOOL = "1";
   out.CLAUDE_CODE_ENABLE_TODO_TOOLS = "1";
-  out.npm_config_cache = join(cache, "npm");
-  out.BUN_INSTALL_CACHE_DIR = join(cache, "bun");
+  Object.assign(out, installCacheEnv(launchCache));
   return { argv, env: out };
 }
 

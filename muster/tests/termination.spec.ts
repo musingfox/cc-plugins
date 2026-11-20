@@ -278,7 +278,7 @@ describe("TerminationReasonInStatus", () => {
   }
 
   test("T1: a DONE report is kept and status shows reason and JSON-quoted detail", async () => {
-    const detail = 'MUSTER_IDLE_TIMEOUT_MS must be a positive number, got "30m"';
+    const detail = 'MUSTER_KILL_GRACE_MS must be a positive number, got "30m"';
     const { layout, h, errs, result, phase } = await terminateAndStatus("prompt-error", detail, "DONE\nok\n");
     expect(readFileSync(layout.report, "utf8")).toBe("DONE\nok\n");
     expect(phase).toMatchObject({ phase: "exited", reason: "prompt-error", detail });

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { decideBash } from "./bash-policy";
 import { writeAtomic, writePhase, type RunPaths } from "./layout";
@@ -6,7 +6,7 @@ import { chooseOutcome, type PermissionOption, type PermissionOutcome } from "./
 import { decideNetwork } from "./network-policy";
 import { danglingLinkTargetOutside, decidePath, resolveRequestPath, type Decision, type ToolCall } from "./path-policy";
 import { awaitAnswerWithin, questionTimeoutMs } from "./question-timeout";
-import { resolveAllowedHosts } from "./sandbox";
+import { DEFAULT_ALLOWED_HOSTS } from "./sandbox";
 import { pollMs, type Reason } from "./termination";
 
 const PATH_KINDS = new Set(["edit", "delete", "move", "read", "search"]);
@@ -26,7 +26,7 @@ export type PermissionHandlerOptions = {
   terminate: (reason: Reason, detail?: string) => Promise<number>;
   logDecision: (msg: object) => Promise<void>;
   env?: { MUSTER_POLL_MS?: string; MUSTER_QUESTION_TIMEOUT_MS?: string };
-  allowedHosts?: string[];
+  allowedHosts?: readonly string[];
 };
 
 function policyDecision(toolCall: ToolCallRequest, worktreeReal: string, fenced?: boolean): Decision {
@@ -78,22 +78,26 @@ function parseAnswer(text: string): Verdict {
   return { decision: "deny", by: "answer-invalid" };
 }
 
+// Each turn runs in its own client, so a turn's questions number on from those earlier turns asked.
+function lastQuestion(runDir: string): number {
+  let names: string[];
+  try {
+    names = readdirSync(runDir);
+  } catch {
+    return 0;
+  }
+  return names.reduce((max, name) => {
+    const m = /^QUESTION-(\d+)\.json$/.exec(name);
+    return m ? Math.max(max, Number(m[1])) : max;
+  }, 0);
+}
+
 export function createPermissionHandler(opts: PermissionHandlerOptions) {
   const { layout, worktreeReal, fenced, trackPending, terminate, logDecision } = opts;
   const env = opts.env ?? process.env;
   const poll = pollMs(env);
-  let questions = 0;
-  let hosts = opts.allowedHosts;
-  const allowedHosts = (): string[] => {
-    if (hosts === undefined) {
-      try {
-        hosts = resolveAllowedHosts(process.env);
-      } catch {
-        hosts = [];
-      }
-    }
-    return hosts;
-  };
+  let questions = lastQuestion(layout.runDir);
+  const allowedHosts = [...(opts.allowedHosts ?? DEFAULT_ALLOWED_HOSTS)];
 
   const waitForAnswer = (n: number): Promise<Settled> =>
     new Promise((resolve) => {
@@ -118,7 +122,7 @@ export function createPermissionHandler(opts: PermissionHandlerOptions) {
     const options = Array.isArray(req.options) ? req.options : [];
     if (options.length === 0) return { outcome: { outcome: "cancelled" } };
 
-    const network = decideNetwork(toolCall, toolCall.kind === "fetch" ? allowedHosts() : []);
+    const network = decideNetwork(toolCall, toolCall.kind === "fetch" ? allowedHosts : []);
     if (network) {
       await logDecision({ decision: network.decision, by: "policy", ...(network.host ? { host: network.host } : {}) });
       return { outcome: chooseOutcome(options, network.decision) };

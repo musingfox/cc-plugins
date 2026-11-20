@@ -46,6 +46,15 @@ function refusal(argv: string[]): UsageError {
 }
 
 describe("RunRefusal", () => {
+  test("H5: an invalid MUSTER_ALLOW_HOSTS entry is refused at dispatch, naming the entry, and no run dir is created", () => {
+    for (const entry of ["https://x.org", "a.com:443", "*"]) {
+      expect(() => parseRunArgs(valid(), { ...env, MUSTER_ALLOW_HOSTS: entry })).toThrow(`invalid-allow-host: ${entry}`);
+      expect(() => parseRunArgs(valid(), { ...env, MUSTER_ALLOW_HOSTS: entry })).toThrow(UsageError);
+    }
+    expect(existsSync(runPaths("a1", env).runDir)).toBe(false);
+    expect(parseRunArgs(valid(), { ...env, MUSTER_ALLOW_HOSTS: "a.org" }).name).toBe("a1");
+  });
+
   test("T1: missing --model is refused and no run dir is created", () => {
     const argv = ["run", "--name", "a1", "--repo", repo, "--ticket", "t"];
     expect(refusal(argv).message).toContain("--model is required");

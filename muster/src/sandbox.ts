@@ -53,7 +53,8 @@ function darwinUserTempDir(): string | undefined {
   return dir === "" ? undefined : dir;
 }
 
-export function sandboxOption(opts: { env: Env; cache: string; userTemp?: string }) {
+// allowedHosts is the list resolved when the run was dispatched; every turn passes the same one.
+export function sandboxOption(opts: { env: Env; cache: string; allowedHosts: readonly string[]; userTemp?: string }) {
   const home = opts.env.HOME ?? homedir();
   const userTemp = "userTemp" in opts ? opts.userTemp : darwinUserTempDir();
   return {
@@ -61,7 +62,7 @@ export function sandboxOption(opts: { env: Env; cache: string; userTemp?: string
     failIfUnavailable: true,
     autoAllowBashIfSandboxed: true,
     allowUnsandboxedCommands: false,
-    network: { allowedDomains: resolveAllowedHosts(opts.env), strictAllowlist: true },
+    network: { allowedDomains: [...opts.allowedHosts], strictAllowlist: true },
     filesystem: { denyRead: CREDENTIAL_STORES.map((p) => join(home, p)), allowWrite: userTemp ? [opts.cache, userTemp] : [opts.cache] },
   };
 }

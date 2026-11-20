@@ -22,13 +22,11 @@ beforeEach(() => {
   mkdirSync(RUNS, { recursive: true });
   home = mkdtempSync(join(RUNS, "session-"));
   repo = makeRepo();
-  process.env.MUSTER_IDLE_TIMEOUT_MS = "500";
 });
 
 afterEach(() => {
   rmSync(home, { recursive: true, force: true });
   rmSync(repo, { recursive: true, force: true });
-  delete process.env.MUSTER_IDLE_TIMEOUT_MS;
 });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -121,15 +119,15 @@ function walk(dir: string): string[] {
 }
 
 describe("WorkerSessionLoop", () => {
-  test("T1: an end_turn with no report leaves the worker idle, records the stopReason, and writes no REPORT.md", async () => {
+  test("T1: runWorker returns when the first turn ends, with phase.json exited, the stopReason recorded and no REPORT.md", async () => {
     const layout = layoutFor();
     const exits: number[] = [];
-    const done = runWorker(request(), layout, { env: envFor(scenario()), exit: (c) => exits.push(c) });
-    expect(await waitFor(() => readPhase(layout)?.stopReason === "end_turn")).toBe(true);
-    expect(readPhase(layout)?.phase).toBe("idle");
-    expect(existsSync(layout.report)).toBe(false);
-    await done;
+    const started = Date.now();
+    await runWorker(request(), layout, { env: envFor(scenario()), exit: (c) => exits.push(c) });
+    expect(Date.now() - started).toBeLessThan(3000);
     expect(exits).toEqual([0]);
+    expect(readPhase(layout)).toMatchObject({ phase: "exited", reason: "turn-ended", stopReason: "end_turn", fetched: true });
+    expect(existsSync(layout.report)).toBe(false);
   });
 
   test("T1b: a copyDeps failure is recorded as depsError and the worker still runs to its normal exit", async () => {
@@ -246,7 +244,7 @@ describe("WorkerSessionLoop", () => {
     expect(await waitFor(() => readPhase(layout)?.phase === "running")).toBe(true);
     expect(readPhase(layout)?.stopReason).toBeUndefined();
     await done;
-    expect(readPhase(layout)?.reason).toBe("idle-timeout");
+    expect(readPhase(layout)?.reason).toBe("turn-ended");
   });
 
   test("T9: an agent binary that cannot start blocks the run with agent-launch-failed and no prompt", async () => {
@@ -284,15 +282,15 @@ describe("WorkerSessionLoop", () => {
     expect(readReportFile(layout)).toContain("prompt-error");
   });
 
-  test("T12: an idle timeout after a DONE report exits 0 without a spurious agent-exited", async () => {
-    process.env.MUSTER_IDLE_TIMEOUT_MS = "300";
+  test("T12: a turn that ends DONE exits 0 with reason turn-ended and no spurious agent-exited", async () => {
     const layout = layoutFor();
     const exits: number[] = [];
     const sc = scenario({ replies: ["DONE\nall good"] });
-    await runWorker(request(), layout, { env: envFor(sc, { MUSTER_IDLE_TIMEOUT_MS: "300" }), exit: (c) => exits.push(c) });
+    await runWorker(request(), layout, { env: envFor(sc), exit: (c) => exits.push(c) });
     expect(exits).toEqual([0]);
     expect(readReportFile(layout)).toBe("DONE\nall good");
-    expect(readPhase(layout)?.reason).toContain("idle-timeout");
+    expect(readPhase(layout)?.reason).toBe("turn-ended");
+    expect(readStatus(layout.runDir).state).toBe("done");
     const everything = [JSON.stringify(readPhase(layout)), readFileSync(layout.events, "utf8"), readFileSync(layout.stderrLog, "utf8")];
     for (const text of everything) expect(text).not.toContain("agent-exited");
   });
@@ -322,42 +320,12 @@ describe("WorkerSessionLoop", () => {
     expect(readReportFile(layout)).toBe("DONE\n[31mred[0m\tok2Jend");
   });
 
-  test("M4: a follow-up turn's final message replaces the previous turn's report", async () => {
-    const layout = layoutFor();
-    const sc = scenario({ replies: ["DONE\nfirst", "BLOCKED\nsecond"] });
-    const run = runWorker(request(), layout, { env: envFor(sc), exit: () => {} });
-    expect(await waitFor(() => readReportFile(layout) === "DONE\nfirst")).toBe(true);
-    expect(await waitFor(() => readPhase(layout)?.phase === "idle")).toBe(true);
-    writeFileSync(join(layout.runDir, "FOLLOWUP-1.md"), "second");
-    await run;
-    expect(readReportFile(layout)).toBe("BLOCKED\nsecond");
-    expect(readdirSync(layout.runDir).filter((f) => f.startsWith("REPORT"))).toEqual(["REPORT.md"]);
-  });
-
   test("M5: a stop that lands during a turn keeps muster's BLOCKED report over the turn's final message", async () => {
     const layout = layoutFor();
     const exits: number[] = [];
     const sc = scenario({ replies: ["DONE\npartial"], promptDelayMs: 400 });
     void runWorker(request(), layout, { env: envFor(sc, { MUSTER_KILL_GRACE_MS: "1500" }), exit: (c) => exits.push(c) });
     expect(await waitFor(() => existsSync(layout.events) && readFileSync(layout.events, "utf8").includes("agent_message_chunk"))).toBe(true);
-    writeFileSync(layout.stop, "");
-    expect(await waitFor(() => exits.length > 0, 5000)).toBe(true);
-    expect(readReportFile(layout)).toBe("BLOCKED\nreason: stopped\n");
-  });
-
-  test("M5b: a stop during a follow-up turn ends BLOCKED, not with the previous turn's DONE", async () => {
-    const layout = layoutFor();
-    const exits: number[] = [];
-    const script = join(home, "slow-second-turn.ts");
-    writeFileSync(
-      script,
-      `import * as base from ${JSON.stringify(SCRIPT)};\nlet n = 0;\nexport const setup = base.setup;\nexport function handle(msg: any, io: any) {\n  if (msg.method === "session/prompt" && ++n === 2) return true;\n  return base.handle(msg, io);\n}\n`,
-    );
-    const sc = scenario({ replies: ["DONE\nfirst"] });
-    void runWorker(request(), layout, { env: { ...envFor(sc), MUSTER_AGENT_CMD: fakeCmd(sc, script) }, exit: (c) => exits.push(c) });
-    expect(await waitFor(() => readReportFile(layout) === "DONE\nfirst" && readPhase(layout)?.phase === "idle")).toBe(true);
-    writeFileSync(join(layout.runDir, "FOLLOWUP-1.md"), "second");
-    expect(await waitFor(() => existsSync(join(layout.runDir, "FOLLOWUP-1.sent.md")))).toBe(true);
     writeFileSync(layout.stop, "");
     expect(await waitFor(() => exits.length > 0, 5000)).toBe(true);
     expect(readReportFile(layout)).toBe("BLOCKED\nreason: stopped\n");
@@ -384,41 +352,22 @@ describe("WorkerSessionLoop", () => {
     expect(exits).toEqual([0]);
   });
 
-  test("R1: the agent exiting during a follow-up turn blocks the run with agent-exited", async () => {
-    const script = join(home, "second-prompt-exits.ts");
-    writeFileSync(
-      script,
-      `import * as base from ${JSON.stringify(SCRIPT)};\nlet n = 0;\nexport const setup = base.setup;\nexport function handle(msg: any, io: any) {\n  if (msg.method === "session/prompt" && ++n === 2) process.exit(3);\n  return base.handle(msg, io);\n}\n`,
-    );
+  test("F1: a commit made in the clone during the turn is fetched back into the user's repo when the turn ends", async () => {
     const layout = layoutFor();
     const exits: number[] = [];
-    const sc = scenario({ replies: ["DONE\nfirst"] });
-    const run = runWorker(request(), layout, { env: { ...envFor(sc), MUSTER_AGENT_CMD: fakeCmd(sc, script) }, exit: (c) => exits.push(c) });
-    expect(await waitFor(() => readPhase(layout)?.phase === "idle")).toBe(true);
-    writeFileSync(join(layout.runDir, "FOLLOWUP-1.md"), "second");
-    await run;
-    expect(exits).toEqual([1]);
-    const lines = readReportFile(layout)?.split("\n") ?? [];
-    expect(lines[0]).toBe("BLOCKED");
-    expect(lines[1]).toContain("agent-exited");
-  });
-
-  test("F1: a commit made in the clone is fetched back into the user's repo when the idle timeout ends the run", async () => {
-    const layout = layoutFor();
-    const exits: number[] = [];
-    const run = runWorker(request(), layout, { env: envFor(scenario()), exit: (c) => exits.push(c) });
-    expect(await waitFor(() => readPhase(layout)?.phase === "idle")).toBe(true);
+    const run = runWorker(request(), layout, { env: envFor(scenario({ promptDelayMs: 400 })), exit: (c) => exits.push(c) });
+    expect(await waitFor(() => readPhase(layout)?.phase === "running")).toBe(true);
     const sha = commitFile(layout.worktree, "late.txt", "x\n", "feat: late");
     await run;
-    expect(readPhase(layout)?.reason).toBe("idle-timeout");
+    expect(readPhase(layout)?.reason).toBe("turn-ended");
     expect(git(repo, ["rev-parse", "muster/run-1"])).toBe(sha);
   });
 
   test("F2: a stopped run's branch is fetched back and the clone is not a worktree of the user's repo", async () => {
     const layout = layoutFor();
     const exits: number[] = [];
-    void runWorker(request(), layout, { env: envFor(scenario()), exit: (c) => exits.push(c) });
-    expect(await waitFor(() => readPhase(layout)?.phase === "idle")).toBe(true);
+    void runWorker(request(), layout, { env: envFor(scenario({ promptDelayMs: 2000 })), exit: (c) => exits.push(c) });
+    expect(await waitFor(() => readPhase(layout)?.phase === "running")).toBe(true);
     const sha = commitFile(layout.worktree, "stop.txt", "x\n", "feat: stop");
     writeFileSync(layout.stop, "");
     expect(await waitFor(() => exits.length > 0)).toBe(true);
@@ -438,26 +387,27 @@ describe("WorkerSessionLoop", () => {
   test("F4: a failed fetch-back is recorded in phase.json and does not stop the run from ending", async () => {
     const layout = layoutFor();
     const exits: number[] = [];
-    void runWorker(request(), layout, { env: envFor(scenario()), exit: (c) => exits.push(c) });
-    expect(await waitFor(() => readPhase(layout)?.phase === "idle")).toBe(true);
-    git(repo, ["switch", "-q", "muster/run-1"]);
+    void runWorker(request(), layout, { env: envFor(scenario({ promptDelayMs: 400 })), exit: (c) => exits.push(c) });
+    expect(await waitFor(() => readPhase(layout)?.phase === "running")).toBe(true);
+    git(repo, ["switch", "-q", "-c", "muster/run-1"]);
     commitFile(layout.worktree, "refused.txt", "x\n", "feat: refused");
-    writeFileSync(layout.stop, "");
     expect(await waitFor(() => exits.length > 0)).toBe(true);
     expect(exits).toEqual([0]);
     expect(readPhase(layout)?.phase).toBe("exited");
     expect(String(readPhase(layout)?.fetchError)).toContain("checked out");
   });
 
-  test("C1: the cache dir exists, the agent env points npm and bun at it, and session/new allows writes to it only", async () => {
+  test("C1: the agent starts from the launch cache, session/new points the worker's npm and bun at the cache dir and allows writes to it only", async () => {
     const layout = layoutFor();
     await runWorker(request(), layout, { env: envFor(scenario({ echoEnv: true })), exit: () => {} });
     expect(statSync(layout.cache).isDirectory()).toBe(true);
+    expect(statSync(layout.launchCache).isDirectory()).toBe(true);
     const echoed = JSON.parse(readFileSync(layout.stderrLog, "utf8")) as Record<string, string>;
-    expect(echoed.npm_config_cache).toBe(join(layout.cache, "npm"));
-    expect(echoed.BUN_INSTALL_CACHE_DIR).toBe(join(layout.cache, "bun"));
-    const sessionNew = events(layout.events).find((e) => e.dir === "out" && e.msg.method === "session/new");
-    expect(sessionNew?.msg.params._meta.claudeCode.options.sandbox.filesystem.allowWrite).toEqual([layout.cache, ...USER_TEMP_WRITES]);
+    expect(echoed.npm_config_cache).toBe(join(layout.launchCache, "npm"));
+    expect(echoed.BUN_INSTALL_CACHE_DIR).toBe(join(layout.launchCache, "bun"));
+    const options = events(layout.events).find((e) => e.dir === "out" && e.msg.method === "session/new")?.msg.params._meta.claudeCode.options;
+    expect(options.env).toEqual({ npm_config_cache: join(layout.cache, "npm"), BUN_INSTALL_CACHE_DIR: join(layout.cache, "bun") });
+    expect(options.sandbox.filesystem.allowWrite).toEqual([layout.cache, ...USER_TEMP_WRITES]);
   });
 
   test("F1: an unfenced run sends session/new without a sandbox key", async () => {

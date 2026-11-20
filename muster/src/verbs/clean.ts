@@ -25,7 +25,7 @@ export function cleanVerb(name: string, env: Env): VerbResult {
   const exited = phase?.phase === "exited";
   const dead = phase !== undefined && typeof phase.pid === "number" && !pidAlive(phase.pid);
   if (!exited && !dead) {
-    return refuse(`run ${name} is still running; stop it and wait for it to exit before clean`);
+    return refuse(`run ${name}: a turn is still running; wait for the turn to end, or stop it, before clean`);
   }
   const meta = readMeta(p.meta);
   if (!meta) return refuse(`run ${name} has an unreadable meta.json, so the repository is unknown; nothing removed`);

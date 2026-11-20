@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, sep } from "node:path";
 import { Env, UsageError, runPaths } from "./layout";
+import { InvalidAllowHost, resolveAllowedHosts } from "./sandbox";
 
 export interface DispatchRequest {
   name: string;
@@ -103,8 +104,19 @@ function ticketText(flags: Map<string, string>): string {
   return text;
 }
 
-export function parseRunArgs(argv: string[], env: Env = { MUSTER_HOME: process.env.MUSTER_HOME, HOME: process.env.HOME ?? "", TMPDIR: process.env.TMPDIR }): DispatchRequest {
+export type RunEnv = Env & { MUSTER_ALLOW_HOSTS?: string };
+
+export function parseRunArgs(
+  argv: string[],
+  env: RunEnv = { MUSTER_HOME: process.env.MUSTER_HOME, HOME: process.env.HOME ?? "", TMPDIR: process.env.TMPDIR, MUSTER_ALLOW_HOSTS: process.env.MUSTER_ALLOW_HOSTS },
+): DispatchRequest {
   const { flags, fenced } = parseFlags(argv[0] === "run" ? argv.slice(1) : argv);
+  try {
+    resolveAllowedHosts(env);
+  } catch (e) {
+    if (e instanceof InvalidAllowHost) throw new UsageError(`MUSTER_ALLOW_HOSTS: ${e.message}`);
+    throw e;
+  }
 
   const name = flags.get("--name");
   if (!name) throw new UsageError("--name is required");
