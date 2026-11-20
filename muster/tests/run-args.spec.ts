@@ -188,6 +188,14 @@ describe("RunRefusal", () => {
     expect(refusal(argv).message).toContain("temp directory");
   });
 
+  test.skipIf(process.platform !== "darwin")("B2d: a MUSTER_HOME under the per-user temp dir the sandbox can write is refused", () => {
+    const userTemp = execFileSync("getconf", ["DARWIN_USER_TEMP_DIR"], { encoding: "utf8" }).trim();
+    env = { ...env, TMPDIR: "/private/tmp/muster-args-other-tmp", MUSTER_HOME: join(userTemp, "muster-args-nonexistent", "m") };
+    const err = refusal(valid());
+    expect(err.message).toContain("MUSTER_HOME");
+    expect(err.message).toContain("temp directory");
+  });
+
   test("B2c: a MUSTER_HOME under /tmp that does not exist yet is refused", () => {
     env = { ...env, MUSTER_HOME: "/tmp/muster-args-nonexistent/m" };
     const err = refusal(valid());

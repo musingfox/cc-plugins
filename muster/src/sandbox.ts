@@ -46,7 +46,7 @@ export const CREDENTIAL_STORES = [
 ];
 
 // Apple mktemp without a template ignores TMPDIR and writes here; without it every test fixture fails to start.
-function darwinUserTempDir(): string | undefined {
+export function darwinUserTempDir(): string | undefined {
   if (process.platform !== "darwin") return undefined;
   const r = spawnSync("getconf", ["DARWIN_USER_TEMP_DIR"], { encoding: "utf8" });
   const dir = r.status === 0 ? r.stdout.trim() : "";

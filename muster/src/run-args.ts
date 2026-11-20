@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, sep } from "node:path";
 import { Env, UsageError, runPaths } from "./layout";
-import { InvalidAllowHost, resolveAllowedHosts } from "./sandbox";
+import { InvalidAllowHost, darwinUserTempDir, resolveAllowedHosts } from "./sandbox";
 
 export interface DispatchRequest {
   name: string;
@@ -59,7 +59,8 @@ function realpathOfExisting(path: string): string {
 
 function refuseUnderTemp(label: string, path: string, env: Env): void {
   const real = realpathOfExisting(path);
-  for (const root of ["/tmp", "/private/tmp", env.TMPDIR]) {
+  // The per-user temp dir is writable by the sandbox even when TMPDIR points elsewhere (sandbox.ts allowWrite).
+  for (const root of ["/tmp", "/private/tmp", env.TMPDIR, darwinUserTempDir()]) {
     if (!root) continue;
     const realRoot = realpathOfExisting(root);
     if (real === realRoot || real.startsWith(realRoot.endsWith(sep) ? realRoot : realRoot + sep)) {
