@@ -49,9 +49,10 @@ async function call(channel: Channel, method: string, params: unknown, ms: numbe
   }
 }
 
+// resume names the session a previous client opened: the new client resumes it with the options session/new had.
 export async function handshake(
   channel: Channel,
-  opts: { worktree: string; cache: string; fenced?: boolean; env?: Record<string, string | undefined> },
+  opts: { worktree: string; cache: string; fenced?: boolean; resume?: string; env?: Record<string, string | undefined> },
 ): Promise<Handshake> {
   const env = opts.env ?? process.env;
   try {
@@ -72,28 +73,30 @@ export async function handshake(
     ms,
   )) as { agentInfo?: AgentInfo } | null;
   assertAdapterVersion(init?.agentInfo);
-  const session = (await call(
-    channel,
-    "session/new",
-    {
-      cwd: opts.worktree,
-      mcpServers: [],
-      _meta: {
-        claudeCode: {
-          options: {
-            settingSources: [],
-            // Claude Code allows WebFetch to its preapproved documentation hosts without asking, which skips the
-            // client's allowlist; an ask rule is checked before that shortcut.
-            settings: { permissions: { ask: ["WebFetch"] }, disableClaudeAiConnectors: true },
-            // Without an allowlist and with connectors on, the worker inherits the user's account-level tools
-            // (RemoteTrigger acted on cloud routines with no permission request).
-            tools: WORKER_TOOLS,
-            ...(sandbox ? { sandbox } : {}),
-          },
+  const params = {
+    cwd: opts.worktree,
+    mcpServers: [],
+    _meta: {
+      claudeCode: {
+        options: {
+          settingSources: [],
+          // Claude Code allows WebFetch to its preapproved documentation hosts without asking, which skips the
+          // client's allowlist; an ask rule is checked before that shortcut.
+          settings: { permissions: { ask: ["WebFetch"] }, disableClaudeAiConnectors: true },
+          // Without an allowlist and with connectors on, the worker inherits the user's account-level tools
+          // (RemoteTrigger acted on cloud routines with no permission request).
+          tools: WORKER_TOOLS,
+          ...(sandbox ? { sandbox } : {}),
         },
       },
     },
-    ms,
-  )) as { sessionId: string; configOptions: unknown };
+  };
+  if (opts.resume !== undefined) {
+    const resumed = (await call(channel, "session/resume", { sessionId: opts.resume, ...params }, ms)) as {
+      configOptions?: unknown;
+    } | null;
+    return { sessionId: opts.resume, configOptions: resumed?.configOptions, agentInfo: init?.agentInfo };
+  }
+  const session = (await call(channel, "session/new", params, ms)) as { sessionId: string; configOptions: unknown };
   return { sessionId: session.sessionId, configOptions: session.configOptions, agentInfo: init?.agentInfo };
 }

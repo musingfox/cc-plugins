@@ -106,6 +106,16 @@ describe("SessionHandshake", () => {
     expect(sessionNew(eventsPath)).toStrictEqual(T1_PARAMS);
   });
 
+  test("S1: a resume sends session/resume with the session id and the same params session/new takes, and no session/new", async () => {
+    const offered = [{ id: "mode", category: "mode", currentValue: "default" }];
+    const { ch, eventsPath } = await open({ results: { ...ADAPTER_RESULTS, "session/new": { sessionId: "unused", configOptions: offered } } });
+    const hs = await handshake(ch, { cache: "/tmp/muster-cache", worktree: "/w/x", fenced: true, resume: "sess-old", env: { HOME: "/home/u" } });
+    expect(hs.sessionId).toBe("sess-old");
+    expect(hs.configOptions).toEqual(offered);
+    expect(sentMethods(eventsPath)).toEqual(["initialize", "session/resume"]);
+    expect(outMessages(eventsPath)[1].params).toStrictEqual({ sessionId: "sess-old", ...T1_PARAMS });
+  });
+
   test("T2: initialize is sent with protocolVersion 1 and fs/terminal capabilities off", async () => {
     const { ch, eventsPath } = await open();
     await handshake(ch, { cache: "/tmp/muster-cache", worktree: WORKTREE });

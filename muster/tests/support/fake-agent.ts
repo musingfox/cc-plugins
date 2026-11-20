@@ -5,6 +5,7 @@
 //   startup items are written to stdout before any request is read; strings go out raw.
 //   results/errors override the reply per method; silent methods are never answered.
 // Requests: "fake/emit" writes params.messages to stdout, then replies {};
+//           "session/resume" without its own result is answered with the configOptions of results["session/new"];
 //           any other request is answered with {echo: params} after params.delayMs.
 // FAKE_AGENT_SCRIPT (module path, optional): exports setup(io), run before stdin is read,
 //   and handle(msg, io), run for every inbound message; returning true skips the base handling.
@@ -38,6 +39,12 @@ script?.setup?.(io);
 if (scenario.stderr) process.stderr.write(scenario.stderr);
 for (const item of scenario.startup ?? []) out(item);
 
+// A resumed session answers with the options the session it resumes offered, as the adapter does.
+function resumeResult(): unknown {
+  const created = scenario.results?.["session/new"] as { configOptions?: unknown } | undefined;
+  return { configOptions: created?.configOptions ?? [] };
+}
+
 function handle(msg: Msg) {
   if (script?.handle?.(msg, io) === true) return;
   if (msg.id === undefined || msg.method === undefined) return;
@@ -52,7 +59,8 @@ function handle(msg: Msg) {
     out({ jsonrpc: "2.0", id: msg.id, error: { code: -32000, message: error } });
     return;
   }
-  const result = scenario.results?.[msg.method] ?? { echo: msg.params ?? null };
+  const resumed = msg.method === "session/resume" ? resumeResult() : undefined;
+  const result = scenario.results?.[msg.method] ?? resumed ?? { echo: msg.params ?? null };
   setTimeout(
     () => out({ jsonrpc: "2.0", id: msg.id, result }),
     msg.params?.delayMs ?? 0,
