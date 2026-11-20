@@ -15,3 +15,12 @@ export function statusVerb(name: string, env: Env): VerbResult {
   }
   return { exitCode: 0, stdout: `${renderStatus(readStatus(p.runDir))}\n`, stderr: "" };
 }
+
+// The last stdout line of `run` and `followup`: what `status` would print once the turn has ended.
+export function withStatusLine(name: string, env: Env, exit: (code: number) => void = (c) => process.exit(c)): (code: number) => void {
+  return (code) => {
+    const p = runPaths(name, env);
+    if (existsSync(p.meta)) process.stdout.write(`${renderStatus(readStatus(p.runDir))}\n`);
+    exit(code);
+  };
+}

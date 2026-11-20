@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { type Env, type RunPaths, readPhase, runPaths, writeAtomic, writePhase } from "../layout";
 import { readClientSpec, resumeWorker, type WorkerOptions } from "../session";
 import { pidAlive } from "../status";
-import type { VerbResult } from "./status";
+import { type VerbResult, withStatusLine } from "./status";
 
 const refuse = (exitCode: number, stderr: string): VerbResult => ({ exitCode, stdout: "", stderr: `${stderr}\n` });
 
@@ -80,6 +80,6 @@ export async function followupVerb(
 
   const refused = claimClient(p);
   if (refused) return refuse(1, refused);
-  await resumeWorker(p, spec, text, opts);
+  await resumeWorker(p, spec, text, { ...opts, exit: withStatusLine(name, env, opts.exit) });
   return { exitCode: 0, stdout: "", stderr: "" };
 }

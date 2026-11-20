@@ -111,7 +111,7 @@ cd "<RUNDIR>/worktree" && claude --resume <id> --fork-session
 
 ## Stop
 
-Stop is for a turn in progress: it asks the worker to end the turn; it does not end it at once. Run `watch` until it reports a terminal state. A run whose turn has already ended needs no stop; `stop` reports it as already exited.
+Stop is for a turn in progress: it asks the worker to end the turn; it does not end it at once. The background `run` or `followup` task exits when the turn has ended, with the status line as its last line. A run whose turn has already ended needs no stop; `stop` reports it as already exited.
 
 ```
 bun ${CLAUDE_PLUGIN_ROOT}/src/muster.ts stop NAME
