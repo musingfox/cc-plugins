@@ -295,6 +295,14 @@ describe("WorkerSessionLoop", () => {
     for (const text of everything) expect(text).not.toContain("agent-exited");
   });
 
+  test("M6: phase.json carries no updated timestamp", async () => {
+    const layout = layoutFor();
+    // writePhase merges every patch into the file, so a key written by any phase would still be present at the end.
+    await runWorker(request(), layout, { env: envFor(scenario()), exit: () => {} });
+    expect(readPhase(layout)?.phase).toBe("exited");
+    expect(readPhase(layout)).not.toHaveProperty("updated");
+  });
+
   test("R3: the session creates no per-run temp dir and hands the agent no temp env or sandbox root", async () => {
     const layout = layoutFor("r1");
     const exits: number[] = [];

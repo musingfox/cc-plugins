@@ -35,7 +35,7 @@ type TurnResult = {
 
 function setPhase(layout: RunPaths, phase: string, extra: Phase = {}): void {
   if (readPhase(layout)?.phase === "exited") return;
-  writePhase(layout, { phase, pid: process.pid, updated: new Date().toISOString(), ...extra });
+  writePhase(layout, { phase, pid: process.pid, ...extra });
 }
 
 // head is the sha the coordinator should merge. A later fetch of the same report (idle timeout, stop) may
