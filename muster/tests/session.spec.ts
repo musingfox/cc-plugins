@@ -205,12 +205,13 @@ describe("WorkerSessionLoop", () => {
     expect(echoed).not.toHaveProperty("ANTHROPIC_API_KEY");
   });
 
-  test("T6: the first prompt carries the ticket and the report file path", async () => {
+  test("T6: the first prompt carries the ticket and asks for a final DONE or BLOCKED message, naming no report file", async () => {
     const layout = layoutFor();
     await runWorker(request(), layout, { env: envFor(scenario({ promptDelayMs: 0 })), exit: () => {} });
     const text = promptText(layout.events);
     expect(text).toContain("Write the hello file");
-    expect(text).toContain(`Report file: ${layout.report}`);
+    expect(text).toContain("final message whose first line is exactly DONE or BLOCKED");
+    expect(text).not.toContain(layout.report);
   });
 
   test("T7: meta.json names the run branch and the real worktree path", async () => {
@@ -321,12 +322,42 @@ describe("WorkerSessionLoop", () => {
     expect(readReportFile(layout)).toBe("DONE\n[31mred[0m\tok2Jend");
   });
 
+  test("M4: a follow-up turn's final message replaces the previous turn's report", async () => {
+    const layout = layoutFor();
+    const sc = scenario({ replies: ["DONE\nfirst", "BLOCKED\nsecond"] });
+    const run = runWorker(request(), layout, { env: envFor(sc), exit: () => {} });
+    expect(await waitFor(() => readReportFile(layout) === "DONE\nfirst")).toBe(true);
+    expect(await waitFor(() => readPhase(layout)?.phase === "idle")).toBe(true);
+    writeFileSync(join(layout.runDir, "FOLLOWUP-1.md"), "second");
+    await run;
+    expect(readReportFile(layout)).toBe("BLOCKED\nsecond");
+    expect(readdirSync(layout.runDir).filter((f) => f.startsWith("REPORT"))).toEqual(["REPORT.md"]);
+  });
+
   test("M5: a stop that lands during a turn keeps muster's BLOCKED report over the turn's final message", async () => {
     const layout = layoutFor();
     const exits: number[] = [];
     const sc = scenario({ replies: ["DONE\npartial"], promptDelayMs: 400 });
     void runWorker(request(), layout, { env: envFor(sc, { MUSTER_KILL_GRACE_MS: "1500" }), exit: (c) => exits.push(c) });
     expect(await waitFor(() => existsSync(layout.events) && readFileSync(layout.events, "utf8").includes("agent_message_chunk"))).toBe(true);
+    writeFileSync(layout.stop, "");
+    expect(await waitFor(() => exits.length > 0, 5000)).toBe(true);
+    expect(readReportFile(layout)).toBe("BLOCKED\nreason: stopped\n");
+  });
+
+  test("M5b: a stop during a follow-up turn ends BLOCKED, not with the previous turn's DONE", async () => {
+    const layout = layoutFor();
+    const exits: number[] = [];
+    const script = join(home, "slow-second-turn.ts");
+    writeFileSync(
+      script,
+      `import * as base from ${JSON.stringify(SCRIPT)};\nlet n = 0;\nexport const setup = base.setup;\nexport function handle(msg: any, io: any) {\n  if (msg.method === "session/prompt" && ++n === 2) return true;\n  return base.handle(msg, io);\n}\n`,
+    );
+    const sc = scenario({ replies: ["DONE\nfirst"] });
+    void runWorker(request(), layout, { env: { ...envFor(sc), MUSTER_AGENT_CMD: fakeCmd(sc, script) }, exit: (c) => exits.push(c) });
+    expect(await waitFor(() => readReportFile(layout) === "DONE\nfirst" && readPhase(layout)?.phase === "idle")).toBe(true);
+    writeFileSync(join(layout.runDir, "FOLLOWUP-1.md"), "second");
+    expect(await waitFor(() => existsSync(join(layout.runDir, "FOLLOWUP-1.sent.md")))).toBe(true);
     writeFileSync(layout.stop, "");
     expect(await waitFor(() => exits.length > 0, 5000)).toBe(true);
     expect(readReportFile(layout)).toBe("BLOCKED\nreason: stopped\n");

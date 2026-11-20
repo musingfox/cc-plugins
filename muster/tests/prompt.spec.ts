@@ -9,38 +9,36 @@ const reportPath = paths.report;
 
 describe("WorkerPrompt", () => {
   test("T1: ticket appears byte-identical in the prompt", () => {
-    const prompt = buildPrompt({ worktree, reportPath, ticket });
+    const prompt = buildPrompt({ worktree, ticket });
     expect(prompt).toContain(ticket);
   });
 
-  test("T2: prompt carries the absolute worktree and the report line from RunLayout", () => {
-    const prompt = buildPrompt({ worktree, reportPath, ticket });
+  test("T2: prompt carries the absolute worktree and names no report file", () => {
+    const prompt = buildPrompt({ worktree, ticket });
     expect(prompt).toContain(worktree);
-    expect(prompt.split("\n")).toContain("Report file: /tmp/m1/runs/a1/REPORT.md");
-    expect(prompt.split("\n")).toContain(`Report file: ${paths.report}`);
+    expect(prompt).not.toContain(reportPath);
+    expect(prompt).not.toMatch(/report file|write (your|the|a) .*report/i);
   });
 
   test("T3: prompt states the first-line DONE/BLOCKED rule and the CLAUDE.md instruction", () => {
-    const prompt = buildPrompt({ worktree, reportPath, ticket });
+    const prompt = buildPrompt({ worktree, ticket });
     expect(prompt).toContain("first line");
     expect(prompt).toContain("DONE");
     expect(prompt).toContain("BLOCKED");
     expect(prompt).toContain("CLAUDE.md");
   });
 
-  test("R1: report instruction pins a bare DONE/BLOCKED first line with a literal example", () => {
-    const prompt = buildPrompt({ worktree, reportPath, ticket });
-    const lines = prompt.split("\n");
-    expect(prompt).toContain("nothing else on that line");
-    expect(prompt).toContain("lines after it");
-    expect(prompt).not.toContain("followed by a summary");
-    const example = lines.indexOf("Example report:");
-    expect(example).toBeGreaterThan(-1);
-    expect(lines[example + 1]).toBe("DONE");
+  test("R1: the turn ends with a final message whose bare first line is DONE or BLOCKED, then only what commits do not show", () => {
+    const prompt = buildPrompt({ worktree, ticket });
+    expect(prompt).toContain("End each turn with a final message whose first line is exactly DONE or BLOCKED, with nothing else on that line.");
+    expect(prompt).toContain("write only what your commits do not show");
+    expect(prompt).toMatch(/checks you ran and their results/);
+    expect(prompt).toMatch(/left open/);
+    expect(prompt).toContain("If a request is refused, do not work around the refusal; end the turn with BLOCKED instead.");
   });
 
   test("R2: prompt says to load deferred tools with ToolSearch and retry a validation error once", () => {
-    const prompt = buildPrompt({ worktree, reportPath, ticket });
+    const prompt = buildPrompt({ worktree, ticket });
     expect(prompt).toMatch(/ToolSearch/);
     expect(prompt).toMatch(/required parameter/i);
     expect(prompt).toMatch(/deferred|not loaded/i);
@@ -48,21 +46,22 @@ describe("WorkerPrompt", () => {
     expect(prompt).toMatch(/not a refusal/i);
   });
 
-  test("T4: follow-up carries the text verbatim and the same report line", () => {
-    const followup = buildFollowup({ text: "do X", reportPath });
-    expect(followup).toContain("do X");
-    expect(followup.split("\n")).toContain("Report file: /tmp/m1/runs/a1/REPORT.md");
+  test("T4: follow-up carries the text verbatim and the same final-message rule, naming no report file", () => {
+    const followup = buildFollowup({ text: "do X" });
+    expect(followup.startsWith("do X\n")).toBe(true);
+    expect(followup).toContain("End each turn with a final message whose first line is exactly DONE or BLOCKED");
+    expect(followup).not.toContain(reportPath);
   });
 
   test("T5: empty ticket or relative worktree throws UsageError", () => {
-    expect(() => buildPrompt({ worktree, reportPath, ticket: "" })).toThrow(UsageError);
-    expect(() => buildPrompt({ worktree: "relative/wt", reportPath, ticket })).toThrow(UsageError);
+    expect(() => buildPrompt({ worktree, ticket: "" })).toThrow(UsageError);
+    expect(() => buildPrompt({ worktree: "relative/wt", ticket })).toThrow(UsageError);
   });
 
   const networkRules = [/network host/i, /web fetch/i, /web search/i, /work(ed)? around/i, /names? the host|naming the host/i];
 
   test("T6: prompt carries the network-refusal rule and the BLOCKED path", () => {
-    const prompt = buildPrompt({ worktree, reportPath, ticket });
+    const prompt = buildPrompt({ worktree, ticket });
     for (const rule of networkRules) {
       expect(prompt).toMatch(rule);
     }

@@ -1,16 +1,12 @@
 import { isAbsolute } from "node:path";
 import { UsageError } from "./layout";
 
-function reportBlock(reportPath: string): string {
-  return [
-    `Report file: ${reportPath}`,
-    "Write your report to that file. Its first line is the single word DONE or BLOCKED, with nothing else on that line. Put the summary on the lines after it.",
-    "Example report:",
-    "DONE",
-    "Created hello.txt with the requested greeting.",
-    "Requests outside the worktree may be denied. If a request is refused, do not work around the refusal; record BLOCKED in the report instead.",
-  ].join("\n");
-}
+// muster writes REPORT.md from this final message, so the worker writes no file outside its worktree.
+const FINAL_MESSAGE = [
+  "End each turn with a final message whose first line is exactly DONE or BLOCKED, with nothing else on that line.",
+  "After it, write only what your commits do not show: the checks you ran and their results, what is left open, and the reason when BLOCKED.",
+  "Requests outside the worktree may be denied. If a request is refused, do not work around the refusal; end the turn with BLOCKED instead.",
+].join("\n");
 
 function requireAbsolute(label: string, value: string): void {
   if (!isAbsolute(value)) {
@@ -18,12 +14,11 @@ function requireAbsolute(label: string, value: string): void {
   }
 }
 
-export function buildPrompt(input: { worktree: string; reportPath: string; ticket: string }): string {
+export function buildPrompt(input: { worktree: string; ticket: string }): string {
   if (!input.ticket) {
     throw new UsageError("ticket must not be empty");
   }
   requireAbsolute("worktree", input.worktree);
-  requireAbsolute("reportPath", input.reportPath);
   return [
     `You are an unattended worker. Work only inside this worktree: ${input.worktree}`,
     "If CLAUDE.md exists in the worktree, read it first and follow it.",
@@ -33,13 +28,12 @@ export function buildPrompt(input: { worktree: string; reportPath: string; ticke
     "",
     "Keep your steps in a task list: one short entry per checkable step, created with TodoWrite, or with TaskCreate and TaskUpdate when TodoWrite is not offered. Mark each entry completed as soon as its step is done.",
     "",
-    reportBlock(input.reportPath),
+    FINAL_MESSAGE,
     "If a tool is reported as deferred or not loaded, load it with ToolSearch first, then call it with all its required parameters. A schema or input-validation error is not a refusal: fix the input and retry it once.",
-    "If a network host, web fetch, or web search is refused (a permission denial, not a validation error), do not work around it with another tool, mirror, or host. If you cannot proceed, write a BLOCKED report naming the host.",
+    "If a network host, web fetch, or web search is refused (a permission denial, not a validation error), do not work around it with another tool, mirror, or host. If you cannot proceed, end the turn with BLOCKED, naming the host.",
   ].join("\n");
 }
 
-export function buildFollowup(input: { text: string; reportPath: string }): string {
-  requireAbsolute("reportPath", input.reportPath);
-  return [input.text, "", reportBlock(input.reportPath)].join("\n");
+export function buildFollowup(input: { text: string }): string {
+  return [input.text, "", FINAL_MESSAGE].join("\n");
 }

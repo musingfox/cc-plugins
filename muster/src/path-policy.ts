@@ -7,7 +7,7 @@ export type ToolCall = {
   rawInput?: Record<string, unknown>;
 };
 
-export type PathContext = { worktreeReal: string; reportPath: string };
+export type PathContext = { worktreeReal: string };
 
 export type Decision = { allow: true } | { allow: false; reason: string };
 
@@ -61,28 +61,12 @@ export function decidePath(toolCall: ToolCall, ctx: PathContext): Decision {
 
     const worktreeReal = ctx.worktreeReal;
     const askDirs = ALWAYS_ASK_DIRS.map((d) => join(worktreeReal, d));
-    const reportIsSymlink = isSymlink(ctx.reportPath);
-    const reportReal = reportIsSymlink ? undefined : realpathDeepest(resolve(worktreeReal, ctx.reportPath));
 
     const resolved = [...new Set(candidates.map((c) => resolveRequestPath(c, worktreeReal)))];
 
     for (const real of resolved) {
       const dir = askDirs.find((d) => real === d || real.startsWith(d + sep));
       if (dir) return { allow: false, reason: `path is inside ${basename(dir)}: ${real}` };
-    }
-
-    if (
-      toolCall.kind === "edit" &&
-      resolved.length === 1 &&
-      reportReal !== undefined &&
-      resolved[0] === reportReal
-    ) {
-      return { allow: true };
-    }
-
-    const reportLexical = resolve(worktreeReal, ctx.reportPath);
-    if (reportIsSymlink && candidates.some((c) => resolve(worktreeReal, c) === reportLexical)) {
-      return { allow: false, reason: "report path is a symlink" };
     }
 
     for (const real of resolved) {
@@ -93,14 +77,6 @@ export function decidePath(toolCall: ToolCall, ctx: PathContext): Decision {
     return { allow: true };
   } catch (err) {
     return { allow: false, reason: `path could not be checked: ${String(err)}` };
-  }
-}
-
-function isSymlink(p: string): boolean {
-  try {
-    return lstatSync(p).isSymbolicLink();
-  } catch {
-    return false;
   }
 }
 

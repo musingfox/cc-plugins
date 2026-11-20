@@ -77,7 +77,7 @@ function followup(n: number, text: string) {
 }
 
 describe("FollowUpInbox", () => {
-  test("T1: follow-up after a DONE turn archives the report, sends the prompt with the report path, and marks the file sent", async () => {
+  test("T1: follow-up after a DONE turn removes the previous report without archiving it, sends the text, and marks the file sent", async () => {
     const ch = await open();
     writeFileSync(paths.report, "DONE\nold");
     await ch.request("session/prompt", { sessionId: SESSION, prompt: [{ type: "text", text: "turn 1" }] });
@@ -87,9 +87,8 @@ describe("FollowUpInbox", () => {
     await inbox;
 
     expect(promptTexts()[1]).toContain("do X");
-    expect(promptTexts()[1]).toContain(paths.report);
-    expect(readFileSync(join(paths.runDir, "REPORT.prev-1.md"), "utf8")).toBe("DONE\nold");
-    expect(existsSync(paths.report)).toBe(false);
+    expect(promptTexts()[1]).not.toContain(paths.report);
+    expect(readdirSync(paths.runDir).filter((f) => f.startsWith("REPORT"))).toEqual([]);
     expect(existsSync(join(paths.runDir, "FOLLOWUP-1.sent.md"))).toBe(true);
     expect(existsSync(join(paths.runDir, "FOLLOWUP-1.md"))).toBe(false);
   });

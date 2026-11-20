@@ -16,7 +16,6 @@ export type Env = {
   outsideDir: string;
   outsideFile: string;
   reportPath: string;
-  reportLink: string;
 };
 
 export const allowAll: Decide = () => ({ allow: true });
@@ -40,7 +39,7 @@ export function runCases(decide: Decide, cases: Case[]): string[] {
 
 export function decisionTable(env: Env): Case[] {
   const wt = env.worktree;
-  const ctx: PathContext = { worktreeReal: wt, reportPath: env.reportPath };
+  const ctx: PathContext = { worktreeReal: wt };
   const edit = (path: string): ToolCall => ({ kind: "edit", rawInput: { file_path: path } });
   const deny = (name: string, toolCall: ToolCall, c: PathContext = ctx): Case => ({
     name,
@@ -78,38 +77,14 @@ export function decisionTable(env: Env): Case[] {
     ]),
     allow("T4 edit of a sibling that only shares the .claude prefix", edit(join(wt, ".claude-notes/a.md"))),
     allow("T4 edit of .claude below another directory", edit(join(wt, "docs/.claude/a.md"))),
-    // T5
-    allow("T5 edit of exactly reportPath", {
-      kind: "edit",
-      locations: [{ path: env.reportPath }],
-    }),
-    deny("T5 delete of reportPath", { kind: "delete", locations: [{ path: env.reportPath }] }),
-    deny(
-      "T5 edit of reportPath that is a symlink",
-      { kind: "edit", locations: [{ path: env.reportLink }] },
-      { worktreeReal: wt, reportPath: env.reportLink },
-    ),
-    deny("T5 edit of reportPath + .bak", {
-      kind: "edit",
-      locations: [{ path: env.reportPath + ".bak" }],
-    }),
+    // T5: the run's report is muster's to write, so an edit of it is denied like any path outside the worktree
+    deny("T5 edit of the run's report path", { kind: "edit", locations: [{ path: env.reportPath }], rawInput: { file_path: env.reportPath } }),
     // T6
     deny("T6 edit that names no path", { kind: "edit", rawInput: {} }),
     // T7
     deny("T7 two paths, one outside", {
       kind: "edit",
       locations: [{ path: join(wt, "a.ts") }, { path: env.outsideFile }],
-    }),
-    // R1
-    allow("R1 report path named twice (locations and rawInput)", {
-      kind: "edit",
-      locations: [{ path: env.reportPath }],
-      rawInput: { file_path: env.reportPath },
-    }),
-    deny("R1 report path plus an outside path", {
-      kind: "edit",
-      locations: [{ path: env.reportPath }],
-      rawInput: { file_path: env.outsideFile },
     }),
   ];
 }

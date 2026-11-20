@@ -76,7 +76,7 @@ export async function runWorker(request: DispatchRequest, layout: RunPaths, opts
       2,
     ) + "\n",
   );
-  const prompt = buildPrompt({ worktree: wt.worktree, reportPath: layout.report, ticket: request.ticket });
+  const prompt = buildPrompt({ worktree: wt.worktree, ticket: request.ticket });
   setPhase(layout, "starting");
   const observe = createProgressWriter(layout, request.ticket);
   const reply = createReplyReader();

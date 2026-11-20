@@ -29,8 +29,8 @@ export type PermissionHandlerOptions = {
   allowedHosts?: string[];
 };
 
-function policyDecision(toolCall: ToolCallRequest, layout: RunPaths, worktreeReal: string, fenced?: boolean): Decision {
-  if (PATH_KINDS.has(toolCall.kind)) return decidePath(toolCall, { worktreeReal, reportPath: layout.report });
+function policyDecision(toolCall: ToolCallRequest, worktreeReal: string, fenced?: boolean): Decision {
+  if (PATH_KINDS.has(toolCall.kind)) return decidePath(toolCall, { worktreeReal });
   if (toolCall.kind === "execute") return decideBash(toolCall.rawInput?.command, { worktreeReal, fenced });
   return { allow: false, reason: `kind ${toolCall.kind} needs an answer` };
 }
@@ -124,7 +124,7 @@ export function createPermissionHandler(opts: PermissionHandlerOptions) {
       return { outcome: chooseOutcome(options, network.decision) };
     }
 
-    const policy = policyDecision(toolCall, layout, worktreeReal, fenced);
+    const policy = policyDecision(toolCall, worktreeReal, fenced);
     if (policy.allow) {
       await logDecision({ decision: "allow", by: "policy" });
       return { outcome: chooseOutcome(options, "allow") };

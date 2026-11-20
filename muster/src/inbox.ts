@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync } from "node:fs";
+import { appendFileSync, readFileSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { Channel } from "./channel";
 import { type RunPaths, UsageError, readPhase, writePhase } from "./layout";
@@ -29,13 +29,6 @@ function nextFollowup(runDir: string): string | undefined {
     .filter((x): x is { name: string; m: RegExpExecArray } => x.m !== null)
     .sort((a, b) => Number(a.m[1]) - Number(b.m[1]));
   return numbered[0]?.name;
-}
-
-function archiveReport(p: RunPaths): void {
-  if (!existsSync(p.report)) return;
-  let k = 1;
-  while (existsSync(join(p.runDir, `REPORT.prev-${k}.md`))) k++;
-  renameSync(p.report, join(p.runDir, `REPORT.prev-${k}.md`));
 }
 
 function logClientDecision(p: RunPaths, msg: object): void {
@@ -76,11 +69,12 @@ export async function runFollowupInbox(opts: {
       logClientDecision(p, { level: "warn", file: name, reason: "empty follow-up skipped" });
       continue;
     }
-    archiveReport(p);
+    // The previous turn's report must not stand for this one: the turn's final message, or termination, writes the next.
+    rmSync(p.report, { force: true });
     writePhase(p, { phase: "running", fetched: false });
     const turn = channel.request("session/prompt", {
       sessionId,
-      prompt: [{ type: "text", text: buildFollowup({ text, reportPath: p.report }) }],
+      prompt: [{ type: "text", text: buildFollowup({ text }) }],
     });
     onTurn?.(turn);
     await turn;
