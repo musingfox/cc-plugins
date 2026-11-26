@@ -121,7 +121,7 @@ case "$cmd" in
     exec bun "$HERE/../lib/cookies.ts" "$BIDI_PORT" "$@"
     ;;
   mcp)
-    exec npx -y "$MCP_PKG" --connect-existing --marionette-port "$MARIONETTE_PORT" --idle-timeout 120
+    exec npx -y "$MCP_PKG" --connect-existing --marionette-port "$MARIONETTE_PORT" --idle-timeout 120 --tools pages snapshot management
     ;;
   setup-shell)
     conf="$HOME/.config/fish/conf.d/zen-agent.fish"

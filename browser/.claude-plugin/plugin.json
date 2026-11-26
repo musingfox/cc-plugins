@@ -1,0 +1,21 @@
+{
+  "name": "browser",
+  "version": "0.1.0",
+  "description": "A browser agents drive while you watch and take over: your own Search browser (macOS, WebKit) first, a separate agent Zen over WebDriver BiDi for what Search cannot do — dialogs, select, iframes, uploads, downloads, console and network, JS, headless and batch scripts; one skill routes between them, with handoff rules for logins, 2FA, payments and secrets",
+  "author": {
+    "name": "musingfox"
+  },
+  "homepage": "https://github.com/musingfox/cc-plugins/tree/main/browser",
+  "repository": "https://github.com/musingfox/cc-plugins",
+  "license": "MIT",
+  "keywords": [
+    "browser",
+    "search",
+    "webkit",
+    "zen",
+    "firefox",
+    "webdriver-bidi",
+    "mcp",
+    "rex"
+  ]
+}

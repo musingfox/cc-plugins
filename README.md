@@ -109,37 +109,23 @@ Browser automation and Playwright test authoring:
 /plugin install agent-browser
 ```
 
-### zen-agent
+### browser
 
-A visible browser agents drive and you can take over, beside your everyday Zen (macOS, Zen, bun, Node for `npx`):
-- **Agent Zen**: a second Zen on its own profile with WebDriver BiDi and Marionette on, framed in red; `zen-agent start | status | stop | open URL`
-- **Headless or headed**: `zen-agent start --headless`, and `zen-agent headed | headless` to switch by restarting; tabs come back
-- **Secrets stay with you**: the agent stops before any step that generates or reveals an API key, token or password, as it does for logins, 2FA and payments
-- **MCP**: Mozilla's `firefox-devtools-mcp` in connect-existing mode — snapshot, click, fill, screenshot
-- **Scripts**: `zen-agent run SCRIPT.ts` runs an agent-written puppeteer script over WebDriver BiDi in one call and prints only what it returns; installs `puppeteer-core` on first use
-- **Cookies on approval**: `zen-agent cookies DOMAIN` copies one domain's cookies from your everyday profile; never pre-approved
+A browser agents drive while you watch and take over (macOS 14+, [Search](https://github.com/driceroland/Search), Zen, bun, `python3`, Node for `npx`). One skill, `browser`, starts in Search and moves to the agent Zen when Search errors or lacks what the page needs:
+- **Search first**: the `search` MCP server (`bin/search-mcp`, vendored verbatim from Search's repo at commit `859c951`, MIT, `bin/search-mcp.LICENSE`) drives tabs of the agent's own in your Search browser — open, read, click, type, press, scroll, wait, screenshot. Re-vendor it when a Search update changes its agent socket. Each connection asks in Search's window first; the agent's tab wears a dot and Stop ends it; logins made there carry over
+- **Agent Zen for the rest**: a second Zen on its own profile with WebDriver BiDi and Marionette on, framed in red; `zen-agent start [--headless] | status | stop | headed | headless | open URL`. `zen-agent run SCRIPT.ts` runs an agent-written puppeteer script in one call and prints only what it returns — the route for confirm dialogs, `select`, iframes, uploads, downloads, console and network, JavaScript and batch work, which Search refuses or fails at
+- **zen MCP**: Mozilla's `firefox-devtools-mcp` in connect-existing mode, cut to its page, snapshot and session tools, for a look at an unfamiliar page before scripting it; its input, dialog and upload tools are off because they report success where the page did not change, and with them on an agent picks Zen over Search for plain clicks
+- **Cookies on approval**: `zen-agent cookies DOMAIN` copies one domain's cookies from your everyday Zen profile into the agent Zen; never pre-approved. Logins do not cross between the two browsers otherwise
+- **Secrets stay with you**: the agent stops before logins, 2FA, payments and any step that generates or reveals an API key or token, and hands them to you
 - **Rex redirect**: `zen-agent setup-shell` makes an agent's `open URL` / `$BROWSER URL` in Rex shells land in the agent Zen; human shells are untouched. Re-run it after a plugin update
 
-**Installation:**
-```bash
-/plugin install zen-agent
-```
+Turn on Search's Settings › About › Developer › "Let coding agents use Search" first. Not on Linux.
 
-### search-agent
-
-Agents browse in your own [Search](https://github.com/driceroland/Search) browser, in tabs of their own beside yours (macOS 14+, Search, `python3`):
-- **MCP**: `bin/search-mcp`, vendored verbatim from Search's repo at commit `859c951` (MIT, `bin/search-mcp.LICENSE`) — open, read, click, type, press, scroll, wait, screenshot. Re-vendor it when a Search update changes its agent socket
-- **You stay in charge**: each connection asks in Search's window first; the agent's tab wears a dot and Stop ends it. Search itself withholds password, card and one-time-code values and refuses downloads
-- **Secrets stay with you**: the agent stops before logins, 2FA, payments and any step that reveals an API key or token, and hands them to you
-- **Logins stick**: a login you make in the agent's tab carries over to later connections
-
-Turn on Settings › About › Developer › "Let coding agents use Search" first. Not on Linux; use zen-agent there.
-
-pi and omp can use the same server; point them at this checkout's `search-agent/bin/search-mcp`, not the plugin cache, whose path carries the version. pi: `pi mcp add search -- <checkout>/search-agent/bin/search-mcp`. omp: a `search` entry under `mcpServers` in `~/.omp/agent/mcp.json`. Search's "Always allow" covers only Claude Code's `claude`, so they are asked on every connection.
+pi and omp can use the Search server too; point them at this checkout's `browser/bin/search-mcp`, not the plugin cache, whose path carries the version. pi: `pi mcp add search -- <checkout>/browser/bin/search-mcp`. omp: a `search` entry under `mcpServers` in `~/.omp/agent/mcp.json`. Search's "Always allow" covers only Claude Code's `claude`, so they are asked on every connection.
 
 **Installation:**
 ```bash
-/plugin install search-agent
+/plugin install browser
 ```
 
 ### Hook Guard
@@ -370,6 +356,7 @@ cc-plugins/
 ├── agent-browser/      skills: agent-browser, playwright, web-test
 ├── apple-podcasts/     skills: apple-podcasts-fetch
 ├── audit/              skills: docs, tests · agents: docs-classifier, tests-tracer · scripts, tests
+├── browser/            skills: browser · bin: search-mcp, zen-agent, open · lib · .mcp.json · package.json
 ├── calendar/          hooks: register (Claude Mod) · tests
 ├── deepen/             skills: survey · agents: explorer · scripts, docs, tests
 ├── diagnose/           skills: diagnose, diagnose-now · docs, scripts, tests
@@ -383,12 +370,10 @@ cc-plugins/
 ├── obsidian-workspace/ skills: pm · templates, tests · hooks: register (Claude Mod)
 ├── omp-quota/          hooks: register (Claude Mod) · tests
 ├── pi-dispatch/        skills: pi-dispatch · agents: reviewer · scripts, shims, extensions, tests
-├── search-agent/       skills: search-agent · bin: search-mcp · .mcp.json
 ├── spec/               skills: spec, glossary · scripts: spec.sh · tests
 ├── viz/                skills: viz-inline, viz-render · lib, tests
 ├── wizard/             skills: wizard
 ├── wrap-up/            skills: wrap-up · scripts: rate.mjs
-├── zen-agent/          skills: zen-agent · bin: zen-agent, open · lib · .mcp.json · package.json
 └── README.md
 ```
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Self-test for zen-agent/bin/open: an agent's lone http(s) URL goes to the
+# Self-test for browser/bin/open: an agent's lone http(s) URL goes to the
 # agent Zen, everything else goes to the real open untouched. Both targets are
 # stubs that record their argv; no browser starts.
 
@@ -10,7 +10,7 @@ ok()  { PASS=$((PASS+1)); echo "ok   - $1"; }
 bad() { FAIL=$((FAIL+1)); echo "FAIL - $1"; }
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SHIM="$REPO/zen-agent/bin/open"
+SHIM="$REPO/browser/bin/open"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 

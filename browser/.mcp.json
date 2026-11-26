@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "search": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/search-mcp"
+    },
+    "zen": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/zen-agent",
+      "args": [
+        "mcp"
+      ]
+    }
+  }
+}

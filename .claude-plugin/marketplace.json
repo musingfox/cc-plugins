@@ -39,14 +39,9 @@
       "description": "Skills for browser automation with agent-browser CLI, Playwright test generation, and web debugging workflows"
     },
     {
-      "name": "zen-agent",
-      "source": "./zen-agent",
-      "description": "A second Zen on its own profile for agents to drive over WebDriver BiDi, beside your everyday Zen: URL redirect in Rex, firefox-devtools MCP or puppeteer scripts, per-domain cookie copy, headless or headed, human handoff for logins and secrets"
-    },
-    {
-      "name": "search-agent",
-      "source": "./search-agent",
-      "description": "Agents browse in tabs of their own in your Search browser (macOS, WebKit) while you watch and take over: the search MCP server, plus handoff rules for logins, 2FA, payments and secrets"
+      "name": "browser",
+      "source": "./browser",
+      "description": "A browser agents drive while you watch and take over: your own Search browser (macOS, WebKit) first, a separate agent Zen over WebDriver BiDi for what Search cannot do — dialogs, select, iframes, uploads, downloads, console and network, JS, headless and batch scripts; one skill routes between them, with handoff rules for logins, 2FA, payments and secrets"
     },
     {
       "name": "hook-guard",
