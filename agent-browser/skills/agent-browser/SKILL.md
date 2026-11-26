@@ -4,7 +4,7 @@ description: >-
   Use for live browser automation via the agent-browser CLI — open URLs, snapshot pages,
   click/fill/screenshot, inspect elements, or read pages that need JavaScript rendering,
   login, or interaction. Not for writing Playwright test files (use playwright or web-test),
-  nor for a visible browser the user watches or takes over (use zen-agent).
+  nor for a visible browser the user watches or takes over (use browser).
 allowed-tools: Bash(agent-browser open *) Bash(agent-browser snapshot *) Bash(agent-browser screenshot *) Bash(agent-browser get *) Read Grep Glob
 ---
 
